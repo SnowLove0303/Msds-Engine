@@ -1,0 +1,5 @@
+schema: spec-driven
+created: 2026-10-05
+goal: Keep value and permitted-label cells focused and editable after clicking
+  and typing
+skip_specs: true

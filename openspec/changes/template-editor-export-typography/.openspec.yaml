@@ -1,0 +1,5 @@
+schema: spec-driven
+created: 2026-10-05
+goal: Export edited values and labels with the correct template font, size, and
+  role weight
+skip_specs: true

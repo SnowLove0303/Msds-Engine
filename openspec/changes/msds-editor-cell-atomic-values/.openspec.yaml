@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-10-05
+goal: Typing continuous text in a cell stays continuous in the editor and
+  exported DOCX
