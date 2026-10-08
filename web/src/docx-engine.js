@@ -301,6 +301,10 @@ export function cellRole(cell) {
   const labelNodes = [];
   const valueNodes = [];
 
+  const allRunsAreBold = cell.paragraphs.length > 0 && cell.paragraphs.every((p) => p.runs.length > 0 && p.runs.every((r) => r.bold));
+  const cellEndsWithColon = /[：:]$/.test(cell.text.trim());
+  const isPureMultiLineLabel = cell.col === 0 && allRunsAreBold && cellEndsWithColon;
+
   for (const paragraph of cell.paragraphs) {
     const boldRuns = paragraph.runs.filter((run) => run.bold);
     const notBoldRuns = paragraph.runs.filter((run) => !run.bold);
@@ -321,8 +325,16 @@ export function cellRole(cell) {
         continue;
       }
 
+      if (isPureMultiLineLabel) {
+        const hasNumInBold = /^\s*(?:v)?\d+(?:[\.．、]\d+)*[\.．、\s]/i.test(boldText);
+        const fullLabel = (num && !hasNumInBold) ? `${num}  ${boldText}` : boldText;
+        labelParts.push(fullLabel);
+        labelNodes.push(...boldRuns.flatMap((r) => r.textNodes));
+        continue;
+      }
+
       // 2. Check for inline colon separating label and value within fully bold paragraph
-      const inlineColon = boldText.match(/^([^：:]{1,12}[：:])\s*(.+)$/);
+      const inlineColon = boldText.match(/^([^：:\n]{1,50}[：:])\s*(.+)$/);
       if (inlineColon) {
         const fullLabel = (num && !/^\s*(?:v)?\d+(?:[\.．、]\d+)*[\.．、\s]/i.test(inlineColon[1]))
           ? `${num}  ${inlineColon[1]}`
@@ -335,11 +347,11 @@ export function cellRole(cell) {
       }
 
       // 3. Header and structural keyword protection: Table headers and sublabels are never values!
-      const isHeaderKeyword = /^(CAS编号|化学品名称|含量|物质|依据|类型|数值|项目|指标|规格|成分|防护手套|生育力|致畸形|体外遗传毒性|经口|经皮|吸入)/i.test(boldText.trim());
+      const isHeaderKeyword = /^(?:CAS编号|CAS\s*(?:NO\.?|Number)?|化学品名称|Chemical\s*name|含量|Concentration|物质|Substance|依据|Basis|类型|Type|数值|Value|项目|Item|指标|Index|规格|Specification|成分|Component|Ingredient|Ingredients|防护手套|Protective\s*gloves|生育力|Fertility|致畸形|Teratogenicity|体外遗传毒性|In\s*vitro\s*genotoxicity|经口|Oral|经皮|Dermal|吸入|Inhalation|工作场所组分控制参数|Control\s*parameters\s*(?:for\s*workplace\s*components)?|工作场所|Workplace)/i.test(boldText.trim());
 
       // 4. Col > 0 context: In data/value columns, demote to value ONLY if NOT a header keyword and length > 12
       if (cell.col > 0 && !isHeaderKeyword) {
-        const isExplicitSubLabel = (/[：:]$/.test(boldText) && boldText.length <= 15) || boldText.length <= 8;
+        const isExplicitSubLabel = (/[：:]$/.test(boldText) && (/[a-zA-Z]/.test(boldText) ? boldText.length <= 40 : boldText.length <= 15)) || boldText.length <= 8;
         if (!isExplicitSubLabel) {
           valueParts.push(boldText);
           valueNodes.push(...boldRuns.flatMap((r) => r.textNodes));
@@ -347,12 +359,12 @@ export function cellRole(cell) {
         }
       }
 
-      // 5. Character count rule: labels are short (<= 15 chars) or end with colon or are section titles or have property number prefix or num
+      // 5. Character count rule: labels are short (<= 15 chars for CN, <= 60 for EN) or end with colon or are section titles or have property number prefix or num
       const endsWithColon = /[：:]$/.test(boldText) || /[：:]$/.test(paragraph.text?.trim() || '');
       const isSecTitle = isSectionTitle(boldText) || (num && isSectionTitle(`${num} ${boldText}`));
-      const isShortLabel = boldText.length <= 15 || isHeaderKeyword;
-      const hasPropertyNumberPrefix = /^\s*(?:v)?\d+(?:[\.．、]\d+)*[\.．、\s]/i.test(boldText) && boldText.length <= 25;
-      const isNumbered = Boolean(num) && (boldText.length <= 25 || endsWithColon);
+      const isShortLabel = (/[a-zA-Z]/.test(boldText) ? boldText.length <= 60 : boldText.length <= 15) || isHeaderKeyword;
+      const hasPropertyNumberPrefix = /^\s*(?:v)?\d+(?:[\.．、]\d+)*[\.．、\s]/i.test(boldText) && (/[a-zA-Z]/.test(boldText) ? boldText.length <= 70 : boldText.length <= 25);
+      const isNumbered = Boolean(num) && (boldText.length <= 35 || endsWithColon);
 
       if (!isShortLabel && !endsWithColon && !isSecTitle && !hasPropertyNumberPrefix && !isNumbered) {
         // Demote to value! This is a long bold sentence/paragraph (e.g. "根据EC指令...", "在着火或爆炸情况下..."), not a slot label
@@ -538,17 +550,19 @@ function buildTableRecord(table, tableIndex, partName, relationshipMap, prefix =
   record.searchText = `${record.searchText} ${record.aliases.join(' ')}`;
   for (const row of rows) {
     const isHeaderRow = row.index === 0 ||
-      /化学品名称.*CAS编号|物质.*依据.*类型/i.test(row.cells.map((c) => c.text).join(' ')) ||
-      (info.sectionNumber === 3 && row.cells.some((c) => /CAS编号|化学品名称/i.test(c.text)));
+      /(?:化学品名称.*CAS编号|物质.*依据.*类型|Chemical\s*name.*CAS|Substance.*Basis.*Type)/i.test(row.cells.map((c) => c.text).join(' ')) ||
+      (info.sectionNumber === 3 && row.cells.some((c) => /(?:CAS编号|化学品名称|CAS\s*NO|Chemical\s*name)/i.test(c.text)));
 
     for (const cell of row.cells) {
       cell.record = record;
       cell.relationships = cell.images.map((image) => ({ ...image, target: relationshipMap.get(image.rid) || null }));
 
-      // Section 8 手部防护脏模板残留彻底净化（文本与底层 XML textNodes 同步）
-      if (info.sectionNumber === 8 && /手部防护[：:]\s*喷涂过程中要求有呼吸防护设备/.test(cell.text)) {
-        cell.text = '手部防护：';
-        cell.labelText = '手部防护：';
+      // Section 8 手部防护脏模板残留彻底净化（中英文通用，文本与底层 XML textNodes 同步）
+      if (info.sectionNumber === 8 && /(?:手部防护|Hand\s*protection)[：:]\s*喷涂过程中要求有呼吸防护设备/i.test(cell.text)) {
+        const isEn = /Hand\s*protection/i.test(cell.text);
+        const cleanLabel = isEn ? 'Hand protection：' : '手部防护：';
+        cell.text = cleanLabel;
+        cell.labelText = cleanLabel;
         cell.valueText = '';
         cell.valueNodes = [];
         cell.kind = 'label-only';
@@ -568,6 +582,13 @@ function buildTableRecord(table, tableIndex, partName, relationshipMap, prefix =
         cell.protectedReason = '表头行受保护';
         cell.role = 'table-header';
         cell.fontRole = 'label-header';
+        cell.kind = 'label-only';
+        if (!cell.labelText && cell.text) {
+          cell.labelText = cell.text;
+          cell.valueText = '';
+          cell.labelNodes = cell.paragraphs.flatMap((p) => p.runs.flatMap((r) => r.textNodes));
+          cell.valueNodes = [];
+        }
         for (const p of cell.paragraphs) {
           for (const r of p.runs) {
             r.bold = true;
@@ -601,12 +622,12 @@ function buildTableRecord(table, tableIndex, partName, relationshipMap, prefix =
         const isS11SubValueCell = info.sectionNumber === 11 &&
           row.cells.length >= 2 &&
           cell === row.cells[row.cells.length - 1] &&
-          row.cells.some((c) => /生育力|致畸形|体外遗传毒性/i.test(c.text));
+          row.cells.some((c) => /生育力|致畸形|体外遗传毒性|Fertility|Teratogenicity|In\s*vitro\s*genotoxicity/i.test(c.text));
 
         const isS8RecoValueCell = info.sectionNumber === 8 &&
           row.cells.length >= 2 &&
           cell === row.cells[row.cells.length - 1] &&
-          row.cells.some((c) => /建议[：:]/i.test(c.text));
+          row.cells.some((c) => /(?:建议|Recommendation)[：:]/i.test(c.text));
 
         // 统一规则：多列数据行末尾非标签格均作为可编辑值格（即使模板初始为空）
         const isEndValueCell = row.cells.length > 1 &&
@@ -1215,18 +1236,19 @@ export function renumberRecord(record) {
   const section = record?.sectionNumber;
   if (!section || record.kind !== 'table') return [];
   let next = 0;
-  let previousOld = null;
+  const seenNodes = new Set();
   const changes = [];
   for (const row of record.rows.slice(1)) {
     const cell = row.cells[0];
     if (!cell) continue;
+    if (cell.node && seenNodes.has(cell.node)) continue;
+    if (cell.node) seenNodes.add(cell.node);
     const match = sequenceMatch(cell.text);
     if (!match || Number(match[2]) !== section) continue;
     const rest = match[5].trim();
     if (!rest || /^[+\-<>=~\d]/.test(rest)) continue;
     const oldItem = Number(match[3]);
-    const item = oldItem === previousOld ? next : ++next;
-    previousOld = oldItem;
+    const item = ++next;
     if (oldItem !== item) {
       changes.push({ row: row.index, from: `${section}.${oldItem}`, to: `${section}.${item}` });
       replaceSequence(cell, section, item);
@@ -1244,29 +1266,135 @@ function clearNonBoldText(rowNode) {
 }
 
 export function addRowAfter(engine, record, rowIndex) {
-  if (!record || record.kind !== 'table') throw new DocxEngineError('当前记录不是表格。', 'NOT_TABLE');
+  if (!record || record.kind !== 'table') throw new DocxEngineError('当前记录不是表格', 'NOT_TABLE');
   const row = record.rows[rowIndex];
-  if (!row) throw new DocxEngineError('未找到要复制的行。', 'ROW_NOT_FOUND');
+  if (!row) throw new DocxEngineError('未找到要复制的行', 'ROW_NOT_FOUND');
   const clone = row.node.cloneNode(true);
   clearNonBoldText(clone);
   row.node.parentNode.insertBefore(clone, row.node.nextSibling);
   engine.refresh();
-  const updated = engine.records.find((item) => item.id === record.id);
-  if (updated) renumberRecord(updated);
+  let updated = engine.records.find((item) => item.id === record.id);
+  if (updated) {
+    renumberRecord(updated);
+    engine.refresh();
+    updated = engine.records.find((item) => item.id === record.id);
+  }
   return updated;
 }
 
 export function deleteRow(engine, record, rowIndex) {
-  if (!record || record.kind !== 'table') throw new DocxEngineError('当前记录不是表格。', 'NOT_TABLE');
-  if (rowIndex === 0) throw new DocxEngineError('禁止删除章节标题行。', 'PROTECTED_ROW');
-  if (record.rows.length <= 2) throw new DocxEngineError('表格数据行数过少，禁止删除唯一正文行。', 'PROTECTED_ROW');
+  if (!record || record.kind !== 'table') throw new DocxEngineError('当前记录不是表格', 'NOT_TABLE');
+  if (rowIndex === 0) throw new DocxEngineError('禁止删除章节标题行', 'PROTECTED_ROW');
+  if (record.rows.length <= 2) throw new DocxEngineError('至少保留一行数据，禁止删除唯一行', 'PROTECTED_ROW');
   const row = record.rows[rowIndex];
-  if (!row) throw new DocxEngineError('未找到要删除的行。', 'ROW_NOT_FOUND');
+  if (!row) throw new DocxEngineError('未找到要删除的行', 'ROW_NOT_FOUND');
   row.node.parentNode.removeChild(row.node);
   engine.refresh();
-  const updated = engine.records.find((item) => item.id === record.id);
-  if (updated) renumberRecord(updated);
+  let updated = engine.records.find((item) => item.id === record.id);
+  if (updated) {
+    renumberRecord(updated);
+    engine.refresh();
+    updated = engine.records.find((item) => item.id === record.id);
+  }
   return updated;
+}
+
+export function addNoteRowAfter(engine, record, rowIndex, initialText = '说明：') {
+  if (!record || record.kind !== 'table') throw new DocxEngineError('当前记录不是表格', 'NOT_TABLE');
+  const targetRow = record.rows[rowIndex];
+  if (!targetRow) throw new DocxEngineError('未找到目标行', 'ROW_NOT_FOUND');
+
+  const totalCols = (record.structure?.gridWidthsTwips?.length) || record.columns || 1;
+  const totalWidthTwips = (record.structure?.gridWidthsTwips || []).reduce((sum, w) => sum + (Number(w) || 0), 0) || 9781;
+
+  const doc = targetRow.node.ownerDocument;
+  const tr = doc.createElementNS(W_NS, 'w:tr');
+
+  const trPr = doc.createElementNS(W_NS, 'w:trPr');
+  tr.appendChild(trPr);
+
+  const tc = doc.createElementNS(W_NS, 'w:tc');
+  const tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+
+  const tcW = doc.createElementNS(W_NS, 'w:tcW');
+  tcW.setAttributeNS(W_NS, 'w:w', String(totalWidthTwips));
+  tcW.setAttributeNS(W_NS, 'w:type', 'dxa');
+  tcPr.appendChild(tcW);
+
+  if (totalCols > 1) {
+    const gridSpan = doc.createElementNS(W_NS, 'w:gridSpan');
+    gridSpan.setAttributeNS(W_NS, 'w:val', String(totalCols));
+    tcPr.appendChild(gridSpan);
+  }
+
+  const tcBorders = doc.createElementNS(W_NS, 'w:tcBorders');
+  for (const borderType of ['top', 'bottom']) {
+    const border = doc.createElementNS(W_NS, `w:${borderType}`);
+    border.setAttributeNS(W_NS, 'w:val', 'dotted');
+    border.setAttributeNS(W_NS, 'w:color', 'auto');
+    border.setAttributeNS(W_NS, 'w:sz', '4');
+    border.setAttributeNS(W_NS, 'w:space', '0');
+    tcBorders.appendChild(border);
+  }
+  tcPr.appendChild(tcBorders);
+  tc.appendChild(tcPr);
+
+  const p = doc.createElementNS(W_NS, 'w:p');
+  const r = doc.createElementNS(W_NS, 'w:r');
+  const t = doc.createElementNS(W_NS, 'w:t');
+  t.setAttribute('xml:space', 'preserve');
+  t.textContent = initialText;
+  r.appendChild(t);
+  p.appendChild(r);
+  tc.appendChild(p);
+
+  tr.appendChild(tc);
+  targetRow.node.parentNode.insertBefore(tr, targetRow.node.nextSibling);
+
+  engine.refresh();
+  let updated = engine.records.find((item) => item.id === record.id);
+  if (updated) {
+    renumberRecord(updated);
+    engine.refresh();
+    updated = engine.records.find((item) => item.id === record.id);
+  }
+  return updated;
+}
+
+export function moveRow(engine, record, rowIndex, direction) {
+  if (!record || record.kind !== 'table') throw new DocxEngineError('当前记录不是表格', 'NOT_TABLE');
+  if (rowIndex === 0) throw new DocxEngineError('禁止移动章节标题行', 'PROTECTED_ROW');
+  const targetRow = record.rows[rowIndex];
+  if (!targetRow) throw new DocxEngineError('未找到目标行', 'ROW_NOT_FOUND');
+
+  if (direction === 'up') {
+    if (rowIndex <= 1) throw new DocxEngineError('该行已处于第一项，无法继续上移', 'CANNOT_MOVE');
+    const prevRow = record.rows[rowIndex - 1];
+    prevRow.node.parentNode.insertBefore(targetRow.node, prevRow.node);
+  } else if (direction === 'down') {
+    if (rowIndex >= record.rows.length - 1) throw new DocxEngineError('该行已处于末尾，无法继续下移', 'CANNOT_MOVE');
+    const nextRow = record.rows[rowIndex + 1];
+    nextRow.node.parentNode.insertBefore(targetRow.node, nextRow.node.nextSibling);
+  } else {
+    throw new DocxEngineError('未知的移动方向', 'INVALID_DIRECTION');
+  }
+
+  engine.refresh();
+  let updated = engine.records.find((item) => item.id === record.id);
+  if (updated) {
+    renumberRecord(updated);
+    engine.refresh();
+    updated = engine.records.find((item) => item.id === record.id);
+  }
+  return updated;
+}
+
+export function moveRowUp(engine, record, rowIndex) {
+  return moveRow(engine, record, rowIndex, 'up');
+}
+
+export function moveRowDown(engine, record, rowIndex) {
+  return moveRow(engine, record, rowIndex, 'down');
 }
 
 export function auditRecord(record) {
@@ -1300,6 +1428,53 @@ export function auditEngine(engine) {
 
 export function recordById(engine, id) {
   return engine.records.find((record) => record.id === id) || null;
+}
+
+export function restoreSectionToTemplate(engine, baselineEngine, sectionIdentifier) {
+  if (!engine) throw new DocxEngineError('目标引擎为空。', 'ENGINE_NULL');
+  if (!baselineEngine) throw new DocxEngineError('基准模板引擎为空。', 'BASELINE_NULL');
+
+  const currentRecord = typeof sectionIdentifier === 'object' && sectionIdentifier
+    ? sectionIdentifier
+    : engine.records.find((r) => r.id === sectionIdentifier || (r.sectionNumber != null && r.sectionNumber === Number(sectionIdentifier)));
+
+  if (!currentRecord || currentRecord.kind !== 'table') {
+    throw new DocxEngineError('未找到当前可恢复的章节表格。', 'SECTION_NOT_FOUND');
+  }
+
+  const baselineRecord = baselineEngine.records.find((r) =>
+    r.kind === 'table' &&
+    (currentRecord.sectionNumber != null
+      ? r.sectionNumber === currentRecord.sectionNumber
+      : r.tableIndex === currentRecord.tableIndex)
+  );
+
+  if (!baselineRecord) {
+    throw new DocxEngineError('未在初始模板中找到对应章节表格。', 'BASELINE_NOT_FOUND');
+  }
+
+  const currentTblNode = currentRecord.rows[0]?.node?.parentNode;
+  const baselineTblNode = baselineRecord.rows[0]?.node?.parentNode;
+
+  if (!currentTblNode || !baselineTblNode || !currentTblNode.parentNode) {
+    throw new DocxEngineError('无法定位表格底层 XML 节点。', 'XML_NODE_NOT_FOUND');
+  }
+
+  const clonedTblNode = baselineTblNode.cloneNode(true);
+  currentTblNode.parentNode.replaceChild(clonedTblNode, currentTblNode);
+
+  engine.refresh();
+
+  const updatedRecord = engine.records.find((r) =>
+    r.kind === 'table' &&
+    (currentRecord.sectionNumber != null
+      ? r.sectionNumber === currentRecord.sectionNumber
+      : r.tableIndex === currentRecord.tableIndex)
+  );
+  if (updatedRecord) {
+    renumberRecord(updatedRecord);
+  }
+  return updatedRecord;
 }
 
 export function editableFields(record) {
@@ -1359,4 +1534,105 @@ export function classifyLabelTier(cell, row, paragraph, record) {
   }
 
   return 'none';
+}
+
+export function extractProductModelFromEngine(engine) {
+  if (!engine) return '';
+  const sec1 = engine.records?.find((r) => r.sectionNumber === 1);
+  if (!sec1) return '';
+
+  for (const r of sec1.rows) {
+    for (const c of r.cells) {
+      const role = cellRole(c);
+      const label = (role.labelText || '').trim();
+      const val = (role.valueText || '').trim();
+      if (!val) continue;
+      if (/此处填写|待填|待确定|待完善|N\/A|---/.test(val)) continue;
+
+      if (/产品名称|Product name|Trade name|品名|型号/i.test(label)) {
+        const m = val.match(/([A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)+)/);
+        if (m) return m[1];
+        if (val.length <= 30) return val;
+      }
+
+      if (/中文名称|Name of substance/i.test(label)) {
+        const m = val.match(/([A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)+)/);
+        if (m) return m[1];
+      }
+    }
+  }
+  return '';
+}
+
+export function extractModelFromText(text) {
+  if (!text) return '';
+  const clean = text.replace(/\.(?:docx|pdf|doc|txt)$/i, '');
+  const stripped = clean
+    .replace(/(?:正式模板|模板|msds|tds|CN|EN|冠志|国彩|Guocai|Guanzhi|原件|编辑后|source|converted|test_export|current_matching|\(\d+\))/gi, ' ')
+    .replace(/^[\s_-]+|[\s_-]+$/g, '')
+    .trim();
+  const m = stripped.match(/([A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)+)/);
+  if (m) return m[1];
+  const parts = stripped.split(/\s+/).filter(Boolean);
+  if (parts.length > 0 && parts[0].length <= 25 && !/^[_-]+$/.test(parts[0])) {
+    return parts[0];
+  }
+  return '';
+}
+
+export function buildExportDocxName(engine, options = {}) {
+  // 1. Language: CN or EN
+  let lang = 'CN';
+  const tplName = options.templateName || '';
+  const srcName = engine?.sourceName || '';
+  if (/EN|English/i.test(tplName) || /_EN_|_EN\b/i.test(srcName)) {
+    lang = 'EN';
+  } else {
+    const sec1 = engine?.records?.find((r) => r.sectionNumber === 1);
+    if (sec1 && /Identification/i.test(sec1.title || '')) {
+      lang = 'EN';
+    }
+  }
+
+  // 2. Entity: 冠志 / 国彩 / Guanzhi / Guocai
+  let entity = (lang === 'EN' && /Guanzhi/i.test(tplName)) ? 'Guanzhi' : '冠志';
+  if (/国彩|Guocai/i.test(tplName) || /国彩|Guocai/i.test(srcName)) {
+    entity = lang === 'EN' ? 'Guocai' : '国彩';
+  } else if (engine) {
+    const sec1 = engine.records?.find((r) => r.sectionNumber === 1);
+    if (sec1) {
+      const allText = sec1.rows.flatMap((r) => r.cells.map((c) => cellRole(c).valueText || '')).join(' ');
+      if (/国彩/i.test(allText)) {
+        entity = lang === 'EN' ? 'Guocai' : '国彩';
+      } else if (/GUOCAI/i.test(allText)) {
+        entity = 'Guocai';
+      } else if (/GUANZHI/i.test(allText) && lang === 'EN' && /Guanzhi/i.test(tplName)) {
+        entity = 'Guanzhi';
+      }
+    }
+  }
+
+  // 3. Product Model
+  let model = '';
+  if (options.productModel && !/^(?:MSDS|模板|正式模板|Template)$/i.test(options.productModel.trim())) {
+    model = extractModelFromText(options.productModel) || options.productModel.trim();
+  }
+  if (!model && engine) {
+    model = extractProductModelFromEngine(engine);
+  }
+  if (!model && options.sourcePreviewName) {
+    model = extractModelFromText(options.sourcePreviewName);
+  }
+  if (!model && srcName) {
+    model = extractModelFromText(srcName);
+  }
+  if (model) {
+    model = model.replace(/^[\s_-]+|[\s_-]+$/g, '');
+  }
+  if (!model || model === '_') {
+    model = 'MSDS';
+  }
+
+  // Output format reference: "OS-1030 msds_CN 冠志.docx"
+  return `${model} msds_${lang} ${entity}.docx`;
 }

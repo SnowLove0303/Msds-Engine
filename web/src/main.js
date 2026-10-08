@@ -1,7 +1,11 @@
 import { renderAsync } from 'docx-preview';
 import {
+  addNoteRowAfter,
   addRowAfter,
+  moveRowUp,
+  moveRowDown,
   auditEngine,
+  buildExportDocxName,
   cellRole,
   classifyLabelTier,
   deleteRow,
@@ -11,6 +15,7 @@ import {
   portableModel,
   recordById,
   renumberRecord,
+  restoreSectionToTemplate,
   writeCellLabel,
   writeCellValue,
 } from './docx-engine.js';
@@ -773,6 +778,7 @@ function renderEditor() {
   if (selectedVisible) state.editor.selectedRecordId = selectedVisible.id;
   return `
     ${headerBand('模板编辑器', '', '', `
+      <button class="button button-quiet" data-action="reset-all-template" title="清空全部修改并恢复至初始模板状态">↺ 恢复整份模板</button>
       <button class="button button-quiet" data-action="run-audit">审计</button>
       <button class="button button-quiet" data-action="toggle-review-drawer" title="查看或管理批注与问题清单"><span>💬</span> 批注 (${(state.review.session?.annotations || []).filter((a) => a.status === 'open').length})</button>
       <button class="button button-dark" data-action="export-review-bundle" title="导出正式 DOCX 与 Agent 审阅包"><span>📦</span> 导出审阅包</button>
@@ -797,6 +803,8 @@ function renderEditor() {
           <div class="heading-pills">
             <span class="pill pill-blue">${selectedVisible ? sectionLabel(selectedVisible.sectionNumber) : '—'}</span>
             <span class="pill">${selectedVisible?.rows?.length || 0} 行</span>
+            <button class="button button-quiet button-sm" data-action="reset-current-section" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="仅将当前 Section 恢复至初始模板状态（保留其他 Section 修改）" style="height:22px;padding:0 8px;font-size:10px;line-height:20px;color:#d97706;">↺ 恢复本节</button>
+            <button class="button button-quiet button-sm" data-table-action="add-note-row" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="在当前节顶部插入单列说明行" style="height:22px;padding:0 8px;font-size:10px;line-height:20px;color:#0284c7;">＋ 说明行</button>
             <button class="button button-quiet button-sm" data-table-action="add-row" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="在表格末尾追加一行" style="height:22px;padding:0 8px;font-size:10px;line-height:20px;">＋ 追加行</button>
             <span class="pill pill-green">${errors.length ? `${errors.length} 个问题` : '通过'}</span>
           </div>
@@ -950,6 +958,45 @@ function bindEvents() {
     showToast(errors.length ? `审计完成：发现 ${errors.length} 个问题。` : '审计完成：16 节结构通过。', errors.length ? 'error' : 'success');
   });
   root.querySelector('[data-action="export-docx"]')?.addEventListener('click', exportDocx);
+  root.querySelector('[data-action="reset-all-template"]')?.addEventListener('click', async () => {
+    if (!state.editor.engine) return;
+    if (!window.confirm(`确认将整份文档恢复至【${state.editor.template}】初始模板状态吗？\n\n当前所有章节未导出的修改都将被清空还原。`)) {
+      return;
+    }
+    try {
+      const engine = await fetchTemplate(state.editor.template);
+      tableRecords(engine).forEach((record) => renumberRecord(record));
+      state.editor.engine = engine;
+      state.editor.dirty = false;
+      renderApp();
+      showToast(`✓ 已将整份模板恢复至初始状态（${state.editor.template}）。`, 'success');
+    } catch (error) {
+      showToast(`恢复模板失败：${error.message}`, 'error');
+    }
+  });
+
+  root.querySelectorAll('[data-action="reset-current-section"]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      if (!state.editor.engine) return;
+      const record = recordById(state.editor.engine, button.dataset.recordId);
+      if (!record) return;
+      const secName = record.title || sectionLabel(record.sectionNumber);
+      if (!window.confirm(`确认仅将【${secName}】恢复至初始模板状态吗？\n\n本章节的所有编辑修改将被撤销还原，其他章节的修改仍将完整保留。`)) {
+        return;
+      }
+      try {
+        const baselineEngine = await fetchTemplate(state.editor.template);
+        tableRecords(baselineEngine).forEach((r) => renumberRecord(r));
+        const updated = restoreSectionToTemplate(state.editor.engine, baselineEngine, record);
+        state.editor.selectedRecordId = updated?.id || record.id;
+        state.editor.dirty = true;
+        renderApp();
+        showToast(`✓ 已将 ${secName} 恢复至初始模板状态，其他章节修改已保留。`, 'success');
+      } catch (error) {
+        showToast(`恢复本节失败：${error.message}`, 'error');
+      }
+    });
+  });
   root.querySelectorAll('[data-action="export-review-bundle"]').forEach((btn) => btn.addEventListener('click', handleExportReviewBundle));
   root.querySelectorAll('[data-action="toggle-review-drawer"]').forEach((btn) => btn.addEventListener('click', () => {
     state.review.drawerOpen = !state.review.drawerOpen;
@@ -1172,6 +1219,19 @@ function bindEvents() {
     });
   });
   root.querySelectorAll('[data-row-action]').forEach((button) => button.addEventListener('click', () => handleRowAction(button)));
+  root.querySelectorAll('[data-table-action="add-note-row"]').forEach((button) => button.addEventListener('click', () => {
+    const record = recordById(state.editor.engine, button.dataset.recordId);
+    if (!record) return;
+    try {
+      const updated = addNoteRowAfter(state.editor.engine, record, 0, '说明：');
+      state.editor.selectedRecordId = updated?.id || record.id;
+      state.editor.dirty = true;
+      renderApp();
+      showToast('已在章节顶部插入单列说明行。', 'success');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  }));
   root.querySelectorAll('[data-table-action="add-row"]').forEach((button) => button.addEventListener('click', () => {
     const record = recordById(state.editor.engine, button.dataset.recordId);
     if (!record) return;
@@ -1180,7 +1240,7 @@ function bindEvents() {
       state.editor.selectedRecordId = updated?.id || record.id;
       state.editor.dirty = true;
       renderApp();
-      showToast('已在表格末尾追加一行。', 'success');
+      showToast('已在表格末尾追加一行并完成序号自动重排序。', 'success');
     } catch (error) {
       showToast(error.message, 'error');
     }
@@ -1530,10 +1590,27 @@ function refreshEditorDirty() {
 function handleRowAction(button) {
   const record = recordById(state.editor.engine, button.dataset.recordId);
   if (!record) return;
+  const rowIndex = Number(button.dataset.row);
+  const action = button.dataset.rowAction;
   try {
-    const updated = button.dataset.rowAction === 'add'
-      ? addRowAfter(state.editor.engine, record, Number(button.dataset.row))
-      : deleteRow(state.editor.engine, record, Number(button.dataset.row));
+    let updated = record;
+    let toastMsg = '';
+    if (action === 'add') {
+      updated = addRowAfter(state.editor.engine, record, rowIndex);
+      toastMsg = '已复制行结构并完成序号自动重排序。';
+    } else if (action === 'add-note') {
+      updated = addNoteRowAfter(state.editor.engine, record, rowIndex, '说明：');
+      toastMsg = '已插入单列说明行（可直接点击编辑内容）。';
+    } else if (action === 'delete') {
+      updated = deleteRow(state.editor.engine, record, rowIndex);
+      toastMsg = '已删除行并完成序号自动重排序。';
+    } else if (action === 'move-up') {
+      updated = moveRowUp(state.editor.engine, record, rowIndex);
+      toastMsg = '已上移行并自动更新序号。';
+    } else if (action === 'move-down') {
+      updated = moveRowDown(state.editor.engine, record, rowIndex);
+      toastMsg = '已下移行并自动更新序号。';
+    }
     state.editor.selectedRecordId = updated?.id || record.id;
     state.editor.dirty = true;
     if (state.review.session) {
@@ -1543,7 +1620,7 @@ function handleRowAction(button) {
       }
     }
     renderApp();
-    showToast(button.dataset.rowAction === 'add' ? '已复制行结构并清空可编辑值。' : '已删除数据行并重新编号。', 'success');
+    if (toastMsg) showToast(toastMsg, 'success');
   } catch (error) {
     showToast(error.message, 'error');
   }
@@ -1583,11 +1660,15 @@ async function exportDocx() {
   }
   try {
     const buffer = await state.editor.engine.exportArrayBuffer();
-    const base = state.editor.engine.sourceName.replace(/\.docx$/i, '');
-    downloadBlob(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }), `${base}_编辑后.docx`);
+    const exportName = buildExportDocxName(state.editor.engine, {
+      templateName: state.editor.template,
+      sourcePreviewName: state.sourcePreview?.name,
+      productModel: state.review.session?.productModel,
+    });
+    downloadBlob(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }), exportName);
     state.editor.dirty = false;
     renderApp();
-    showToast('编辑后 DOCX 已导出，源模板保持不变。', 'success');
+    showToast(`已导出 ${exportName}，源模板保持不变。`, 'success');
   } catch (error) {
     showToast(`导出失败：${error.message}`, 'error');
   }
@@ -1614,8 +1695,12 @@ async function handleExportReviewBundle() {
 
   try {
     const cleanDocxBuf = await tEngine.exportArrayBuffer();
+    const finalDocxName = buildExportDocxName(tEngine, {
+      templateName: state.matching.template || state.editor.template,
+      sourcePreviewName: state.sourcePreview?.name,
+      productModel: state.review.session.productModel,
+    });
     const model = state.review.session.productModel || 'MSDS';
-    const finalDocxName = `${model}_MSDS_CN_冠志.docx`;
 
     const bundle = buildReviewBundle(state.review.session, { finalDocxName });
 

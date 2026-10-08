@@ -14,7 +14,10 @@ from msds_template_editor import (
     EMBEDDED_TEMPLATE_EN,
     TEMPLATE_LIBRARY,
     MutationViolation,
+    add_note_row_after,
+    build_export_docx_name,
     add_row_after,
+    move_row,
     audit_document,
     cell_views,
     create_work_copy,
@@ -126,7 +129,7 @@ def main() -> None:
     assert "1.2  产品使用建议和使用限制：" in t0.rows[4].cells[0].text
     assert "1.3  供应商信息：" in t0.rows[5].cells[0].text
 
-    # 9. Repeated prefix preservation test (cloned row retains same prefix until edited)
+    # 9. Continuous renumbering test after row addition
     numbering_doc = Document(str(DEFAULT_TEMPLATE))
     numbering_table = numbering_doc.tables[8]
     before_prefixes = [row_prefix(row) for row in numbering_table.rows[1:4]]
@@ -134,7 +137,7 @@ def main() -> None:
     renumber_document(numbering_doc)
     after_prefixes = [row_prefix(row) for row in numbering_table.rows[1:5]]
     assert before_prefixes == ["9.1", "9.2", "9.3"]
-    assert after_prefixes == ["9.1", "9.1", "9.2", "9.3"]
+    assert after_prefixes == ["9.1", "9.2", "9.3", "9.4"]
 
     # 10. Write cell value & whitespace normalization test
     test_cell = numbering_doc.tables[0].rows[1].cells[1]
@@ -176,6 +179,27 @@ def main() -> None:
         assert "自定义值" in all_text
         assert "测试值" in all_text
     assert file_sha256(DEFAULT_TEMPLATE) == original_hash
+
+    # 14. Note row creation and row movement test
+    sec11_doc = Document(str(DEFAULT_TEMPLATE))
+    sec11_tbl = sec11_doc.tables[10]
+    orig_s11_rows = len(sec11_tbl.rows)
+    add_note_row_after(sec11_tbl, 0, "【测试节顶部说明行】")
+    assert len(sec11_tbl.rows) == orig_s11_rows + 1
+    assert "【测试节顶部说明行】" in sec11_tbl.rows[1].cells[0].text
+
+    # Move note row down
+    move_row(sec11_tbl, 1, "down")
+    assert "【测试节顶部说明行】" in sec11_tbl.rows[2].cells[0].text
+
+    # Move note row up
+    move_row(sec11_tbl, 2, "up")
+    assert "【测试节顶部说明行】" in sec11_tbl.rows[1].cells[0].text
+
+        # Verify standardized export docx naming: {model} msds_{lang} {entity}.docx
+    os_name = build_export_docx_name(sec11_doc, Path("OS-1030.docx"))
+    assert os_name == "OS-1030 msds_CN 冠志.docx", f"Bad name: {os_name}"
+    
     print("SELF_CHECK_PASS")
 
 

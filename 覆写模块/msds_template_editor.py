@@ -21,6 +21,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from docx import Document
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
 
@@ -433,6 +434,89 @@ def safe_add_row_after(table, row_index: int, *, auto_renumber: bool = True) -> 
 def add_row_after(table, row_index: int) -> None:
     safe_add_row_after(table, row_index, auto_renumber=True)
 
+def safe_add_note_row_after(table, row_index: int, text: str = "说明：", *, auto_renumber: bool = True) -> None:
+    """Safely insert a full-width single-column note row after row_index."""
+    target_tr = table.rows[row_index]._tr
+    grid_cols = len(table.columns) or 1
+    total_width = 0
+    tblGrid = table._tbl.tblGrid
+    if tblGrid is not None:
+        for col in tblGrid.gridCol_lst:
+            total_width += int(col.get(qn("w:w"), 0))
+    if total_width == 0:
+        total_width = 9781
+
+    tr = OxmlElement("w:tr")
+    tc = OxmlElement("w:tc")
+    tcPr = OxmlElement("w:tcPr")
+    tcW = OxmlElement("w:tcW")
+    tcW.set(qn("w:w"), str(total_width))
+    tcW.set(qn("w:type"), "dxa")
+    tcPr.append(tcW)
+
+    if grid_cols > 1:
+        gridSpan = OxmlElement("w:gridSpan")
+        gridSpan.set(qn("w:val"), str(grid_cols))
+        tcPr.append(gridSpan)
+
+    tcBorders = OxmlElement("w:tcBorders")
+    for border_name in ("top", "bottom"):
+        b = OxmlElement(f"w:{border_name}")
+        b.set(qn("w:val"), "dotted")
+        b.set(qn("w:color"), "auto")
+        b.set(qn("w:sz"), "4")
+        b.set(qn("w:space"), "0")
+        tcBorders.append(b)
+    tcPr.append(tcBorders)
+    tc.append(tcPr)
+
+    p = OxmlElement("w:p")
+    r = OxmlElement("w:r")
+    t = OxmlElement("w:t")
+    t.text = text
+    t.set(qn("xml:space"), "preserve")
+    r.append(t)
+    p.append(r)
+    tc.append(p)
+
+    tr.append(tc)
+    target_tr.addnext(tr)
+
+    if auto_renumber:
+        renumber_table(table)
+
+
+def add_note_row_after(table, row_index: int, text: str = "说明：") -> None:
+    safe_add_note_row_after(table, row_index, text=text, auto_renumber=True)
+
+
+def safe_move_row(table, row_index: int, direction: str = "up", *, auto_renumber: bool = True) -> None:
+    """Safely move a row up or down within the table."""
+    if row_index == 0:
+        raise MutationViolation("禁止移动章节标题行（Row 0 为受保护的结构标题）")
+    rows = list(table.rows)
+    if direction == "up":
+        if row_index <= 1:
+            raise MutationViolation("该行已处于第一项，无法继续上移")
+        current_tr = rows[row_index]._tr
+        prev_tr = rows[row_index - 1]._tr
+        prev_tr.addprevious(current_tr)
+    elif direction == "down":
+        if row_index >= len(rows) - 1:
+            raise MutationViolation("该行已处于末尾，无法继续下移")
+        current_tr = rows[row_index]._tr
+        next_tr = rows[row_index + 1]._tr
+        next_tr.addnext(current_tr)
+    else:
+        raise ValueError(f"Unknown direction: {direction}")
+
+    if auto_renumber:
+        renumber_table(table)
+
+
+def move_row(table, row_index: int, direction: str = "up") -> None:
+    safe_move_row(table, row_index, direction=direction, auto_renumber=True)
+
 
 def sequence_runs(row) -> list:
     """Find the sequence runs in the primary label cell (cell 0)."""
@@ -532,7 +616,7 @@ def renumber_table(table, section_number: int | None = None) -> list[tuple[int, 
 
     - Preserves Row 0 section title (never touches Row 0).
     - Maintains a continuous item counter across unnumbered intermediate rows.
-    - Keeps adjacent repeated sub-items on the same number (e.g. 11.1 sub-tests).
+    - Renumbers all item rows strictly sequentially (1..N), guaranteeing continuity.
     - Dynamically calculates prefix_width=5 in Section 9 so all colons align.
     - Ignores measurements (e.g. 0.03 mg/m3) in non-label columns.
     """
@@ -544,12 +628,16 @@ def renumber_table(table, section_number: int | None = None) -> list[tuple[int, 
     changes = []
     current_new_item = 0
     last_old_item = None
+    seen_tcs = set()
 
     for r_idx in range(1, len(rows)):
         row = rows[r_idx]
         if not row.cells:
             continue
         cell = row.cells[0]
+        if cell._tc in seen_tcs:
+            continue
+        seen_tcs.add(cell._tc)
         text = visible_text(cell)
         m = PREFIX_PATTERN.match(text)
         if not m:
@@ -562,12 +650,9 @@ def renumber_table(table, section_number: int | None = None) -> list[tuple[int, 
         if not rest or rest[0] in "-+<>=~" or rest[0].isdigit():
             continue
 
-        if old_item == last_old_item:
-            new_item = current_new_item
-        else:
-            current_new_item += 1
-            new_item = current_new_item
-            last_old_item = old_item
+        current_new_item += 1
+        new_item = current_new_item
+        last_old_item = old_item
 
         p = cell.paragraphs[0]
         if sec == 9:
@@ -711,6 +796,86 @@ def is_row_editable(row) -> bool:
     return bool(row_fields(0, 0, row))
 
 
+
+
+def extract_product_model_from_doc(document) -> str:
+    """Extract product code/model from Section 1 table of document."""
+    if document is None or not getattr(document, "tables", None):
+        return ""
+    tbl1 = document.tables[0]
+    for row in tbl1.rows:
+        row_txt = [c.text.strip() for c in row.cells]
+        if len(row_txt) >= 2:
+            lbl, val = row_txt[0], row_txt[1]
+            if any(ph in val for ph in ["此处填写", "待填", "待确定", "待完善", "N/A"]):
+                continue
+            if re.search(r"产品名称|Product name|Trade name|品名|型号", lbl, re.I):
+                m = re.search(r"([A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)+)", val)
+                if m:
+                    return m.group(1)
+                if len(val) <= 30 and val:
+                    return val
+            if re.search(r"中文名称|Name of substance", lbl, re.I):
+                m = re.search(r"([A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)+)", val)
+                if m:
+                    return m.group(1)
+    return ""
+
+def extract_model_from_text(text: str) -> str:
+    """Extract model code from file stem or arbitrary string."""
+    if not text:
+        return ""
+    clean = Path(text).stem
+    stripped = re.sub(
+        r"(?:正式模板|模板|msds|tds|CN|EN|冠志|国彩|Guocai|Guanzhi|原件|编辑后|source|converted|test_export|current_matching|\(\d+\))",
+        " ",
+        clean,
+        flags=re.I
+    ).strip(" _-\t\r\n")
+    m = re.search(r"([A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)+)", stripped)
+    if m:
+        return m.group(1)
+    parts = stripped.split()
+    if parts and len(parts[0]) <= 25 and not re.match(r"^[_-]+$", parts[0]):
+        return parts[0]
+    return ""
+
+def build_export_docx_name(document=None, source_path=None, template_name: str = "") -> str:
+    """Build standardized export DOCX filename: {ProductModel} msds_{CN|EN} {Entity}.docx"""
+    src_name = source_path.name if isinstance(source_path, Path) else (str(source_path or ""))
+    # 1. Language
+    lang = "CN"
+    if re.search(r"EN|English", template_name, re.I) or re.search(r"_EN_|_EN\b", src_name, re.I):
+        lang = "EN"
+    elif document and getattr(document, "tables", None) and document.tables[0].rows:
+        sec1_txt = " ".join(c.text for c in document.tables[0].rows[0].cells)
+        if "Identification" in sec1_txt:
+            lang = "EN"
+
+    # 2. Entity
+    entity = "Guanzhi" if (lang == "EN" and "Guanzhi" in template_name) else "冠志"
+    if "国彩" in template_name or "Guocai" in template_name or "国彩" in src_name or "Guocai" in src_name:
+        entity = "Guocai" if lang == "EN" else "国彩"
+    elif document and getattr(document, "tables", None):
+        all_text = " ".join(c.text for r in document.tables[0].rows for c in r.cells)
+        if "国彩" in all_text:
+            entity = "Guocai" if lang == "EN" else "国彩"
+        elif "GUOCAI" in all_text:
+            entity = "Guocai"
+
+    # 3. Model
+    model = ""
+    if document:
+        model = extract_product_model_from_doc(document)
+    if not model and src_name:
+        model = extract_model_from_text(src_name)
+    if model:
+        model = model.strip(" _-")
+    if not model or model == "_":
+        model = "MSDS"
+
+    return f"{model} msds_{lang} {entity}.docx"
+
 class EditorApp:
     def __init__(self, root: tk.Tk, template: Path | None = None):
         self.root = root
@@ -744,6 +909,7 @@ class EditorApp:
         ttk.Button(toolbar, text="载入", command=self.load_builtin_template).pack(side="left")
         ttk.Button(toolbar, text="打开模板...", command=self.open_dialog).pack(side="left")
         ttk.Button(toolbar, text="导出编辑后 DOCX", command=self.export).pack(side="left", padx=(8, 0))
+        ttk.Button(toolbar, text="↺ 恢复整份模板", command=self.reset_entire_template).pack(side="left", padx=(8, 0))
         ttk.Checkbutton(toolbar, text="特殊情况：允许修改标签文本 (常用于 Section 9 理化特性)",
                         variable=self.allow_label_edit,
                         command=self._toggle_label_edit).pack(side="left", padx=(12, 0))
@@ -898,8 +1064,11 @@ class EditorApp:
             return
         table = self.document.tables[self.current_table]
         title = row_label(table.rows[0], unique_cells(table.rows[0])) if table.rows else ""
-        ttk.Label(self.form, text=f"Section {self.current_table + 1}  ·  {title}",
-                  font=("Microsoft YaHei UI", 12, "bold"), foreground="#344054").pack(anchor="w", pady=(0, 4))
+        sec_header = ttk.Frame(self.form)
+        sec_header.pack(fill="x", pady=(0, 4))
+        ttk.Label(sec_header, text=f"Section {self.current_table + 1}  ·  {title}",
+                  font=("Microsoft YaHei UI", 12, "bold"), foreground="#344054").pack(side="left")
+        ttk.Button(sec_header, text="↺ 恢复本节至模板状态", command=self.reset_current_section).pack(side="right")
         label_mode = "标签编辑模式：已开启（支持修改Section 9等特殊标签，序号与格式依然锁定）" if self.allow_label_edit.get() else "标签锁定只读（仅编辑常规值；特殊标签修改请勾选顶部开关）"
         ttk.Label(self.form, text=label_mode, foreground="#026aa2" if self.allow_label_edit.get() else "#667085").pack(anchor="w", pady=(0, 8))
         grid = tk.Frame(self.form, background="#98a2b3")
@@ -938,7 +1107,20 @@ class EditorApp:
         ttk.Label(action, text=f"行 {row_index + 1}", foreground="#667085").pack(pady=(4, 0))
         if sequence:
             ttk.Label(action, text=f"序 {sequence}", foreground="#98a2b3", font=("Microsoft YaHei UI", 8)).pack()
-        ttk.Button(action, text="＋", command=lambda i=row_index: self.add_row(i), width=6).pack(pady=1)
+        if row_index > 0:
+            btn_frame = tk.Frame(action, background="#f8fafc")
+            btn_frame.pack(pady=1)
+            up_btn = ttk.Button(btn_frame, text="↑", command=lambda i=row_index: self.move_row_up(i), width=2)
+            if row_index <= 1:
+                up_btn.state(["disabled"])
+            up_btn.pack(side="left", padx=1)
+            down_btn = ttk.Button(btn_frame, text="↓", command=lambda i=row_index: self.move_row_down(i), width=2)
+            if row_index >= len(table.rows) - 1:
+                down_btn.state(["disabled"])
+            down_btn.pack(side="left", padx=1)
+        ttk.Button(action, text="增行", command=lambda i=row_index: self.add_row(i), width=6).pack(pady=1)
+        if row_index > 0:
+            ttk.Button(action, text="+注", command=lambda i=row_index: self.add_note_row(i), width=6).pack(pady=1)
         if row_index > 0 and is_row_editable(row):
             ttk.Button(action, text="删除", command=lambda i=row_index: self.remove_row(i), width=6).pack(pady=1)
         views = cell_views(self.current_table, row_index, row)
@@ -1021,6 +1203,30 @@ class EditorApp:
         for widget, field in self._text_widgets:
             self._text_changed(widget, field)
 
+    def add_note_row(self, row_index: int = 0, text: str = "说明："):
+        if self.document is None:
+            return
+        self._sync_texts()
+        safe_add_note_row_after(self.document.tables[self.current_table], row_index, text=text, auto_renumber=True)
+        self._set_dirty()
+        self._refresh_sections()
+
+    def move_row_up(self, row_index: int):
+        if self.document is None:
+            return
+        self._sync_texts()
+        safe_move_row(self.document.tables[self.current_table], row_index, direction="up", auto_renumber=True)
+        self._set_dirty()
+        self._refresh_sections()
+
+    def move_row_down(self, row_index: int):
+        if self.document is None:
+            return
+        self._sync_texts()
+        safe_move_row(self.document.tables[self.current_table], row_index, direction="down", auto_renumber=True)
+        self._set_dirty()
+        self._refresh_sections()
+
     def add_row(self, row_index):
         if self.document is None:
             return
@@ -1052,7 +1258,7 @@ class EditorApp:
             messagebox.showinfo("未载入模板", "请先打开一个 DOCX 模板。", parent=self.root)
             return
         self._sync_texts()
-        initial = f"{self.source_path.stem}_编辑后.docx"
+        initial = build_export_docx_name(self.document, self.source_path, getattr(self, "current_template_name", ""))
         path = filedialog.asksaveasfilename(title="导出编辑后 DOCX", initialdir=str(self.source_path.parent),
                                             initialfile=initial, defaultextension=".docx",
                                             filetypes=[("Word 文档", "*.docx")])
@@ -1072,6 +1278,52 @@ class EditorApp:
             messagebox.showinfo("导出成功", f"文件已导出至：\n{output}", parent=self.root)
         except Exception as exc:
             messagebox.showerror("导出失败", f"源模板未被更改。\n\n{exc}", parent=self.root)
+
+    def reset_entire_template(self):
+        """恢复整份模板至初始模板状态"""
+        if self.document is None or not self.source_path:
+            messagebox.showinfo("提示", "当前未载入任何模板。", parent=self.root)
+            return
+        confirmed = messagebox.askyesno(
+            "恢复整份模板",
+            f"确认将整份文档恢复至【{self.source_path.name}】初始模板状态？\n\n当前所有章节未导出的修改都将被清空还原。",
+            parent=self.root,
+        )
+        if not confirmed:
+            return
+        self.load_document(self.source_path)
+        messagebox.showinfo("恢复成功", "已将整份模板恢复至初始状态。", parent=self.root)
+
+    def reset_current_section(self):
+        """仅将当前选择的 Section 恢复至初始模板状态，保留其他 Section 的修改"""
+        if self.document is None or not self.source_path:
+            messagebox.showinfo("提示", "当前未载入任何模板。", parent=self.root)
+            return
+        if self.current_table >= len(self.document.tables):
+            messagebox.showinfo("提示", "当前项目不支持单节恢复。", parent=self.root)
+            return
+        sec_num = self.current_table + 1
+        confirmed = messagebox.askyesno(
+            "恢复本节至模板状态",
+            f"确认仅将【第 {sec_num} 节 (Section {sec_num})】恢复至初始模板状态？\n\n本章节的所有编辑修改将被撤销还原，其他章节的修改仍将完整保留不变。",
+            parent=self.root,
+        )
+        if not confirmed:
+            return
+        try:
+            from copy import deepcopy
+            orig_doc = Document(str(self.source_path))
+            if self.current_table >= len(orig_doc.tables):
+                raise IndexError("初始模板中找不到对应章节表格")
+            current_tbl = self.document.tables[self.current_table]._tbl
+            new_tbl = deepcopy(orig_doc.tables[self.current_table]._tbl)
+            current_tbl.getparent().replace(current_tbl, new_tbl)
+            renumber_document(self.document)
+            self._set_dirty(True)
+            self._render_current_section()
+            messagebox.showinfo("恢复成功", f"第 {sec_num} 节已成功恢复至初始模板状态，其他章节修改已保留。", parent=self.root)
+        except Exception as exc:
+            messagebox.showerror("恢复失败", f"恢复本节失败：\n{exc}", parent=self.root)
 
     def close(self):
         if self.confirm_discard():

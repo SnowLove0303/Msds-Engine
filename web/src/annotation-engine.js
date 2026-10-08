@@ -627,7 +627,7 @@ export function parseNdjson(ndjsonText = '') {
 export function buildReviewBundle(reviewSession, options = {}) {
   const gate = checkExportGate(reviewSession);
   const now = new Date().toISOString();
-  const finalMsdsFile = options.finalDocxName || `${reviewSession.productModel || 'MSDS'}_MSDS_CN_冠志.docx`;
+  const finalMsdsFile = options.finalDocxName || `${reviewSession.productModel || 'MSDS'} msds_CN 冠志.docx`;
 
   const total = reviewSession.annotations.length;
   const openCount = reviewSession.annotations.filter((a) => a.status === 'open').length;

@@ -327,8 +327,11 @@ export function renderEditorCell(record, row, cell, tableWidth, fallbackGrid = f
     innerMarkup = renderCellContent(cell, '', record, roleStyles, row);
   }
 
+  const canMoveUp = row.index > 1;
+  const canMoveDown = row.index < (record.rows?.length || 1) - 1;
+
   const floatingActions = (!isRow0 && isLastCellInRow)
-    ? `<div class="row-floating-actions" aria-hidden="false"><button type="button" class="row-mini-btn" data-row-action="add" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" title="在此行后新增行">＋</button><button type="button" class="row-mini-btn danger" data-row-action="delete" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" title="删除此行" ${record.rows.length <= 2 ? 'disabled' : ''}>×</button></div>`
+    ? `<div class="row-floating-actions" aria-hidden="false"><button type="button" class="row-mini-btn btn-move" data-row-action="move-up" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" title="上移行" ${canMoveUp ? '' : 'disabled'}>↑</button><button type="button" class="row-mini-btn btn-move" data-row-action="move-down" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" title="下移行" ${canMoveDown ? '' : 'disabled'}>↓</button><button type="button" class="row-mini-btn" data-row-action="add" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" title="在此行后新增同构数据行">＋</button><button type="button" class="row-mini-btn btn-note wide" data-row-action="add-note" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" title="在此行后插入单列说明行">＋注</button><button type="button" class="row-mini-btn danger" data-row-action="delete" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" title="删除行" ${record.rows.length <= 2 ? 'disabled' : ''}>－</button></div>`
     : '';
 
   const totalRows = record.rows?.length || 1;

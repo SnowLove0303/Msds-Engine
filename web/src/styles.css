@@ -413,6 +413,32 @@ body { background-image: none; }
   opacity: 0.35;
   cursor: not-allowed;
 }
+.row-mini-btn.wide {
+  width: auto;
+  min-width: 26px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.row-mini-btn.btn-note {
+  color: #1a7f64;
+  border-color: #8ed0be;
+  background: #f0fbf8;
+}
+.row-mini-btn.btn-note:hover {
+  border-color: #1a7f64;
+  color: #115c48;
+  background: #def6ee;
+}
+.row-mini-btn.btn-move {
+  color: #3b5998;
+  font-size: 11px;
+}
+.row-mini-btn.btn-move:hover {
+  border-color: #3b5998;
+  color: #243a6d;
+  background: #eef2fa;
+}
 
 .file-ribbon .template-selector select { height: 28px; border: 1px solid #b9c1c9; border-radius: 4px; color: #202a33; background: #fff; font-size: 11px; }
 .file-ribbon .toggle-control { display: inline-flex; align-items: center; gap: 8px; color: #5e6872; font-size: 10px; cursor: pointer; }
