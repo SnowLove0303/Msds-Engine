@@ -6,6 +6,8 @@ import {
   moveRowDown,
   auditEngine,
   buildExportDocxName,
+  extractHeaderFooterData,
+  updateHeaderFooterData,
   cellRole,
   classifyLabelTier,
   deleteRow,
@@ -68,7 +70,7 @@ const state = {
   sourcePreview: null, // { name: string, type: 'docx' | 'pdf' | 'doc', blobUrl?: string, file?: File }
   inspector: { engine: null, selectedRecordId: null, selectedCellId: null, query: '', showPreview: true, zoomScale: 'fit' },
   matching: { template: 'CN 冠志', templateEngine: null, result: null, selectedSectionNumber: 1, query: '', compareMode: 'doc-match', zoomScale: 'fit', isWidePreview: false },
-  editor: { engine: null, template: 'CN 冠志', selectedRecordId: null, selectedCellId: null, allowLabelEdit: false, dirty: false, query: '' },
+  editor: { engine: null, template: 'CN 冠志', selectedRecordId: null, selectedCellId: null, allowLabelEdit: false, dirty: false, query: '', customFileName: '' },
   review: {
     session: null,
     drawerOpen: false,
@@ -370,8 +372,21 @@ function renderInspector() {
   `;
 }
 
-function sectionNav(records, selectedId, query, mode) {
-  return Array.from({ length: 16 }, (_, index) => {
+function sectionNav(records, selectedId, query, mode, engine = null) {
+  let hfNavItem = '';
+  if (mode === 'editor') {
+    const isHfSelected = selectedId === '__header_footer__';
+    const hf = engine?.headerFooterData || (engine ? extractHeaderFooterData(engine) : null);
+    const modelBadge = hf?.model ? escapeHtml(hf.model) : '待配置';
+    hfNavItem = `
+      <button class="section-nav-row hf-nav-row ${isHfSelected ? 'active' : ''}" data-record-id="__header_footer__">
+        <span class="section-index hf-index">00</span>
+        <span class="hf-nav-label">页眉与页脚 (Header & Footer)</span>
+        <i class="hf-model-badge">${modelBadge}</i>
+      </button>
+    `;
+  }
+  const bodyNavItems = Array.from({ length: 16 }, (_, index) => {
     const section = index + 1;
     const record = records.find((item) => item.sectionNumber === section);
     const visible = !query || record?.searchText?.toLowerCase().includes(query);
@@ -379,6 +394,7 @@ function sectionNav(records, selectedId, query, mode) {
     if (!visible) return `<div class="section-nav-row filtered"><span class="section-index">${String(section).padStart(2, '0')}</span><span>Section ${section}</span><i>过滤</i></div>`;
     return recordNavItem(record, selectedId, mode);
   }).join('');
+  return hfNavItem + bodyNavItems;
 }
 
 function recordNavItem(record, selectedId, extra = '') {
@@ -647,6 +663,13 @@ function renderMatching() {
       <div class="matching-topbar">
         <div class="matching-brand-group">
           <h2 class="matching-title"><span>⇄</span>智能匹配</h2>
+          <div class="matching-meta-ribbon">
+            <span class="meta-tag"><strong>型号：</strong>${escapeHtml(state.matching.result?.headerFooter?.model || state.matching.templateEngine?.headerFooterData?.model || '—')}</span>
+            <span class="meta-tag"><strong>主体：</strong>${escapeHtml(state.matching.result?.fileNaming?.entity || state.matching.templateEngine?.headerFooterData?.entity || '冠志')}</span>
+            <span class="meta-tag"><strong>语言：</strong>${escapeHtml(state.matching.result?.fileNaming?.language || 'CN')}</span>
+            <span class="meta-tag"><strong>修订：</strong>${escapeHtml(state.matching.result?.headerFooter?.revisionDate || state.matching.templateEngine?.headerFooterData?.revisionDate || '—')}</span>
+            <span class="meta-tag meta-filename"><strong>推荐导出名：</strong><code>${escapeHtml(state.matching.result?.fileNaming?.recommendedFileName || (state.matching.templateEngine ? buildExportDocxName(state.matching.templateEngine) : ''))}</code></span>
+          </div>
           <div class="matching-template-select-wrap">
             <label for="matching-template-select">选择模板：</label>
             <select id="matching-template-select">
@@ -765,10 +788,184 @@ function renderMatching() {
   `;
 }
 
+function renderHeaderFooterEditor(engine, records, query) {
+  const hf = engine?.headerFooterData || extractHeaderFooterData(engine) || {};
+  const currentExportName = buildExportDocxName(engine, {
+    customFileName: state.editor.customFileName,
+    templateName: state.editor.template,
+    sourcePreviewName: state.sourcePreview?.name,
+    productModel: hf.model,
+  });
+
+  return `
+    ${headerBand('模板编辑器', '', '', `
+      <button class="button button-quiet" data-action="reset-all-template" title="清空全部修改并恢复至初始模板状态">↺ 恢复整份模板</button>
+      <button class="button button-quiet" data-action="run-audit">审计</button>
+      <button class="button button-quiet" data-action="toggle-review-drawer" title="查看或管理批注与问题清单"><span>💬</span> 批注 (${(state.review.session?.annotations || []).filter((a) => a.status === 'open').length})</button>
+      <button class="button button-dark" data-action="export-review-bundle" title="导出正式 DOCX 与 Agent 审阅包"><span>📦</span> 导出审阅包</button>
+      <button class="button button-dark" data-action="export-docx">导出 DOCX</button>
+    `)}
+    <div class="file-ribbon" title="内嵌模板工作副本，源模板只读">
+      <div class="file-ribbon-icon">模板</div>
+      <div class="file-ribbon-copy">
+        <strong>${escapeHtml(state.editor.template)}</strong>
+        <span class="file-ribbon-name-wrap">
+          <span>导出文件名：</span>
+          <input id="quick-export-name-input" class="quick-export-name-input" value="${escapeHtml(currentExportName)}" title="直接修改导出文件名，回车或失焦生效" />
+          <button class="button button-quiet button-xs" data-action="reset-filename-to-standard" title="恢复标准命名规则" style="padding:1px 6px;height:20px;font-size:11px;">↺</button>
+        </span>
+      </div>
+      <div class="template-selector"><select id="template-select" aria-label="模板选择">${Object.keys(TEMPLATE_OPTIONS).map((name) => `<option ${state.editor.template === name ? 'selected' : ''}>${name}</option>`).join('')}</select></div>
+      <label class="toggle-control"><input id="allow-label-edit" type="checkbox" ${state.editor.allowLabelEdit ? 'checked' : ''}><span class="toggle-track"></span><span>特殊情况：允许修改标签文本</span></label>
+      <div class="file-ribbon-coverage"><span class="pulse-dot"></span>${records.filter((record) => record.sectionNumber).length}/16</div>
+    </div>
+    <div class="inspector-layout editor-layout">
+      <aside class="side-panel editor-side">
+        <div class="side-heading"><h2>Section</h2><span class="side-count">${records.filter((record) => record.sectionNumber).length}/16</span></div>
+        <label class="search-box"><span>⌕</span><input id="editor-search" type="search" placeholder="搜索标签、序号…" value="${escapeHtml(state.editor.query)}" /><kbd>⌘ K</kbd></label>
+        <div class="section-list">${sectionNav(records, state.editor.selectedRecordId, query, 'editor', engine)}</div>
+        <div class="side-footer"><span class="file-signal"></span><span>${state.editor.dirty ? '有未导出修改' : '工作副本干净'}</span></div>
+      </aside>
+      <section class="content-panel editor-content structured-panel">
+        <div class="panel-heading hf-heading">
+          <div>
+            <h2>📑 全局文档标识与页眉页脚管理</h2>
+            <p class="hf-sub-desc">统一配置产品型号、版本号、公司主体与修订日期，系统自动同步注入 DOCX 物理页眉页脚并规范导出文件名。</p>
+          </div>
+          <div class="heading-pills">
+            <span class="pill pill-blue">word/header1.xml & footer1.xml</span>
+            <button class="button button-quiet button-sm" data-action="reset-hf-to-template" title="恢复模板原始页眉页脚">↺ 恢复模板默认</button>
+          </div>
+        </div>
+
+        <div class="hf-form-grid">
+          <!-- 卡片 1: 页眉 (Header) -->
+          <div class="hf-card">
+            <div class="hf-card-head">
+              <div class="hf-card-icon">⤒</div>
+              <div>
+                <h3>页眉配置 (Header)</h3>
+                <small>对应 DOCX 顶端页眉主标题与右上角产品型号格</small>
+              </div>
+            </div>
+            <div class="hf-card-body">
+              <div class="hf-field">
+                <label for="hf-title-input">文档主标题 (Title)</label>
+                <input type="text" id="hf-title-input" class="form-input" value="${escapeHtml(hf.title || '物料安全数据表')}" placeholder="物料安全数据表 / MATERIAL SAFETY DATA SHEET" />
+              </div>
+              <div class="hf-field-row">
+                <div class="hf-field" style="flex: 2;">
+                  <label for="hf-model-input">产品型号 (Product Model) <span class="required-star" style="color:#f28b91;">*</span></label>
+                  <input type="text" id="hf-model-input" class="form-input hf-highlight-input" value="${escapeHtml(hf.model || '')}" placeholder="如：OS-1030" />
+                  <small class="field-hint" style="color:#8497ad;display:block;margin-top:4px;">与 Header 表格第一行第一格强绑定，同步关联 Footer MSDS 编号与导出文件名</small>
+                </div>
+                <div class="hf-field" style="flex: 1;">
+                  <label for="hf-version-input">版本号 (Version)</label>
+                  <input type="text" id="hf-version-input" class="form-input" value="${escapeHtml(hf.version || 'V1.0')}" placeholder="V1.0" />
+                </div>
+              </div>
+              <div class="hf-preview-box">
+                <div class="preview-tag">页眉视觉预览 (Header Preview)</div>
+                <div class="hf-preview-content header-preview">
+                  <div class="hp-left">
+                    <div class="hp-title">${escapeHtml(hf.title || '物料安全数据表')}</div>
+                    <div class="hp-ver">Version：${escapeHtml((hf.version || 'V1.0').replace(/^Version[：:\s]*/i, ''))}</div>
+                  </div>
+                  <div class="hp-right">
+                    <div class="hp-model-box">${escapeHtml(hf.model || '未设定型号')}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 卡片 2: 页脚 (Footer) -->
+          <div class="hf-card">
+            <div class="hf-card-head">
+              <div class="hf-card-icon">⤓</div>
+              <div>
+                <h3>页脚配置 (Footer)</h3>
+                <small>对应 DOCX 底部公司主体、MSDS 编号与修订日期</small>
+              </div>
+            </div>
+            <div class="hf-card-body">
+              <div class="hf-field">
+                <label for="hf-company-select">发布公司主体 (Company Entity)</label>
+                <div class="hf-company-box">
+                  <select id="hf-company-select" class="form-select" style="width:100%;padding:6px 10px;background:#0d1d2f;color:#d9e6f5;border:1px solid rgba(142,177,214,.2);border-radius:6px;">
+                    <option value="广州冠志新材料科技有限公司" ${hf.company?.includes('冠志') ? 'selected' : ''}>广州冠志新材料科技有限公司 (Guanzhi)</option>
+                    <option value="英德市国彩新材料有限公司" ${hf.company?.includes('国彩') ? 'selected' : ''}>英德市国彩新材料有限公司 (Guocai)</option>
+                    <option value="custom" ${(!hf.company?.includes('冠志') && !hf.company?.includes('国彩')) ? 'selected' : ''}>其他 / 手动输入公司名称...</option>
+                  </select>
+                  <input type="text" id="hf-company-input" class="form-input" style="${(hf.company?.includes('冠志') || hf.company?.includes('国彩')) ? 'display:none;' : ''}margin-top:6px;" value="${escapeHtml(hf.company || '')}" placeholder="输入自定义公司全称" />
+                </div>
+              </div>
+              <div class="hf-field-row">
+                <div class="hf-field" style="flex: 1;">
+                  <label for="hf-doc-code-input">MSDS 识别编码</label>
+                  <input type="text" id="hf-doc-code-input" class="form-input" value="${escapeHtml(hf.docCode || (hf.model ? `${hf.model}-MSDS` : ''))}" readonly style="background:#091422;color:#8497ad;" />
+                  <small class="field-hint" style="color:#8497ad;display:block;margin-top:4px;">自动根据产品型号生成</small>
+                </div>
+                <div class="hf-field" style="flex: 1;">
+                  <label for="hf-date-input">修订日期 (Revision Date)</label>
+                  <div style="display:flex;gap:6px;">
+                    <input type="text" id="hf-date-input" class="form-input" value="${escapeHtml(hf.revisionDate || '')}" placeholder="如：2026年10月08日" />
+                    <button type="button" class="button button-quiet button-sm" data-action="hf-set-today" title="设为当前系统日期">今日</button>
+                  </div>
+                </div>
+              </div>
+              <div class="hf-preview-box">
+                <div class="preview-tag">页脚视觉预览 (Footer Preview)</div>
+                <div class="hf-preview-content footer-preview">
+                  <div class="fp-left">${escapeHtml(hf.company || '广州冠志新材料科技有限公司')} ${escapeHtml(hf.model ? `${hf.model}-MSDS` : 'MSDS')}</div>
+                  <div class="fp-right">修订日期：${escapeHtml(hf.revisionDate || 'YYYY年MM月DD日')}</div>
+                </div>
+                <div class="fp-page-note" style="margin-top:8px;font-size:12px;color:#8497ad;"><span>Word 原生页码域：</span><code style="background:#0a1727;padding:2px 6px;border-radius:4px;color:#5bd6d2;">3 / 5 (PAGE / NUMPAGES 保护保留)</code></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 卡片 3: 导出文件名称管理 (Export Filename Control) -->
+        <div class="hf-card hf-filename-fullcard" style="margin-top:16px;">
+          <div class="hf-card-head">
+            <div class="hf-card-icon">🖹</div>
+            <div>
+              <h3>导出文件名称管理 (Export Filename Management)</h3>
+              <small>行业交付规范: <code>{产品型号} msds_{CN|EN} {冠志|国彩}.docx</code></small>
+            </div>
+          </div>
+          <div class="hf-card-body">
+            <div class="hf-field-row">
+              <div class="hf-field" style="flex: 3;">
+                <label for="hf-export-filename">当前设定导出文件名 (支持直接编辑修改)</label>
+                <div style="display:flex;gap:8px;">
+                  <input type="text" id="hf-export-filename" class="form-input hf-export-name-field" style="font-weight:600;color:#5bd6d2;" value="${escapeHtml(currentExportName)}" />
+                  <button type="button" class="button button-quiet" data-action="reset-filename-to-standard" title="按当前型号与主体重新生成标准规范文件名">↺ 按规则重置</button>
+                </div>
+              </div>
+              <div class="hf-field" style="flex: 1;">
+                <label for="hf-lang-select">语言版本</label>
+                <select id="hf-lang-select" class="form-select" style="width:100%;padding:6px 10px;background:#0d1d2f;color:#d9e6f5;border:1px solid rgba(142,177,214,.2);border-radius:6px;">
+                  <option value="CN" ${hf.language === 'CN' ? 'selected' : ''}>CN (中文版)</option>
+                  <option value="EN" ${hf.language === 'EN' ? 'selected' : ''}>EN (英文版)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
 function renderEditor() {
   const engine = state.editor.engine;
   if (!engine) return `${headerBand('模板编辑器')}${emptyWorkspace('editor')}`;
   const records = tableRecords(engine);
+  if (state.editor.selectedRecordId === '__header_footer__') {
+    return renderHeaderFooterEditor(engine, records, query);
+  }
   const selected = selectedRecord(engine, state.editor.selectedRecordId);
   if (selected) state.editor.selectedRecordId = selected.id;
   const errors = auditEngine(engine);
@@ -785,7 +982,15 @@ function renderEditor() {
       <button class="button button-dark" data-action="export-docx">导出 DOCX</button>
     `)}
     <div class="file-ribbon" title="内嵌模板工作副本，源模板只读">
-      <div class="file-ribbon-icon">模板</div><div class="file-ribbon-copy"><strong>${escapeHtml(state.editor.template)} · ${escapeHtml(engine.sourceName)}</strong><span>工作副本${state.editor.dirty ? ' · 有未导出修改' : ' · 干净'} · 源模板只读</span></div>
+      <div class="file-ribbon-icon">模板</div>
+      <div class="file-ribbon-copy">
+        <strong>${escapeHtml(state.editor.template)}</strong>
+        <span class="file-ribbon-name-wrap">
+          <span>导出文件名：</span>
+          <input id="quick-export-name-input" class="quick-export-name-input" value="${escapeHtml(buildExportDocxName(engine, { customFileName: state.editor.customFileName, templateName: state.editor.template, sourcePreviewName: state.sourcePreview?.name, productModel: engine.headerFooterData?.model }))}" title="直接修改导出文件名，回车或失焦生效" />
+          <button class="button button-quiet button-xs" data-action="reset-filename-to-standard" title="恢复标准命名规则" style="padding:1px 6px;height:20px;font-size:11px;">↺</button>
+        </span>
+      </div>
       <div class="template-selector"><select id="template-select" aria-label="模板选择">${Object.keys(TEMPLATE_OPTIONS).map((name) => `<option ${state.editor.template === name ? 'selected' : ''}>${name}</option>`).join('')}</select></div>
       <label class="toggle-control"><input id="allow-label-edit" type="checkbox" ${state.editor.allowLabelEdit ? 'checked' : ''}><span class="toggle-track"></span><span>特殊情况：允许修改标签文本</span></label>
       <div class="file-ribbon-coverage"><span class="pulse-dot"></span>${records.filter((record) => record.sectionNumber).length}/16</div>
@@ -794,7 +999,7 @@ function renderEditor() {
       <aside class="side-panel editor-side">
         <div class="side-heading"><h2>Section</h2><span class="side-count">${records.filter((record) => record.sectionNumber).length}/16</span></div>
         <label class="search-box"><span>⌕</span><input id="editor-search" type="search" placeholder="搜索标签、序号…" value="${escapeHtml(state.editor.query)}" /><kbd>⌘ K</kbd></label>
-        <div class="section-list">${sectionNav(records, state.editor.selectedRecordId, query, 'editor')}</div>
+        <div class="section-list">${sectionNav(records, state.editor.selectedRecordId, query, 'editor', engine)}</div>
         <div class="side-footer"><span class="file-signal"></span><span>${state.editor.dirty ? '有未导出修改' : '工作副本干净'}</span></div>
       </aside>
       <section class="content-panel editor-content structured-panel">
@@ -863,6 +1068,139 @@ function bindEvents() {
     input?.focus();
     input?.setSelectionRange(caret, caret);
   });
+  // 页眉页尾及导出文件名事件绑定
+  root.querySelectorAll('#hf-model-input').forEach((input) => input.addEventListener('input', (e) => {
+    if (!state.editor.engine) return;
+    updateHeaderFooterData(state.editor.engine, { model: e.target.value.trim() });
+    state.editor.dirty = true;
+    const docCodeInp = root.querySelector('#hf-doc-code-input');
+    if (docCodeInp) docCodeInp.value = e.target.value.trim() ? `${e.target.value.trim()}-MSDS` : '';
+    const hBoxes = root.querySelectorAll('.hp-model-box');
+    hBoxes.forEach((b) => b.textContent = e.target.value.trim() || '未设定型号');
+    const fLeft = root.querySelector('.fp-left');
+    if (fLeft) {
+      const comp = state.editor.engine.headerFooterData?.company || '广州冠志新材料科技有限公司';
+      fLeft.textContent = e.target.value.trim() ? `${comp} ${e.target.value.trim()}-MSDS` : comp;
+    }
+    const hfNavBadge = root.querySelector('.hf-model-badge');
+    if (hfNavBadge) hfNavBadge.textContent = e.target.value.trim() || '待配置';
+    if (!state.editor.customFileName) {
+      const expInp = root.querySelector('#hf-export-filename') || root.querySelector('#quick-export-name-input');
+      if (expInp) expInp.value = buildExportDocxName(state.editor.engine);
+    }
+  }));
+
+  root.querySelectorAll('#hf-title-input').forEach((input) => input.addEventListener('input', (e) => {
+    if (!state.editor.engine) return;
+    updateHeaderFooterData(state.editor.engine, { title: e.target.value.trim() });
+    state.editor.dirty = true;
+    const hTitle = root.querySelector('.hp-title');
+    if (hTitle) hTitle.textContent = e.target.value.trim() || '物料安全数据表';
+  }));
+
+  root.querySelectorAll('#hf-version-input').forEach((input) => input.addEventListener('input', (e) => {
+    if (!state.editor.engine) return;
+    updateHeaderFooterData(state.editor.engine, { version: e.target.value.trim() });
+    state.editor.dirty = true;
+    const hVer = root.querySelector('.hp-ver');
+    if (hVer) hVer.textContent = `Version：${e.target.value.trim() || 'V1.0'}`;
+  }));
+
+  root.querySelectorAll('#hf-company-select').forEach((sel) => sel.addEventListener('change', (e) => {
+    if (!state.editor.engine) return;
+    const customInp = root.querySelector('#hf-company-input');
+    if (e.target.value === 'custom') {
+      if (customInp) customInp.style.display = 'block';
+    } else {
+      if (customInp) customInp.style.display = 'none';
+      updateHeaderFooterData(state.editor.engine, { company: e.target.value });
+      state.editor.dirty = true;
+      const fLeft = root.querySelector('.fp-left');
+      if (fLeft) {
+        const mod = state.editor.engine.headerFooterData?.model || '';
+        fLeft.textContent = mod ? `${e.target.value} ${mod}-MSDS` : e.target.value;
+      }
+      if (!state.editor.customFileName) {
+        const expInp = root.querySelector('#hf-export-filename') || root.querySelector('#quick-export-name-input');
+        if (expInp) expInp.value = buildExportDocxName(state.editor.engine);
+      }
+    }
+  }));
+
+  root.querySelectorAll('#hf-company-input').forEach((input) => input.addEventListener('input', (e) => {
+    if (!state.editor.engine) return;
+    updateHeaderFooterData(state.editor.engine, { company: e.target.value.trim() });
+    state.editor.dirty = true;
+    const fLeft = root.querySelector('.fp-left');
+    if (fLeft) {
+      const mod = state.editor.engine.headerFooterData?.model || '';
+      fLeft.textContent = mod ? `${e.target.value.trim()} ${mod}-MSDS` : e.target.value.trim();
+    }
+    if (!state.editor.customFileName) {
+      const expInp = root.querySelector('#hf-export-filename') || root.querySelector('#quick-export-name-input');
+      if (expInp) expInp.value = buildExportDocxName(state.editor.engine);
+    }
+  }));
+
+  root.querySelectorAll('#hf-date-input').forEach((input) => input.addEventListener('input', (e) => {
+    if (!state.editor.engine) return;
+    updateHeaderFooterData(state.editor.engine, { revisionDate: e.target.value.trim() });
+    state.editor.dirty = true;
+    const fRight = root.querySelector('.fp-right');
+    if (fRight) fRight.textContent = `修订日期：${e.target.value.trim() || 'YYYY年MM月DD日'}`;
+  }));
+
+  root.querySelectorAll('[data-action="hf-set-today"]').forEach((btn) => btn.addEventListener('click', () => {
+    if (!state.editor.engine) return;
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}年${String(d.getMonth() + 1).padStart(2, '0')}月${String(d.getDate()).padStart(2, '0')}日`;
+    updateHeaderFooterData(state.editor.engine, { revisionDate: todayStr });
+    state.editor.dirty = true;
+    const dateInp = root.querySelector('#hf-date-input');
+    if (dateInp) dateInp.value = todayStr;
+    const fRight = root.querySelector('.fp-right');
+    if (fRight) fRight.textContent = `修订日期：${todayStr}`;
+    showToast('已将修订日期更新为今日。', 'info');
+  }));
+
+  root.querySelectorAll('#hf-lang-select').forEach((sel) => sel.addEventListener('change', (e) => {
+    if (!state.editor.engine) return;
+    const nextLang = e.target.value;
+    updateHeaderFooterData(state.editor.engine, { language: nextLang });
+    state.editor.dirty = true;
+    if (!state.editor.customFileName) {
+      const expInp = root.querySelector('#hf-export-filename') || root.querySelector('#quick-export-name-input');
+      if (expInp) expInp.value = buildExportDocxName(state.editor.engine, { lang: nextLang });
+    }
+  }));
+
+  root.querySelectorAll('#hf-export-filename, #quick-export-name-input').forEach((input) => input.addEventListener('input', (e) => {
+    state.editor.customFileName = e.target.value.trim();
+  }));
+
+  root.querySelectorAll('[data-action="reset-filename-to-standard"]').forEach((btn) => btn.addEventListener('click', () => {
+    state.editor.customFileName = '';
+    renderApp();
+    showToast('已按当前产品型号与规则恢复标准导出文件名。', 'info');
+  }));
+
+  root.querySelectorAll('[data-action="reset-hf-to-template"]').forEach((btn) => btn.addEventListener('click', async () => {
+    if (!confirm('确定要恢复模板原始的页眉与页脚吗？')) return;
+    if (state.editor.engine) {
+      updateHeaderFooterData(state.editor.engine, {
+        model: 'PEA-4139',
+        company: '广州冠志新材料科技有限公司',
+        version: 'V1.0',
+        title: '物料安全数据表',
+        revisionDate: '2026年08月05日',
+      });
+      state.editor.customFileName = '';
+      state.editor.dirty = true;
+      renderApp();
+      showToast('已恢复模板初始页眉与页脚。', 'info');
+    }
+  }));
+
   root.querySelector('#editor-search')?.addEventListener('input', (event) => {
     state.editor.query = event.target.value;
     const caret = event.target.selectionStart;
@@ -1661,9 +1999,10 @@ async function exportDocx() {
   try {
     const buffer = await state.editor.engine.exportArrayBuffer();
     const exportName = buildExportDocxName(state.editor.engine, {
+      customFileName: state.editor.customFileName,
       templateName: state.editor.template,
       sourcePreviewName: state.sourcePreview?.name,
-      productModel: state.review.session?.productModel,
+      productModel: state.editor.engine?.headerFooterData?.model || state.review.session?.productModel,
     });
     downloadBlob(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }), exportName);
     state.editor.dirty = false;
@@ -1696,9 +2035,10 @@ async function handleExportReviewBundle() {
   try {
     const cleanDocxBuf = await tEngine.exportArrayBuffer();
     const finalDocxName = buildExportDocxName(tEngine, {
+      customFileName: state.editor.customFileName,
       templateName: state.matching.template || state.editor.template,
       sourcePreviewName: state.sourcePreview?.name,
-      productModel: state.review.session.productModel,
+      productModel: tEngine?.headerFooterData?.model || state.review.session?.productModel,
     });
     const model = state.review.session.productModel || 'MSDS';
 

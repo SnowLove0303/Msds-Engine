@@ -822,56 +822,249 @@ function allTablesInDocument(documentXml) {
   return descendants(documentXml, 'tbl');
 }
 
-export function stampDocumentIdentity(engine, { model, date } = {}) {
-  if (!engine) return;
-  const targetModel = String(model || '').trim();
-  const currentDate = String(date || '').trim() || (() => {
-    const d = new Date();
-    return `${d.getFullYear()}年${String(d.getMonth() + 1).padStart(2, '0')}月${String(d.getDate()).padStart(2, '0')}日`;
-  })();
 
-  if (!targetModel) return;
+/**
+ * 从引擎中解析结构化页眉页脚数据
+ */
+export function extractHeaderFooterData(engine) {
+  if (!engine) return null;
+  const data = {
+    title: '物料安全数据表',
+    version: 'V1.0',
+    model: '',
+    company: '广州冠志新材料科技有限公司',
+    docCode: '',
+    revisionDate: '',
+    language: 'CN',
+    entity: '冠志',
+  };
 
-  // 1. 更新页眉与页脚 supportingXml
-  for (const [partName, xmlText] of Object.entries(engine.supportingXml)) {
-    if (!/^word\/(?:header|footer)\d+\.xml$/.test(partName)) continue;
+  // 1. 扫描 supportingXml 中的 header 与 footer
+  for (const [partName, xmlText] of Object.entries(engine.supportingXml || {})) {
+    if (!/^word\/(?:header|footer)\d+\.xml$/.test(partName) || !xmlText) continue;
     try {
       const doc = parseXml(xmlText, partName);
-      const tNodes = Array.from(doc.getElementsByTagNameNS(W_NS, 't'));
-      let modified = false;
-
-      // 页眉处理：替换示例型号
       if (/header/i.test(partName)) {
-        for (const t of tNodes) {
-          if (/PEA-4139|PEA/i.test(t.textContent)) {
-            t.textContent = t.textContent.replace(/PEA-4139/g, targetModel).replace(/PEA/g, targetModel);
-            modified = true;
+        // 段落 0: 标题
+        const pars = Array.from(doc.getElementsByTagNameNS(W_NS, 'p'));
+        if (pars[0]) {
+          const t = pars[0].textContent?.trim();
+          if (t) {
+            data.title = t;
+            if (/MATERIAL SAFETY|SAFETY DATA/i.test(t)) {
+              data.language = 'EN';
+            }
+          }
+        }
+        // 段落 1: 版本号
+        if (pars[1]) {
+          const t = pars[1].textContent?.trim();
+          const vm = t.match(/Version[：:\s]*(V?[\d.]+)/i);
+          if (vm) data.version = vm[1].startsWith('V') ? vm[1] : `V${vm[1]}`;
+        }
+        // 表格 0: 型号
+        const tbl = doc.getElementsByTagNameNS(W_NS, 'tbl')[0];
+        if (tbl) {
+          const m = tbl.textContent?.trim();
+          if (m && !/^(?:PEA-4139|示例型号)$/i.test(m)) {
+            data.model = m;
+          } else if (!data.model && m) {
+            data.model = m;
+          }
+        }
+      } else if (/footer/i.test(partName)) {
+        const tbl = doc.getElementsByTagNameNS(W_NS, 'tbl')[0];
+        if (tbl) {
+          const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
+          if (rows[0]) {
+            const cells = Array.from(rows[0].getElementsByTagNameNS(W_NS, 'tc'));
+            // cell 0: 公司 + 型号-MSDS
+            if (cells[0]) {
+              const c0Text = cells[0].textContent?.trim() || '';
+              // 公司提取
+              if (/国彩|Guocai/i.test(c0Text)) {
+                data.company = /Guocai/i.test(c0Text) ? 'Yingde Guocai New Material Co., Ltd.' : '英德市国彩新材料有限公司';
+                data.entity = '国彩';
+              } else if (/冠志|Guanzhi/i.test(c0Text)) {
+                data.company = /Guanzhi/i.test(c0Text) ? 'Guangzhou Guanzhi New Material Technology Co., Ltd.' : '广州冠志新材料科技有限公司';
+                data.entity = '冠志';
+              }
+              // 型号与编号提取
+              const codeM = c0Text.match(/([A-Za-z0-9_-]+)-MSDS/i);
+              if (codeM) {
+                data.docCode = codeM[0];
+                if (!data.model) data.model = codeM[1];
+              }
+            }
+            // cell 1: 修订日期
+            if (cells[1]) {
+              const c1Text = cells[1].textContent?.trim() || '';
+              const dm = c1Text.match(/(\d{4}[年\-\/.\s]\d{1,2}[月\-\/.\s]\d{1,2}日?|\d{4}-\d{1,2}-\d{1,2})/);
+              if (dm) {
+                data.revisionDate = dm[1].trim();
+              }
+            }
           }
         }
       }
+    } catch (e) {}
+  }
 
-      // 页脚处理：清除悬挂 P 字符、更新当前日期、替换型号
-      if (/footer/i.test(partName)) {
-        for (const t of tNodes) {
-          if (/P?\s*修订日期[：:]/.test(t.textContent)) {
-            t.textContent = `修订日期：${currentDate}  `;
-            modified = true;
-          }
-          if (t.textContent.includes('广州冠志新材料科技有限公司')) {
-            t.textContent = t.textContent.replace(/\s*P\s*$/, ' ');
+  // 2. 辅以 Section 1 的补充推断
+  const sec1 = engine.records?.find((r) => r.sectionNumber === 1);
+  if (sec1) {
+    if (!data.model) {
+      data.model = extractProductModelFromEngine(engine);
+    }
+    const allSec1 = sec1.rows?.flatMap((r) => r.cells.map((c) => c.text || '')).join(' ') || '';
+    if (/国彩|Guocai/i.test(allSec1)) {
+      data.company = /Guocai/i.test(allSec1) ? 'Yingde Guocai New Material Co., Ltd.' : '英德市国彩新材料有限公司';
+      data.entity = '国彩';
+    }
+  }
+
+  // 3. 辅以 sourceName 提取
+  if (!data.model && engine.sourceName) {
+    data.model = extractModelFromText(engine.sourceName);
+  }
+
+  if (data.model && !data.docCode) {
+    data.docCode = `${data.model}-MSDS`;
+  }
+
+  if (!data.revisionDate) {
+    const d = new Date();
+    data.revisionDate = `${d.getFullYear()}年${String(d.getMonth() + 1).padStart(2, '0')}月${String(d.getDate()).padStart(2, '0')}日`;
+  }
+
+  return data;
+}
+
+/**
+ * 结构化安全更新页眉与页脚，并持久化到 supportingXml 与内存模型
+ */
+export function updateHeaderFooterData(engine, patch = {}) {
+  if (!engine) return null;
+  const current = extractHeaderFooterData(engine) || {};
+  const next = { ...current, ...patch };
+
+  const targetModel = String(next.model || '').trim();
+  const targetCompany = String(next.company || '').trim();
+  const targetDate = String(next.revisionDate || '').trim();
+  const targetVersion = String(next.version || '').trim();
+  const targetTitle = String(next.title || '').trim();
+
+  // 格式化修订日期：去除残留 P 前缀与异形空格
+  const cleanDateStr = targetDate.replace(/^[P\s]+/, '').trim();
+  const formattedDate = /修订日期|Revision Date/i.test(cleanDateStr)
+    ? cleanDateStr
+    : (next.language === 'EN' ? `Revision Date: ${cleanDateStr}` : `修订日期：${cleanDateStr}`);
+
+  for (const [partName, xmlText] of Object.entries(engine.supportingXml || {})) {
+    if (!/^word\/(?:header|footer)\d+\.xml$/.test(partName) || !xmlText) continue;
+    try {
+      const doc = parseXml(xmlText, partName);
+      let modified = false;
+
+      if (/header/i.test(partName)) {
+        const pars = Array.from(doc.getElementsByTagNameNS(W_NS, 'p'));
+        // 1. Header 标题
+        if (targetTitle && pars[0]) {
+          const p = pars[0];
+          const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+          if (runs.length > 0) {
+            let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
+            if (!t) {
+              t = doc.createElementNS(W_NS, 'w:t');
+              runs[0].appendChild(t);
+            }
+            t.textContent = targetTitle.startsWith(' ') ? targetTitle : `  ${targetTitle}`;
+            for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
             modified = true;
           }
         }
 
-        // 清除拆分 Run 中的 PEA-4139-MSDS
-        for (let i = 0; i < tNodes.length; i++) {
-          const t = tNodes[i];
-          if (t.textContent === 'EA' && i > 0 && tNodes[i - 1].textContent.includes('广州冠志')) {
-            t.textContent = `${targetModel}-MSDS`;
+        // 2. Header 版本号
+        if (targetVersion && pars[1]) {
+          const p = pars[1];
+          const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+          if (runs.length > 0) {
+            let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
+            if (!t) {
+              t = doc.createElementNS(W_NS, 'w:t');
+              runs[0].appendChild(t);
+            }
+            const cleanV = targetVersion.replace(/^Version[：:\s]*/i, '');
+            t.textContent = `Version：${cleanV}`;
+            for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
             modified = true;
-            if (tNodes[i + 1]?.textContent === '-') tNodes[i + 1].textContent = '';
-            if (tNodes[i + 2]?.textContent === '4139') tNodes[i + 2].textContent = '';
-            if (tNodes[i + 3]?.textContent === '-MSDS') tNodes[i + 3].textContent = '';
+          }
+        }
+
+        // 3. Header 表格型号
+        if (targetModel) {
+          const tbl = doc.getElementsByTagNameNS(W_NS, 'tbl')[0];
+          if (tbl) {
+            const tc = tbl.getElementsByTagNameNS(W_NS, 'tc')[0];
+            const p = tc?.getElementsByTagNameNS(W_NS, 'p')[0];
+            if (p) {
+              const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+              if (runs.length > 0) {
+                let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
+                if (!t) {
+                  t = doc.createElementNS(W_NS, 'w:t');
+                  runs[0].appendChild(t);
+                }
+                t.textContent = targetModel;
+                for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
+                modified = true;
+              }
+            }
+          }
+        }
+      } else if (/footer/i.test(partName)) {
+        const tbl = doc.getElementsByTagNameNS(W_NS, 'tbl')[0];
+        if (tbl) {
+          const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
+          if (rows[0]) {
+            const cells = Array.from(rows[0].getElementsByTagNameNS(W_NS, 'tc'));
+            // 1. Footer Row 0 Cell 0: 公司 + 型号-MSDS
+            if (cells[0] && (targetCompany || targetModel)) {
+              const p = cells[0].getElementsByTagNameNS(W_NS, 'p')[0];
+              if (p) {
+                const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+                if (runs.length > 0) {
+                  let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
+                  if (!t) {
+                    t = doc.createElementNS(W_NS, 'w:t');
+                    runs[0].appendChild(t);
+                  }
+                  const comp = targetCompany || current.company || '广州冠志新材料科技有限公司';
+                  const mod = targetModel || current.model || '';
+                  t.textContent = mod ? `${comp} ${mod}-MSDS` : comp;
+                  for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
+                  modified = true;
+                }
+              }
+            }
+
+            // 2. Footer Row 0 Cell 1: 修订日期
+            if (cells[1] && formattedDate) {
+              const p = cells[1].getElementsByTagNameNS(W_NS, 'p')[0];
+              if (p) {
+                const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+                if (runs.length > 0) {
+                  let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
+                  if (!t) {
+                    t = doc.createElementNS(W_NS, 'w:t');
+                    runs[0].appendChild(t);
+                  }
+                  t.textContent = `${formattedDate}   `;
+                  for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
+                  modified = true;
+                }
+              }
+            }
           }
         }
       }
@@ -880,19 +1073,51 @@ export function stampDocumentIdentity(engine, { model, date } = {}) {
         engine.supportingXml[partName] = serializer().serializeToString(doc);
       }
     } catch (e) {
-      console.warn('Failed to stamp identity in', partName, e);
+      console.warn('Failed to update header/footer part', partName, e);
     }
   }
 
-  // 2. 更新正文 documentXml 中的示例型号
-  try {
-    const tNodes = Array.from(engine.documentXml.getElementsByTagNameNS(W_NS, 't'));
-    for (const t of tNodes) {
-      if (t.textContent.includes('PEA-4139')) {
-        t.textContent = t.textContent.replace(/PEA-4139/g, targetModel);
+  // 同步正文 documentXml 中的示例型号 (如果包含 PEA-4139 等)
+  if (targetModel) {
+    try {
+      const tNodes = Array.from(engine.documentXml.getElementsByTagNameNS(W_NS, 't'));
+      for (const t of tNodes) {
+        if (/PEA-4139/i.test(t.textContent)) {
+          t.textContent = t.textContent.replace(/PEA-4139/g, targetModel);
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 刷新内存记录中的 Header/Footer 单元格文本
+  engine.headerFooterData = next;
+  for (const record of (engine.records || [])) {
+    if (record.part && /header/i.test(record.part)) {
+      if (record.kind === 'table' && record.rows?.[0]?.cells?.[0] && targetModel) {
+        record.rows[0].cells[0].text = targetModel;
+      }
+    } else if (record.part && /footer/i.test(record.part)) {
+      if (record.kind === 'table' && record.rows?.[0]?.cells) {
+        if (record.rows[0].cells[0] && (targetCompany || targetModel)) {
+          const comp = targetCompany || current.company || '广州冠志新材料科技有限公司';
+          const mod = targetModel || current.model || '';
+          record.rows[0].cells[0].text = mod ? `${comp} ${mod}-MSDS` : comp;
+        }
+        if (record.rows[0].cells[1] && formattedDate) {
+          record.rows[0].cells[1].text = formattedDate;
+        }
       }
     }
-  } catch (e) {}
+  }
+
+  return next;
+}
+
+export function stampDocumentIdentity(engine, info = {}) {
+  if (!engine) return;
+  const patch = typeof info === 'string' ? { model: info } : { ...info };
+  if (patch.date && !patch.revisionDate) patch.revisionDate = patch.date;
+  return updateHeaderFooterData(engine, patch);
 }
 
 export async function loadDocx(source, sourceName = 'document.docx') {
@@ -936,6 +1161,7 @@ export async function loadDocx(source, sourceName = 'document.docx') {
     warnings: [],
     coverage: {},
     roleStyles: { label: { bold: true }, value: { bold: false } },
+    headerFooterData: null,
     refresh() {
       this.records = [];
       this.warnings = [];
@@ -962,6 +1188,7 @@ export async function loadDocx(source, sourceName = 'document.docx') {
         const xml = entry.name === 'word/document.xml' ? serializer().serializeToString(this.documentXml) : this.supportingXml[entry.name];
         if (xml) this.warnings.push(...countUnsupported(xml));
       }
+      this.headerFooterData = extractHeaderFooterData(this);
       return this;
     },
     async exportArrayBuffer() {
@@ -1581,34 +1808,52 @@ export function extractModelFromText(text) {
 }
 
 export function buildExportDocxName(engine, options = {}) {
+  // 0. 用户显式指定的自定义文件名优先
+  if (options.customFileName && typeof options.customFileName === 'string') {
+    let custom = options.customFileName.trim();
+    if (custom) {
+      if (!/\.docx$/i.test(custom)) custom += '.docx';
+      return custom;
+    }
+  }
+
   // 1. Language: CN or EN
-  let lang = 'CN';
+  let lang = options.lang || (options.language ? (options.language.toUpperCase().startsWith('EN') ? 'EN' : 'CN') : '');
   const tplName = options.templateName || '';
   const srcName = engine?.sourceName || '';
-  if (/EN|English/i.test(tplName) || /_EN_|_EN\b/i.test(srcName)) {
-    lang = 'EN';
-  } else {
-    const sec1 = engine?.records?.find((r) => r.sectionNumber === 1);
-    if (sec1 && /Identification/i.test(sec1.title || '')) {
+  if (!lang) {
+    if (/EN|English/i.test(tplName) || /_EN_|_EN\b/i.test(srcName) || engine?.headerFooterData?.language === 'EN') {
       lang = 'EN';
+    } else {
+      const sec1 = engine?.records?.find((r) => r.sectionNumber === 1);
+      if (sec1 && /Identification/i.test(sec1.title || '')) {
+        lang = 'EN';
+      } else {
+        lang = 'CN';
+      }
     }
   }
 
   // 2. Entity: 冠志 / 国彩 / Guanzhi / Guocai
-  let entity = (lang === 'EN' && /Guanzhi/i.test(tplName)) ? 'Guanzhi' : '冠志';
-  if (/国彩|Guocai/i.test(tplName) || /国彩|Guocai/i.test(srcName)) {
-    entity = lang === 'EN' ? 'Guocai' : '国彩';
-  } else if (engine) {
-    const sec1 = engine.records?.find((r) => r.sectionNumber === 1);
-    if (sec1) {
-      const allText = sec1.rows.flatMap((r) => r.cells.map((c) => cellRole(c).valueText || '')).join(' ');
-      if (/国彩/i.test(allText)) {
-        entity = lang === 'EN' ? 'Guocai' : '国彩';
-      } else if (/GUOCAI/i.test(allText)) {
-        entity = 'Guocai';
-      } else if (/GUANZHI/i.test(allText) && lang === 'EN' && /Guanzhi/i.test(tplName)) {
-        entity = 'Guanzhi';
+  let entity = options.entity || '';
+  if (!entity) {
+    if (/国彩|Guocai/i.test(tplName) || /国彩|Guocai/i.test(srcName) || engine?.headerFooterData?.entity === '国彩') {
+      entity = lang === 'EN' ? 'Guocai' : '国彩';
+    } else if (engine) {
+      const sec1 = engine.records?.find((r) => r.sectionNumber === 1);
+      if (sec1) {
+        const allText = sec1.rows.flatMap((r) => r.cells.map((c) => cellRole(c).valueText || '')).join(' ');
+        if (/国彩/i.test(allText)) {
+          entity = lang === 'EN' ? 'Guocai' : '国彩';
+        } else if (/GUOCAI/i.test(allText)) {
+          entity = 'Guocai';
+        } else if (/GUANZHI/i.test(allText) && lang === 'EN') {
+          entity = 'Guanzhi';
+        }
       }
+    }
+    if (!entity) {
+      entity = (lang === 'EN' && /Guanzhi/i.test(tplName)) ? 'Guanzhi' : '冠志';
     }
   }
 
@@ -1616,6 +1861,9 @@ export function buildExportDocxName(engine, options = {}) {
   let model = '';
   if (options.productModel && !/^(?:MSDS|模板|正式模板|Template)$/i.test(options.productModel.trim())) {
     model = extractModelFromText(options.productModel) || options.productModel.trim();
+  }
+  if (!model && engine?.headerFooterData?.model) {
+    model = engine.headerFooterData.model;
   }
   if (!model && engine) {
     model = extractProductModelFromEngine(engine);
@@ -1629,7 +1877,7 @@ export function buildExportDocxName(engine, options = {}) {
   if (model) {
     model = model.replace(/^[\s_-]+|[\s_-]+$/g, '');
   }
-  if (!model || model === '_') {
+  if (!model || model === '_' || /^(?:MSDS|模板|正式模板)$/i.test(model)) {
     model = 'MSDS';
   }
 

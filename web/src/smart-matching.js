@@ -17,6 +17,8 @@ import {
   renumberRecord,
   recordById,
   auditRecord,
+  extractModelFromText,
+  updateHeaderFooterData,
 } from './docx-engine.js';
 
 // 语义换行策略体系契约 (Semantic Line-Break Policy Contract)
@@ -2128,10 +2130,108 @@ export function runSmartMatching(inspectorRecords) {
     });
   }
 
+  // 提取源文档的页眉页尾元数据与文件名管理
+  let hfTitle = '';
+  let hfVersion = 'V1.0';
+  let hfModel = '';
+  let hfCompany = '';
+  let hfDate = '';
+
+  const hfRecords = (inspectorRecords || []).filter((r) => (r.part && /header|footer/i.test(r.part)) || r.sectionNumber === 0);
+  for (const r of hfRecords) {
+    if (/header/i.test(r.part || '')) {
+      if (r.kind === 'table' && r.rows?.[0]?.cells?.[0]) {
+        const m = r.rows[0].cells[0].text?.trim();
+        if (m && !/^(?:PEA-4139|示例型号)$/i.test(m)) {
+          hfModel = m;
+        }
+      } else {
+        const t = r.title || r.text || '';
+        if (/物料安全数据表|化学品安全技术说明书|MATERIAL SAFETY|SAFETY DATA/i.test(t)) {
+          hfTitle = t.trim();
+        }
+        const vm = t.match(/Version[：:\s]*(V?[\d.]+)/i);
+        if (vm) hfVersion = vm[1].startsWith('V') ? vm[1] : `V${vm[1]}`;
+      }
+    } else if (/footer/i.test(r.part || '')) {
+      if (r.kind === 'table' && r.rows?.[0]?.cells) {
+        const c0 = r.rows[0].cells[0]?.text?.trim() || '';
+        if (/国彩|Guocai/i.test(c0)) {
+          hfCompany = /Guocai/i.test(c0) ? 'Yingde Guocai New Material Co., Ltd.' : '英德市国彩新材料有限公司';
+        } else if (/冠志|Guanzhi/i.test(c0)) {
+          hfCompany = /Guanzhi/i.test(c0) ? 'Guangzhou Guanzhi New Material Technology Co., Ltd.' : '广州冠志新材料科技有限公司';
+        }
+        const codeM = c0.match(/([A-Za-z0-9_-]+)-MSDS/i);
+        if (codeM && !hfModel) hfModel = codeM[1];
+
+        const c1 = r.rows[0].cells[1]?.text?.trim() || '';
+        const dm = c1.match(/(\d{4}[年\-\/. ]\d{1,2}[月\-\/. ]\d{1,2}日?|\d{4}-\d{1,2}-\d{1,2})/);
+        if (dm) hfDate = dm[1].trim();
+      }
+    }
+  }
+
+  // 结合 Section 1 互补
+  const sec1Match = matchedSections.find((s) => s.sectionNumber === 1);
+  if (sec1Match) {
+    const s1Rows = sec1Match.matchedRows || [];
+    if (!hfModel) {
+      const mItem = s1Rows.find((r) => r.key === 'model' && r.value)?.value;
+      if (mItem) hfModel = mItem.trim();
+    }
+    if (!hfModel) {
+      const pItem = s1Rows.find((r) => r.key === 'product_name' && r.value)?.value;
+      if (pItem) hfModel = extractModelFromText(pItem) || pItem.trim();
+    }
+    if (!hfCompany) {
+      const supItem = s1Rows.find((r) => r.key === 'supplier_name' && r.value)?.value;
+      if (supItem) {
+        if (/国彩|Guocai/i.test(supItem)) {
+          hfCompany = /Guocai/i.test(supItem) ? 'Yingde Guocai New Material Co., Ltd.' : '英德市国彩新材料有限公司';
+        } else if (/冠志|Guanzhi/i.test(supItem)) {
+          hfCompany = /Guanzhi/i.test(supItem) ? 'Guangzhou Guanzhi New Material Technology Co., Ltd.' : '广州冠志新材料科技有限公司';
+        } else {
+          hfCompany = supItem.trim();
+        }
+      }
+    }
+  }
+
+  if (!hfDate) {
+    const d = new Date();
+    hfDate = `${d.getFullYear()}年${String(d.getMonth() + 1).padStart(2, '0')}月${String(d.getDate()).padStart(2, '0')}日`;
+  }
+
+  const isEn = /MATERIAL SAFETY|SAFETY DATA/i.test(hfTitle) || sec1Match?.matchedRows?.some((r) => /English/i.test(r.key));
+  const isGuocai = /国彩|Guocai/i.test(hfCompany);
+  const entity = isGuocai ? (isEn ? 'Guocai' : '国彩') : (isEn ? 'Guanzhi' : '冠志');
+  const lang = isEn ? 'EN' : 'CN';
+  const cleanModel = hfModel.replace(/^[\s_-]+|[\s_-]+$/g, '') || 'MSDS';
+
+  const headerFooter = {
+    title: hfTitle || (isEn ? 'MATERIAL SAFETY DATA SHEET' : '物料安全数据表'),
+    version: hfVersion || 'V1.0',
+    model: cleanModel,
+    company: hfCompany || (isGuocai ? '英德市国彩新材料有限公司' : '广州冠志新材料科技有限公司'),
+    docCode: `${cleanModel}-MSDS`,
+    revisionDate: hfDate,
+    language: lang,
+    entity: isGuocai ? '国彩' : '冠志',
+  };
+
+  const fileNaming = {
+    model: cleanModel,
+    language: lang,
+    entity: isGuocai ? (isEn ? 'Guocai' : '国彩') : (isEn ? 'Guanzhi' : '冠志'),
+    recommendedFileName: `${cleanModel} msds_${lang} ${entity}.docx`,
+  };
+
   return {
     success: true,
     timestamp: Date.now(),
     matchedSections,
+    headerFooter,
+    fileNaming,
     summary: {
       totalSections: 16,
       matchedSectionsCount: matchedSections.filter((s) => s.sourceRecord).length,
@@ -2210,15 +2310,27 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
   }
 
   // 1. 全局身份戳记动态注入 (标题、页眉、页脚)
+  const hf = matchResult?.headerFooter || {};
   const s1Sec = matchResult?.matchedSections?.find((s) => s.sectionNumber === 1);
-  const s1Text = s1Sec?.matchedRows?.map((r) => `${r.key}: ${r.value}`).join(' ') || '';
-  const modelM = s1Text.match(/PU[-\s]?\d+[A-Za-z]?/i);
-  const targetModel = matchResult?.metadata?.model ||
+  const targetModel = hf.model ||
     s1Sec?.matchedRows?.find((r) => r.key === 'model')?.value ||
-    (modelM ? modelM[0].replace(/\s+/g, '') : '') ||
+    matchResult?.fileNaming?.model ||
     '';
+  const targetCompany = hf.company ||
+    s1Sec?.matchedRows?.find((r) => r.key === 'supplier_name')?.value ||
+    '';
+  const targetDate = hf.revisionDate || '';
+  const targetVersion = hf.version || 'V1.0';
+  const targetTitle = hf.title || '';
+
   if (typeof editorEngine.stampIdentity === 'function') {
-    editorEngine.stampIdentity({ model: targetModel });
+    editorEngine.stampIdentity({
+      model: targetModel,
+      company: targetCompany,
+      revisionDate: targetDate,
+      version: targetVersion,
+      title: targetTitle,
+    });
   }
 
   // 2. 全局模板全域值格安全清零（杜绝历史模板旧数据幽灵残留）

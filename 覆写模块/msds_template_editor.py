@@ -798,9 +798,160 @@ def is_row_editable(row) -> bool:
 
 
 
+def _update_paragraph_runs(p, new_text: str):
+    """Safely updates a paragraph's text while preserving the first run's formatting."""
+    if not p.runs:
+        p.add_run(new_text)
+        return
+    p.runs[0].text = new_text
+    for r in p.runs[1:]:
+        r.text = ""
+
+def extract_header_footer_info(document) -> dict:
+    """Extract header and footer metadata from python-docx Document."""
+    info = {
+        "title": "物料安全数据表",
+        "version": "V1.0",
+        "model": "",
+        "company": "广州冠志新材料科技有限公司",
+        "doc_code": "",
+        "revision_date": "",
+        "language": "CN",
+        "entity": "冠志",
+    }
+    if document is None or not getattr(document, "sections", None):
+        return info
+
+    sec = document.sections[0]
+    hdr = sec.header
+    ftr = sec.footer
+
+    for p in hdr.paragraphs:
+        txt = re.sub(r'\\s+', ' ', p.text or '').strip()
+        if not txt:
+            continue
+        if re.search(r"MATERIAL SAFETY DATA SHEET", txt, re.I):
+            info["title"] = "MATERIAL SAFETY DATA SHEET"
+            info["language"] = "EN"
+        elif re.search(r"物料安全数据表", txt):
+            info["title"] = "物料安全数据表"
+            info["language"] = "CN"
+
+        v_match = re.search(r"Version[:：]\\s*(V[0-9.]+)", txt, re.I)
+        if v_match:
+            info["version"] = v_match.group(1)
+
+    if hdr.tables and len(hdr.tables) > 0 and hdr.tables[0].rows:
+        cell_txt = re.sub(r'\\s+', ' ', hdr.tables[0].rows[0].cells[0].text or '').strip()
+        if cell_txt:
+            info["model"] = cell_txt
+
+    if ftr.tables and len(ftr.tables) > 0 and ftr.tables[0].rows:
+        row0 = ftr.tables[0].rows[0]
+        if len(row0.cells) > 0:
+            c0_txt = re.sub(r'\\s+', ' ', row0.cells[0].text or '').strip()
+            code_m = re.search(r"([A-Za-z0-9_-]+-MSDS)", c0_txt, re.I)
+            if code_m:
+                info["doc_code"] = code_m.group(1)
+                comp_part = c0_txt.replace(code_m.group(1), "").strip()
+                if comp_part:
+                    info["company"] = comp_part
+            elif c0_txt:
+                parts = c0_txt.split()
+                if len(parts) >= 2:
+                    info["company"] = parts[0]
+                    info["doc_code"] = parts[1]
+                else:
+                    info["company"] = c0_txt
+
+            if "国彩" in c0_txt or "GUOCAI" in c0_txt.upper():
+                info["entity"] = "国彩"
+            elif "冠志" in c0_txt or "GUANZHI" in c0_txt.upper():
+                info["entity"] = "冠志"
+
+        if len(row0.cells) > 1:
+            c1_txt = re.sub(r'\\s+', ' ', row0.cells[1].text or '').strip()
+            date_m = re.search(r"(\\d{4}[年/-]\\d{1,2}[月/-]\\d{1,2}日?)", c1_txt)
+            if date_m:
+                info["revision_date"] = date_m.group(1)
+            else:
+                info["revision_date"] = c1_txt.replace("P修订日期：", "").replace("修订日期：", "").strip()
+
+    return info
+
+def update_header_footer_info(document, patch: dict) -> dict:
+    """Update header and footer metadata in python-docx Document safely."""
+    if document is None or not getattr(document, "sections", None):
+        return {}
+
+    sec = document.sections[0]
+    hdr = sec.header
+    ftr = sec.footer
+
+    # 1. Header Title & Version in paragraphs
+    for p in hdr.paragraphs:
+        txt = p.text.strip()
+        if not txt:
+            continue
+        if ("物料安全数据表" in txt or "MATERIAL SAFETY" in txt) and "title" in patch:
+            _update_paragraph_runs(p, patch["title"])
+        elif "Version" in txt and "version" in patch:
+            ver = patch["version"]
+            if not ver.upper().startswith("V"):
+                ver = f"V{ver}"
+            _update_paragraph_runs(p, f"Version：{ver}")
+
+    # 2. Header Model in Table 0 Row 0 Cell 0
+    if "model" in patch and hdr.tables and len(hdr.tables) > 0 and hdr.tables[0].rows:
+        c0 = hdr.tables[0].rows[0].cells[0]
+        if c0.paragraphs:
+            _update_paragraph_runs(c0.paragraphs[0], patch["model"])
+        else:
+            c0.text = patch["model"]
+
+    # 3. Footer Table 0
+    if ftr.tables and len(ftr.tables) > 0 and ftr.tables[0].rows:
+        row0 = ftr.tables[0].rows[0]
+        if len(row0.cells) > 0 and ("company" in patch or "model" in patch):
+            current_info = extract_header_footer_info(document)
+            company = patch.get("company", current_info.get("company", "广州冠志新材料科技有限公司"))
+            model = patch.get("model", current_info.get("model", "MSDS"))
+            new_c0_text = f"{company} {model}-MSDS".strip()
+            c0 = row0.cells[0]
+            if c0.paragraphs:
+                _update_paragraph_runs(c0.paragraphs[0], new_c0_text)
+            else:
+                c0.text = new_c0_text
+
+        if len(row0.cells) > 1 and "revision_date" in patch:
+            rev_date = patch["revision_date"].strip()
+            if rev_date.startswith("P"):
+                rev_date = rev_date[1:].strip()
+            if not rev_date.startswith("修订日期") and not rev_date.lower().startswith("revision"):
+                prefix = "Revision Date: " if patch.get("language") == "EN" else "修订日期："
+                new_c1_text = f"{prefix}{rev_date}"
+            else:
+                new_c1_text = rev_date
+            c1 = row0.cells[1]
+            if c1.paragraphs:
+                _update_paragraph_runs(c1.paragraphs[0], new_c1_text)
+            else:
+                c1.text = new_c1_text
+
+    return extract_header_footer_info(document)
+
 def extract_product_model_from_doc(document) -> str:
-    """Extract product code/model from Section 1 table of document."""
-    if document is None or not getattr(document, "tables", None):
+    """Extract product code/model from header or Section 1 table of document."""
+    if document is None:
+        return ""
+    # Try header table first
+    try:
+        hf = extract_header_footer_info(document)
+        if hf.get("model") and hf["model"] != "PEA-4139":
+            return hf["model"]
+    except Exception:
+        pass
+    if not getattr(document, "tables", None):
         return ""
     tbl1 = document.tables[0]
     for row in tbl1.rows:
@@ -867,6 +1018,10 @@ def build_export_docx_name(document=None, source_path=None, template_name: str =
     model = ""
     if document:
         model = extract_product_model_from_doc(document)
+        if not model:
+            hf = extract_header_footer_info(document)
+            if hf.get("model") and hf["model"] != "PEA-4139":
+                model = hf["model"]
     if not model and src_name:
         model = extract_model_from_text(src_name)
     if model:
@@ -889,6 +1044,9 @@ class EditorApp:
         self.source_hash = ""
         self.dirty = False
         self.current_table = 0
+        self.selected_nav_idx = 0
+        self.custom_file_name = ""
+        self._hf_entries = {}
         self._text_widgets: list[tuple[tk.Text, Field]] = []
         self.allow_label_edit = tk.BooleanVar(value=False)
         self._build_ui()
@@ -1010,6 +1168,8 @@ class EditorApp:
         self._set_dirty(False)
         self.allow_label_edit.set(False)
         self.current_table = 0
+        self.selected_nav_idx = 0
+        self.custom_file_name = ""
         self._refresh_sections()
 
     def _toggle_label_edit(self):
@@ -1032,6 +1192,9 @@ class EditorApp:
         if self.document is None:
             self._show_empty("请选择一个 DOCX 模板开始编辑")
             return
+        hf = extract_header_footer_info(self.document)
+        model_badge = f"[{hf['model']}]" if hf.get("model") else "[待配置]"
+        self.section_list.insert(tk.END, f"第 00 节   页眉与页脚 (Header & Footer)   {model_badge}")
         for index, table in enumerate(self.document.tables, 1):
             fields = sum(
                 sum(bool(view.label_field) + bool(view.value_field)
@@ -1043,15 +1206,187 @@ class EditorApp:
         if body_count:
             self.section_list.insert(tk.END, f"正文段落   {body_count} 处值")
         if self.section_list.size():
-            self.section_list.selection_set(min(self.current_table, self.section_list.size() - 1))
+            self.section_list.selection_set(min(self.selected_nav_idx, self.section_list.size() - 1))
             self.section_list.event_generate("<<ListboxSelect>>")
 
     def _select_section(self, _event=None):
         selection = self.section_list.curselection()
         if not selection or self.document is None:
             return
-        self.current_table = selection[0]
+        self.selected_nav_idx = selection[0]
+        if self.selected_nav_idx == 0:
+            self._render_header_footer()
+            return
+        self.current_table = self.selected_nav_idx - 1
         self._render_current_section()
+
+    def _sync_header_footer(self):
+        if not hasattr(self, "_hf_entries") or not self._hf_entries or self.document is None:
+            return
+        title = self._hf_entries.get("title").get().strip() if "title" in self._hf_entries else ""
+        model = self._hf_entries.get("model").get().strip() if "model" in self._hf_entries else ""
+        version = self._hf_entries.get("version").get().strip() if "version" in self._hf_entries else ""
+        company = self._hf_entries.get("company").get().strip() if "company" in self._hf_entries else ""
+        revision_date = self._hf_entries.get("revision_date").get().strip() if "revision_date" in self._hf_entries else ""
+        export_name = self._hf_entries.get("export_name").get().strip() if "export_name" in self._hf_entries else ""
+
+        patch = {}
+        if title: patch["title"] = title
+        if model: patch["model"] = model
+        if version: patch["version"] = version
+        if company: patch["company"] = company
+        if revision_date: patch["revision_date"] = revision_date
+
+        if patch:
+            update_header_footer_info(self.document, patch)
+        if export_name:
+            self.custom_file_name = export_name
+
+    def _render_header_footer(self):
+        for widget in self.form.winfo_children():
+            widget.destroy()
+        self._text_widgets.clear()
+        self._hf_entries.clear()
+        if self.document is None:
+            return
+
+        hf = extract_header_footer_info(self.document)
+        current_export = self.custom_file_name or build_export_docx_name(self.document, self.source_path, self.template_choice.get())
+
+        # Header bar
+        sec_header = ttk.Frame(self.form)
+        sec_header.pack(fill="x", pady=(0, 6))
+        ttk.Label(sec_header, text="第 00 节  ·  全局文档标识与页眉页脚管理",
+                  font=("Microsoft YaHei UI", 12, "bold"), foreground="#0f172a").pack(side="left")
+        ttk.Button(sec_header, text="↺ 恢复模板初始页眉页脚", command=self._reset_header_footer_to_template).pack(side="right")
+
+        desc = ttk.Label(self.form, text="统一配置产品型号、版本号、公司主体与修订日期，系统自动安全同步至 DOCX 物理页眉页脚并规范导出文件名。",
+                         foreground="#64748b", wraplength=760, justify="left")
+        desc.pack(anchor="w", pady=(0, 10))
+
+        # Main Cards Frame
+        cards_frame = ttk.Frame(self.form)
+        cards_frame.pack(fill="x", expand=True)
+
+        # Card 1: Header
+        c1 = ttk.LabelFrame(cards_frame, text=" 页眉配置 (Header - word/header1.xml) ", padding=(12, 10))
+        c1.pack(fill="x", pady=(0, 10))
+
+        row1 = ttk.Frame(c1)
+        row1.pack(fill="x", pady=3)
+        ttk.Label(row1, text="文档主标题：", width=14).pack(side="left")
+        title_var = tk.StringVar(value=hf.get("title", "物料安全数据表"))
+        title_ent = ttk.Entry(row1, textvariable=title_var, width=45)
+        title_ent.pack(side="left", padx=4)
+        self._hf_entries["title"] = title_var
+
+        row2 = ttk.Frame(c1)
+        row2.pack(fill="x", pady=3)
+        ttk.Label(row2, text="产品型号 *：", width=14).pack(side="left")
+        model_var = tk.StringVar(value=hf.get("model", ""))
+        model_ent = ttk.Entry(row2, textvariable=model_var, width=25, font=("Microsoft YaHei UI", 9, "bold"))
+        model_ent.pack(side="left", padx=4)
+        self._hf_entries["model"] = model_var
+        ttk.Label(row2, text="版本号：", width=10).pack(side="left", padx=(16, 0))
+        ver_var = tk.StringVar(value=hf.get("version", "V1.0"))
+        ver_ent = ttk.Entry(row2, textvariable=ver_var, width=15)
+        ver_ent.pack(side="left", padx=4)
+        self._hf_entries["version"] = ver_var
+        ttk.Label(row2, text="(如 V1.0)", foreground="#94a3b8").pack(side="left", padx=4)
+
+        # Card 2: Footer
+        c2 = ttk.LabelFrame(cards_frame, text=" 页脚与发布信息 (Footer - word/footer1.xml) ", padding=(12, 10))
+        c2.pack(fill="x", pady=(0, 10))
+
+        row3 = ttk.Frame(c2)
+        row3.pack(fill="x", pady=3)
+        ttk.Label(row3, text="发布主体公司：", width=14).pack(side="left")
+        comp_var = tk.StringVar(value=hf.get("company", "广州冠志新材料科技有限公司"))
+        comp_ent = ttk.Entry(row3, textvariable=comp_var, width=38)
+        comp_ent.pack(side="left", padx=4)
+        self._hf_entries["company"] = comp_var
+
+        ttk.Label(row3, text="MSDS 编号：", width=11).pack(side="left", padx=(16, 0))
+        doc_code_lbl = ttk.Label(row3, text=f"{hf.get('model', '...')}-MSDS", foreground="#0284c7", font=("Consolas", 9, "bold"))
+        doc_code_lbl.pack(side="left", padx=4)
+
+        row4 = ttk.Frame(c2)
+        row4.pack(fill="x", pady=3)
+        ttk.Label(row4, text="修订日期：", width=14).pack(side="left")
+        rev_var = tk.StringVar(value=hf.get("revision_date", ""))
+        rev_ent = ttk.Entry(row4, textvariable=rev_var, width=20)
+        rev_ent.pack(side="left", padx=4)
+        self._hf_entries["revision_date"] = rev_var
+
+        def _set_today():
+            from datetime import date
+            today_str = date.today().strftime("%Y年%m月%d日")
+            rev_var.set(today_str)
+            self._apply_hf_patch()
+
+        ttk.Button(row4, text="📅 设为今日", command=_set_today).pack(side="left", padx=6)
+        ttk.Label(row4, text="原生页码域：", width=12).pack(side="left", padx=(16, 0))
+        ttk.Label(row4, text="3 / 5  (PAGE / NUMPAGES 字段码保护锁定)", foreground="#16a34a").pack(side="left", padx=4)
+
+        # Card 3: Export file naming
+        c3 = ttk.LabelFrame(cards_frame, text=" 导出文件名管理 (File Naming) ", padding=(12, 10))
+        c3.pack(fill="x", pady=(0, 10))
+
+        row5 = ttk.Frame(c3)
+        row5.pack(fill="x", pady=3)
+        ttk.Label(row5, text="导出文件名：", width=14).pack(side="left")
+        name_var = tk.StringVar(value=current_export)
+        name_ent = ttk.Entry(row5, textvariable=name_var, width=45)
+        name_ent.pack(side="left", padx=4)
+        self._hf_entries["export_name"] = name_var
+
+        def _reset_std_name():
+            self.custom_file_name = ""
+            std = build_export_docx_name(self.document, self.source_path, self.template_choice.get())
+            name_var.set(std)
+
+        ttk.Button(row5, text="↺ 恢复标准命名", command=_reset_std_name).pack(side="left", padx=6)
+
+        # Bottom actions
+        act_row = ttk.Frame(self.form)
+        act_row.pack(fill="x", pady=10)
+        save_btn = ttk.Button(act_row, text="💾 保存并应用页眉页脚修改", command=self._apply_hf_patch)
+        save_btn.pack(side="left")
+
+        # Bind auto-update
+        def _on_hf_change(*_args):
+            m = model_var.get().strip()
+            if m:
+                doc_code_lbl.configure(text=f"{m}-MSDS")
+                if not self.custom_file_name:
+                    name_var.set(build_export_docx_name(self.document, self.source_path, self.template_choice.get()))
+
+        model_var.trace_add("write", _on_hf_change)
+        title_var.trace_add("write", lambda *_: self._set_dirty(True))
+        ver_var.trace_add("write", lambda *_: self._set_dirty(True))
+        comp_var.trace_add("write", lambda *_: self._set_dirty(True))
+        rev_var.trace_add("write", lambda *_: self._set_dirty(True))
+        name_var.trace_add("write", lambda *_: self._set_dirty(True))
+
+    def _apply_hf_patch(self):
+        self._sync_header_footer()
+        self._set_dirty(True)
+        messagebox.showinfo("页眉页脚已更新", "页眉、页脚及文件名配置已更新并应用至模板。", parent=self.root)
+        self._refresh_sections()
+
+    def _reset_header_footer_to_template(self):
+        if not messagebox.askyesno("恢复确认", "确认恢复模板原始页眉页脚（PEA-4139、冠志、V1.0）？", parent=self.root):
+            return
+        update_header_footer_info(self.document, {
+            "model": "PEA-4139",
+            "company": "广州冠志新材料科技有限公司",
+            "version": "V1.0",
+            "title": "物料安全数据表",
+            "revision_date": "2026年08月05日",
+        })
+        self.custom_file_name = ""
+        self._set_dirty(True)
+        self._refresh_sections()
 
     def _render_current_section(self):
         for widget in self.form.winfo_children():
@@ -1200,6 +1535,7 @@ class EditorApp:
                 messagebox.showerror("写入约束拦截", f"{exc}", parent=self.root)
 
     def _sync_texts(self):
+        self._sync_header_footer()
         for widget, field in self._text_widgets:
             self._text_changed(widget, field)
 
@@ -1258,7 +1594,7 @@ class EditorApp:
             messagebox.showinfo("未载入模板", "请先打开一个 DOCX 模板。", parent=self.root)
             return
         self._sync_texts()
-        initial = build_export_docx_name(self.document, self.source_path, getattr(self, "current_template_name", ""))
+        initial = getattr(self, "custom_file_name", None) or build_export_docx_name(self.document, self.source_path, getattr(self, "current_template_name", "") or self.template_choice.get())
         path = filedialog.asksaveasfilename(title="导出编辑后 DOCX", initialdir=str(self.source_path.parent),
                                             initialfile=initial, defaultextension=".docx",
                                             filetypes=[("Word 文档", "*.docx")])
