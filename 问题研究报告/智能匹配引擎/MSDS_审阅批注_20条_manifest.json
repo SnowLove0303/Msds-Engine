@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "msds-review-bundle/v1",
+  "sourceUrl": "http://127.0.0.1:18766/",
+  "exportedAt": "2026-10-09",
+  "annotationCount": 20,
+  "status": "open",
+  "note": "从当前浏览器会话的审阅批注清单逐条读取；未修改批注状态。正式 MSDS 导出因未处理 error 批注被门禁阻止，审阅批注仍已固化。",
+  "annotationIds": [
+    "ANN-MV0NYY6R-SQII",
+    "ANN-MV0O07Q1-Q3J1",
+    "ANN-MV0O1CX3-57R0",
+    "ANN-MV0O1YDB-KTZS",
+    "ANN-MV0O2S1B-6JG6",
+    "ANN-MV0O3A6F-6MJR",
+    "ANN-MV0O3ZLB-S9AG",
+    "ANN-MV0O4IL3-Z4XZ",
+    "ANN-MV0O510F-PBAD",
+    "ANN-MV0O5SAN-6LXZ",
+    "ANN-MV0O6PRB-Z5I3",
+    "ANN-MV0O7Z87-KAB7",
+    "ANN-MV0O9EDJ-BFRL",
+    "ANN-MV0OA4XB-GMD4",
+    "ANN-MV0OC2HZ-SEFW",
+    "ANN-MV0OCGVR-7G6X",
+    "ANN-MV0OCYAF-W4YF",
+    "ANN-MV0OE2QF-TERL",
+    "ANN-MV0OEV7J-LGAQ",
+    "ANN-MV0OF613-DYDT"
+  ]
+}
