@@ -303,8 +303,7 @@ export function renderCellContent(cell, selectedCellId, record, roleStyles = nul
 export function renderEditorCell(record, row, cell, tableWidth, fallbackGrid = false, roleStyles = null, isLastCellInRow = false, options = {}) {
   const isRow0 = row.index === 0;
   const allowLabelEdit = Boolean(options.allowLabelEdit);
-  const activePreset = options.activePreset || null;
-  const getCellSemanticKey = options.getCellSemanticKey || null;
+  const isPresetMode = Boolean(options.isPresetMode);
   let innerMarkup = '';
 
   if (isRow0) {
@@ -318,24 +317,26 @@ export function renderEditorCell(record, row, cell, tableWidth, fallbackGrid = f
       return target ? `<img class="source-inline-image" data-image-target="${escapeHtml(target)}" style="${imageStyle(img)}" alt="DOCX 图像" />` : '';
     }).join('');
 
-    const semKey = (typeof getCellSemanticKey === 'function') ? getCellSemanticKey(cell) : null;
-    const isOverridden = Boolean(activePreset && semKey && activePreset.fieldOverrides && (semKey in activePreset.fieldOverrides));
-    const cellValue = isOverridden
-      ? activePreset.fieldOverrides[semKey]
-      : (cell.valueText || '');
+    const placeholder = isPresetMode ? '留空则继承普通模式值…' : '点击输入值…';
+    const cellValue = cell.valueText || '';
+    const hasValue = Boolean(cellValue.trim());
 
-    const presetBadge = activePreset ? `
-      <div class="preset-cell-status-bar">
-        ${isOverridden
-          ? `<span class="preset-tag tag-override" title="预设 [${escapeHtml(activePreset.name)}] 专属覆写值">已覆写</span><button type="button" class="preset-revert-btn" data-preset-action="revert-cell" data-semantic-key="${escapeHtml(semKey)}" title="撤销覆写，恢复继承基准值">↺ 还原</button>`
-          : `<span class="preset-tag tag-inherited" title="继承基准值">继承基准</span>`
-        }
-      </div>
-    ` : '';
+    // 值清空按钮：普通模式与预设模式均支持
+    const clearBtn = hasValue
+      ? `<button type="button" class="cell-clear-val-btn" data-cell-action="clear-value" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" data-col="${cell.col}" title="一键清空此格内容">✕</button>`
+      : '';
 
-    const overrideClass = isOverridden ? ' is-preset-overridden' : (activePreset ? ' is-preset-inherited' : '');
-    const valueEditor = `<div class="structured-cell-copy excel-cell-editor is-editable-value${overrideClass}" contenteditable="plaintext-only" data-edit-kind="value" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" data-col="${cell.col}" data-semantic-key="${escapeHtml(semKey || '')}" data-placeholder="点击输入值…" spellcheck="false" role="textbox" aria-label="可编辑值">${escapeHtml(cellValue)}</div>`;
-    innerMarkup = `${labelPart}${images}${presetBadge}${valueEditor}`;
+    const presetIndicator = isPresetMode
+      ? `<span class="preset-mode-cell-tag ${hasValue ? 'tag-has-override' : 'tag-inherited'}">${hasValue ? '预设覆盖' : '留空继承'}</span>`
+      : '';
+
+    const cellClass = isPresetMode
+      ? (hasValue ? 'is-preset-override-val' : 'is-preset-inherited-val')
+      : '';
+
+    const valueEditor = `<div class="structured-cell-copy excel-cell-editor is-editable-value ${cellClass}" contenteditable="plaintext-only" data-edit-kind="value" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" data-col="${cell.col}" data-placeholder="${placeholder}" spellcheck="false" role="textbox" aria-label="可编辑值">${escapeHtml(cellValue)}</div>`;
+    
+    innerMarkup = `<div class="editor-cell-wrapper">${labelPart}${images}${valueEditor}${clearBtn}${presetIndicator}</div>`;
   } else if (cell.labelText) {
     if (allowLabelEdit) {
       innerMarkup = renderEditorLabelMarkup(cell.labelText, true, record, row, cell);

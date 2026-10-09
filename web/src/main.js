@@ -20,6 +20,9 @@ import {
   restoreSectionToTemplate,
   writeCellLabel,
   writeCellValue,
+  clearCellValue,
+  clearSectionValues,
+  applyPresetPriorityOverlay,
   PresetStore,
   getCellSemanticKey,
   findCellBySemanticKey,
@@ -85,8 +88,9 @@ const state = {
     dirty: false,
     query: '',
     customFileName: '',
-    presetModeEnabled: false,
-    activePresetId: null,
+    isPresetEditing: false,
+    editingPresetId: 'preset_guocai_cn',
+    normalEngine: null,
     presets: PresetStore.loadPresets(),
     exportModalOpen: false,
     managerModalOpen: false,
@@ -349,43 +353,37 @@ function getPresetExportFileName(preset, model) {
   return `${m} msds_${lang} ${entity}.docx`;
 }
 
-function renderPresetRibbon() {
-  const pMode = state.editor.presetModeEnabled;
-  const activePreset = state.editor.presets.find((p) => p.id === state.editor.activePresetId);
-  return `
-    <div class="preset-ribbon">
-      <div class="preset-ribbon-left">
-        <label class="preset-mode-toggle" title="开启后可在当前编辑器中针对衍生预设版本（如国彩主体）进行局部差异编辑">
-          <input type="checkbox" id="preset-mode-toggle" ${pMode ? 'checked' : ''} />
-          <span class="preset-switch"></span>
-          <span class="preset-mode-title">⚡ 局部同步覆写模式</span>
-        </label>
-        ${pMode ? `
-          <div class="preset-layer-selector-wrap">
-            <span class="layer-label">当前编辑图层:</span>
-            <select id="preset-layer-select" class="preset-layer-select" aria-label="选择编辑图层">
-              <option value="__base__" ${!state.editor.activePresetId ? 'selected' : ''}>🌱 基准视图 (${escapeHtml(state.editor.template)})</option>
-              ${state.editor.presets.map((p) => `
-                <option value="${escapeHtml(p.id)}" ${state.editor.activePresetId === p.id ? 'selected' : ''}>
-                  ${p.isBuiltin ? '🏢' : '⚙️'} ${escapeHtml(p.name)} [底模: ${escapeHtml(p.targetTemplate)}]
-                  ${Object.keys(p.fieldOverrides || {}).length ? ` (${Object.keys(p.fieldOverrides).length}处覆写)` : ''}
-                </option>
-              `).join('')}
-            </select>
-            <button class="button button-quiet button-xs" data-action="create-new-preset" title="基于当前基准创建新衍生预设" style="padding:1px 6px;height:20px;font-size:11px;">＋ 新建</button>
-          </div>
-        ` : ''}
-      </div>
-      ${pMode ? `
-        <div class="preset-ribbon-right">
-          <span class="preset-sync-tip">${activePreset ? `当前处于【${escapeHtml(activePreset.name)}】图层，直接修改单元格即可原位覆写` : '当前处于基准图层，所作修改将同步作为所有衍生预设的底稿'}</span>
-          <button class="button button-quiet button-xs" data-action="open-preset-manager-modal" title="查看全部预设配置与绑定关系">⚙️ 管理预设</button>
+function renderEditorBanner() {
+  if (state.editor.isPresetEditing) {
+    const curP = state.editor.presets.find((p) => p.id === state.editor.editingPresetId) || state.editor.presets[0];
+    return `
+      <div class="preset-mode-banner">
+        <div class="preset-banner-title">
+          <span>⚙️ 预设编辑模式</span>
+          <span style="font-weight:400;color:#fde68a;">正在编辑覆盖模板：</span>
+          <select id="switch-editing-preset-select" class="preset-layer-select" style="font-size:13px;padding:3px 10px;background:#1e1b4b;border-color:#f59e0b;color:#fef08a;">
+            ${state.editor.presets.map((p) => `
+              <option value="${escapeHtml(p.id)}" ${p.id === state.editor.editingPresetId ? 'selected' : ''}>
+                ${escapeHtml(p.name)} [${escapeHtml(p.targetTemplate)}]
+              </option>
+            `).join('')}
+          </select>
         </div>
-      ` : ''}
+        <div class="preset-banner-actions">
+          <button class="button button-quiet button-sm" data-action="save-current-preset" style="background:#f59e0b;color:#000;font-weight:700;border:none;">💾 保存预设</button>
+          <button class="button button-quiet button-sm" data-action="save-as-new-preset" style="color:#fde68a;border-color:#f59e0b;">➕ 另存为新预设</button>
+          <button class="button button-quiet button-sm" data-action="exit-preset-editing" style="color:#fff;background:rgba(255,255,255,0.15);">↩️ 退出预设编辑 (回普通模式)</button>
+        </div>
+      </div>
+    `;
+  }
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 16px;background:rgba(15,23,42,.6);border-bottom:1px solid rgba(148,163,184,.15);font-size:12px;">
+      <span style="color:#94a3b8;">当前模式：<strong style="color:#38bdf8;">普通文档编辑</strong>（编辑具体物料主稿）</span>
+      <button class="button button-quiet button-xs" data-action="enter-preset-mode" style="color:#f59e0b;border-color:rgba(245,158,11,.4);padding:2px 10px;font-size:11px;" title="进入预设编辑模式，对整个 MSDS 任意地方配置并保存覆盖模板">⚙️ 进入预设编辑模式</button>
     </div>
   `;
 }
-
 function renderPresetExportModal() {
   if (!state.editor.exportModalOpen) return '';
   const baseModel = state.editor.engine?.headerFooterData?.model || '';
@@ -972,7 +970,7 @@ function renderHeaderFooterEditor(engine, records, query) {
       <button class="button button-dark" data-action="export-review-bundle" title="导出正式 DOCX 与 Agent 审阅包"><span>📦</span> 导出审阅包</button>
       <button class="button button-dark" data-action="export-docx">导出 DOCX</button>
     `)}
-    ${renderPresetRibbon()}
+    ${renderEditorBanner()}
     <div class="file-ribbon" title="内嵌模板工作副本，源模板只读">
       <div class="file-ribbon-icon">模板</div>
       <div class="file-ribbon-copy">
@@ -1149,7 +1147,7 @@ function renderEditor() {
       <button class="button button-dark" data-action="export-review-bundle" title="导出正式 DOCX 与 Agent 审阅包"><span>📦</span> 导出审阅包</button>
       <button class="button button-dark" data-action="export-docx">导出 DOCX</button>
     `)}
-    ${renderPresetRibbon()}
+    ${renderEditorBanner()}
     <div class="file-ribbon" title="内嵌模板工作副本，源模板只读">
       <div class="file-ribbon-icon">模板</div>
       <div class="file-ribbon-copy">
@@ -1180,6 +1178,7 @@ function renderEditor() {
             <button class="button button-quiet button-sm" data-action="reset-current-section" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="仅将当前 Section 恢复至初始模板状态（保留其他 Section 修改）" style="height:22px;padding:0 8px;font-size:10px;line-height:20px;color:#d97706;">↺ 恢复本节</button>
             <button class="button button-quiet button-sm" data-table-action="add-note-row" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="在当前节顶部插入单列说明行" style="height:22px;padding:0 8px;font-size:10px;line-height:20px;color:#0284c7;">＋ 说明行</button>
             <button class="button button-quiet button-sm" data-table-action="add-row" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="在表格末尾追加一行" style="height:22px;padding:0 8px;font-size:10px;line-height:20px;">＋ 追加行</button>
+            <button class="button button-quiet button-sm btn-clear-section" data-action="clear-current-section-values" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="一键清空当前章节所有单元格内容（支持普通与预设模式）" style="height:22px;padding:0 8px;font-size:10px;line-height:20px;color:#ef4444;border-color:rgba(239,68,68,0.3);">🗑️ 清空本节填写值</button>
             <span class="pill pill-green">${errors.length ? `${errors.length} 个问题` : '通过'}</span>
           </div>
         </div>
@@ -1202,14 +1201,10 @@ function renderEditor() {
 }
 
 function renderEditorTable(record) {
-  const activePreset = state.editor.presetModeEnabled && state.editor.activePresetId
-    ? state.editor.presets.find((p) => p.id === state.editor.activePresetId)
-    : null;
   return renderEditorTableMarkup(record, {
     allowLabelEdit: state.editor.allowLabelEdit,
     roleStyles: state.editor.engine?.roleStyles || null,
-    activePreset,
-    getCellSemanticKey,
+    isPresetMode: state.editor.isPresetEditing,
   });
 }
 
@@ -2067,6 +2062,65 @@ async function fetchTemplate(name) {
 }
 
 
+  
+  // 值清空功能绑定 (普通模式与预设模式均支持)
+  root.querySelectorAll('[data-cell-action="clear-value"]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const record = recordById(state.editor.engine, btn.dataset.recordId);
+      const cell = getCell(record, btn.dataset.row, btn.dataset.col);
+      if (cell && cell.editable) {
+        clearCellValue(cell, state.editor.engine?.roleStyles?.value);
+        state.editor.dirty = true;
+        refreshEditorDirty();
+        renderApp();
+      }
+    });
+  });
+
+  root.querySelectorAll('[data-action="clear-current-section-values"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const record = recordById(state.editor.engine, btn.dataset.recordId);
+      if (!record) return;
+      if (window.confirm(`确定要清空【${record.title || '当前章节'}】的所有填写内容吗？`)) {
+        clearSectionValues(record, state.editor.engine?.roleStyles?.value);
+        state.editor.dirty = true;
+        refreshEditorDirty();
+        showToast(`已清空【${record.title || '当前章节'}】的所有填写内容。`, 'info');
+        renderApp();
+      }
+    });
+  });
+
+  // 预设模式切换与保存动作
+  root.querySelectorAll('[data-action="enter-preset-mode"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      enterPresetEditing(state.editor.editingPresetId || 'preset_guocai_cn');
+    });
+  });
+
+  root.querySelectorAll('[data-action="exit-preset-editing"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      exitPresetEditing();
+    });
+  });
+
+  root.querySelectorAll('[data-action="save-current-preset"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      saveCurrentPreset(false);
+    });
+  });
+
+  root.querySelectorAll('[data-action="save-as-new-preset"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      saveCurrentPreset(true);
+    });
+  });
+
+  root.querySelector('#switch-editing-preset-select')?.addEventListener('change', (e) => {
+    enterPresetEditing(e.target.value);
+  });
+
   // 局部同步覆写预设交互事件绑定
   root.querySelector('#preset-mode-toggle')?.addEventListener('change', (e) => {
     state.editor.presetModeEnabled = e.target.checked;
@@ -2281,6 +2335,92 @@ function exportJson() {
   showToast('识别 JSON 已下载。', 'success');
 }
 
+
+async function enterPresetEditing(presetId) {
+  const p = state.editor.presets.find((x) => x.id === presetId) || state.editor.presets[0];
+  if (!p) return;
+  if (!state.editor.isPresetEditing) {
+    state.editor.normalEngine = state.editor.engine;
+  }
+  state.editor.editingPresetId = p.id;
+
+  try {
+    const rawBuf = engineBuffer(state.editor.normalEngine || state.editor.engine);
+    const presetEngine = await loadDocx(rawBuf, p.targetTemplate || state.editor.template);
+    
+    // 清空所有表格数据，然后注入预设已有值
+    for (const rec of tableRecords(presetEngine)) {
+      clearSectionValues(rec);
+    }
+    if (p.fieldOverrides) {
+      applySemanticOverrides(presetEngine, p.fieldOverrides);
+    }
+    if (p.headerFooterOverrides) {
+      updateHeaderFooterData(presetEngine, p.headerFooterOverrides);
+    }
+
+    state.editor.engine = presetEngine;
+    state.editor.isPresetEditing = true;
+    state.editor.dirty = false;
+    showToast(`已进入【${p.name}】预设编辑模式。你可以在编辑器中修改任意地方，编辑完成后请点击【保存预设】。`, 'info');
+    renderApp();
+  } catch (err) {
+    showToast(`进入预设编辑模式失败：${err.message}`, 'error');
+  }
+}
+
+function exitPresetEditing() {
+  if (state.editor.dirty && !window.confirm('当前预设尚有未保存的修改，退出将丢失修改。确定退出并返回普通模式吗？')) {
+    return;
+  }
+  if (state.editor.normalEngine) {
+    state.editor.engine = state.editor.normalEngine;
+    state.editor.normalEngine = null;
+  }
+  state.editor.isPresetEditing = false;
+  state.editor.dirty = false;
+  showToast('已退出预设编辑模式，已返回普通文档编辑。', 'success');
+  renderApp();
+}
+
+function saveCurrentPreset(isNew = false) {
+  if (!state.editor.engine) return;
+  let p = state.editor.presets.find((x) => x.id === state.editor.editingPresetId);
+  if (isNew || !p) {
+    const name = window.prompt('请输入新预设名称：', '新自定义预设');
+    if (!name || !name.trim()) return;
+    const newId = `preset_${Date.now()}`;
+    p = {
+      id: newId,
+      name: name.trim(),
+      targetTemplate: state.editor.template.includes('EN') ? 'EN 国彩' : 'CN 国彩',
+      isBuiltin: false,
+      enabledForExport: true,
+      headerFooterOverrides: {},
+      fieldOverrides: {},
+    };
+    state.editor.presets.push(p);
+    state.editor.editingPresetId = newId;
+  }
+
+  // 提取当前引擎中所有非空值作为覆盖模板
+  const snapshot = extractSemanticSnapshot(state.editor.engine);
+  p.fieldOverrides = snapshot;
+  const hf = state.editor.engine.headerFooterData || {};
+  p.headerFooterOverrides = {
+    company: hf.company || '',
+    title: hf.title || '',
+    version: hf.version || '',
+    revisionDate: hf.revisionDate || '',
+    customFileNamePattern: hf.customFileNamePattern || (p.headerFooterOverrides?.customFileNamePattern) || '',
+  };
+
+  PresetStore.savePresets(state.editor.presets);
+  state.editor.dirty = false;
+  showToast(`预设【${p.name}】已成功保存！（包含 ${Object.keys(snapshot).length} 项覆盖值）`, 'success');
+  renderApp();
+}
+
 async function exportDocx() {
   if (!state.editor.engine) return;
   if (state.editor.presetModeEnabled) {
@@ -2320,7 +2460,11 @@ async function exportDocx() {
 }
 
 async function executeBatchPresetExport() {
-  if (!state.editor.engine) return;
+  const baseEngine = state.editor.isPresetEditing ? state.editor.normalEngine : state.editor.engine;
+  if (!baseEngine) {
+    showToast('缺少主文档实例，无法导出。', 'error');
+    return;
+  }
   if (state.review.session) {
     const gate = checkExportGate(state.review.session);
     if (!gate.allowed) {
@@ -2330,7 +2474,7 @@ async function executeBatchPresetExport() {
       return;
     }
   }
-  const errors = auditEngine(state.editor.engine);
+  const errors = auditEngine(baseEngine);
   if (errors.length) {
     showToast(`导出已阻止：请先处理 ${errors.length} 个审计问题。`, 'error');
     return;
@@ -2340,16 +2484,16 @@ async function executeBatchPresetExport() {
   const checkedPresetIds = Array.from(root.querySelectorAll('.export-preset-check:checked')).map((el) => el.dataset.presetId);
   const selectedPresets = state.editor.presets.filter((p) => checkedPresetIds.includes(p.id));
 
-  showToast('正在生成基准与衍生预设文档，请稍候…', 'info');
+  showToast('正在生成普通与预设文档，请稍候…', 'info');
 
   try {
     const outputs = [];
-    const baseModel = state.editor.engine?.headerFooterData?.model || '';
+    const baseModel = baseEngine.headerFooterData?.model || '';
 
-    // 1. 导出基准版本
+    // 1. 导出普通版本 (主文档)
     if (exportBase) {
-      const baseBuffer = await state.editor.engine.exportArrayBuffer();
-      const baseName = buildExportDocxName(state.editor.engine, {
+      const baseBuffer = await baseEngine.exportArrayBuffer();
+      const baseName = buildExportDocxName(baseEngine, {
         customFileName: state.editor.customFileName,
         templateName: state.editor.template,
         sourcePreviewName: state.sourcePreview?.name,
@@ -2358,33 +2502,14 @@ async function executeBatchPresetExport() {
       outputs.push({ name: baseName, buffer: baseBuffer });
     }
 
-    // 2. 提取基准全部语义快照
-    const baseSnapshot = extractSemanticSnapshot(state.editor.engine);
-
-    // 3. 逐个生成预设衍生版本
+    // 2. 逐个生成勾选的预设版本 (优先级覆盖：预设填了的优先覆盖，未填继承主文档)
     for (const preset of selectedPresets) {
-      const rawBuf = engineBuffer(state.editor.engine);
+      const rawBuf = engineBuffer(baseEngine);
       const presetEngine = await loadDocx(rawBuf, preset.targetTemplate || state.editor.template);
 
-      // 同步基准全部数据到衍生引擎
-      applySemanticOverrides(presetEngine, baseSnapshot);
+      // 核心：调用 applyPresetPriorityOverlay
+      applyPresetPriorityOverlay(baseEngine, preset, presetEngine);
 
-      // 应用预设专有的字段覆写
-      if (preset.fieldOverrides) {
-        applySemanticOverrides(presetEngine, preset.fieldOverrides);
-      }
-
-      // 应用预设专有的页眉页脚与公司主体
-      const hf = { ...(state.editor.engine.headerFooterData || {}) };
-      if (preset.headerFooterOverrides) {
-        if (preset.headerFooterOverrides.company) hf.company = preset.headerFooterOverrides.company;
-        if (preset.headerFooterOverrides.title) hf.title = preset.headerFooterOverrides.title;
-        if (preset.headerFooterOverrides.version) hf.version = preset.headerFooterOverrides.version;
-        if (preset.headerFooterOverrides.revisionDate) hf.revisionDate = preset.headerFooterOverrides.revisionDate;
-      }
-      updateHeaderFooterData(presetEngine, hf);
-
-      // 计算衍生文档文件名
       const presetFileName = getPresetExportFileName(preset, baseModel);
       const presetBuffer = await presetEngine.exportArrayBuffer();
       outputs.push({ name: presetFileName, buffer: presetBuffer });
@@ -2407,69 +2532,14 @@ async function executeBatchPresetExport() {
       const zipBlob = await zip.generateAsync({ type: 'blob' });
       const zipName = `${baseModel || 'MSDS'}_多版本同步包.zip`;
       downloadBlob(zipBlob, zipName);
-      showToast(`🎉 成功同步导出 ${outputs.length} 份标准文档并打包为 ${zipName}！`, 'success');
+      showToast(`🎉 成功按预设优先级覆盖同步导出 ${outputs.length} 份标准文档！`, 'success');
     }
 
     state.editor.exportModalOpen = false;
-    state.editor.dirty = false;
     renderApp();
   } catch (error) {
     showToast(`同步导出失败：${error.message}`, 'error');
   }
 }
 
-async function handleExportReviewBundle() {
-  if (!state.review.session) {
-    showToast('当前尚未生成审阅会话，请先执行智能匹配。', 'warning');
-    return;
-  }
-  const gate = checkExportGate(state.review.session);
-  if (!gate.allowed) {
-    showToast(`导出已阻止：${gate.message}`, 'error');
-    state.review.drawerOpen = true;
-    renderApp();
-    return;
-  }
 
-  const tEngine = state.editor.engine || state.matching.templateEngine;
-  if (!tEngine) {
-    showToast('缺少模板引擎实例，无法导出审阅包。', 'error');
-    return;
-  }
-
-  try {
-    const cleanDocxBuf = await tEngine.exportArrayBuffer();
-    const finalDocxName = buildExportDocxName(tEngine, {
-      customFileName: state.editor.customFileName,
-      templateName: state.matching.template || state.editor.template,
-      sourcePreviewName: state.sourcePreview?.name,
-      productModel: tEngine?.headerFooterData?.model || state.review.session?.productModel,
-    });
-    const model = state.review.session.productModel || 'MSDS';
-
-    const bundle = buildReviewBundle(state.review.session, { finalDocxName });
-
-    const zip = new JSZip();
-    zip.file(finalDocxName, cleanDocxBuf);
-    for (const [fname, content] of Object.entries(bundle.files)) {
-      zip.file(fname, content);
-    }
-
-    const zipBlob = await zip.generateAsync({ type: 'blob' });
-    downloadBlob(zipBlob, `${model}_MSDS_REVIEW_BUNDLE.zip`);
-    showToast(`正式 MSDS 与 Agent 审阅包已成功导出 (${gate.status})！`, 'success');
-  } catch (err) {
-    showToast(`审阅包导出失败: ${err.message}`, 'error');
-  }
-}
-
-async function bootstrap() {
-  renderApp();
-  try {
-    await loadEditorTemplate('CN 冠志');
-  } catch (error) {
-    showToast('内嵌模板暂时无法加载，请确认开发服务器已启动。', 'error');
-  }
-}
-
-bootstrap();

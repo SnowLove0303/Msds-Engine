@@ -2127,3 +2127,66 @@ export class PresetStore {
     return result;
   }
 }
+
+
+// ============================================================
+// 值清空功能 (Clear Value Functions) - 支持普通与预设编辑模式
+// ============================================================
+
+export function clearCellValue(cell, valueStyle = null) {
+  if (!cell || !cell.editable) return false;
+  writeCellValue(cell, '', valueStyle);
+  return true;
+}
+
+export function clearSectionValues(record, valueStyle = null) {
+  if (!record || !Array.isArray(record.rows)) return 0;
+  let clearedCount = 0;
+  for (const row of record.rows) {
+    for (const cell of row.cells) {
+      if (cell.editable) {
+        writeCellValue(cell, '', valueStyle);
+        clearedCount++;
+      }
+    }
+  }
+  return clearedCount;
+}
+
+// ============================================================
+// 预设优先级覆盖核心合并管线 (Preset Priority Overlay Pipeline)
+// ============================================================
+
+export function applyPresetPriorityOverlay(baseEngine, preset, targetEngine) {
+  if (!baseEngine || !preset || !targetEngine) return 0;
+
+  // 1. 提取普通基准模式全部语义快照
+  const baseSnapshot = extractSemanticSnapshot(baseEngine);
+
+  // 2. 准备最终合并键值对：优先采用预设的非空值，未填项继承普通基准
+  const mergedValues = { ...baseSnapshot };
+  const presetValues = preset.fieldOverrides || preset.values || {};
+  for (const [key, val] of Object.entries(presetValues)) {
+    if (val !== undefined && val !== null && String(val).trim() !== '') {
+      mergedValues[key] = String(val); // 优先级覆盖！
+    }
+  }
+
+  // 3. 应用到目标引擎
+  const appliedCount = applySemanticOverrides(targetEngine, mergedValues);
+
+  // 4. 合并页眉页脚
+  const baseHf = baseEngine.headerFooterData || {};
+  const presetHf = preset.headerFooterOverrides || preset.headerFooterData || {};
+  const mergedHf = {
+    ...baseHf,
+    company: presetHf.company?.trim() || baseHf.company || '',
+    title: presetHf.title?.trim() || baseHf.title || '物料安全数据表',
+    version: presetHf.version?.trim() || baseHf.version || 'V1.0',
+    revisionDate: presetHf.revisionDate?.trim() || baseHf.revisionDate || '',
+    model: baseHf.model || '', // 型号始终继承主文档
+  };
+  updateHeaderFooterData(targetEngine, mergedHf);
+
+  return appliedCount;
+}
