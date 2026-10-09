@@ -964,6 +964,12 @@ function renderHeaderFooterEditor(engine, records, query) {
 
   return `
     ${headerBand('模板编辑器', '', '', `
+      ${state.editor.isPresetEditing ? `
+        <button class="button button-quiet" data-action="save-current-preset" style="color:#000;background:#f59e0b;font-weight:700;"><span>💾</span> 保存预设</button>
+        <button class="button button-quiet" data-action="exit-preset-editing" style="color:#fff;background:rgba(255,255,255,0.15);"><span>↩️</span> 退出预设</button>
+      ` : `
+        <button class="button button-quiet" data-action="enter-preset-mode" style="color:#f59e0b;border-color:rgba(245,158,11,.6);font-weight:600;"><span>⚙️</span> 进入预设编辑</button>
+      `}
       <button class="button button-quiet" data-action="reset-all-template" title="清空全部修改并恢复至初始模板状态">↺ 恢复整份模板</button>
       <button class="button button-quiet" data-action="run-audit">审计</button>
       <button class="button button-quiet" data-action="toggle-review-drawer" title="查看或管理批注与问题清单"><span>💬</span> 批注 (${(state.review.session?.annotations || []).filter((a) => a.status === 'open').length})</button>
@@ -1141,6 +1147,12 @@ function renderEditor() {
   if (selectedVisible) state.editor.selectedRecordId = selectedVisible.id;
   return `
     ${headerBand('模板编辑器', '', '', `
+      ${state.editor.isPresetEditing ? `
+        <button class="button button-quiet" data-action="save-current-preset" style="color:#000;background:#f59e0b;font-weight:700;"><span>💾</span> 保存预设</button>
+        <button class="button button-quiet" data-action="exit-preset-editing" style="color:#fff;background:rgba(255,255,255,0.15);"><span>↩️</span> 退出预设</button>
+      ` : `
+        <button class="button button-quiet" data-action="enter-preset-mode" style="color:#f59e0b;border-color:rgba(245,158,11,.6);font-weight:600;"><span>⚙️</span> 进入预设编辑</button>
+      `}
       <button class="button button-quiet" data-action="reset-all-template" title="清空全部修改并恢复至初始模板状态">↺ 恢复整份模板</button>
       <button class="button button-quiet" data-action="run-audit">审计</button>
       <button class="button button-quiet" data-action="toggle-review-drawer" title="查看或管理批注与问题清单"><span>💬</span> 批注 (${(state.review.session?.annotations || []).filter((a) => a.status === 'open').length})</button>
@@ -2337,8 +2349,20 @@ function exportJson() {
 
 
 async function enterPresetEditing(presetId) {
+  if (!state.editor.engine && !state.editor.normalEngine) {
+    try {
+      await loadEditorTemplate(state.editor.template || 'CN 冠志');
+    } catch (e) {
+      showToast('请先等待模板底稿加载完成。', 'warning');
+      return;
+    }
+  }
+
   const p = state.editor.presets.find((x) => x.id === presetId) || state.editor.presets[0];
-  if (!p) return;
+  if (!p) {
+    showToast('未找到指定预设配置。', 'warning');
+    return;
+  }
   if (!state.editor.isPresetEditing) {
     state.editor.normalEngine = state.editor.engine;
   }
@@ -2346,15 +2370,18 @@ async function enterPresetEditing(presetId) {
 
   try {
     const rawBuf = engineBuffer(state.editor.normalEngine || state.editor.engine);
-    const presetEngine = await loadDocx(rawBuf, p.targetTemplate || state.editor.template);
+    const docxName = `${p.targetTemplate || state.editor.template || 'template'}.docx`;
+    const presetEngine = await loadDocx(rawBuf, docxName);
     
-    // 清空所有表格数据，然后注入预设已有值
+    // 清空所有表格数据，展示纯净预设画布
     for (const rec of tableRecords(presetEngine)) {
       clearSectionValues(rec);
     }
-    if (p.fieldOverrides) {
+    // 注入当前预设已保存的字段覆盖值
+    if (p.fieldOverrides && Object.keys(p.fieldOverrides).length > 0) {
       applySemanticOverrides(presetEngine, p.fieldOverrides);
     }
+    // 注入当前预设的页眉页脚
     if (p.headerFooterOverrides) {
       updateHeaderFooterData(presetEngine, p.headerFooterOverrides);
     }
@@ -2362,9 +2389,10 @@ async function enterPresetEditing(presetId) {
     state.editor.engine = presetEngine;
     state.editor.isPresetEditing = true;
     state.editor.dirty = false;
-    showToast(`已进入【${p.name}】预设编辑模式。你可以在编辑器中修改任意地方，编辑完成后请点击【保存预设】。`, 'info');
+    showToast(`已成功进入【${p.name}】预设编辑模式！可在任意位置修改，完成后点击【保存预设】。`, 'info');
     renderApp();
   } catch (err) {
+    console.error('进入预设编辑模式失败:', err);
     showToast(`进入预设编辑模式失败：${err.message}`, 'error');
   }
 }

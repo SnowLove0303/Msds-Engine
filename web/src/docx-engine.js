@@ -1121,8 +1121,9 @@ export function stampDocumentIdentity(engine, info = {}) {
 }
 
 export async function loadDocx(source, sourceName = 'document.docx') {
-  if (!String(sourceName).toLowerCase().endsWith('.docx')) {
-    throw new DocxEngineError('网页识别工作区只支持 .docx 文件。', 'UNSUPPORTED_EXTENSION');
+  let safeName = String(sourceName || 'document.docx');
+  if (!safeName.toLowerCase().endsWith('.docx')) {
+    safeName += '.docx';
   }
   let bytes;
   if (source instanceof ArrayBuffer) bytes = new Uint8Array(source);
