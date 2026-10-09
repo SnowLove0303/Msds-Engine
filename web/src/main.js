@@ -89,7 +89,7 @@ const state = {
     query: '',
     customFileName: '',
     isPresetEditing: false,
-    editingPresetId: 'preset_guocai_cn',
+    editingPresetId: null,
     normalEngine: null,
     presets: PresetStore.loadPresets(),
     exportModalOpen: false,
@@ -348,45 +348,66 @@ function getPresetExportFileName(preset, model) {
   if (preset.headerFooterOverrides?.customFileNamePattern) {
     return preset.headerFooterOverrides.customFileNamePattern.replace('{model}', m);
   }
-  const entity = preset.headerFooterOverrides?.entity || (preset.name.includes('国彩') ? '国彩' : '衍生');
+  const cleanPresetName = (preset.name || '预设').replace(/[\\/:*?"<>|]/g, '_');
   const lang = preset.targetTemplate?.includes('EN') ? 'EN' : 'CN';
-  return `${m} msds_${lang} ${entity}.docx`;
+  return `${m} msds_${lang}_${cleanPresetName}.docx`;
 }
 
 function renderEditorBanner() {
   if (state.editor.isPresetEditing) {
-    const curP = state.editor.presets.find((p) => p.id === state.editor.editingPresetId) || state.editor.presets[0];
+    const activePreset = state.editor.presets.find((x) => x.id === state.editor.editingPresetId) || state.editor.presets[0] || { id: 'preset_custom_1', name: '自定义预设 1', fieldOverrides: {} };
     return `
       <div class="preset-mode-banner">
         <div class="preset-banner-title">
-          <span>⚙️ 预设编辑模式</span>
-          <span style="font-weight:400;color:#fde68a;">正在编辑覆盖模板：</span>
-          <select id="switch-editing-preset-select" class="preset-layer-select" style="font-size:13px;padding:3px 10px;background:#1e1b4b;border-color:#f59e0b;color:#fef08a;">
-            ${state.editor.presets.map((p) => `
-              <option value="${escapeHtml(p.id)}" ${p.id === state.editor.editingPresetId ? 'selected' : ''}>
-                ${escapeHtml(p.name)} [${escapeHtml(p.targetTemplate)}]
-              </option>
-            `).join('')}
-          </select>
+          <span class="preset-banner-badge">⚙️ 预设局部覆写模式</span>
+          <div class="preset-name-edit-group">
+            <label for="editing-preset-name-input" class="preset-name-label">当前预设名称：</label>
+            <input
+              id="editing-preset-name-input"
+              class="preset-name-input"
+              value="${escapeHtml(activePreset.name)}"
+              placeholder="输入预设名称"
+              title="可直接修改此预设名称，保存时自动生效"
+            />
+          </div>
+          <div class="preset-switch-group">
+            <label for="switch-editing-preset-select" class="preset-switch-label">切换：</label>
+            <select id="switch-editing-preset-select" class="preset-selector-dropdown">
+              ${state.editor.presets.map((p) => `
+                <option value="${escapeHtml(p.id)}" ${p.id === activePreset.id ? 'selected' : ''}>
+                  ${escapeHtml(p.name)} (${Object.keys(p.fieldOverrides || {}).length}项覆写)
+                </option>
+              `).join('')}
+            </select>
+          </div>
         </div>
         <div class="preset-banner-actions">
-          <button class="button button-quiet button-sm" data-action="save-current-preset" style="background:#f59e0b;color:#000;font-weight:700;border:none;">💾 保存预设</button>
-          <button class="button button-quiet button-sm" data-action="save-as-new-preset" style="color:#fde68a;border-color:#f59e0b;">➕ 另存为新预设</button>
-          <button class="button button-quiet button-sm" data-action="exit-preset-editing" style="color:#fff;background:rgba(255,255,255,0.15);">↩️ 退出预设编辑 (回普通模式)</button>
+          <button type="button" class="button button-quiet button-sm btn-preset-new" data-action="create-new-preset" title="新建一个全新的空白预设">➕ 新建预设</button>
+          <button type="button" class="button button-quiet button-sm btn-preset-clone" data-action="save-as-new-preset" title="将当前编辑的覆写另存为新预设">📋 另存为新预设</button>
+          <button type="button" class="button button-quiet button-sm btn-preset-clear" data-action="clear-all-preset-overrides" title="清空本预设所有覆写字段，恢复全部留空继承">🧹 清空所有覆写</button>
+          ${state.editor.presets.length > 1 ? `
+            <button type="button" class="button button-quiet button-sm btn-preset-delete" data-action="delete-current-preset" title="删除当前正在编辑的预设">🗑️ 删除此预设</button>
+          ` : ''}
+          <button type="button" class="button button-primary button-sm btn-preset-save" data-action="save-current-preset" title="保存对当前预设的覆写修改与名称">💾 保存预设</button>
+          <button type="button" class="button button-quiet button-sm btn-preset-exit" data-action="exit-preset-editing" title="退出预设编辑，返回普通物料文档编辑">↩️ 退出预设 (返回普通模式)</button>
         </div>
       </div>
     `;
   }
   return `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 16px;background:rgba(15,23,42,.6);border-bottom:1px solid rgba(148,163,184,.15);font-size:12px;">
-      <span style="color:#94a3b8;">当前模式：<strong style="color:#38bdf8;">普通文档编辑</strong>（编辑具体物料主稿）</span>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <button class="button button-quiet button-xs" data-action="open-preset-export-modal" style="color:#38bdf8;border-color:rgba(56,189,248,.4);padding:2px 10px;font-size:11px;" title="勾选预设，局部优先级覆盖同步导出多版本 DOCX">📦 预设同步导出</button>
-        <button class="button button-quiet button-xs" data-action="enter-preset-mode" style="color:#f59e0b;border-color:rgba(245,158,11,.4);padding:2px 10px;font-size:11px;" title="进入预设编辑模式，对整个 MSDS 任意地方配置并保存覆盖模板">⚙️ 进入预设编辑模式</button>
+    <div class="normal-mode-banner">
+      <div class="normal-banner-info">
+        <span class="normal-mode-indicator">当前模式：<strong>普通文档编辑</strong>（编辑此物料的具体主稿内容）</span>
+        <span class="normal-preset-count">已存预设：${state.editor.presets.length} 个</span>
+      </div>
+      <div class="normal-banner-actions">
+        <button class="button button-quiet button-xs btn-normal-export-presets" data-action="open-preset-export-modal" title="勾选预设，局部优先级覆盖同步导出多版本 DOCX">📦 预设同步导出</button>
+        <button class="button button-quiet button-xs btn-normal-enter-preset" data-action="enter-preset-mode" title="进入预设编辑模式，对 MSDS 整个模板进行局部覆写预设">⚙️ 进入预设编辑模式</button>
       </div>
     </div>
   `;
 }
+
 function renderPresetExportModal() {
   if (!state.editor.exportModalOpen) return '';
   const baseModel = state.editor.engine?.headerFooterData?.model || '';
@@ -1782,12 +1803,12 @@ function bindEvents() {
   if (!root._presetDelegationBound) {
     root._presetDelegationBound = true;
     root.addEventListener('click', (e) => {
-      // 1. 进入预设编辑模式 (支持顶部与条幅两处按钮)
+      // 1. 进入预设编辑模式
       const enterBtn = e.target.closest('[data-action="enter-preset-mode"]');
       if (enterBtn) {
         e.preventDefault();
         e.stopPropagation();
-        enterPresetEditing(state.editor.editingPresetId || 'preset_guocai_cn');
+        enterPresetEditing(state.editor.editingPresetId || state.editor.presets[0]?.id);
         return;
       }
 
@@ -1818,7 +1839,34 @@ function bindEvents() {
         return;
       }
 
-      // 5. 打开预设同步导出弹窗
+      // 5. 新建空白预设
+      const newPresetBtn = e.target.closest('[data-action="create-new-preset"]');
+      if (newPresetBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleCreateNewPreset();
+        return;
+      }
+
+      // 6. 删除当前预设
+      const deleteCurPresetBtn = e.target.closest('[data-action="delete-current-preset"]');
+      if (deleteCurPresetBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleDeleteCurrentPreset();
+        return;
+      }
+
+      // 7. 清空当前预设所有覆写
+      const clearAllOverridesBtn = e.target.closest('[data-action="clear-all-preset-overrides"]');
+      if (clearAllOverridesBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleClearAllPresetOverrides();
+        return;
+      }
+
+      // 8. 打开预设同步导出弹窗
       const openExportModalBtn = e.target.closest('[data-action="open-preset-export-modal"]');
       if (openExportModalBtn) {
         e.preventDefault();
@@ -1828,7 +1876,7 @@ function bindEvents() {
         return;
       }
 
-      // 6. 关闭预设弹窗
+      // 9. 关闭预设弹窗
       const closeModalBtn = e.target.closest('[data-action="close-preset-modal"]');
       if (closeModalBtn) {
         e.preventDefault();
@@ -1839,7 +1887,7 @@ function bindEvents() {
         return;
       }
 
-      // 7. 确认批量预设导出
+      // 10. 确认批量预设导出
       const confirmBatchBtn = e.target.closest('[data-action="confirm-batch-preset-export"]');
       if (confirmBatchBtn) {
         e.preventDefault();
@@ -1848,7 +1896,7 @@ function bindEvents() {
         return;
       }
 
-      // 8. 单元格一键清空值 (普通模式与预设模式通用)
+      // 11. 单元格一键清空值 (普通模式与预设模式通用)
       const clearCellBtn = e.target.closest('[data-cell-action="clear-value"]');
       if (clearCellBtn) {
         e.preventDefault();
@@ -1864,7 +1912,7 @@ function bindEvents() {
         return;
       }
 
-      // 9. 整节填写值一键清空
+      // 12. 整节填写值一键清空
       const clearSecBtn = e.target.closest('[data-action="clear-current-section-values"]');
       if (clearSecBtn) {
         e.preventDefault();
@@ -1884,6 +1932,14 @@ function bindEvents() {
   }
 
   // 预设选择器与复选框事件 (每次 renderApp 刷新)
+  root.querySelector('#editing-preset-name-input')?.addEventListener('input', (e) => {
+    const curP = state.editor.presets.find((p) => p.id === state.editor.editingPresetId);
+    if (curP && e.target.value.trim()) {
+      curP.name = e.target.value.trim();
+      PresetStore.savePresets(state.editor.presets);
+    }
+  });
+
   root.querySelector('#switch-editing-preset-select')?.addEventListener('change', (e) => {
     enterPresetEditing(e.target.value);
   });
@@ -2399,9 +2455,13 @@ async function enterPresetEditing(presetId) {
     try {
       await loadEditorTemplate(state.editor.template || 'CN 冠志');
     } catch (e) {
-      showToast('请先等待模板底稿加载完成。', 'warning');
+      showToast('请等待底模加载完成。', 'warning');
       return;
     }
+  }
+
+  if (!state.editor.presets || state.editor.presets.length === 0) {
+    state.editor.presets = PresetStore.loadPresets();
   }
 
   const p = state.editor.presets.find((x) => x.id === presetId) || state.editor.presets[0];
@@ -2419,7 +2479,7 @@ async function enterPresetEditing(presetId) {
     const docxName = `${p.targetTemplate || state.editor.template || 'template'}.docx`;
     const presetEngine = await loadDocx(rawBuf, docxName);
     
-    // 清空所有表格数据，展示纯净预设画布
+    // 清空所有表格值，展示纯预设画布
     for (const rec of tableRecords(presetEngine)) {
       clearSectionValues(rec);
     }
@@ -2427,7 +2487,7 @@ async function enterPresetEditing(presetId) {
     if (p.fieldOverrides && Object.keys(p.fieldOverrides).length > 0) {
       applySemanticOverrides(presetEngine, p.fieldOverrides);
     }
-    // 注入当前预设的页眉页脚
+    // 注入当前预设页眉页脚
     if (p.headerFooterOverrides) {
       updateHeaderFooterData(presetEngine, p.headerFooterOverrides);
     }
@@ -2435,7 +2495,7 @@ async function enterPresetEditing(presetId) {
     state.editor.engine = presetEngine;
     state.editor.isPresetEditing = true;
     state.editor.dirty = false;
-    showToast(`已成功进入【${p.name}】预设编辑模式！可在任意位置修改，完成后点击【保存预设】。`, 'info');
+    showToast(`已进入【${p.name}】预设覆写编辑模式。可在上方直接修改预设名称或在下方编辑字段覆写。`, 'info');
     renderApp();
   } catch (err) {
     console.error('进入预设编辑模式失败:', err);
@@ -2444,7 +2504,7 @@ async function enterPresetEditing(presetId) {
 }
 
 function exitPresetEditing() {
-  if (state.editor.dirty && !window.confirm('当前预设尚有未保存的修改，退出将丢失修改。确定退出并返回普通模式吗？')) {
+  if (state.editor.dirty && !window.confirm('当前预设编辑有未保存修改，退出将丢失这些修改。确定要退出并返回普通模式吗？')) {
     return;
   }
   if (state.editor.normalEngine) {
@@ -2453,21 +2513,25 @@ function exitPresetEditing() {
   }
   state.editor.isPresetEditing = false;
   state.editor.dirty = false;
-  showToast('已退出预设编辑模式，已返回普通文档编辑。', 'success');
+  showToast('已退出预设编辑模式，已安全返回普通文档编辑。', 'success');
   renderApp();
 }
 
 function saveCurrentPreset(isNew = false) {
   if (!state.editor.engine) return;
+  const nameInput = root.querySelector('#editing-preset-name-input');
+  const inputName = nameInput?.value?.trim();
+
   let p = state.editor.presets.find((x) => x.id === state.editor.editingPresetId);
   if (isNew || !p) {
-    const name = window.prompt('请输入新预设名称：', '新自定义预设');
+    const defaultName = isNew && p ? `${p.name} (副本)` : `自定义预设 ${state.editor.presets.length + 1}`;
+    const name = window.prompt('请输入另存为的新预设名称：', defaultName);
     if (!name || !name.trim()) return;
     const newId = `preset_${Date.now()}`;
     p = {
       id: newId,
       name: name.trim(),
-      targetTemplate: state.editor.template.includes('EN') ? 'EN 国彩' : 'CN 国彩',
+      targetTemplate: state.editor.template || 'CN 冠志',
       isBuiltin: false,
       enabledForExport: true,
       headerFooterOverrides: {},
@@ -2475,9 +2539,11 @@ function saveCurrentPreset(isNew = false) {
     };
     state.editor.presets.push(p);
     state.editor.editingPresetId = newId;
+  } else if (inputName && inputName !== p.name) {
+    p.name = inputName;
   }
 
-  // 提取当前引擎中所有非空值作为覆盖模板
+  // 提取当前所有非空值作为覆盖项
   const snapshot = extractSemanticSnapshot(state.editor.engine);
   p.fieldOverrides = snapshot;
   const hf = state.editor.engine.headerFooterData || {};
@@ -2491,7 +2557,49 @@ function saveCurrentPreset(isNew = false) {
 
   PresetStore.savePresets(state.editor.presets);
   state.editor.dirty = false;
-  showToast(`预设【${p.name}】已成功保存！（包含 ${Object.keys(snapshot).length} 项覆盖值）`, 'success');
+  showToast(`预设【${p.name}】已成功保存！共包含 ${Object.keys(snapshot).length} 项覆写值。`, 'success');
+  renderApp();
+}
+
+function handleCreateNewPreset() {
+  const name = window.prompt('请输入新预设的名称（如：出口客户A、清远分厂、定制版等）：', `自定义预设 ${state.editor.presets.length + 1}`);
+  if (!name || !name.trim()) return;
+  const newPreset = PresetStore.createPreset(name.trim(), state.editor.template || 'CN 冠志');
+  state.editor.presets.push(newPreset);
+  PresetStore.savePresets(state.editor.presets);
+  state.editor.editingPresetId = newPreset.id;
+  enterPresetEditing(newPreset.id);
+  showToast(`已创建并进入新预设【${newPreset.name}】！可在编辑器中直接修改覆写字段。`, 'success');
+}
+
+function handleDeleteCurrentPreset() {
+  if (state.editor.presets.length <= 1) {
+    showToast('至少需保留一个预设，无法删除最后一份预设。', 'warning');
+    return;
+  }
+  const curP = state.editor.presets.find((p) => p.id === state.editor.editingPresetId);
+  if (!curP) return;
+  if (!window.confirm(`确定要删除预设【${curP.name}】吗？删除后不可恢复。`)) return;
+  state.editor.presets = state.editor.presets.filter((p) => p.id !== curP.id);
+  PresetStore.savePresets(state.editor.presets);
+  const nextP = state.editor.presets[0];
+  state.editor.editingPresetId = nextP.id;
+  showToast(`已删除预设【${curP.name}】，已切换至【${nextP.name}】。`, 'info');
+  enterPresetEditing(nextP.id);
+}
+
+function handleClearAllPresetOverrides() {
+  const curP = state.editor.presets.find((p) => p.id === state.editor.editingPresetId);
+  if (!curP) return;
+  if (!window.confirm(`确定要清空预设【${curP.name}】的所有覆写值吗？\n清空后该预设所有字段将恢复留空继承普通文档。`)) return;
+  curP.fieldOverrides = {};
+  curP.headerFooterOverrides = {};
+  for (const rec of tableRecords(state.editor.engine)) {
+    clearSectionValues(rec);
+  }
+  PresetStore.savePresets(state.editor.presets);
+  state.editor.dirty = true;
+  showToast(`已清空预设【${curP.name}】的全部覆写值，所有字段现已恢复留空继承。`, 'info');
   renderApp();
 }
 

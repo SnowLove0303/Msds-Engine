@@ -2050,47 +2050,21 @@ export function applySemanticOverrides(engine, fieldOverrides = {}) {
   return count;
 }
 
-export const SYSTEM_BUILTIN_PRESETS = [
+export const SYSTEM_DEFAULT_PRESETS = [
   {
-    id: 'preset_guocai_cn',
-    name: '英德国彩主体 (CN)',
-    targetTemplate: 'CN 国彩',
-    isBuiltin: true,
+    id: 'preset_custom_1',
+    name: '自定义预设 1',
+    targetTemplate: 'CN 冠志',
+    isBuiltin: false,
     enabledForExport: true,
-    headerFooterOverrides: {
-      company: '英德市国彩新材料有限公司',
-      entity: '国彩',
-      customFileNamePattern: '{model} msds_CN 国彩.docx',
-    },
-    fieldOverrides: {
-      'sec1.supplier.name': '英德市国彩新材料有限公司',
-      'sec1.supplier.address': '英德市清华园东华片区新材料产业基地',
-      'sec1.supplier.tel': '86-763-2608111',
-      'sec1.supplier.fax': '86-763-2608222',
-    },
-  },
-  {
-    id: 'preset_guocai_en',
-    name: '英德国彩主体 (EN)',
-    targetTemplate: 'EN 国彩',
-    isBuiltin: true,
-    enabledForExport: false,
-    headerFooterOverrides: {
-      company: 'Yingde Guocai New Material Technology Co., Ltd.',
-      entity: '国彩',
-      customFileNamePattern: '{model} msds_EN 国彩.docx',
-    },
-    fieldOverrides: {
-      'sec1.supplier.name': 'Yingde Guocai New Material Technology Co., Ltd.',
-      'sec1.supplier.address': 'New Material Industrial Base, Donghua Area, Qinghua Park, Yingde, Guangdong, China',
-      'sec1.supplier.tel': '+86-763-2608111',
-      'sec1.supplier.fax': '+86-763-2608222',
-    },
+    headerFooterOverrides: {},
+    fieldOverrides: {},
   },
 ];
+export const SYSTEM_BUILTIN_PRESETS = SYSTEM_DEFAULT_PRESETS;
 
 export class PresetStore {
-  static STORAGE_KEY = 'msds_editor_presets_v1';
+  static STORAGE_KEY = 'msds_editor_presets_v2';
 
   static loadPresets() {
     try {
@@ -2106,7 +2080,19 @@ export class PresetStore {
     } catch (e) {
       console.warn('Failed to load presets from localStorage', e);
     }
-    return JSON.parse(JSON.stringify(SYSTEM_BUILTIN_PRESETS));
+    return JSON.parse(JSON.stringify(SYSTEM_DEFAULT_PRESETS));
+  }
+
+  static createPreset(name = '新建自定义预设', targetTemplate = 'CN 冠志') {
+    return {
+      id: `preset_${Date.now()}`,
+      name: (name || '新建自定义预设').trim(),
+      targetTemplate: targetTemplate || 'CN 冠志',
+      isBuiltin: false,
+      enabledForExport: true,
+      headerFooterOverrides: {},
+      fieldOverrides: {},
+    };
   }
 
   static savePresets(presets) {
