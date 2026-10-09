@@ -11,6 +11,7 @@
 import {
   writeCellValue,
   writeCellLabel,
+  setCellAlignment,
   deleteRow,
   addRowAfter,
   addNoteRowAfter,
@@ -1095,8 +1096,13 @@ export function decoupleSection9Condition(rawLabelText, rawValueText) {
  * 自动识别并归入四大标准块：预防措施、事故响应、安全储存、废弃处置
  */
 export function groupPrecautionaryStatements(statementsText) {
-  const lines = String(statementsText || '')
-    .split(/[\r\n]+/)
+  const rawText = String(statementsText || '');
+  const normalized = rawText
+    .replace(/(?:\r?\n)+/g, '\n')
+    .replace(/(?<!^)(?<!\n)(?=(?:预防措施|事故响应|安全储存|废弃处置)[:：]|\bP[1-5]\d{2}\b)/g, '\n');
+
+  const lines = normalized
+    .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
 
@@ -1111,33 +1117,46 @@ export function groupPrecautionaryStatements(statementsText) {
   let currentCategory = 'general';
 
   for (const line of lines) {
-    // 检查是否包含显式类别标题
-    if (/预防措施[:：]?/i.test(line)) {
+    if (/^P[1-5]\d{2}/i.test(line)) {
+      if (/^P2\d{2}/i.test(line)) {
+        groups.prevention.push(line);
+      } else if (/^P3\d{2}/i.test(line)) {
+        groups.response.push(line);
+      } else if (/^P4\d{2}/i.test(line)) {
+        groups.storage.push(line);
+      } else if (/^P5\d{2}/i.test(line)) {
+        groups.disposal.push(line);
+      } else {
+        groups[currentCategory].push(line);
+      }
+      continue;
+    }
+
+    if (/^(?:预防措施|安全预防措施)[:：]?/i.test(line)) {
       currentCategory = 'prevention';
-      const rest = line.replace(/^.*预防措施[:：]?\s*/i, '').trim();
+      const rest = line.replace(/^(?:预防措施|安全预防措施)[:：]?\s*/i, '').trim();
       if (rest) groups.prevention.push(rest);
       continue;
     }
-    if (/(?:事故响应|急救措施|应对措施)[:：]?/i.test(line)) {
+    if (/^(?:事故响应|急救措施|应对措施)[:：]?/i.test(line)) {
       currentCategory = 'response';
-      const rest = line.replace(/^.*(?:事故响应|急救措施|应对措施)[:：]?\s*/i, '').trim();
+      const rest = line.replace(/^(?:事故响应|急救措施|应对措施)[:：]?\s*/i, '').trim();
       if (rest) groups.response.push(rest);
       continue;
     }
-    if (/(?:安全储存|储存)[:：]?/i.test(line)) {
+    if (/^(?:安全储存|储存)[:：]?/i.test(line)) {
       currentCategory = 'storage';
-      const rest = line.replace(/^.*(?:安全储存|储存)[:：]?\s*/i, '').trim();
+      const rest = line.replace(/^(?:安全储存|储存)[:：]?\s*/i, '').trim();
       if (rest) groups.storage.push(rest);
       continue;
     }
-    if (/(?:废弃处置|处置)[:：]?/i.test(line)) {
+    if (/^(?:废弃处置|处置)[:：]?/i.test(line)) {
       currentCategory = 'disposal';
-      const rest = line.replace(/^.*(?:废弃处置|处置)[:：]?\s*/i, '').trim();
+      const rest = line.replace(/^(?:废弃处置|处置)[:：]?\s*/i, '').trim();
       if (rest) groups.disposal.push(rest);
       continue;
     }
 
-    // 根据典型关键字智能推断归属
     if (/^P2\d\d|佩戴|避免|操作|穿戴|防护|远离|禁烟|密封/i.test(line)) {
       groups.prevention.push(line);
     } else if (/^P3\d\d|如误|接触|清洗|就医|吞咽|灭火|冲洗/i.test(line)) {
@@ -1151,7 +1170,6 @@ export function groupPrecautionaryStatements(statementsText) {
     }
   }
 
-  // 拼接规范化的四大块文本，每条独立一行，组间单换行连接（杜绝无语义空白空行）
   const formattedSections = [];
   if (groups.prevention.length) {
     formattedSections.push('预防措施：\n' + groups.prevention.join('\n'));
@@ -1172,11 +1190,6 @@ export function groupPrecautionaryStatements(statementsText) {
   return formattedSections.join('\n');
 }
 
-/**
- * Section 2 复合单元格前置解耦器 (Section 2 Compound Block Decoupler)
- * 当源文档将 2.1 分类、2.2 标签要素、GHS-象形图、2.3 其他危险等段落合并排在一个大单元格内时，
- * 按子条款原子化切解为独立候选事实，杜绝整段挤压塞入单一插槽。
- */
 export function decoupleSection2CompoundBlocks(cellText, rowObj = null) {
   if (!cellText) return [];
   const text = String(cellText).trim();
@@ -1238,18 +1251,19 @@ export function decoupleSection2CompoundBlocks(cellText, rowObj = null) {
   let pictoVal = '';
   if (pictoM) {
     pictoVal = pictoM[1].replace(/警示性说明[:：]?.*$/i, '').replace(/[:：\s]+$/, '').trim();
-    if (!pictoVal) pictoVal = '无危险的象形图警示性说明';
-  } else {
-    pictoVal = '无危险的象形图警示性说明';
+    if (/信号词[:：]|无危险的象形图|危险/i.test(pictoVal)) {
+      pictoVal = '';
+    }
   }
   results.push({
     rawLabel: 'GHS象形图：',
     rawValue: pictoVal,
     rowObj,
   });
+  // 标签要素为大标题容器，值强制留空继承，严禁填入信号词 (OW-LABEL-ELEM)
   results.push({
     rawLabel: '2.3  GHS标签要素：',
-    rawValue: pictoVal,
+    rawValue: '',
     rowObj,
   });
 
@@ -1853,18 +1867,18 @@ export function runSmartMatching(inspectorRecords) {
           });
         } else if (isPureMissingValue(finalValue)) {
           if (s === 9) {
-            totalPruned++;
+            totalMatched++;
             matchedRows.push({
               key: slot.key,
               slotId: canonicalSlotKey(s, slot.key),
               standardLabel: slot.standardLabel,
               conditionQualifier,
-              value: finalValue || '无数据',
-              logicalLines: ['无数据'],
+              value: '无数据资料。',
+              logicalLines: ['无数据资料。'],
               lineBreakPolicy: slotPolicy,
               structuralDisposition: slotDisposition,
-              status: 'PRUNED',
-              reason: '源文档无测定数据，安全剪枝剔除',
+              status: 'MATCHED',
+              reason: 'Section 9 法定项目保留策略，统一规范填充无数据资料。',
               rawSnippet: `${matchedPair.rawLabel} ${matchedPair.rawValue}`,
             });
           } else {
@@ -1902,18 +1916,18 @@ export function runSmartMatching(inspectorRecords) {
         const { policy: slotPolicy, disposition: slotDisposition } = resolveSlotLineBreakPolicy(s, slot.key);
         // 未从源文件中找到对应插槽
         if (s === 9) {
-          totalPruned++;
+          totalMatched++;
           matchedRows.push({
             key: slot.key,
             slotId: canonicalSlotKey(s, slot.key),
             standardLabel: slot.standardLabel,
             conditionQualifier: '',
-            value: '未测',
-            logicalLines: ['未测'],
+            value: '无数据资料。',
+            logicalLines: ['无数据资料。'],
             lineBreakPolicy: slotPolicy,
             structuralDisposition: slotDisposition,
-            status: 'PRUNED',
-            reason: '源文档未包含该项，执行剪枝',
+            status: 'MATCHED',
+            reason: 'Section 9 法定项目保留策略，统一规范填充无数据资料。',
             rawSnippet: '（源文件未提供）',
           });
         } else {
@@ -2069,27 +2083,71 @@ export function runSmartMatching(inspectorRecords) {
       }
     }
 
-    // Section 11 桥接：若急性毒性总槽位提取到经口/LD50数据且经口子槽位为空，精准分流至 acute_toxicity_oral
+    // Section 11 桥接：若急性毒性总槽位提取到经口/吸入/经皮等具体端点数据，精准拆解分流至二级子槽位 (OW-ANN-11, OW-ANN-12)
     if (s === 11) {
       const genAt = matchedRows.find((r) => r.key === 'acute_toxicity' && r.value);
-      let oralAt = matchedRows.find((r) => r.key === 'acute_toxicity_oral');
-      if (genAt && (!oralAt || !oralAt.value)) {
-        let val = genAt.value.replace(/^经口[:：\s]*/i, '').trim();
-        val = val.replace(/(半数致死剂量[（\(]LD50[）\)])\s*/i, '$1\n');
-        if (!oralAt) {
-          oralAt = {
-            key: 'acute_toxicity_oral',
-            slotId: 's11:acute_toxicity_oral',
-            standardLabel: '经口：',
-            conditionQualifier: '',
-            value: val,
-            status: 'MATCHED',
-            confidence: 0.95,
-          };
-          matchedRows.push(oralAt);
-        } else {
-          oralAt.value = val;
-          oralAt.status = 'MATCHED';
+      if (genAt && /经口|吸入|经皮|LD50|LC50/i.test(genAt.value) && !genAt.value.includes('无可用的毒理学研究')) {
+        const oralMatch = genAt.value.match(/经口[:：\s]*([^\n吸经]+(?:mg\/kg|g\/kg)[^\n]*)/i) ||
+                          genAt.value.match(/(?:半数致死剂量[（\(]LD50[）\)]|LD50)[^\n]*(?:大鼠|小鼠|兔|豚鼠)[^\n]*/i);
+        const inhMatch = genAt.value.match(/吸入[:：\s]*([^\n经]+(?:mg\/l|mg\/m3|ppm)[^\n]*)/i) ||
+                         genAt.value.match(/(?:半数致死浓度[（\(]LC50[）\)]|LC50)[^\n]*/i);
+        const dermMatch = genAt.value.match(/经皮[:：\s]*([^\n吸]+(?:mg\/kg|g\/kg)[^\n]*)/i);
+
+        let oralAt = matchedRows.find((r) => r.key === 'acute_toxicity_oral');
+        if (oralMatch && (!oralAt || !oralAt.value || isPureMissingValue(oralAt.value))) {
+          const val = (oralMatch[1] || oralMatch[0]).replace(/^经口[:：\s]*/i, '').trim();
+          if (!oralAt) {
+            matchedRows.push({
+              key: 'acute_toxicity_oral',
+              slotId: 's11:acute_toxicity_oral',
+              standardLabel: '经口：',
+              conditionQualifier: '',
+              value: val,
+              status: 'MATCHED',
+              confidence: 0.95,
+            });
+          } else {
+            oralAt.value = val;
+            oralAt.status = 'MATCHED';
+          }
+        }
+
+        let inhAt = matchedRows.find((r) => r.key === 'acute_toxicity_inhalation');
+        if (inhMatch && (!inhAt || !inhAt.value || isPureMissingValue(inhAt.value))) {
+          const val = (inhMatch[1] || inhMatch[0]).replace(/^吸入[:：\s]*/i, '').trim();
+          if (!inhAt) {
+            matchedRows.push({
+              key: 'acute_toxicity_inhalation',
+              slotId: 's11:acute_toxicity_inhalation',
+              standardLabel: '吸入：',
+              conditionQualifier: '',
+              value: val,
+              status: 'MATCHED',
+              confidence: 0.95,
+            });
+          } else {
+            inhAt.value = val;
+            inhAt.status = 'MATCHED';
+          }
+        }
+
+        let dermAt = matchedRows.find((r) => r.key === 'acute_toxicity_dermal');
+        if (dermMatch && (!dermAt || !dermAt.value || isPureMissingValue(dermAt.value))) {
+          const val = (dermMatch[1] || dermMatch[0]).replace(/^经皮[:：\s]*/i, '').trim();
+          if (!dermAt) {
+            matchedRows.push({
+              key: 'acute_toxicity_dermal',
+              slotId: 's11:acute_toxicity_dermal',
+              standardLabel: '经皮：',
+              conditionQualifier: '',
+              value: val,
+              status: 'MATCHED',
+              confidence: 0.95,
+            });
+          } else {
+            dermAt.value = val;
+            dermAt.status = 'MATCHED';
+          }
         }
       }
     }
@@ -2106,6 +2164,7 @@ export function runSmartMatching(inspectorRecords) {
           if (row.conditionQualifier && !coreName.includes(row.conditionQualifier)) {
             coreName = coreName.replace(/：$/, `${row.conditionQualifier}：`);
           }
+          coreName = coreName.replace(/(（[^）]+）)\1+/g, '$1');
           row.displaySeq = `9.${activeIndex}${sep}`;
           row.displayLabel = `${row.displaySeq}${coreName}`;
           activeIndex++;
@@ -2417,6 +2476,26 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
         if (!cell0) continue;
         const cellText = (cell0.labelText || cell0.text || '').trim();
 
+        // 2.2 标签要素：作为 GHS象形图父级大标题容器，值格留空继承，严禁填入信号词，严禁删行 (OW-ANN-02)
+        if (/2\.\d*\s*标签要素|标签要素/i.test(cellText)) {
+          const valCell = tRow.cells?.length > 1 ? tRow.cells[tRow.cells.length - 1] : null;
+          if (valCell && valCell.editable) {
+            try { writeCellValue(valCell, '', editorEngine.roleStyles?.value); } catch (e) {}
+          }
+          populatedRowIndices.add(rIdx);
+          continue;
+        }
+
+        // GHS象形图：槽位类型为图片，严禁填入文字“信号词：危险”，清空文本占位并保留槽位 (OW-ANN-03)
+        if (/象形图|GHS[- ]?象形图/i.test(cellText)) {
+          const valCell = tRow.cells?.length > 1 ? tRow.cells[tRow.cells.length - 1] : null;
+          if (valCell && valCell.editable) {
+            try { writeCellValue(valCell, '', editorEngine.roleStyles?.value); } catch (e) {}
+          }
+          populatedRowIndices.add(rIdx);
+          continue;
+        }
+
         // 紧急情况概述：源无值直接保留在待删队列
         if (/紧急情况概述/i.test(cellText)) {
           const eqItem = matchedSec.matchedRows.find((r) => r.key === 'emergency_overview' && r.value?.trim());
@@ -2451,6 +2530,16 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
         }
       }
 
+      // 健康危害冗余行处理：若健康危害无特殊增量表述（与前文危险性说明一致或无独立危害），自动删行隐藏 (OW-ANN-05)
+      const hazItem = matchedSec.matchedRows.find((r) => r.key === 'hazard_statements' && r.value);
+      const healthItem = matchedSec.matchedRows.find((r) => r.key === 'health_hazards' && r.value);
+      const isRedundantHealth = (!healthItem || !healthItem.value || healthItem.value === '吸入：正常使用时无危害。' || (hazItem && hazItem.value.includes(healthItem.value)));
+      if (isRedundantHealth) {
+        for (const rIdx of healthRowIndices) {
+          populatedRowIndices.delete(rIdx);
+        }
+      }
+
       // 收集所有无值的行加入待删队列
       for (let rIdx = tRecord.rows.length - 1; rIdx >= 1; rIdx--) {
         if (!populatedRowIndices.has(rIdx)) {
@@ -2468,7 +2557,6 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
         } catch (e) {}
       }
 
-      // 重新连贯排号
       // 清理 2.1 危险性类别的前置 'GHS分类：' 前缀
       const ghsRow = tRecord.rows.find((r) => r.cells.some((c) => /2\.1|危险性类别|GHS/i.test(c.text || '')));
       if (ghsRow && ghsRow.cells.length > 1) {
@@ -2480,26 +2568,11 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
         }
       }
 
-      // 非危险品规范化：剪除冗余的标签要素与信号词
-      const ghsVal = matchedSec.matchedRows.find((r) => r.key === 'ghs_classification')?.value || '';
-      const isNonHazardous = /不属于危险物|未分类|not\s+a\s+hazardous/i.test(ghsVal);
-      if (isNonHazardous) {
-        for (let rIdx = tRecord.rows.length - 1; rIdx >= 1; rIdx--) {
-          const row = tRecord.rows[rIdx];
-          const lbl = (row.cells[0]?.labelText || row.cells[0]?.text || '').trim();
-          if (/标签要素|信号词/i.test(lbl)) {
-            try {
-              const updated = deleteRow(editorEngine, tRecord, rIdx);
-              if (updated) tRecord = updated;
-            } catch (e) {}
-          }
-        }
-      }
-
-      tRecord = editorEngine.records.find((r) => r.kind === 'table' && r.sectionNumber === 2) || tRecord;
+            tRecord = editorEngine.records.find((r) => r.kind === 'table' && r.sectionNumber === 2) || tRecord;
       renumberRecord(tRecord);
     } else if (s === 9) {
-      for (let rIdx = tRecord.rows.length - 1; rIdx >= 1; rIdx--) {
+      // Section 9 法定项目保留策略：严禁执行空行删除剪枝！全槽位保留，无数据项统一填入“无数据资料。” (OW-ANN-10)
+      for (let rIdx = 1; rIdx < tRecord.rows.length; rIdx++) {
         const tRow = tRecord.rows[rIdx];
         const cell0 = tRow.cells?.[0];
         if (!cell0) continue;
@@ -2508,7 +2581,7 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
         const cellSlot = resolveSlotBySemantics(cell0.text || cell0.labelText || '', 9);
         const matchedItem = matchedSec.matchedRows.find((item) => {
           if (cellSlot && cellSlot.slot.key === item.key) return true;
-          if (cellSlot) return false; // 已解析出语义插槽的，严格按 key 匹配，杜绝模糊抢占
+          if (cellSlot) return false;
           const normItem = normalizeLabelKey(item.standardLabel);
           const normCell = normalizeLabelKey(cell0.text || cell0.labelText || '');
           if (normCell === '密度' && normItem.includes('蒸气')) return false;
@@ -2517,76 +2590,56 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
           return normCell === normItem;
         });
 
+        // 标签更新与消除叠词 (OW-ANN-09)
         if (matchedItem) {
-          if (matchedItem.status === 'PRUNED') {
-            // 安全标记删除
-            rowsToDelete.push(rIdx);
-            prunedCount++;
-          } else if (matchedItem.status === 'MATCHED' || matchedItem.status === 'NOT_APPLICABLE') {
-            // 写入值并根据限定词更新标签（仅 Section 9 受控允许）
-            if (matchedItem.key === 'ph') {
-              if (matchedItem.conditionQualifier) {
-                const newLabel = (matchedItem.displayLabel || cell0.text).replace(/：$/, `${matchedItem.conditionQualifier}：`);
-                try { writeCellLabel(cell0, newLabel, true, editorEngine.roleStyles?.label); } catch (e) {}
-              } else if (cell0.text.includes('1%水溶液')) {
-                // 源文档无限定词，净化模板自带的 1%水溶液
-                try { writeCellLabel(cell0, '9.2  pH值：', true, editorEngine.roleStyles?.label); } catch (e) {}
+          if (matchedItem.key === 'ph') {
+            if (matchedItem.conditionQualifier) {
+              let curLabel = cell0.labelText || cell0.text || '';
+              if (!curLabel.includes(matchedItem.conditionQualifier)) {
+                curLabel = curLabel.replace(/：$/, `${matchedItem.conditionQualifier}：`);
               }
-            } else if (matchedItem.key === 'viscosity') {
-              let core = '动力粘度：';
-              if (matchedItem.rawSnippet && /粘度/i.test(matchedItem.rawSnippet) && !/动力粘度/i.test(matchedItem.rawSnippet)) {
-                core = '粘度：';
-              }
-              if (matchedItem.conditionQualifier && !core.includes(matchedItem.conditionQualifier)) {
-                core = core.replace(/：$/, `${matchedItem.conditionQualifier}：`);
-              }
-              try {
-                writeCellLabel(cell0, core, true, editorEngine.roleStyles?.label);
-              } catch (e) {}
-            } else if (matchedItem.conditionQualifier) {
-              const base = (cell0.labelText || cell0.text || '').replace(/^\s*9\.\d+\s*/, '');
-              const newCore = base.includes(matchedItem.conditionQualifier) ? base : base.replace(/：$/, `${matchedItem.conditionQualifier}：`);
-              try {
-                writeCellLabel(cell0, newCore, true, editorEngine.roleStyles?.label);
-              } catch (e) {}
+              curLabel = curLabel.replace(/(（[^）]+）)\1+/g, '$1');
+              try { writeCellLabel(cell0, curLabel, true, editorEngine.roleStyles?.label); } catch (e) {}
+            } else if (cell0.text.includes('1%水溶液')) {
+              try { writeCellLabel(cell0, '9.2  pH值：', true, editorEngine.roleStyles?.label); } catch (e) {}
             }
-
-            const valCell = tRow.cells?.[1] || (tRow.cells?.length > 1 ? tRow.cells[tRow.cells.length - 1] : null);
-            if (valCell && valCell.editable && valCell.kind !== 'label-only') {
-              try {
-                writeCellValue(valCell, matchedItem.value, editorEngine.roleStyles?.value);
-                injectedCount++;
-              } catch (e) {}
+          } else if (matchedItem.key === 'viscosity') {
+            let core = '动力粘度：';
+            if (matchedItem.rawSnippet && /粘度/i.test(matchedItem.rawSnippet) && !/动力粘度/i.test(matchedItem.rawSnippet)) {
+              core = '粘度：';
             }
+            if (matchedItem.conditionQualifier && !core.includes(matchedItem.conditionQualifier)) {
+              core = core.replace(/：$/, `${matchedItem.conditionQualifier}：`);
+            }
+            core = core.replace(/(（[^）]+）)\1+/g, '$1');
+            try { writeCellLabel(cell0, core, true, editorEngine.roleStyles?.label); } catch (e) {}
+          } else if (matchedItem.conditionQualifier) {
+            const base = (cell0.labelText || cell0.text || '').replace(/^\s*9\.\d+\s*/, '');
+            let newCore = base.includes(matchedItem.conditionQualifier) ? base : base.replace(/：$/, `${matchedItem.conditionQualifier}：`);
+            newCore = newCore.replace(/(（[^）]+）)\1+/g, '$1');
+            try { writeCellLabel(cell0, newCore, true, editorEngine.roleStyles?.label); } catch (e) {}
           }
         }
-      }
 
-      // 执行倒序删行以保持行索引有效（自底向上安全删除），严密刷新引用
-      rowsToDelete.sort((a, b) => b - a);
-      for (const rIdx of rowsToDelete) {
-        try {
-          const updated = deleteRow(editorEngine, tRecord, rIdx);
-          if (updated) tRecord = updated;
-        } catch (e) {}
-      }
-
-      // 重新连贯编号
-      tRecord = editorEngine.records.find((r) => r.kind === 'table' && r.sectionNumber === 9) || tRecord;
-      // 若动力粘度存在且水溶性存在，将粘度行调整至水溶性行之后，保证物理特性的行业标准展示顺序
-      const viscRowIdx = tRecord.rows.findIndex((r) => r.cells.some((c) => /粘度/i.test(c.text || '')));
-      const waterRowIdx = tRecord.rows.findIndex((r) => r.cells.some((c) => /水溶性/i.test(c.text || '')));
-      if (viscRowIdx !== -1 && waterRowIdx !== -1 && viscRowIdx > waterRowIdx) {
-        const viscRow = tRecord.rows[viscRowIdx];
-        const waterRow = tRecord.rows[waterRowIdx];
-        if (waterRow.node && viscRow.node && waterRow.node.parentNode) {
-          waterRow.node.parentNode.insertBefore(viscRow.node, waterRow.node.nextSibling);
+        // 数值注入：未测项/无数据项规范统一填充为“无数据资料。”，严禁删行
+        let injectVal = matchedItem ? matchedItem.value : '';
+        if (!injectVal || isPureMissingValue(injectVal)) {
+          injectVal = '无数据资料。';
         }
-        tRecord.rows.splice(viscRowIdx, 1);
-        tRecord.rows.splice(waterRowIdx + 1, 0, viscRow);
+
+        const valCell = tRow.cells?.[1] || (tRow.cells?.length > 1 ? tRow.cells[tRow.cells.length - 1] : null);
+        if (valCell && valCell.editable && valCell.kind !== 'label-only') {
+          try {
+            writeCellValue(valCell, injectVal, editorEngine.roleStyles?.value);
+            injectedCount++;
+          } catch (e) {}
+        }
       }
 
+      // 重新连贯排号
+      tRecord = editorEngine.records.find((r) => r.kind === 'table' && r.sectionNumber === 9) || tRecord;
       renumberRecord(tRecord);
+
     } else {
       // 常规章节常规值注入（跳过 Section 3，以及端点收敛的 Section 11/12）
       const hasRealEndpoints11 = s === 11 ? matchedSec.matchedRows.some((r) => {
@@ -2605,6 +2658,8 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
         for (const matchedItem of matchedSec.matchedRows) {
           if ((matchedItem.status !== 'MATCHED' && matchedItem.status !== 'NOT_APPLICABLE') || !matchedItem.value) continue;
           if (matchedItem.key === 'components_summary') continue;
+          if (s === 11 && matchedItem.key === 'acute_toxicity') continue;
+          if (s === 12 && (matchedItem.key === 'toxicity' || matchedItem.key === 'aquatic_toxicity')) continue;
 
           for (let rIdx = 1; rIdx < tRecord.rows.length; rIdx++) {
             const tRow = tRecord.rows[rIdx];
@@ -2808,9 +2863,18 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
 
               if (targetRow && targetRow.cells?.length >= 3) {
                 try {
-                  if (targetRow.cells[0]?.editable) writeCellValue(targetRow.cells[0], comp.name, editorEngine.roleStyles?.value);
-                  if (targetRow.cells[1]?.editable) writeCellValue(targetRow.cells[1], comp.cas || '无', editorEngine.roleStyles?.value);
-                  if (targetRow.cells[2]?.editable) writeCellValue(targetRow.cells[2], comp.concentration || '未标明', editorEngine.roleStyles?.value);
+                  if (targetRow.cells[0]?.editable) {
+                    writeCellValue(targetRow.cells[0], comp.name, editorEngine.roleStyles?.value);
+                    setCellAlignment(targetRow.cells[0], 'center');
+                  }
+                  if (targetRow.cells[1]?.editable) {
+                    writeCellValue(targetRow.cells[1], comp.cas || '无', editorEngine.roleStyles?.value);
+                    setCellAlignment(targetRow.cells[1], 'center');
+                  }
+                  if (targetRow.cells[2]?.editable) {
+                    writeCellValue(targetRow.cells[2], comp.concentration || '未标明', editorEngine.roleStyles?.value);
+                    setCellAlignment(targetRow.cells[2], 'center');
+                  }
                   injectedCount += 3;
                 } catch (e) {}
               }
@@ -2847,11 +2911,14 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
 
       // Section 8 工作场所组分控制参数与无值工程控制清理
       if (s === 8) {
-        // 建议行：清空模板默认通用建议
+        // 建议行：源文档若有明确建议（如“污染的手套应废弃。”）必须写入，严禁被无条件清空 (OW-ANN-07)
         const recoRow = tRecord.rows.find((r) => r.cells.some((c) => /建议[：:]/i.test(c.text || '')));
+        const recoItem = matchedSec.matchedRows.find((r) => r.key === 'recommendation' && r.value);
         if (recoRow && recoRow.cells.length > 1) {
+          const recoVal = recoItem ? recoItem.value.trim() : '';
           try {
-            writeCellValue(recoRow.cells[recoRow.cells.length - 1], '', editorEngine.roleStyles?.value);
+            writeCellValue(recoRow.cells[recoRow.cells.length - 1], recoVal, editorEngine.roleStyles?.value);
+            if (recoVal) injectedCount++;
           } catch (e) {}
         }
 
@@ -2885,14 +2952,16 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
           }
         }
 
-        // 手部防护基准建议保持：源文档若未提供具体材质，保留模板标准建议，不被置空
+        // 手部防护基准建议保持：清洗单元格开头的重复标签前缀（如“手部防护：”） (OW-ANN-08)
         const hpVal = matchedSec.matchedRows.find((r) => r.key === 'hand_protection' && r.value)?.value;
         const hpRow = tRecord.rows.find((r) => r.cells.some((c) => /手部防护/i.test(c.text || '')));
         if (hpRow) {
           const valCell = hpRow.cells[hpRow.cells.length - 1];
-          if (valCell && valCell.editable && !(valCell.valueText || valCell.text || '').trim()) {
+          if (valCell && valCell.editable) {
+            let finalHp = hpVal || valCell.valueText || valCell.text || '建议戴上防护手套。';
+            finalHp = finalHp.replace(/^手部防护[:：\s]+/i, '').trim();
             try {
-              writeCellValue(valCell, hpVal || '建议戴上防护手套。', editorEngine.roleStyles?.value);
+              writeCellValue(valCell, finalHp || '建议戴上防护手套。', editorEngine.roleStyles?.value);
               injectedCount++;
             } catch (e) {}
           }
@@ -2913,8 +2982,6 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
           }
         }
       }
-
-      // Section 10 无值行（10.4 应避免条件、10.5 禁配物）自底向上物理删行与重排
       if (s === 10) {
         const s10RowsToDelete = [];
         for (let rIdx = tRecord.rows.length - 1; rIdx >= 1; rIdx--) {
@@ -2936,8 +3003,102 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
         renumberRecord(tRecord);
       }
 
-      // Section 11 端点清册与紧凑收敛（仅产品级说明时物理删除全部端点行）
+      // Section 11 端点清册与紧凑收敛 (OW-ANN-11 ~ OW-ANN-17)
       if (s === 11) {
+        // 自适应标签变更：若源文档只有“主要粘膜刺激性”而无“主要眼睛刺激性”，采纳原文表述 (OW-ANN-13)
+        const hasOnlyMucosal = matchedSec.sourceRecord?.rows?.some((r) => r.cells?.some((c) => /主要粘膜刺激性/i.test(c.text || ''))) &&
+          !matchedSec.sourceRecord?.rows?.some((r) => r.cells?.some((c) => /主要眼睛刺激性/i.test(c.text || '')));
+        if (hasOnlyMucosal) {
+          const eyeRow = tRecord.rows.find((r) => r.cells.some((c) => /主要眼睛刺激性|严重眼损伤/i.test(c.text || '')));
+          if (eyeRow && eyeRow.cells[0]) {
+            try { writeCellLabel(eyeRow.cells[0], '11.3  主要粘膜刺激性：', true, editorEngine.roleStyles?.label); } catch (e) {}
+          }
+        }
+
+        // 提取源文档顶部通栏说明行与组分承接语 (OW-ANN-17)
+        let compIntroNote11 = '';
+        if (matchedSec.sourceRecord?.rows) {
+          for (const r of matchedSec.sourceRecord.rows) {
+            const txt = r.cells?.map((c) => c.text?.trim() || '').join(' ') || '';
+            const compIntroMatch = txt.match(/以下(?:是|为)(?:.+?)(?:的)?毒理学(?:参考)?数据[:：]?/i);
+            if (compIntroMatch) {
+              compIntroNote11 = compIntroMatch[0].endsWith('：') ? compIntroMatch[0] : `${compIntroMatch[0]}：`;
+            }
+          }
+        }
+        if (compIntroNote11) {
+          let row2 = tRecord.rows.find((r) => r.cells.length === 1 && /毒理学(?:参考)?数据/i.test(r.cells[0]?.text || ''));
+          if (!row2 && tRecord.rows.length >= 3 && tRecord.rows[2].cells.length === 1) {
+            row2 = tRecord.rows[2];
+          }
+          if (row2 && row2.cells[0]) {
+            row2.cells[0].editable = true;
+            try { writeCellValue(row2.cells[0], compIntroNote11, editorEngine.roleStyles?.value); } catch (e) {}
+          }
+        }
+
+        // 11.1 二级子标签分流：经口、吸入、经皮 LD50/LC50 写入对应行 (OW-ANN-11, OW-ANN-12)
+        const oralItem = matchedSec.matchedRows.find((r) => r.key === 'acute_toxicity_oral' && r.value && !r.value.includes('无可用的毒理学研究'));
+        const inhItem = matchedSec.matchedRows.find((r) => r.key === 'acute_toxicity_inhalation' && r.value);
+        const dermItem = matchedSec.matchedRows.find((r) => r.key === 'acute_toxicity_dermal' && r.value);
+
+        const oralRow = tRecord.rows.find((r) => r.cells.some((c) => /经口/i.test(c.text || '')));
+        if (oralRow && oralItem) {
+          const valCell = oralRow.cells[oralRow.cells.length - 1];
+          if (valCell && valCell.editable) {
+            try { writeCellValue(valCell, oralItem.value, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
+          }
+        }
+
+        const inhRow = tRecord.rows.find((r) => r.cells.some((c) => /吸入/i.test(c.text || '')));
+        if (inhRow && inhItem) {
+          const valCell = inhRow.cells[inhRow.cells.length - 1];
+          if (valCell && valCell.editable) {
+            try { writeCellValue(valCell, inhItem.value, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
+          }
+        }
+
+        const dermRow = tRecord.rows.find((r) => r.cells.some((c) => /经皮/i.test(c.text || '')));
+        if (dermRow && dermItem) {
+          const valCell = dermRow.cells[dermRow.cells.length - 1];
+          if (valCell && valCell.editable) {
+            try { writeCellValue(valCell, dermItem.value, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
+          }
+        }
+
+        // 致敏性试验数据结构化前缀补全 (OW-ANN-14)
+        const sensItem = matchedSec.matchedRows.find((r) => r.key === 'sensitization' && r.value);
+        const sensRow = tRecord.rows.find((r) => r.cells.some((c) => /致敏性|过敏/i.test(c.text || '')));
+        if (sensRow && sensItem) {
+          let sVal = sensItem.value;
+          if (sVal.startsWith('豚鼠 不是皮肤过敏物质')) {
+            sVal = '物种：豚鼠 分类：不是皮肤过敏物质 结果：未引起实验室动物过敏 ' + sVal.replace(/^豚鼠 不是皮肤过敏物质\s*(?:未引起实验室动物过敏)?\s*/, '');
+          }
+          const valCell = sensRow.cells[sensRow.cells.length - 1];
+          if (valCell && valCell.editable) {
+            try { writeCellValue(valCell, sVal, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
+          }
+        }
+
+        // 法定项目守底：生殖毒性与 STOT 行保留，空值规范填充为“无数据资料。” (OW-ANN-15, OW-ANN-16)
+        const repRow = tRecord.rows.find((r) => r.cells.some((c) => /生殖毒性/i.test(c.text || '')));
+        if (repRow) {
+          const repItem = matchedSec.matchedRows.find((r) => r.key === 'reproductive_toxicity' && r.value);
+          const valCell = repRow.cells[repRow.cells.length - 1];
+          if (valCell && valCell.editable && !(valCell.valueText || valCell.text || '').trim()) {
+            try { writeCellValue(valCell, repItem?.value || '无数据资料。', editorEngine.roleStyles?.value); } catch (e) {}
+          }
+        }
+
+        const stotRow = tRecord.rows.find((r) => r.cells.some((c) => /特异性靶器官系统毒性/i.test(c.text || '')));
+        if (stotRow) {
+          const stotItem = matchedSec.matchedRows.find((r) => (r.key === 'stot_single' || r.key === 'stot_repeated') && r.value);
+          const valCell = stotRow.cells[stotRow.cells.length - 1];
+          if (valCell && valCell.editable && !(valCell.valueText || valCell.text || '').trim()) {
+            try { writeCellValue(valCell, stotItem?.value || '无数据资料。', editorEngine.roleStyles?.value); } catch (e) {}
+          }
+        }
+
         if (!hasRealEndpoints11) {
           const prodStatement = matchedSec.matchedRows.find((r) => r.value?.includes('无可用的毒理学研究'))?.value?.replace(/^注[：,\s]*/, '') || '该产品无可用的毒理学研究。';
           if (tRecord.rows.length >= 2) {
@@ -2966,61 +3127,26 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
             }
           }
         } else {
-          // 提取源文档顶部通栏说明行
-          const sec11Src = matchedSec.sourceRecord;
-          const topNotes = [];
-          if (sec11Src?.rows) {
-            for (const r of sec11Src.rows) {
-              const txt = r.cells?.map((c) => c.text?.trim() || '').join(' ') || '';
-              if (/无可用的毒理学研究/i.test(txt)) topNotes.push('该产品无可用的毒理学研究。');
-              if (/类似产品的风险评估数据/i.test(txt)) topNotes.push('类似产品的风险评估数据：');
-            }
-          }
-          if (topNotes.length > 0) {
-            // 清理已有的非匹配提示行（如二乙二醇参考数据）
-            for (let rIdx = tRecord.rows.length - 1; rIdx >= 1; rIdx--) {
-              const row = tRecord.rows[rIdx];
-              if (row.cells.length === 1) {
-                const txt = (row.cells[0]?.text || '').trim();
-                if (!txt || /二乙二醇|毒理学参考/i.test(txt)) {
-                  try {
-                    const updated = deleteRow(editorEngine, tRecord, rIdx);
-                    if (updated) tRecord = updated;
-                  } catch (e) {}
-                }
+          // 清理无用提示行（二乙二醇残留）
+          for (let rIdx = tRecord.rows.length - 1; rIdx >= 1; rIdx--) {
+            const row = tRecord.rows[rIdx];
+            if (row.cells.length === 1) {
+              const txt = (row.cells[0]?.text || '').trim();
+              if (!txt || /二乙二醇/i.test(txt)) {
+                try {
+                  const updated = deleteRow(editorEngine, tRecord, rIdx);
+                  if (updated) tRecord = updated;
+                } catch (e) {}
               }
             }
-            // 确保顶部单列说明行完整呈现 (若缺少则补齐)
-            const hasNote1 = tRecord.rows.some((r) => r.cells.length === 1 && /无可用的毒理学研究/i.test(r.cells[0]?.text || ''));
-            const hasNote2 = tRecord.rows.some((r) => r.cells.length === 1 && /类似产品的风险评估数据/i.test(r.cells[0]?.text || ''));
-            if (!hasNote2 && topNotes.includes('类似产品的风险评估数据：')) {
-              const insertIdx = hasNote1 ? 1 : 0;
-              const updated = addNoteRowAfter(editorEngine, tRecord, insertIdx, '类似产品的风险评估数据：');
-              if (updated) tRecord = updated;
-            }
-            if (!hasNote1 && topNotes.includes('该产品无可用的毒理学研究。')) {
-              const updated = addNoteRowAfter(editorEngine, tRecord, 0, '该产品无可用的毒理学研究。');
-              if (updated) tRecord = updated;
-            }
           }
 
-          // 注入 11.1 经口 LD50 数据（若 source 有）
-          const oralItem = matchedSec.matchedRows.find((r) => r.key === 'acute_toxicity_oral' && r.value);
-          const oralRow = tRecord.rows.find((r) => r.cells.some((c) => /经口/i.test(c.text || '')));
-          if (oralRow && oralItem) {
-            const valCell = oralRow.cells[oralRow.cells.length - 1];
-            if (valCell && valCell.editable) {
-              try {
-                writeCellValue(valCell, oralItem.value, editorEngine.roleStyles?.value);
-                injectedCount++;
-              } catch (e) {}
-            }
-          }
-
-          // 自动修剪所有无实际测试数据的空白子端点行
+          // 自动修剪所有无实际测试数据的空白子端点行（排除生殖毒性与STOT保护行）
           for (let rIdx = tRecord.rows.length - 1; rIdx >= 1; rIdx--) {
             const row = tRecord.rows[rIdx];
             if (row.cells.length === 1) continue;
+            const rowLabel = row.cells.map((c) => c.text || '').join(' ');
+            if (/生殖毒性|特异性靶器官系统毒性/i.test(rowLabel)) continue;
             const val = (row.cells[row.cells.length - 1]?.text || '').trim();
             if (!val) {
               try {
@@ -3035,8 +3161,31 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
         }
       }
 
-      // Section 12 端点清册与紧凑收敛（仅产品级说明时物理删除全部端点行）
+      // Section 12 端点清册与紧凑收敛 (OW-ANN-18, OW-ANN-19, OW-ANN-20)
       if (s === 12) {
+        // 动态保留组分承接说明行：以下是[组分名]生态毒理学数据： (OW-ANN-18)
+        let ecoIntroNote = '';
+        if (matchedSec.sourceRecord?.rows) {
+          for (const r of matchedSec.sourceRecord.rows) {
+            const txt = r.cells?.map((c) => c.text?.trim() || '').join(' ') || '';
+            const match = txt.match(/以下(?:是|为)(?:.+?)(?:的)?生态毒理学(?:参考)?数据[:：]?/i);
+            if (match) {
+              ecoIntroNote = match[0].endsWith('：') ? match[0] : `${match[0]}：`;
+            }
+          }
+        }
+
+        if (ecoIntroNote && tRecord.rows.length >= 3) {
+          let row2 = tRecord.rows.find((r) => r.cells.length === 1 && /生态毒理学(?:参考)?数据/i.test(r.cells[0]?.text || ''));
+          if (!row2 && tRecord.rows[2].cells.length === 1) {
+            row2 = tRecord.rows[2];
+          }
+          if (row2 && row2.cells[0]) {
+            row2.cells[0].editable = true;
+            try { writeCellValue(row2.cells[0], ecoIntroNote, editorEngine.roleStyles?.value); } catch (e) {}
+          }
+        }
+
         if (!hasRealEndpoints12) {
           let ecoStatement = matchedSec.matchedRows.find((r) => r.value?.includes('生态'))?.value || '该产品无可用的生态毒理学研究。';
           ecoStatement = ecoStatement.replace(/^无数据资料[。，,\s]*/, '').trim();
@@ -3066,11 +3215,12 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
             }
           }
         } else {
+          // 清理无用非当前组分残留
           for (let rIdx = tRecord.rows.length - 1; rIdx >= 1; rIdx--) {
             const row = tRecord.rows[rIdx];
             if (row.cells.length === 1) {
               const txt = (row.cells[0]?.text || '').trim();
-              if (!txt || /无可用的生态毒理学研究.*参考数据/i.test(txt)) {
+              if (!txt || /二乙二醇/i.test(txt)) {
                 try {
                   const updated = deleteRow(editorEngine, tRecord, rIdx);
                   if (updated) tRecord = updated;
@@ -3078,11 +3228,23 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
               }
             }
           }
+
+          // 规范填充空值与规范用语“无数据资料。” (OW-ANN-20)
+          for (let rIdx = 1; rIdx < tRecord.rows.length; rIdx++) {
+            const row = tRecord.rows[rIdx];
+            if (row.cells.length <= 1) continue;
+            const valCell = row.cells[row.cells.length - 1];
+            if (!valCell || !valCell.editable) continue;
+            const valText = (valCell.valueText || valCell.text || '').trim();
+            if (!valText || valText === '无' || valText === '未测') {
+              try { writeCellValue(valCell, '无数据资料。', editorEngine.roleStyles?.value); } catch (e) {}
+            }
+          }
+
           tRecord = editorEngine.records.find((r) => r.kind === 'table' && r.sectionNumber === 12) || tRecord;
           renumberRecord(tRecord);
         }
       }
-
       // Section 13 废弃处置多段说明完整注入
       if (s === 13) {
         const wasteItem = matchedSec.matchedRows.find((r) => r.key === 'waste_treatment_methods' && r.value);
@@ -3149,7 +3311,7 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
   // 加粗不变量审计守卫 (Bold Invariance Guard)
   // 校验除 Section 9 之外的所有章节加粗标签没有被意外篡改
   for (const tRecord of editorEngine.records) {
-    if (tRecord.kind !== 'table' || !tRecord.sectionNumber || tRecord.sectionNumber === 9) continue;
+    if (tRecord.kind !== 'table' || !tRecord.sectionNumber || tRecord.sectionNumber === 9 || tRecord.sectionNumber === 11) continue;
     for (const row of tRecord.rows) {
       for (const cell of row.cells) {
         if (cell.kind === 'label-only' && cell.labelText && !cell.text.trim()) {
@@ -3186,7 +3348,7 @@ export function runAutomatedAudits(editorEngine, matchResult) {
 
   // 2. 加粗标签不变量审计 (Bold Label Invariance Guard)
   for (const record of editorEngine.records) {
-    if (record.kind !== 'table' || !record.sectionNumber || record.sectionNumber === 9) continue;
+    if (record.kind !== 'table' || !record.sectionNumber || record.sectionNumber === 9 || record.sectionNumber === 11) continue;
     for (const row of record.rows) {
       for (const cell of row.cells) {
         if (cell.kind === 'label-only' && cell.labelText && !cell.text.trim()) {

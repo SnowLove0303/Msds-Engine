@@ -420,6 +420,7 @@ function parseCell(tc, rowIndex, column, span, rowNode, numbering = null) {
     text: cellText({ paragraphs }),
     images,
     format: parseCellProperties(tc),
+    align: paragraphs[0]?.format?.alignment || 'left',
   };
   Object.assign(cell, cellRole(cell));
   cell.nestedTableCount = nestedTables;
@@ -1414,6 +1415,32 @@ function replaceCellValueContent(cell, value, roleStyle) {
   cell.paragraphs = keptParagraphs;
 }
 
+export function setCellAlignment(cell, align = 'center') {
+  if (!cell?.node) return;
+  const ps = cell.node.getElementsByTagNameNS(W_NS, 'p');
+  for (let i = 0; i < ps.length; i++) {
+    const p = ps[i];
+    let pPr = firstChild(p, 'pPr');
+    if (!pPr) {
+      pPr = cell.node.ownerDocument.createElementNS(W_NS, 'w:pPr');
+      p.insertBefore(pPr, p.firstChild);
+    }
+    let jc = firstChild(pPr, 'jc');
+    if (!jc) {
+      jc = cell.node.ownerDocument.createElementNS(W_NS, 'w:jc');
+      pPr.appendChild(jc);
+    }
+    jc.setAttributeNS(W_NS, 'w:val', align);
+  }
+  cell.align = align;
+  if (cell.paragraphs) {
+    for (const para of cell.paragraphs) {
+      if (!para.format) para.format = {};
+      para.format.alignment = align;
+    }
+  }
+}
+
 export function writeCellValue(cell, value, roleStyle = null) {
   if (!cell?.editable) throw new DocxEngineError(cell?.protectedReason || '该单元格不是可编辑值区域。', 'LOCKED_FIELD');
   const valStr = typeof value === 'object' && value !== null && 'value' in value
@@ -1427,8 +1454,8 @@ export function writeCellValue(cell, value, roleStyle = null) {
 
 export function writeCellLabel(cell, value, allowLabelEdit = false, roleStyle = null) {
   if (!allowLabelEdit) throw new DocxEngineError('标签默认锁定，请先开启“允许修改标签文本”。', 'LOCKED_LABEL');
-  if (cell?.record?.sectionNumber && cell.record.sectionNumber !== 9) {
-    throw new DocxEngineError('只有第9部分允许根据源文件微调特殊标签，其他章节标签完全锁定。', 'LABEL_MUTATION_FORBIDDEN');
+  if (cell?.record?.sectionNumber && cell.record.sectionNumber !== 9 && cell.record.sectionNumber !== 11) {
+    throw new DocxEngineError('只有第9部分与第11部分允许根据源文件微调特殊标签，其他章节标签完全锁定。', 'LABEL_MUTATION_FORBIDDEN');
   }
   if (!cell?.labelNodes?.length) throw new DocxEngineError('该单元格没有可编辑的标签运行区。', 'NO_LABEL');
   let clean = String(value ?? '').trim();
@@ -1437,6 +1464,12 @@ export function writeCellLabel(cell, value, allowLabelEdit = false, roleStyle = 
     if (!/[：:]$/.test(clean)) clean += '：';
     const prefixMatch = cell.text.match(/^\s*(9\.\d+)/);
     const prefix = prefixMatch ? `${prefixMatch[1]}${' '.repeat(Math.max(1, 5 - prefixMatch[1].length))}` : '';
+    clean = prefix + clean;
+  } else if (cell.row >= 1 && /^\s*11\.\d+/.test(cell.text)) {
+    clean = clean.replace(/^\s*11\.\d+\s*/, '').trim();
+    if (!/[：:]$/.test(clean)) clean += '：';
+    const prefixMatch = cell.text.match(/^\s*(11\.\d+)/);
+    const prefix = prefixMatch ? `${prefixMatch[1]}${' '.repeat(Math.max(1, 6 - prefixMatch[1].length))}` : '';
     clean = prefix + clean;
   }
   distributeText(cell.labelNodes, clean);

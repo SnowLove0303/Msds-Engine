@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:smoke": "node tests/smoke.mjs",
+    "test:annotations": "node tests/test_smart_matching_20_annotations.mjs",
     "start": "node server.mjs"
   },
   "dependencies": {
