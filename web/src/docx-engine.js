@@ -1884,3 +1884,246 @@ export function buildExportDocxName(engine, options = {}) {
   // Output format reference: "OS-1030 msds_CN 冠志.docx"
   return `${model} msds_${lang} ${entity}.docx`;
 }
+
+// =============================================================================
+// 编辑器局部同步覆写模式 (Template-Agnostic Local Preset Overlay System)
+// =============================================================================
+
+export const SEMANTIC_KEY_PATTERNS = {
+  'sec1.product_name': /^(?:1\.1\s*)?(?:产品名称|中文名称|Product\s*name|Trade\s*name|Product\s*Identifier)/i,
+  'sec1.chemical_category': /^(?:化学品分类|Chemical\s*category|Chemical\s*Family|Chemical\s*Classification)/i,
+  'sec1.recommended_use': /^(?:1\.2\s*)?(?:产品使用建议|使用建议和使用限制|Product\s*use|Recommended\s*Use)/i,
+  'sec1.supplier.name': /^(?:供应商名称|Name\s*of\s*supplier|Supplier\s*Name)/i,
+  'sec1.supplier.address': /^(?:供应商地址|Supplier\s*address)/i,
+  'sec1.supplier.tel': /^(?:电话|Tel|Telephone)/i,
+  'sec1.supplier.fax': /^(?:传真|Fax)/i,
+  'sec2.ghs_classification': /^(?:2\.1\s*)?(?:GHS\s*危险性类别|GHS\s*Hazard\s*Classification)/i,
+  'sec2.ghs_pictograms': /^(?:GHS\s*象形图|GHS\s*Hazard\s*Pictograms|GHS\s*Pictograms)/i,
+  'sec2.other_hazards': /^(?:2\.2\s*)?(?:其他危害|Other\s*Hazards)/i,
+  'sec3.product_type': /^(?:3\.1\s*)?(?:产品类型|Product\s*type)/i,
+  'sec9.appearance': /^(?:9\.1\s*)?(?:外观|Appearance)/i,
+  'sec9.ph': /^(?:9\.2\s*|9\.3\s*)?(?:pH\s*值|pH\s*value|pH)/i,
+  'sec9.ionicity': /^(?:9\.3\s*|9\.4\s*)?(?:离子性|Ionicity|Ionic\s*Character)/i,
+  'sec9.flammability': /^(?:9\.4\s*|9\.8\s*)?(?:可燃性|Flammability)/i,
+  'sec9.density': /^(?:9\.5\s*|9\.12\s*)?(?:密度|Density)/i,
+  'sec9.water_solubility': /^(?:9\.6\s*|9\.13\s*)?(?:水溶性|Solubility\s*in\s*water|Water\s*Solubility)/i,
+  'sec9.viscosity': /^(?:9\.7\s*|9\.19\s*)?(?:粘度|Viscosity|Dynamic\s*viscosity)/i,
+  'sec9.auto_ignition': /^(?:9\.8\s*|9\.16\s*)?(?:自燃温度|Auto-ignition)/i,
+  'sec9.ignition_temp': /^(?:9\.9\s*|9\.17\s*)?(?:引燃温度|Ignition\s*Temperature)/i,
+  'sec9.explosive_props': /^(?:9\.10\s*|9\.20\s*)?(?:爆炸特性|Explosive\s*properties)/i,
+  'sec9.dust_explosion': /^(?:9\.11\s*|9\.21\s*)?(?:粉尘爆炸级别|Dust\s*explosion\s*class)/i,
+  'sec9.solids': /^(?:9\.12\s*|9\.22\s*)?(?:固体含量|Solid\s*content|Solids\s*Content)/i,
+  'sec9.other_info': /^(?:9\.13\s*|9\.24\s*)?(?:其他信息|Other\s*information)/i,
+  'sec10.chemical_stability': /^(?:10\.1\s*)?(?:化学稳定性|Chemical\s*stability)/i,
+  'sec10.decomposition_products': /^(?:10\.2\s*)?(?:危险分解产物|Hazardous\s*decomposition)/i,
+  'sec10.possible_reactions': /^(?:10\.3\s*)?(?:可能的危害反应|Possible\s*hazardous\s*reactions|Possibility\s*of\s*Hazardous)/i,
+  'sec11.acute_toxicity': /^(?:11\.1\s*)?(?:急性毒性|Acute\s*toxicity)/i,
+  'sec11.skin_irritation': /^(?:11\.2\s*)?(?:主要皮肤刺激性|Primary\s*skin\s*irritation)/i,
+  'sec11.eye_irritation': /^(?:11\.3\s*)?(?:主要眼睛刺激性|主要粘膜刺激性|Primary\s*eye\s*irritation)/i,
+  'sec11.sensitization': /^(?:11\.4\s*)?(?:致敏性|Sensitization)/i,
+  'sec11.mutagenicity': /^(?:11\.5\s*)?(?:致突变性|Mutagenicity)/i,
+  'sec12.ecotoxicity': /^(?:12\.1\s*)?(?:生态毒性|Ecotoxicity)/i,
+  'sec12.persistence': /^(?:12\.2\s*)?(?:持久性和降解性|Persistence\s*and\s*degradability)/i,
+  'sec12.other_effects': /^(?:12\.3\s*)?(?:其他不利的影响|Other\s*adverse\s*effects)/i,
+  'sec13.disposal_methods': /^(?:处理方法|Disposal\s*methods)/i,
+  'sec14.road_rail': /^(?:14\.1\s*)?(?:公路和铁路运输|Road\s*and\s*rail\s*transport)/i,
+  'sec14.sea': /^(?:14\.2\s*)?(?:海上运输|Maritime\s*transport|Sea\s*Transport)/i,
+  'sec14.air': /^(?:14\.3\s*)?(?:空运|Air\s*transport)/i,
+  'sec14.special_precautions': /^(?:14\.4\s*)?(?:用户特殊注意事项|Special\s*precautions\s*for\s*user)/i,
+};
+
+export function getCellSemanticKey(cell) {
+  if (!cell) return null;
+  const sec = cell.record?.sectionNumber;
+  if (!sec) return null;
+  const row = cell.record.rows[cell.row];
+  if (!row) return null;
+
+  // 1. Identify label text for the row / cell
+  const labelCell =
+    row.cells.find((c) => c.role === 'label' || c.isLabel) ||
+    row.cells.slice(0, cell.col).reverse().find((c) => !c.editable && (c.labelText || c.text)?.trim()) ||
+    row.cells.find((c) => !c.editable && (c.labelText || c.text)?.trim()) ||
+    row.cells[0];
+  const rawLabel = (cell.labelText || (cell.editable ? (labelCell?.labelText || labelCell?.text) : cell.text) || '').trim();
+
+  // 2. Match canonical patterns
+  for (const [key, pattern] of Object.entries(SEMANTIC_KEY_PATTERNS)) {
+    if (key.startsWith(`sec${sec}.`) && pattern.test(rawLabel)) {
+      return key;
+    }
+  }
+
+  // 3. Fallback: normalized clean label key
+  if (rawLabel) {
+    const clean = rawLabel
+      .replace(/^[0-9.]+\s*/, '')
+      .replace(/[:：]/g, '')
+      .replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '_')
+      .toLowerCase()
+      .slice(0, 32);
+    if (clean) return `sec${sec}.lbl_${clean}`;
+  }
+
+  return `sec${sec}.r${cell.row}_c${cell.col}`;
+}
+
+export function findCellBySemanticKey(engine, semanticKey) {
+  if (!engine?.records || !semanticKey) return null;
+  const [secPart] = semanticKey.split('.');
+  const secNum = parseInt(secPart.replace('sec', ''), 10);
+  const matchingRecords = engine.records.filter((r) => r.sectionNumber === secNum && Array.isArray(r.rows));
+  if (matchingRecords.length === 0) return null;
+
+  // 1. Try exact match using getCellSemanticKey on editable cells across matching records
+  let fallbackCandidate = null;
+  for (const record of matchingRecords) {
+    for (const row of record.rows) {
+      for (const cell of row.cells) {
+        if (cell.editable && getCellSemanticKey(cell) === semanticKey) {
+          if (cell.text && cell.text.trim()) {
+            return cell;
+          }
+          if (!fallbackCandidate) fallbackCandidate = cell;
+        }
+      }
+    }
+  }
+  if (fallbackCandidate) return fallbackCandidate;
+
+  // 2. Pattern fallback
+  const pattern = SEMANTIC_KEY_PATTERNS[semanticKey];
+  if (pattern) {
+    for (const record of matchingRecords) {
+      for (const row of record.rows) {
+        const rowLabelCell =
+          row.cells.find((c) => c.role === 'label' || c.isLabel) ||
+          row.cells.find((c) => !c.editable && (c.labelText || c.text)?.trim()) ||
+          row.cells[0];
+        const rowLabel = (rowLabelCell?.labelText || rowLabelCell?.text || '').trim();
+        if (pattern.test(rowLabel)) {
+          const valCell = row.cells.find((c) => c.editable);
+          if (valCell) return valCell;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+export function extractSemanticSnapshot(engine) {
+  const snapshot = {};
+  if (!engine?.records) return snapshot;
+  for (const record of engine.records) {
+    if (!Array.isArray(record.rows)) continue;
+    for (const row of record.rows) {
+      for (const cell of row.cells) {
+        if (cell.editable) {
+          const key = getCellSemanticKey(cell);
+          if (key) {
+            // 优先记录具有实质有效文本的单元格，防止小节空标题行遮蔽具体数据值行
+            if (!(key in snapshot) || (!snapshot[key]?.trim() && cell.text?.trim())) {
+              snapshot[key] = cell.text;
+            }
+          }
+        }
+      }
+    }
+  }
+  return snapshot;
+}
+
+export function applySemanticOverrides(engine, fieldOverrides = {}) {
+  if (!engine?.records || !fieldOverrides) return 0;
+  let count = 0;
+  for (const [key, value] of Object.entries(fieldOverrides)) {
+    if (value === undefined || value === null) continue;
+    const cell = findCellBySemanticKey(engine, key);
+    if (cell && cell.editable) {
+      writeCellValue(cell, value);
+      count++;
+    }
+  }
+  return count;
+}
+
+export const SYSTEM_BUILTIN_PRESETS = [
+  {
+    id: 'preset_guocai_cn',
+    name: '英德国彩主体 (CN)',
+    targetTemplate: 'CN 国彩',
+    isBuiltin: true,
+    enabledForExport: true,
+    headerFooterOverrides: {
+      company: '英德市国彩新材料有限公司',
+      entity: '国彩',
+      customFileNamePattern: '{model} msds_CN 国彩.docx',
+    },
+    fieldOverrides: {
+      'sec1.supplier.name': '英德市国彩新材料有限公司',
+      'sec1.supplier.address': '英德市清华园东华片区新材料产业基地',
+      'sec1.supplier.tel': '86-763-2608111',
+      'sec1.supplier.fax': '86-763-2608222',
+    },
+  },
+  {
+    id: 'preset_guocai_en',
+    name: '英德国彩主体 (EN)',
+    targetTemplate: 'EN 国彩',
+    isBuiltin: true,
+    enabledForExport: false,
+    headerFooterOverrides: {
+      company: 'Yingde Guocai New Material Technology Co., Ltd.',
+      entity: '国彩',
+      customFileNamePattern: '{model} msds_EN 国彩.docx',
+    },
+    fieldOverrides: {
+      'sec1.supplier.name': 'Yingde Guocai New Material Technology Co., Ltd.',
+      'sec1.supplier.address': 'New Material Industrial Base, Donghua Area, Qinghua Park, Yingde, Guangdong, China',
+      'sec1.supplier.tel': '+86-763-2608111',
+      'sec1.supplier.fax': '+86-763-2608222',
+    },
+  },
+];
+
+export class PresetStore {
+  static STORAGE_KEY = 'msds_editor_presets_v1';
+
+  static loadPresets() {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const raw = window.localStorage.getItem(this.STORAGE_KEY);
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list) && list.length > 0) {
+            return this._mergeWithBuiltins(list);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load presets from localStorage', e);
+    }
+    return JSON.parse(JSON.stringify(SYSTEM_BUILTIN_PRESETS));
+  }
+
+  static savePresets(presets) {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(this.STORAGE_KEY, JSON.stringify(presets));
+      }
+    } catch (e) {
+      console.warn('Failed to save presets to localStorage', e);
+    }
+  }
+
+  static _mergeWithBuiltins(userList) {
+    const result = [...userList];
+    for (const b of SYSTEM_BUILTIN_PRESETS) {
+      if (!result.some((p) => p.id === b.id)) {
+        result.push(JSON.parse(JSON.stringify(b)));
+      }
+    }
+    return result;
+  }
+}

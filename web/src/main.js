@@ -20,6 +20,12 @@ import {
   restoreSectionToTemplate,
   writeCellLabel,
   writeCellValue,
+  PresetStore,
+  getCellSemanticKey,
+  findCellBySemanticKey,
+  extractSemanticSnapshot,
+  applySemanticOverrides,
+  SYSTEM_BUILTIN_PRESETS,
 } from './docx-engine.js';
 import {
   escapeHtml,
@@ -70,7 +76,21 @@ const state = {
   sourcePreview: null, // { name: string, type: 'docx' | 'pdf' | 'doc', blobUrl?: string, file?: File }
   inspector: { engine: null, selectedRecordId: null, selectedCellId: null, query: '', showPreview: true, zoomScale: 'fit' },
   matching: { template: 'CN 冠志', templateEngine: null, result: null, selectedSectionNumber: 1, query: '', compareMode: 'doc-match', zoomScale: 'fit', isWidePreview: false },
-  editor: { engine: null, template: 'CN 冠志', selectedRecordId: null, selectedCellId: null, allowLabelEdit: false, dirty: false, query: '', customFileName: '' },
+  editor: {
+    engine: null,
+    template: 'CN 冠志',
+    selectedRecordId: null,
+    selectedCellId: null,
+    allowLabelEdit: false,
+    dirty: false,
+    query: '',
+    customFileName: '',
+    presetModeEnabled: false,
+    activePresetId: null,
+    presets: PresetStore.loadPresets(),
+    exportModalOpen: false,
+    managerModalOpen: false,
+  },
   review: {
     session: null,
     drawerOpen: false,
@@ -318,13 +338,160 @@ function renderAnnotationModal() {
   `;
 }
 
+
+function getPresetExportFileName(preset, model) {
+  const m = model || 'MSDS';
+  if (preset.headerFooterOverrides?.customFileNamePattern) {
+    return preset.headerFooterOverrides.customFileNamePattern.replace('{model}', m);
+  }
+  const entity = preset.headerFooterOverrides?.entity || (preset.name.includes('国彩') ? '国彩' : '衍生');
+  const lang = preset.targetTemplate?.includes('EN') ? 'EN' : 'CN';
+  return `${m} msds_${lang} ${entity}.docx`;
+}
+
+function renderPresetRibbon() {
+  const pMode = state.editor.presetModeEnabled;
+  const activePreset = state.editor.presets.find((p) => p.id === state.editor.activePresetId);
+  return `
+    <div class="preset-ribbon">
+      <div class="preset-ribbon-left">
+        <label class="preset-mode-toggle" title="开启后可在当前编辑器中针对衍生预设版本（如国彩主体）进行局部差异编辑">
+          <input type="checkbox" id="preset-mode-toggle" ${pMode ? 'checked' : ''} />
+          <span class="preset-switch"></span>
+          <span class="preset-mode-title">⚡ 局部同步覆写模式</span>
+        </label>
+        ${pMode ? `
+          <div class="preset-layer-selector-wrap">
+            <span class="layer-label">当前编辑图层:</span>
+            <select id="preset-layer-select" class="preset-layer-select" aria-label="选择编辑图层">
+              <option value="__base__" ${!state.editor.activePresetId ? 'selected' : ''}>🌱 基准视图 (${escapeHtml(state.editor.template)})</option>
+              ${state.editor.presets.map((p) => `
+                <option value="${escapeHtml(p.id)}" ${state.editor.activePresetId === p.id ? 'selected' : ''}>
+                  ${p.isBuiltin ? '🏢' : '⚙️'} ${escapeHtml(p.name)} [底模: ${escapeHtml(p.targetTemplate)}]
+                  ${Object.keys(p.fieldOverrides || {}).length ? ` (${Object.keys(p.fieldOverrides).length}处覆写)` : ''}
+                </option>
+              `).join('')}
+            </select>
+            <button class="button button-quiet button-xs" data-action="create-new-preset" title="基于当前基准创建新衍生预设" style="padding:1px 6px;height:20px;font-size:11px;">＋ 新建</button>
+          </div>
+        ` : ''}
+      </div>
+      ${pMode ? `
+        <div class="preset-ribbon-right">
+          <span class="preset-sync-tip">${activePreset ? `当前处于【${escapeHtml(activePreset.name)}】图层，直接修改单元格即可原位覆写` : '当前处于基准图层，所作修改将同步作为所有衍生预设的底稿'}</span>
+          <button class="button button-quiet button-xs" data-action="open-preset-manager-modal" title="查看全部预设配置与绑定关系">⚙️ 管理预设</button>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderPresetExportModal() {
+  if (!state.editor.exportModalOpen) return '';
+  const baseModel = state.editor.engine?.headerFooterData?.model || '';
+  const baseExportName = buildExportDocxName(state.editor.engine, {
+    customFileName: state.editor.customFileName,
+    templateName: state.editor.template,
+    sourcePreviewName: state.sourcePreview?.name,
+    productModel: baseModel,
+  });
+
+  return `
+    <div class="modal-backdrop" data-action="close-preset-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:9999;">
+      <div class="modal-card preset-export-dialog" onclick="event.stopPropagation()" style="background:#0b192c;border:1px solid rgba(91,214,210,.3);border-radius:12px;width:540px;max-width:92vw;box-shadow:0 20px 40px rgba(0,0,0,.6);overflow:hidden;">
+        <div class="modal-header" style="padding:14px 20px;border-bottom:1px solid rgba(142,177,214,.2);display:flex;justify-content:space-between;align-items:center;">
+          <div class="modal-title" style="font-weight:700;font-size:15px;color:#e2e8f0;display:flex;align-items:center;gap:8px;">
+            <span>📦</span> 同步覆写多版本批量导出
+          </div>
+          <button class="modal-close" data-action="close-preset-modal" style="background:transparent;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">×</button>
+        </div>
+        <div class="modal-body" style="padding:20px;">
+          <p style="color:#94a3b8;font-size:13px;margin:0 0 14px 0;line-height:1.5;">勾选需要同时导出的文档版本。系统将基于当前基准底稿，自动注入各版本专属的页眉页脚与字段覆写差量：</p>
+          <div class="preset-export-list">
+            <label class="preset-export-item active" style="cursor:default;">
+              <input type="checkbox" id="export-check-base" checked disabled style="margin-right:10px;accent-color:#0ea5e9;" />
+              <div class="preset-item-info" style="flex:1;">
+                <span class="preset-item-title">🌱 基准文档 (${escapeHtml(state.editor.template)})</span>
+                <span class="preset-item-filename">${escapeHtml(baseExportName)}</span>
+              </div>
+              <span class="preset-tag tag-inherited">底稿主版本</span>
+            </label>
+            ${state.editor.presets.map((p) => `
+              <label class="preset-export-item ${p.enabledForExport ? 'active' : ''}" style="cursor:pointer;">
+                <input type="checkbox" class="export-preset-check" data-preset-id="${escapeHtml(p.id)}" ${p.enabledForExport ? 'checked' : ''} style="margin-right:10px;accent-color:#0ea5e9;" />
+                <div class="preset-item-info" style="flex:1;">
+                  <span class="preset-item-title">${p.isBuiltin ? '🏢' : '⚙️'} ${escapeHtml(p.name)} [底模: ${escapeHtml(p.targetTemplate)}]</span>
+                  <span class="preset-item-filename">${escapeHtml(getPresetExportFileName(p, baseModel))}</span>
+                  <span class="preset-item-overrides-count">${Object.keys(p.fieldOverrides || {}).length} 处专属覆写字段</span>
+                </div>
+                <span class="preset-tag tag-override">衍生版本</span>
+              </label>
+            `).join('')}
+          </div>
+          <div style="margin-top:14px;padding:10px 12px;background:rgba(14,165,233,.08);border:1px solid rgba(14,165,233,.2);border-radius:6px;font-size:12px;color:#7dd3fc;display:flex;align-items:center;gap:8px;">
+            <span>💡</span> 选中多个版本时，系统将逐个触发下载并同步打包为 ZIP 格式！
+          </div>
+        </div>
+        <div class="modal-actions" style="padding:12px 20px;background:#081322;border-top:1px solid rgba(142,177,214,.15);display:flex;justify-content:flex-end;gap:10px;">
+          <button class="button button-quiet" data-action="close-preset-modal">取消</button>
+          <button class="button button-dark" data-action="confirm-batch-preset-export" style="background:#0ea5e9;color:#fff;border-color:#0284c7;">🚀 立即开始同步导出</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderPresetManagerModal() {
+  if (!state.editor.managerModalOpen) return '';
+  return `
+    <div class="modal-backdrop" data-action="close-preset-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:9999;">
+      <div class="modal-card" onclick="event.stopPropagation()" style="background:#0b192c;border:1px solid rgba(91,214,210,.3);border-radius:12px;width:600px;max-width:92vw;box-shadow:0 20px 40px rgba(0,0,0,.6);overflow:hidden;">
+        <div class="modal-header" style="padding:14px 20px;border-bottom:1px solid rgba(142,177,214,.2);display:flex;justify-content:space-between;align-items:center;">
+          <div class="modal-title" style="font-weight:700;font-size:15px;color:#e2e8f0;display:flex;align-items:center;gap:8px;">
+            <span>⚙️</span> 预设图层配置管理
+          </div>
+          <button class="modal-close" data-action="close-preset-modal" style="background:transparent;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">×</button>
+        </div>
+        <div class="modal-body" style="padding:20px;max-height:65vh;overflow-y:auto;">
+          <p style="color:#94a3b8;font-size:13px;margin:0 0 14px 0;">管理系统内置与自定义衍生预设。预设与语义化键强绑定，跨模板切换永不失效：</p>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            ${state.editor.presets.map((p) => `
+              <div style="padding:12px 14px;background:rgba(15,23,42,.7);border:1px solid rgba(148,163,184,.2);border-radius:8px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                  <div>
+                    <strong style="color:#f1f5f9;font-size:13px;">${escapeHtml(p.name)}</strong>
+                    <span style="font-size:11px;color:#38bdf8;margin-left:6px;background:rgba(56,189,248,.1);padding:1px 6px;border-radius:3px;">${escapeHtml(p.targetTemplate)}</span>
+                    ${p.isBuiltin ? '<span style="font-size:10px;color:#94a3b8;margin-left:4px;">(系统内置)</span>' : ''}
+                  </div>
+                  <div>
+                    ${!p.isBuiltin ? `<button class="button button-quiet button-xs" data-action="delete-preset" data-preset-id="${escapeHtml(p.id)}" style="color:#ef4444;font-size:11px;">删除</button>` : ''}
+                  </div>
+                </div>
+                <div style="font-size:12px;color:#94a3b8;display:flex;flex-direction:column;gap:3px;">
+                  <div>发布主体：<span style="color:#e2e8f0;">${escapeHtml(p.headerFooterOverrides?.company || '同基准')}</span></div>
+                  <div>命名规则：<code style="color:#5bd6d2;font-size:11px;">${escapeHtml(p.headerFooterOverrides?.customFileNamePattern || '标准命名')}</code></div>
+                  <div>覆写字段：<span style="color:#fbbf24;font-weight:600;">${Object.keys(p.fieldOverrides || {}).length} 项</span></div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        <div class="modal-actions" style="padding:12px 20px;background:#081322;border-top:1px solid rgba(142,177,214,.15);display:flex;justify-content:space-between;align-items:center;">
+          <button class="button button-quiet button-sm" data-action="reset-presets-to-default" style="color:#f59e0b;">↺ 恢复系统默认预设</button>
+          <button class="button button-quiet" data-action="close-preset-modal">关闭</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderApp() {
   let content = '';
   if (state.view === 'inspect') content = renderInspector();
   else if (state.view === 'matching') content = renderMatching();
   else content = renderEditor();
 
-  root.innerHTML = `${navMarkup()}<main class="page-shell ${state.view === 'matching' ? 'matching-shell' : ''}">${content}</main>${toastMarkup()}${renderAnnotationDrawer()}${renderAnnotationModal()}`;
+  root.innerHTML = `${navMarkup()}<main class="page-shell ${state.view === 'matching' ? 'matching-shell' : ''}">${content}</main>${toastMarkup()}${renderAnnotationDrawer()}${renderAnnotationModal()}${renderPresetExportModal()}${renderPresetManagerModal()}`;
   bindEvents();
   window.requestAnimationFrame(renderPreviews);
 }
@@ -805,6 +972,7 @@ function renderHeaderFooterEditor(engine, records, query) {
       <button class="button button-dark" data-action="export-review-bundle" title="导出正式 DOCX 与 Agent 审阅包"><span>📦</span> 导出审阅包</button>
       <button class="button button-dark" data-action="export-docx">导出 DOCX</button>
     `)}
+    ${renderPresetRibbon()}
     <div class="file-ribbon" title="内嵌模板工作副本，源模板只读">
       <div class="file-ribbon-icon">模板</div>
       <div class="file-ribbon-copy">
@@ -981,6 +1149,7 @@ function renderEditor() {
       <button class="button button-dark" data-action="export-review-bundle" title="导出正式 DOCX 与 Agent 审阅包"><span>📦</span> 导出审阅包</button>
       <button class="button button-dark" data-action="export-docx">导出 DOCX</button>
     `)}
+    ${renderPresetRibbon()}
     <div class="file-ribbon" title="内嵌模板工作副本，源模板只读">
       <div class="file-ribbon-icon">模板</div>
       <div class="file-ribbon-copy">
@@ -1033,9 +1202,14 @@ function renderEditor() {
 }
 
 function renderEditorTable(record) {
+  const activePreset = state.editor.presetModeEnabled && state.editor.activePresetId
+    ? state.editor.presets.find((p) => p.id === state.editor.activePresetId)
+    : null;
   return renderEditorTableMarkup(record, {
     allowLabelEdit: state.editor.allowLabelEdit,
     roleStyles: state.editor.engine?.roleStyles || null,
+    activePreset,
+    getCellSemanticKey,
   });
 }
 
@@ -1892,12 +2066,139 @@ async function fetchTemplate(name) {
   return loadDocx(await response.arrayBuffer(), TEMPLATE_OPTIONS[name]);
 }
 
+
+  // 局部同步覆写预设交互事件绑定
+  root.querySelector('#preset-mode-toggle')?.addEventListener('change', (e) => {
+    state.editor.presetModeEnabled = e.target.checked;
+    if (!state.editor.presetModeEnabled) {
+      state.editor.activePresetId = null;
+    }
+    renderApp();
+  });
+
+  root.querySelector('#preset-layer-select')?.addEventListener('change', (e) => {
+    const val = e.target.value;
+    state.editor.activePresetId = val === '__base__' ? null : val;
+    const p = state.editor.presets.find((x) => x.id === state.editor.activePresetId);
+    showToast(p ? `已切换至图层：${p.name}` : '已切换至基准视图', 'info');
+    renderApp();
+  });
+
+  root.querySelectorAll('[data-action="create-new-preset"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const name = window.prompt('请输入新衍生预设名称（例如：客户定制国彩版、英文出口版等）：', '新建衍生预设');
+      if (!name || !name.trim()) return;
+      const newId = `preset_custom_${Date.now()}`;
+      const newPreset = {
+        id: newId,
+        name: name.trim(),
+        targetTemplate: state.editor.template.includes('EN') ? 'EN 国彩' : 'CN 国彩',
+        isBuiltin: false,
+        enabledForExport: true,
+        headerFooterOverrides: {
+          company: '英德市国彩新材料有限公司',
+          entity: '国彩',
+          customFileNamePattern: `{model} msds_${state.editor.template.includes('EN') ? 'EN' : 'CN'} 国彩.docx`,
+        },
+        fieldOverrides: {},
+      };
+      state.editor.presets.push(newPreset);
+      PresetStore.savePresets(state.editor.presets);
+      state.editor.presetModeEnabled = true;
+      state.editor.activePresetId = newId;
+      showToast(`已创建并激活新预设：${newPreset.name}`, 'success');
+      renderApp();
+    });
+  });
+
+  root.querySelectorAll('[data-preset-action="revert-cell"]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const semKey = btn.dataset.semanticKey;
+      const activePreset = state.editor.presets.find((p) => p.id === state.editor.activePresetId);
+      if (activePreset && semKey && activePreset.fieldOverrides) {
+        delete activePreset.fieldOverrides[semKey];
+        PresetStore.savePresets(state.editor.presets);
+        showToast(`已撤销 [${semKey}] 的覆写，恢复继承基准值。`, 'info');
+        renderApp();
+      }
+    });
+  });
+
+  root.querySelectorAll('[data-action="open-preset-manager-modal"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.editor.managerModalOpen = true;
+      renderApp();
+    });
+  });
+
+  root.querySelectorAll('[data-action="close-preset-modal"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.editor.exportModalOpen = false;
+      state.editor.managerModalOpen = false;
+      renderApp();
+    });
+  });
+
+  root.querySelectorAll('.export-preset-check').forEach((chk) => {
+    chk.addEventListener('change', (e) => {
+      const pId = e.target.dataset.presetId;
+      const p = state.editor.presets.find((x) => x.id === pId);
+      if (p) {
+        p.enabledForExport = e.target.checked;
+        PresetStore.savePresets(state.editor.presets);
+      }
+    });
+  });
+
+  root.querySelector('[data-action="confirm-batch-preset-export"]')?.addEventListener('click', () => {
+    executeBatchPresetExport();
+  });
+
+  root.querySelector('[data-action="reset-presets-to-default"]')?.addEventListener('click', () => {
+    if (window.confirm('确定要恢复为系统默认预设吗？自定义预设将被清空。')) {
+      state.editor.presets = JSON.parse(JSON.stringify(SYSTEM_BUILTIN_PRESETS));
+      PresetStore.savePresets(state.editor.presets);
+      state.editor.activePresetId = null;
+      showToast('已重置为系统默认预设。', 'success');
+      renderApp();
+    }
+  });
+
+  root.querySelectorAll('[data-action="delete-preset"]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      const pId = btn.dataset.presetId;
+      if (window.confirm('确定要删除此预设吗？')) {
+        state.editor.presets = state.editor.presets.filter((p) => p.id !== pId);
+        PresetStore.savePresets(state.editor.presets);
+        if (state.editor.activePresetId === pId) state.editor.activePresetId = null;
+        showToast('已删除该预设。', 'info');
+        renderApp();
+      }
+    });
+  });
+
+
 function handleEditorInput(event) {
   const input = event.currentTarget;
   const record = recordById(state.editor.engine, input.dataset.recordId);
   const cell = getCell(record, input.dataset.row, input.dataset.col);
   if (!record || !cell) return;
   const text = (input.isContentEditable ? (input.innerText || '') : (input.value || '')).replace(/^\n$/, '');
+
+  // 局部同步覆写预设分支
+  if (state.editor.presetModeEnabled && state.editor.activePresetId && input.dataset.editKind === 'value') {
+    const activePreset = state.editor.presets.find((p) => p.id === state.editor.activePresetId);
+    const semKey = input.dataset.semanticKey || getCellSemanticKey(cell);
+    if (activePreset && semKey) {
+      if (!activePreset.fieldOverrides) activePreset.fieldOverrides = {};
+      activePreset.fieldOverrides[semKey] = text;
+      PresetStore.savePresets(state.editor.presets);
+      state.editor.dirty = true;
+      refreshEditorDirty();
+      return;
+    }
+  }
   try {
     if (input.dataset.editKind === 'label') {
       writeCellLabel(cell, text, state.editor.allowLabelEdit, state.editor.engine?.roleStyles?.label);
@@ -1982,6 +2283,11 @@ function exportJson() {
 
 async function exportDocx() {
   if (!state.editor.engine) return;
+  if (state.editor.presetModeEnabled) {
+    state.editor.exportModalOpen = true;
+    renderApp();
+    return;
+  }
   if (state.review.session) {
     const gate = checkExportGate(state.review.session);
     if (!gate.allowed) {
@@ -2010,6 +2316,105 @@ async function exportDocx() {
     showToast(`已导出 ${exportName}，源模板保持不变。`, 'success');
   } catch (error) {
     showToast(`导出失败：${error.message}`, 'error');
+  }
+}
+
+async function executeBatchPresetExport() {
+  if (!state.editor.engine) return;
+  if (state.review.session) {
+    const gate = checkExportGate(state.review.session);
+    if (!gate.allowed) {
+      showToast(`导出已阻止：${gate.message}`, 'error');
+      state.review.drawerOpen = true;
+      renderApp();
+      return;
+    }
+  }
+  const errors = auditEngine(state.editor.engine);
+  if (errors.length) {
+    showToast(`导出已阻止：请先处理 ${errors.length} 个审计问题。`, 'error');
+    return;
+  }
+
+  const exportBase = root.querySelector('#export-check-base')?.checked ?? true;
+  const checkedPresetIds = Array.from(root.querySelectorAll('.export-preset-check:checked')).map((el) => el.dataset.presetId);
+  const selectedPresets = state.editor.presets.filter((p) => checkedPresetIds.includes(p.id));
+
+  showToast('正在生成基准与衍生预设文档，请稍候…', 'info');
+
+  try {
+    const outputs = [];
+    const baseModel = state.editor.engine?.headerFooterData?.model || '';
+
+    // 1. 导出基准版本
+    if (exportBase) {
+      const baseBuffer = await state.editor.engine.exportArrayBuffer();
+      const baseName = buildExportDocxName(state.editor.engine, {
+        customFileName: state.editor.customFileName,
+        templateName: state.editor.template,
+        sourcePreviewName: state.sourcePreview?.name,
+        productModel: baseModel,
+      });
+      outputs.push({ name: baseName, buffer: baseBuffer });
+    }
+
+    // 2. 提取基准全部语义快照
+    const baseSnapshot = extractSemanticSnapshot(state.editor.engine);
+
+    // 3. 逐个生成预设衍生版本
+    for (const preset of selectedPresets) {
+      const rawBuf = engineBuffer(state.editor.engine);
+      const presetEngine = await loadDocx(rawBuf, preset.targetTemplate || state.editor.template);
+
+      // 同步基准全部数据到衍生引擎
+      applySemanticOverrides(presetEngine, baseSnapshot);
+
+      // 应用预设专有的字段覆写
+      if (preset.fieldOverrides) {
+        applySemanticOverrides(presetEngine, preset.fieldOverrides);
+      }
+
+      // 应用预设专有的页眉页脚与公司主体
+      const hf = { ...(state.editor.engine.headerFooterData || {}) };
+      if (preset.headerFooterOverrides) {
+        if (preset.headerFooterOverrides.company) hf.company = preset.headerFooterOverrides.company;
+        if (preset.headerFooterOverrides.title) hf.title = preset.headerFooterOverrides.title;
+        if (preset.headerFooterOverrides.version) hf.version = preset.headerFooterOverrides.version;
+        if (preset.headerFooterOverrides.revisionDate) hf.revisionDate = preset.headerFooterOverrides.revisionDate;
+      }
+      updateHeaderFooterData(presetEngine, hf);
+
+      // 计算衍生文档文件名
+      const presetFileName = getPresetExportFileName(preset, baseModel);
+      const presetBuffer = await presetEngine.exportArrayBuffer();
+      outputs.push({ name: presetFileName, buffer: presetBuffer });
+    }
+
+    if (outputs.length === 0) {
+      showToast('未选择任何导出项。', 'warning');
+      return;
+    }
+
+    if (outputs.length === 1) {
+      downloadBlob(new Blob([outputs[0].buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }), outputs[0].name);
+      showToast(`已成功导出：${outputs[0].name}`, 'success');
+    } else {
+      const zip = new JSZip();
+      for (const item of outputs) {
+        zip.file(item.name, item.buffer);
+        downloadBlob(new Blob([item.buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }), item.name);
+      }
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const zipName = `${baseModel || 'MSDS'}_多版本同步包.zip`;
+      downloadBlob(zipBlob, zipName);
+      showToast(`🎉 成功同步导出 ${outputs.length} 份标准文档并打包为 ${zipName}！`, 'success');
+    }
+
+    state.editor.exportModalOpen = false;
+    state.editor.dirty = false;
+    renderApp();
+  } catch (error) {
+    showToast(`同步导出失败：${error.message}`, 'error');
   }
 }
 

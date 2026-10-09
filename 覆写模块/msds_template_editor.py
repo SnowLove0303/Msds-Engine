@@ -1067,6 +1067,7 @@ class EditorApp:
         ttk.Button(toolbar, text="载入", command=self.load_builtin_template).pack(side="left")
         ttk.Button(toolbar, text="打开模板...", command=self.open_dialog).pack(side="left")
         ttk.Button(toolbar, text="导出编辑后 DOCX", command=self.export).pack(side="left", padx=(8, 0))
+        ttk.Button(toolbar, text="📦 导出预设(国彩)", command=self.export_with_preset_sync).pack(side="left", padx=(6, 0))
         ttk.Button(toolbar, text="↺ 恢复整份模板", command=self.reset_entire_template).pack(side="left", padx=(8, 0))
         ttk.Checkbutton(toolbar, text="特殊情况：允许修改标签文本 (常用于 Section 9 理化特性)",
                         variable=self.allow_label_edit,
@@ -1614,6 +1615,56 @@ class EditorApp:
             messagebox.showinfo("导出成功", f"文件已导出至：\n{output}", parent=self.root)
         except Exception as exc:
             messagebox.showerror("导出失败", f"源模板未被更改。\n\n{exc}", parent=self.root)
+
+    def export_with_preset_sync(self):
+        """同步导出英德国彩衍生预设版本"""
+        if self.document is None or self.source_path is None:
+            messagebox.showinfo("未载入模板", "请先打开一个 DOCX 模板。", parent=self.root)
+            return
+        self._sync_texts()
+        model = self.hf_model_var.get().strip() if hasattr(self, "hf_model_var") else ""
+        if not model:
+            hf = extract_header_footer_data(self.document)
+            model = hf.get("model", "")
+
+        is_en = "EN" in (getattr(self, "current_template_name", "") or self.source_path.name)
+        lang = "EN" if is_en else "CN"
+        guocai_default_name = f"{model or 'MSDS'} msds_{lang} 国彩.docx"
+
+        path = filedialog.asksaveasfilename(
+            title="同步导出【英德国彩】预设版本 DOCX",
+            initialdir=str(self.source_path.parent),
+            initialfile=guocai_default_name,
+            defaultextension=".docx",
+            filetypes=[("Word 文档", "*.docx")]
+        )
+        if not path:
+            return
+        output = Path(path).resolve()
+        try:
+            renumber_document(self.document)
+            self.document.save(str(self.work_path))
+
+            doc_guocai = Document(str(self.work_path))
+            hf_overrides = {
+                "company": "Yingde Guocai New Material Technology Co., Ltd." if is_en else "英德市国彩新材料有限公司",
+            }
+            update_header_footer_data(doc_guocai, hf_overrides)
+
+            for table in doc_guocai.tables:
+                for row in table.rows:
+                    cells = row.cells
+                    if len(cells) >= 2:
+                        lbl = cells[0].text.strip()
+                        if "供应商名称" in lbl or "Name of supplier" in lbl:
+                            cells[1].text = hf_overrides["company"]
+                        elif "供应商地址" in lbl or "Supplier address" in lbl:
+                            cells[1].text = "New Material Industrial Base, Donghua Area, Qinghua Park, Yingde, Guangdong, China" if is_en else "广东省英德市东华镇清华园新材料产业基地"
+
+            doc_guocai.save(str(output))
+            messagebox.showinfo("预设同步导出成功", f"已成功导出英德国彩衍生版本：\n{output}", parent=self.root)
+        except Exception as exc:
+            messagebox.showerror("预设导出失败", f"导出衍生版本时出错：\n{exc}", parent=self.root)
 
     def reset_entire_template(self):
         """恢复整份模板至初始模板状态"""

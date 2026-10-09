@@ -303,6 +303,8 @@ export function renderCellContent(cell, selectedCellId, record, roleStyles = nul
 export function renderEditorCell(record, row, cell, tableWidth, fallbackGrid = false, roleStyles = null, isLastCellInRow = false, options = {}) {
   const isRow0 = row.index === 0;
   const allowLabelEdit = Boolean(options.allowLabelEdit);
+  const activePreset = options.activePreset || null;
+  const getCellSemanticKey = options.getCellSemanticKey || null;
   let innerMarkup = '';
 
   if (isRow0) {
@@ -315,8 +317,25 @@ export function renderEditorCell(record, row, cell, tableWidth, fallbackGrid = f
       const target = cell.relationships?.find((item) => item.rid === img.rid)?.target;
       return target ? `<img class="source-inline-image" data-image-target="${escapeHtml(target)}" style="${imageStyle(img)}" alt="DOCX 图像" />` : '';
     }).join('');
-    const valueEditor = `<div class="structured-cell-copy excel-cell-editor is-editable-value" contenteditable="plaintext-only" data-edit-kind="value" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" data-col="${cell.col}" data-placeholder="点击输入值…" spellcheck="false" role="textbox" aria-label="可编辑值">${escapeHtml(cell.valueText || '')}</div>`;
-    innerMarkup = `${labelPart}${images}${valueEditor}`;
+
+    const semKey = (typeof getCellSemanticKey === 'function') ? getCellSemanticKey(cell) : null;
+    const isOverridden = Boolean(activePreset && semKey && activePreset.fieldOverrides && (semKey in activePreset.fieldOverrides));
+    const cellValue = isOverridden
+      ? activePreset.fieldOverrides[semKey]
+      : (cell.valueText || '');
+
+    const presetBadge = activePreset ? `
+      <div class="preset-cell-status-bar">
+        ${isOverridden
+          ? `<span class="preset-tag tag-override" title="预设 [${escapeHtml(activePreset.name)}] 专属覆写值">已覆写</span><button type="button" class="preset-revert-btn" data-preset-action="revert-cell" data-semantic-key="${escapeHtml(semKey)}" title="撤销覆写，恢复继承基准值">↺ 还原</button>`
+          : `<span class="preset-tag tag-inherited" title="继承基准值">继承基准</span>`
+        }
+      </div>
+    ` : '';
+
+    const overrideClass = isOverridden ? ' is-preset-overridden' : (activePreset ? ' is-preset-inherited' : '');
+    const valueEditor = `<div class="structured-cell-copy excel-cell-editor is-editable-value${overrideClass}" contenteditable="plaintext-only" data-edit-kind="value" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" data-col="${cell.col}" data-semantic-key="${escapeHtml(semKey || '')}" data-placeholder="点击输入值…" spellcheck="false" role="textbox" aria-label="可编辑值">${escapeHtml(cellValue)}</div>`;
+    innerMarkup = `${labelPart}${images}${presetBadge}${valueEditor}`;
   } else if (cell.labelText) {
     if (allowLabelEdit) {
       innerMarkup = renderEditorLabelMarkup(cell.labelText, true, record, row, cell);

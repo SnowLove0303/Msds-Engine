@@ -1358,3 +1358,228 @@ td:hover .ann-trigger-btn, tr:hover .ann-trigger-btn {
   font-family: inherit;
   font-weight: 600;
 }
+
+/* ============================================================
+   局部同步覆写模式 (Local Sync Preset Overlay Mode)
+   ============================================================ */
+
+.preset-ribbon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 16px;
+  background: linear-gradient(90deg, rgba(20, 35, 55, 0.95), rgba(13, 24, 38, 0.95));
+  border-bottom: 1px solid rgba(91, 214, 210, 0.25);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  font-size: 13px;
+  z-index: 10;
+}
+
+.preset-ribbon-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.preset-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.preset-mode-toggle input {
+  display: none;
+}
+
+.preset-switch {
+  width: 32px;
+  height: 18px;
+  background: rgba(142, 177, 214, 0.25);
+  border-radius: 10px;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.preset-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.preset-mode-toggle input:checked + .preset-switch {
+  background: #0ea5e9;
+  box-shadow: 0 0 10px rgba(14, 165, 233, 0.5);
+}
+
+.preset-mode-toggle input:checked + .preset-switch::after {
+  transform: translateX(14px);
+}
+
+.preset-mode-title {
+  color: #e2e8f0;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.preset-layer-selector-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 6px;
+}
+
+.layer-label {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.preset-layer-select {
+  background: #0f172a;
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+}
+
+.preset-layer-select:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+
+.preset-ribbon-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.preset-sync-tip {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+/* 单元格覆写微标与状态 */
+.preset-cell-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.preset-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.preset-tag.tag-override {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.preset-tag.tag-inherited {
+  background: rgba(100, 116, 139, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
+.preset-revert-btn {
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.preset-revert-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.excel-cell-editor.is-preset-overridden {
+  background: rgba(245, 158, 11, 0.08) !important;
+  border-left: 3px solid #f59e0b !important;
+  color: #fef08a !important;
+}
+
+.excel-cell-editor.is-preset-inherited {
+  opacity: 0.9;
+}
+
+/* 导出弹窗的多预设勾选列表 */
+.preset-export-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.preset-export-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  transition: border-color 0.15s ease;
+}
+
+.preset-export-item:hover {
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.preset-export-item.active {
+  border-color: #0ea5e9;
+  background: rgba(14, 165, 233, 0.08);
+}
+
+.preset-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.preset-item-title {
+  color: #f1f5f9;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.preset-item-filename {
+  color: #38bdf8;
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+}
+
+.preset-item-overrides-count {
+  font-size: 11px;
+  color: #94a3b8;
+}
