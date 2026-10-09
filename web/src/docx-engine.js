@@ -2024,8 +2024,9 @@ export function extractSemanticSnapshot(engine) {
           const key = getCellSemanticKey(cell);
           if (key) {
             // 优先记录具有实质有效文本的单元格，防止小节空标题行遮蔽具体数据值行
-            if (!(key in snapshot) || (!snapshot[key]?.trim() && cell.text?.trim())) {
-              snapshot[key] = cell.text;
+            const val = (cell.valueText !== undefined ? cell.valueText : cell.text) || '';
+            if (!(key in snapshot) || (!snapshot[key]?.trim() && val.trim())) {
+              snapshot[key] = val;
             }
           }
         }

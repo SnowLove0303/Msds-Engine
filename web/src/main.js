@@ -380,7 +380,10 @@ function renderEditorBanner() {
   return `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 16px;background:rgba(15,23,42,.6);border-bottom:1px solid rgba(148,163,184,.15);font-size:12px;">
       <span style="color:#94a3b8;">当前模式：<strong style="color:#38bdf8;">普通文档编辑</strong>（编辑具体物料主稿）</span>
-      <button class="button button-quiet button-xs" data-action="enter-preset-mode" style="color:#f59e0b;border-color:rgba(245,158,11,.4);padding:2px 10px;font-size:11px;" title="进入预设编辑模式，对整个 MSDS 任意地方配置并保存覆盖模板">⚙️ 进入预设编辑模式</button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="button button-quiet button-xs" data-action="open-preset-export-modal" style="color:#38bdf8;border-color:rgba(56,189,248,.4);padding:2px 10px;font-size:11px;" title="勾选预设，局部优先级覆盖同步导出多版本 DOCX">📦 预设同步导出</button>
+        <button class="button button-quiet button-xs" data-action="enter-preset-mode" style="color:#f59e0b;border-color:rgba(245,158,11,.4);padding:2px 10px;font-size:11px;" title="进入预设编辑模式，对整个 MSDS 任意地方配置并保存覆盖模板">⚙️ 进入预设编辑模式</button>
+      </div>
     </div>
   `;
 }
@@ -970,6 +973,7 @@ function renderHeaderFooterEditor(engine, records, query) {
       ` : `
         <button class="button button-quiet" data-action="enter-preset-mode" style="color:#f59e0b;border-color:rgba(245,158,11,.6);font-weight:600;"><span>⚙️</span> 进入预设编辑</button>
       `}
+      <button class="button button-quiet" data-action="open-preset-export-modal" style="color:#38bdf8;border-color:rgba(56,189,248,.6);font-weight:600;" title="勾选预设，局部优先级覆盖同步导出多版本 DOCX"><span>📦</span> 预设同步导出</button>
       <button class="button button-quiet" data-action="reset-all-template" title="清空全部修改并恢复至初始模板状态">↺ 恢复整份模板</button>
       <button class="button button-quiet" data-action="run-audit">审计</button>
       <button class="button button-quiet" data-action="toggle-review-drawer" title="查看或管理批注与问题清单"><span>💬</span> 批注 (${(state.review.session?.annotations || []).filter((a) => a.status === 'open').length})</button>
@@ -1135,14 +1139,14 @@ function renderEditor() {
   const engine = state.editor.engine;
   if (!engine) return `${headerBand('模板编辑器')}${emptyWorkspace('editor')}`;
   const records = tableRecords(engine);
+    const query = state.editor.query.trim().toLowerCase();
   if (state.editor.selectedRecordId === '__header_footer__') {
     return renderHeaderFooterEditor(engine, records, query);
   }
   const selected = selectedRecord(engine, state.editor.selectedRecordId);
   if (selected) state.editor.selectedRecordId = selected.id;
   const errors = auditEngine(engine);
-  const query = state.editor.query.trim().toLowerCase();
-  const visibleRecords = records.filter((record) => !query || record.searchText.toLowerCase().includes(query));
+    const visibleRecords = records.filter((record) => !query || record.searchText.toLowerCase().includes(query));
   const selectedVisible = visibleRecords.find((record) => record.id === selected?.id) || visibleRecords[0] || selected;
   if (selectedVisible) state.editor.selectedRecordId = selectedVisible.id;
   return `
@@ -1153,6 +1157,7 @@ function renderEditor() {
       ` : `
         <button class="button button-quiet" data-action="enter-preset-mode" style="color:#f59e0b;border-color:rgba(245,158,11,.6);font-weight:600;"><span>⚙️</span> 进入预设编辑</button>
       `}
+      <button class="button button-quiet" data-action="open-preset-export-modal" style="color:#38bdf8;border-color:rgba(56,189,248,.6);font-weight:600;" title="勾选预设，局部优先级覆盖同步导出多版本 DOCX"><span>📦</span> 预设同步导出</button>
       <button class="button button-quiet" data-action="reset-all-template" title="清空全部修改并恢复至初始模板状态">↺ 恢复整份模板</button>
       <button class="button button-quiet" data-action="run-audit">审计</button>
       <button class="button button-quiet" data-action="toggle-review-drawer" title="查看或管理批注与问题清单"><span>💬</span> 批注 (${(state.review.session?.annotations || []).filter((a) => a.status === 'open').length})</button>
@@ -1770,6 +1775,216 @@ function bindEvents() {
       root.querySelector('#inspect-search')?.focus();
     }
   }, { once: true });
+
+  // ============================================================
+  // 全局事件委托：预设模式/清空/导出动作 (确保任何重绘与子元素点击100%响应)
+  // ============================================================
+  if (!root._presetDelegationBound) {
+    root._presetDelegationBound = true;
+    root.addEventListener('click', (e) => {
+      // 1. 进入预设编辑模式 (支持顶部与条幅两处按钮)
+      const enterBtn = e.target.closest('[data-action="enter-preset-mode"]');
+      if (enterBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        enterPresetEditing(state.editor.editingPresetId || 'preset_guocai_cn');
+        return;
+      }
+
+      // 2. 退出预设编辑模式
+      const exitBtn = e.target.closest('[data-action="exit-preset-editing"]');
+      if (exitBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        exitPresetEditing();
+        return;
+      }
+
+      // 3. 保存预设
+      const saveBtn = e.target.closest('[data-action="save-current-preset"]');
+      if (saveBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        saveCurrentPreset(false);
+        return;
+      }
+
+      // 4. 另存为新预设
+      const saveAsBtn = e.target.closest('[data-action="save-as-new-preset"]');
+      if (saveAsBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        saveCurrentPreset(true);
+        return;
+      }
+
+      // 5. 打开预设同步导出弹窗
+      const openExportModalBtn = e.target.closest('[data-action="open-preset-export-modal"]');
+      if (openExportModalBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        state.editor.exportModalOpen = true;
+        renderApp();
+        return;
+      }
+
+      // 6. 关闭预设弹窗
+      const closeModalBtn = e.target.closest('[data-action="close-preset-modal"]');
+      if (closeModalBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        state.editor.exportModalOpen = false;
+        state.editor.managerModalOpen = false;
+        renderApp();
+        return;
+      }
+
+      // 7. 确认批量预设导出
+      const confirmBatchBtn = e.target.closest('[data-action="confirm-batch-preset-export"]');
+      if (confirmBatchBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        executeBatchPresetExport();
+        return;
+      }
+
+      // 8. 单元格一键清空值 (普通模式与预设模式通用)
+      const clearCellBtn = e.target.closest('[data-cell-action="clear-value"]');
+      if (clearCellBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const record = recordById(state.editor.engine, clearCellBtn.dataset.recordId);
+        const cell = getCell(record, clearCellBtn.dataset.row, clearCellBtn.dataset.col);
+        if (cell && cell.editable) {
+          clearCellValue(cell, state.editor.engine?.roleStyles?.value);
+          state.editor.dirty = true;
+          refreshEditorDirty();
+          renderApp();
+        }
+        return;
+      }
+
+      // 9. 整节填写值一键清空
+      const clearSecBtn = e.target.closest('[data-action="clear-current-section-values"]');
+      if (clearSecBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const record = recordById(state.editor.engine, clearSecBtn.dataset.recordId);
+        if (!record) return;
+        if (window.confirm(`确定要清空【${record.title || '当前章节'}】的所有填写内容吗？`)) {
+          clearSectionValues(record, state.editor.engine?.roleStyles?.value);
+          state.editor.dirty = true;
+          refreshEditorDirty();
+          showToast(`已清空【${record.title || '当前章节'}】的全部填写值。`, 'info');
+          renderApp();
+        }
+        return;
+      }
+    });
+  }
+
+  // 预设选择器与复选框事件 (每次 renderApp 刷新)
+  root.querySelector('#switch-editing-preset-select')?.addEventListener('change', (e) => {
+    enterPresetEditing(e.target.value);
+  });
+
+  root.querySelector('#preset-mode-toggle')?.addEventListener('change', (e) => {
+    state.editor.presetModeEnabled = e.target.checked;
+    if (!state.editor.presetModeEnabled) {
+      state.editor.activePresetId = null;
+    }
+    renderApp();
+  });
+
+  root.querySelector('#preset-layer-select')?.addEventListener('change', (e) => {
+    const val = e.target.value;
+    state.editor.activePresetId = val === '__base__' ? null : val;
+    const p = state.editor.presets.find((x) => x.id === state.editor.activePresetId);
+    showToast(p ? `切换图层：${p.name}` : '切换至标准底图', 'info');
+    renderApp();
+  });
+
+  root.querySelectorAll('[data-action="create-new-preset"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const name = window.prompt('请输入预设名称（例如：客户定制国彩版、英文出口版等）：', '新建预设');
+      if (!name || !name.trim()) return;
+      const newId = `preset_custom_${Date.now()}`;
+      const newPreset = {
+        id: newId,
+        name: name.trim(),
+        targetTemplate: state.editor.template.includes('EN') ? 'EN 国彩' : 'CN 国彩',
+        isBuiltin: false,
+        enabledForExport: true,
+        headerFooterOverrides: {
+          company: '英德市国彩新材料有限公司',
+          entity: '国彩',
+          customFileNamePattern: `{model} msds_${state.editor.template.includes('EN') ? 'EN' : 'CN'} 国彩.docx`,
+        },
+        fieldOverrides: {},
+      };
+      state.editor.presets.push(newPreset);
+      PresetStore.savePresets(state.editor.presets);
+      state.editor.presetModeEnabled = true;
+      state.editor.activePresetId = newId;
+      showToast(`已创建预设：${newPreset.name}`, 'success');
+      renderApp();
+    });
+  });
+
+  root.querySelectorAll('[data-preset-action="revert-cell"]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const semKey = btn.dataset.semanticKey;
+      const activePreset = state.editor.presets.find((p) => p.id === state.editor.activePresetId);
+      if (activePreset && semKey && activePreset.fieldOverrides) {
+        delete activePreset.fieldOverrides[semKey];
+        PresetStore.savePresets(state.editor.presets);
+        showToast(`已撤销 [${semKey}] 的覆写，恢复继承基准值。`, 'info');
+        renderApp();
+      }
+    });
+  });
+
+  root.querySelectorAll('[data-action="open-preset-manager-modal"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.editor.managerModalOpen = true;
+      renderApp();
+    });
+  });
+
+  root.querySelectorAll('.export-preset-check').forEach((chk) => {
+    chk.addEventListener('change', (e) => {
+      const pId = e.target.dataset.presetId;
+      const p = state.editor.presets.find((x) => x.id === pId);
+      if (p) {
+        p.enabledForExport = e.target.checked;
+        PresetStore.savePresets(state.editor.presets);
+      }
+    });
+  });
+
+  root.querySelector('[data-action="reset-presets-to-default"]')?.addEventListener('click', () => {
+    if (window.confirm('确定要重置为系统默认预设吗？自定义预设将被清空。')) {
+      state.editor.presets = JSON.parse(JSON.stringify(SYSTEM_BUILTIN_PRESETS));
+      PresetStore.savePresets(state.editor.presets);
+      state.editor.activePresetId = null;
+      showToast('已重置为系统默认预设。', 'success');
+      renderApp();
+    }
+  });
+
+  root.querySelectorAll('[data-action="delete-preset"]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      const pId = btn.dataset.presetId;
+      if (window.confirm('确定要删除该预设吗？')) {
+        state.editor.presets = state.editor.presets.filter((p) => p.id !== pId);
+        PresetStore.savePresets(state.editor.presets);
+        if (state.editor.activePresetId === pId) state.editor.activePresetId = null;
+        showToast('已删除预设。', 'info');
+        renderApp();
+      }
+    });
+  });
 }
 
 function renderZoomBar(targetId, currentZoom = 'fit') {
@@ -2043,6 +2258,7 @@ async function loadInspectorTemplate(name) {
     state.matching.templateEngine = null;
     state.view = 'inspect';
     showToast('已加载内嵌模板样例，可直接查看 16 节识别结果。', 'success');
+    renderApp();
   } catch (error) {
     showToast(error.message, 'error');
   }
@@ -2062,6 +2278,7 @@ async function loadEditorTemplate(name) {
     state.editor.dirty = false;
     state.view = 'editor';
     showToast(`已载入 ${name} 内嵌模板。`, 'success');
+    renderApp();
   } catch (error) {
     showToast(error.message, 'error');
   }
@@ -2072,177 +2289,6 @@ async function fetchTemplate(name) {
   if (!response.ok) throw new DocxEngineError(`无法读取内嵌模板：${response.status}`, 'TEMPLATE_FETCH');
   return loadDocx(await response.arrayBuffer(), TEMPLATE_OPTIONS[name]);
 }
-
-
-  
-  // 值清空功能绑定 (普通模式与预设模式均支持)
-  root.querySelectorAll('[data-cell-action="clear-value"]').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const record = recordById(state.editor.engine, btn.dataset.recordId);
-      const cell = getCell(record, btn.dataset.row, btn.dataset.col);
-      if (cell && cell.editable) {
-        clearCellValue(cell, state.editor.engine?.roleStyles?.value);
-        state.editor.dirty = true;
-        refreshEditorDirty();
-        renderApp();
-      }
-    });
-  });
-
-  root.querySelectorAll('[data-action="clear-current-section-values"]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const record = recordById(state.editor.engine, btn.dataset.recordId);
-      if (!record) return;
-      if (window.confirm(`确定要清空【${record.title || '当前章节'}】的所有填写内容吗？`)) {
-        clearSectionValues(record, state.editor.engine?.roleStyles?.value);
-        state.editor.dirty = true;
-        refreshEditorDirty();
-        showToast(`已清空【${record.title || '当前章节'}】的所有填写内容。`, 'info');
-        renderApp();
-      }
-    });
-  });
-
-  // 预设模式切换与保存动作
-  root.querySelectorAll('[data-action="enter-preset-mode"]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      enterPresetEditing(state.editor.editingPresetId || 'preset_guocai_cn');
-    });
-  });
-
-  root.querySelectorAll('[data-action="exit-preset-editing"]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      exitPresetEditing();
-    });
-  });
-
-  root.querySelectorAll('[data-action="save-current-preset"]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      saveCurrentPreset(false);
-    });
-  });
-
-  root.querySelectorAll('[data-action="save-as-new-preset"]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      saveCurrentPreset(true);
-    });
-  });
-
-  root.querySelector('#switch-editing-preset-select')?.addEventListener('change', (e) => {
-    enterPresetEditing(e.target.value);
-  });
-
-  // 局部同步覆写预设交互事件绑定
-  root.querySelector('#preset-mode-toggle')?.addEventListener('change', (e) => {
-    state.editor.presetModeEnabled = e.target.checked;
-    if (!state.editor.presetModeEnabled) {
-      state.editor.activePresetId = null;
-    }
-    renderApp();
-  });
-
-  root.querySelector('#preset-layer-select')?.addEventListener('change', (e) => {
-    const val = e.target.value;
-    state.editor.activePresetId = val === '__base__' ? null : val;
-    const p = state.editor.presets.find((x) => x.id === state.editor.activePresetId);
-    showToast(p ? `已切换至图层：${p.name}` : '已切换至基准视图', 'info');
-    renderApp();
-  });
-
-  root.querySelectorAll('[data-action="create-new-preset"]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const name = window.prompt('请输入新衍生预设名称（例如：客户定制国彩版、英文出口版等）：', '新建衍生预设');
-      if (!name || !name.trim()) return;
-      const newId = `preset_custom_${Date.now()}`;
-      const newPreset = {
-        id: newId,
-        name: name.trim(),
-        targetTemplate: state.editor.template.includes('EN') ? 'EN 国彩' : 'CN 国彩',
-        isBuiltin: false,
-        enabledForExport: true,
-        headerFooterOverrides: {
-          company: '英德市国彩新材料有限公司',
-          entity: '国彩',
-          customFileNamePattern: `{model} msds_${state.editor.template.includes('EN') ? 'EN' : 'CN'} 国彩.docx`,
-        },
-        fieldOverrides: {},
-      };
-      state.editor.presets.push(newPreset);
-      PresetStore.savePresets(state.editor.presets);
-      state.editor.presetModeEnabled = true;
-      state.editor.activePresetId = newId;
-      showToast(`已创建并激活新预设：${newPreset.name}`, 'success');
-      renderApp();
-    });
-  });
-
-  root.querySelectorAll('[data-preset-action="revert-cell"]').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const semKey = btn.dataset.semanticKey;
-      const activePreset = state.editor.presets.find((p) => p.id === state.editor.activePresetId);
-      if (activePreset && semKey && activePreset.fieldOverrides) {
-        delete activePreset.fieldOverrides[semKey];
-        PresetStore.savePresets(state.editor.presets);
-        showToast(`已撤销 [${semKey}] 的覆写，恢复继承基准值。`, 'info');
-        renderApp();
-      }
-    });
-  });
-
-  root.querySelectorAll('[data-action="open-preset-manager-modal"]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      state.editor.managerModalOpen = true;
-      renderApp();
-    });
-  });
-
-  root.querySelectorAll('[data-action="close-preset-modal"]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      state.editor.exportModalOpen = false;
-      state.editor.managerModalOpen = false;
-      renderApp();
-    });
-  });
-
-  root.querySelectorAll('.export-preset-check').forEach((chk) => {
-    chk.addEventListener('change', (e) => {
-      const pId = e.target.dataset.presetId;
-      const p = state.editor.presets.find((x) => x.id === pId);
-      if (p) {
-        p.enabledForExport = e.target.checked;
-        PresetStore.savePresets(state.editor.presets);
-      }
-    });
-  });
-
-  root.querySelector('[data-action="confirm-batch-preset-export"]')?.addEventListener('click', () => {
-    executeBatchPresetExport();
-  });
-
-  root.querySelector('[data-action="reset-presets-to-default"]')?.addEventListener('click', () => {
-    if (window.confirm('确定要恢复为系统默认预设吗？自定义预设将被清空。')) {
-      state.editor.presets = JSON.parse(JSON.stringify(SYSTEM_BUILTIN_PRESETS));
-      PresetStore.savePresets(state.editor.presets);
-      state.editor.activePresetId = null;
-      showToast('已重置为系统默认预设。', 'success');
-      renderApp();
-    }
-  });
-
-  root.querySelectorAll('[data-action="delete-preset"]').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      const pId = btn.dataset.presetId;
-      if (window.confirm('确定要删除此预设吗？')) {
-        state.editor.presets = state.editor.presets.filter((p) => p.id !== pId);
-        PresetStore.savePresets(state.editor.presets);
-        if (state.editor.activePresetId === pId) state.editor.activePresetId = null;
-        showToast('已删除该预设。', 'info');
-        renderApp();
-      }
-    });
-  });
 
 
 function handleEditorInput(event) {
@@ -2451,7 +2497,13 @@ function saveCurrentPreset(isNew = false) {
 
 async function exportDocx() {
   if (!state.editor.engine) return;
-  if (state.editor.presetModeEnabled) {
+  if (state.editor.isPresetEditing) {
+    if (window.confirm('您当前处于预设编辑模式。\n\n点击【确定】打开【多版本同步导出】窗口以勾选预设同步导出；\n点击【取消】导出当前单份预设预览文档。')) {
+      state.editor.exportModalOpen = true;
+      renderApp();
+      return;
+    }
+  } else if (state.editor.presets && state.editor.presets.length > 0 && state.editor.presetModeEnabled) {
     state.editor.exportModalOpen = true;
     renderApp();
     return;
