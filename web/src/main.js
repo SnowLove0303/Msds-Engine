@@ -2542,4 +2542,58 @@ async function executeBatchPresetExport() {
   }
 }
 
+async function handleExportReviewBundle() {
+  if (!state.review.session) {
+    showToast('当前尚未生成审阅会话，请先执行智能匹配。', 'warning');
+    return;
+  }
+  const gate = checkExportGate(state.review.session);
+  if (!gate.allowed) {
+    showToast(`导出已阻止：${gate.message}`, 'error');
+    state.review.drawerOpen = true;
+    renderApp();
+    return;
+  }
 
+  const tEngine = state.editor.engine || state.matching.templateEngine;
+  if (!tEngine) {
+    showToast('缺少模板引擎实例，无法导出审阅包。', 'error');
+    return;
+  }
+
+  try {
+    const cleanDocxBuf = await tEngine.exportArrayBuffer();
+    const finalDocxName = buildExportDocxName(tEngine, {
+      customFileName: state.editor.customFileName,
+      templateName: state.matching.template || state.editor.template,
+      sourcePreviewName: state.sourcePreview?.name,
+      productModel: tEngine?.headerFooterData?.model || state.review.session?.productModel,
+    });
+    const model = state.review.session.productModel || 'MSDS';
+
+    const bundle = buildReviewBundle(state.review.session, { finalDocxName });
+
+    const zip = new JSZip();
+    zip.file(finalDocxName, cleanDocxBuf);
+    for (const [fname, content] of Object.entries(bundle.files)) {
+      zip.file(fname, content);
+    }
+
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    downloadBlob(zipBlob, `${model}_MSDS_REVIEW_BUNDLE.zip`);
+    showToast(`正式 MSDS 与 Agent 审阅包已成功导出 (${gate.status})！`, 'success');
+  } catch (err) {
+    showToast(`审阅包导出失败: ${err.message}`, 'error');
+  }
+}
+
+async function bootstrap() {
+  renderApp();
+  try {
+    await loadEditorTemplate('CN 冠志');
+  } catch (error) {
+    showToast('内嵌模板暂时无法加载，请确认开发服务器已启动。', 'error');
+  }
+}
+
+bootstrap();
