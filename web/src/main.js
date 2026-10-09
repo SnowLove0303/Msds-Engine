@@ -97,6 +97,8 @@ const state = {
     managerModalOpen: false,
     versionModalOpen: false,
   },
+  pendingScrollSection: { inspect: null, matching: null, editor: null },
+  previewScrollPositions: { inspect: 0, matching: 0, editor: 0 },
   review: {
     session: null,
     drawerOpen: false,
@@ -109,6 +111,68 @@ const state = {
 
 const shortNumber = (value) => new Intl.NumberFormat('zh-CN').format(value || 0);
 const sectionLabel = (number) => number ? `Section ${number}` : '未分类';
+
+// 原版式阅览器 DOM 渲染缓存池与 Section 锚定关键词字典
+const previewRenderCache = new Map();
+
+const SECTION_KEYWORDS = {
+  1: ['化学品及企业标识', 'Identification', 'CHEMICAL PRODUCT', 'SECTION 1', '第1部分', '1. 化学品', '1. IDENTIFICATION', '1、化学品'],
+  2: ['危险性概述', 'Hazards Identification', 'HAZARDS IDENTIFICATION', 'SECTION 2', '第2部分', '2. 危险性', '2. HAZARDS', '2、危险性'],
+  3: ['成分/组成信息', 'Composition', 'COMPOSITION/INFORMATION', 'SECTION 3', '第3部分', '3. 成分', '3. COMPOSITION', '3、成分'],
+  4: ['急救措施', 'First-Aid', 'FIRST AID', 'SECTION 4', '第4部分', '4. 急救', '4. FIRST AID', '4、急救'],
+  5: ['消防措施', 'Fire-Fighting', 'FIRE FIGHTING', 'SECTION 5', '第5部分', '5. 消防', '5. FIRE FIGHTING', '5、消防'],
+  6: ['泄漏应急处理', 'Accidental Release', 'ACCIDENTAL RELEASE', 'SECTION 6', '第6部分', '6. 泄漏', '6. ACCIDENTAL', '6、泄漏'],
+  7: ['操作处置与储存', 'Handling and Storage', 'HANDLING AND STORAGE', 'SECTION 7', '第7部分', '7. 操作', '7. HANDLING', '7、操作'],
+  8: ['接触控制/个体防护', 'Exposure Controls', 'EXPOSURE CONTROLS', 'SECTION 8', '第8部分', '8. 接触', '8. EXPOSURE', '8、接触'],
+  9: ['理化特性', 'Physical and Chemical', 'PHYSICAL AND CHEMICAL', 'SECTION 9', '第9部分', '9. 理化', '9. PHYSICAL', '9、理化'],
+  10: ['稳定性和反应性', 'Stability and Reactivity', 'STABILITY AND REACTIVITY', 'SECTION 10', '第10部分', '10. 稳定', '10. STABILITY', '10、稳定'],
+  11: ['毒理学信息', 'Toxicological Information', 'TOXICOLOGICAL INFORMATION', 'SECTION 11', '第11部分', '11. 毒理', '11. TOXICOLOGICAL', '11、毒理'],
+  12: ['生态学信息', 'Ecological Information', 'ECOLOGICAL INFORMATION', 'SECTION 12', '第12部分', '12. 生态', '12. ECOLOGICAL', '12、生态'],
+  13: ['废弃处置', 'Disposal Considerations', 'DISPOSAL CONSIDERATIONS', 'SECTION 13', '第13部分', '13. 废弃', '13. DISPOSAL', '13、废弃'],
+  14: ['运输信息', 'Transport Information', 'TRANSPORT INFORMATION', 'SECTION 14', '第14部分', '14. 运输', '14. TRANSPORT', '14、运输'],
+  15: ['法规信息', 'Regulatory Information', 'REGULATORY INFORMATION', 'SECTION 15', '第15部分', '15. 法规', '15. REGULATORY', '15、法规'],
+  16: ['其他信息', 'Other Information', 'OTHER INFORMATION', 'SECTION 16', '第16部分', '16. 其他', '16. OTHER', '16、其他'],
+};
+
+function scrollToSectionInPreview(container, sectionNumber) {
+  if (!container || !sectionNumber) return;
+  const keywords = SECTION_KEYWORDS[sectionNumber] || [`Section ${sectionNumber}`, `第${sectionNumber}部分`];
+  const candidates = container.querySelectorAll('p, h1, h2, h3, h4, th, td, div');
+  let matchedEl = null;
+
+  for (const el of candidates) {
+    const text = (el.innerText || el.textContent || '').trim();
+    if (!text || text.length > 90) continue;
+    const hit = keywords.some((kw) => text.toLowerCase().includes(kw.toLowerCase()));
+    if (hit) {
+      matchedEl = el;
+      break;
+    }
+  }
+
+  if (matchedEl) {
+    const containerRect = container.getBoundingClientRect();
+    const elRect = matchedEl.getBoundingClientRect();
+    const targetScroll = container.scrollTop + (elRect.top - containerRect.top) - 15;
+    container.scrollTo({
+      top: Math.max(0, targetScroll),
+      behavior: 'smooth',
+    });
+    if (container.dataset.preview) {
+      state.previewScrollPositions[container.dataset.preview] = Math.max(0, targetScroll);
+    }
+  } else {
+    const ratio = Math.max(0, Math.min(1, (sectionNumber - 1) / 16));
+    const targetScroll = container.scrollHeight * ratio;
+    container.scrollTo({
+      top: targetScroll,
+      behavior: 'smooth',
+    });
+    if (container.dataset.preview) {
+      state.previewScrollPositions[container.dataset.preview] = targetScroll;
+    }
+  }
+}
 
 function showToast(message, type = 'info') {
   state.toast = { message, type, id: Date.now() };
@@ -254,6 +318,13 @@ function renderAnnotationDrawer() {
             </select>
           </label>
         </div>
+        <div class="ann-drawer-batch-actions" style="padding:8px 16px;background:rgba(15,23,42,.6);border-bottom:1px solid rgba(148,163,184,.15);display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:11px;color:#94a3b8;">未解决: <strong style="color:${annotations.some(a => a.status === 'open') ? '#f87171' : '#34d399'};">${annotations.filter(a => a.status === 'open').length}</strong> 项</span>
+          <div style="display:flex;gap:8px;">
+            <button class="button button-quiet button-xs" data-action="resolve-all-annotations" type="button" style="color:#34d399;border-color:rgba(52,211,153,.35);font-size:11px;" title="将当前所有批注一键标记为已修复解决">✓ 全部标为已解决</button>
+            <button class="button button-quiet button-xs" data-action="clear-all-annotations" type="button" style="color:#ef4444;border-color:rgba(239,68,68,.35);font-size:11px;" title="彻底清空当前会话中的所有审阅批注">🧹 一键清空批注</button>
+          </div>
+        </div>
         <div class="ann-drawer-list">
           ${filtered.length === 0 ? '<div class="no-results" style="padding:20px;text-align:center;color:#94a3b8;">无符合条件的批注</div>' : filtered.map((a) => `
             <div class="ann-item-card is-${a.severity} ${a.status === 'resolved' ? 'is-resolved' : ''}">
@@ -300,10 +371,10 @@ function renderAnnotationModal() {
             <div class="ann-form-group">
               <label>严重程度</label>
               <select id="ann-modal-severity">
-                <option value="error">Error (需修复)</option>
-                <option value="blocker">Blocker (阻断导出)</option>
-                <option value="warning">Warning (存疑警告)</option>
+                <option value="warning" selected>Warning (存疑警告，不阻断导出)</option>
                 <option value="info">Info (记录说明)</option>
+                <option value="error">Error (需修复，导出时提示)</option>
+                <option value="blocker">Blocker (严重阻断)</option>
               </select>
             </div>
             <div class="ann-form-group">
@@ -580,6 +651,13 @@ ${escapeHtml(UPDATE_COMMANDS.linux)}</pre>
 }
 
 function renderApp() {
+  // 保存当前原版式视口的实际滚动像素位置，防止 DOM 替换后滚动条弹回顶部
+  root.querySelectorAll('.docx-preview-shell[data-preview]').forEach((el) => {
+    if (el.dataset.preview && el.scrollTop > 0) {
+      state.previewScrollPositions[el.dataset.preview] = el.scrollTop;
+    }
+  });
+
   let content = '';
   if (state.view === 'inspect') content = renderInspector();
   else if (state.view === 'matching') content = renderMatching();
@@ -1325,8 +1403,19 @@ function bindEvents() {
     renderApp();
   }));
   root.querySelectorAll('.section-nav-row[data-record-id]').forEach((button) => button.addEventListener('click', () => {
-    if (state.view === 'inspect') state.inspector.selectedRecordId = button.dataset.recordId;
-    else state.editor.selectedRecordId = button.dataset.recordId;
+    if (state.view === 'inspect') {
+      state.inspector.selectedRecordId = button.dataset.recordId;
+      const rec = recordById(state.inspector.engine, button.dataset.recordId);
+      if (rec?.sectionNumber) {
+        state.pendingScrollSection.inspect = rec.sectionNumber;
+      }
+    } else {
+      state.editor.selectedRecordId = button.dataset.recordId;
+      const rec = recordById(state.editor.engine, button.dataset.recordId);
+      if (rec?.sectionNumber) {
+        state.pendingScrollSection.editor = rec.sectionNumber;
+      }
+    }
     renderApp();
   }));
   root.querySelectorAll('[data-cell-id]').forEach((button) => button.addEventListener('click', () => {
@@ -1617,6 +1706,24 @@ function bindEvents() {
     state.review.drawerOpen = false;
     renderApp();
   }));
+  root.querySelectorAll('[data-action="clear-all-annotations"]').forEach((btn) => btn.addEventListener('click', () => {
+    if (state.review.session?.annotations?.length > 0) {
+      if (window.confirm('确定要清空当前所有审阅批注吗？清空后导出门禁拦截将自动解除。')) {
+        state.review.session.annotations = [];
+        showToast('已清空全部审阅批注，导出门禁已彻底解除。', 'info');
+        renderApp();
+      }
+    } else {
+      showToast('当前没有批注。', 'info');
+    }
+  }));
+  root.querySelectorAll('[data-action="resolve-all-annotations"]').forEach((btn) => btn.addEventListener('click', () => {
+    if (state.review.session?.annotations) {
+      state.review.session.annotations.forEach((a) => { a.status = 'resolved'; });
+      showToast('已将全部批注标记为已解决，准予直接导出。', 'success');
+      renderApp();
+    }
+  }));
   root.querySelector('#ann-filter-section')?.addEventListener('change', (e) => {
     state.review.filterSection = e.target.value;
     renderApp();
@@ -1799,6 +1906,7 @@ function bindEvents() {
 
   root.querySelectorAll('.matching-nav-item[data-section-num]').forEach((btn) => btn.addEventListener('click', () => {
     state.matching.selectedSectionNumber = Number(btn.dataset.sectionNum);
+    state.pendingScrollSection.matching = state.matching.selectedSectionNumber;
     renderApp();
   }));
 
@@ -2318,15 +2426,30 @@ const previewResizeObserver = new ResizeObserver((entries) => {
 function renderPreviews() {
   const targets = root.querySelectorAll('[data-preview]');
   targets.forEach(async (target) => {
-    const isEditor = target.dataset.preview === 'editor';
+    const pKey = target.dataset.preview;
+    const isEditor = pKey === 'editor';
     const previewType = isEditor ? 'docx' : (state.sourcePreview?.type || 'docx');
 
+    // 绑定滚动事件，实时记录用户的当前滚动位置，防止被重绘冲掉
+    target.onscroll = () => {
+      if (pKey) {
+        state.previewScrollPositions[pKey] = target.scrollTop;
+      }
+    };
+
     if (previewType === 'pdf' && state.sourcePreview?.blobUrl) {
-      target.innerHTML = `
-        <div class="pdf-viewer-shell">
-          <iframe src="${state.sourcePreview.blobUrl}#toolbar=1&navpanes=0&view=FitH" class="native-pdf-frame" title="PDF 真实原版式阅览"></iframe>
-        </div>
-      `;
+      const pdfKey = `pdf:${state.sourcePreview.blobUrl}`;
+      if (previewRenderCache.has(pdfKey)) {
+        target.innerHTML = '';
+        target.appendChild(previewRenderCache.get(pdfKey));
+      } else {
+        const wrap = document.createElement('div');
+        wrap.className = 'pdf-viewer-shell';
+        wrap.innerHTML = `<iframe src="${state.sourcePreview.blobUrl}#toolbar=1&navpanes=0&view=FitH" class="native-pdf-frame" title="PDF 真实原版式阅览"></iframe>`;
+        previewRenderCache.set(pdfKey, wrap);
+        target.innerHTML = '';
+        target.appendChild(wrap);
+      }
       return;
     }
 
@@ -2349,22 +2472,58 @@ function renderPreviews() {
     }
 
     let engine = null;
-    if (target.dataset.preview === 'inspect' || target.dataset.preview === 'matching') {
+    if (pKey === 'inspect' || pKey === 'matching') {
       engine = state.inspector.engine;
     } else if (isEditor) {
       engine = state.editor.engine;
     }
     if (!engine) return;
+
+    const cacheKey = `${pKey}:${engine.sourceName || 'engine'}:${engine.originalBytes?.byteLength || 0}`;
+
+    // 如果该引擎的 DOCX 已经渲染过，直接复用已渲染 DOM 树，实现 0ms 瞬间挂载并精确保持滚动位置！
+    if (previewRenderCache.has(cacheKey)) {
+      const cachedWrapper = previewRenderCache.get(cacheKey);
+      target.innerHTML = '';
+      target.appendChild(cachedWrapper);
+      previewResizeObserver.observe(target);
+      applyDocxFitToWidth(target, target.dataset.zoomMode || 'fit');
+
+      if (state.pendingScrollSection && state.pendingScrollSection[pKey]) {
+        const targetSec = state.pendingScrollSection[pKey];
+        state.pendingScrollSection[pKey] = null;
+        window.setTimeout(() => scrollToSectionInPreview(target, targetSec), 50);
+      } else {
+        target.scrollTop = state.previewScrollPositions[pKey] || 0;
+      }
+      return;
+    }
+
     try {
       target.innerHTML = '';
-      await renderAsync(engineBuffer(engine), target, null, {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'docx-preview-wrapper-holder';
+      wrapper.style.width = '100%';
+      target.appendChild(wrapper);
+
+      await renderAsync(engineBuffer(engine), wrapper, null, {
         className: 'docx-preview',
         inWrapper: true,
         breakPages: true,
         useBase64URL: true,
       });
+
+      previewRenderCache.set(cacheKey, wrapper);
       previewResizeObserver.observe(target);
       applyDocxFitToWidth(target, target.dataset.zoomMode || 'fit');
+
+      if (state.pendingScrollSection && state.pendingScrollSection[pKey]) {
+        const targetSec = state.pendingScrollSection[pKey];
+        state.pendingScrollSection[pKey] = null;
+        window.setTimeout(() => scrollToSectionInPreview(target, targetSec), 50);
+      } else {
+        target.scrollTop = state.previewScrollPositions[pKey] || 0;
+      }
     } catch (error) {
       target.innerHTML = `<div class="preview-error"><strong>原版式预览不可用</strong><p>${escapeHtml(error.message)}</p><small>结构化识别结果仍可继续使用。</small></div>`;
     }
@@ -2792,10 +2951,14 @@ async function exportDocx() {
   if (state.review.session) {
     const gate = checkExportGate(state.review.session);
     if (!gate.allowed) {
-      showToast(`导出已阻止：${gate.message}`, 'error');
-      state.review.drawerOpen = true;
-      renderApp();
-      return;
+      const confirmExport = window.confirm(
+        `【审阅门禁提示】\n当前存在 ${gate.blockers.length} 个阻断项与 ${gate.errors.length} 个错误批注尚未标记解决。\n\n是否确认忽略门禁并继续强行导出 DOCX？`
+      );
+      if (!confirmExport) {
+        state.review.drawerOpen = true;
+        renderApp();
+        return;
+      }
     }
   }
   const errors = auditEngine(state.editor.engine);
@@ -2829,10 +2992,14 @@ async function executeBatchPresetExport() {
   if (state.review.session) {
     const gate = checkExportGate(state.review.session);
     if (!gate.allowed) {
-      showToast(`导出已阻止：${gate.message}`, 'error');
-      state.review.drawerOpen = true;
-      renderApp();
-      return;
+      const confirmExport = window.confirm(
+        `【审阅门禁提示】\n当前存在 ${gate.blockers.length} 个阻断项与 ${gate.errors.length} 个错误批注尚未标记解决。\n\n是否确认忽略门禁并继续强行导出 DOCX？`
+      );
+      if (!confirmExport) {
+        state.review.drawerOpen = true;
+        renderApp();
+        return;
+      }
     }
   }
   tableRecords(baseEngine).forEach((r) => renumberRecord(r));
@@ -2910,13 +3077,7 @@ async function handleExportReviewBundle() {
     showToast('当前尚未生成审阅会话，请先执行智能匹配。', 'warning');
     return;
   }
-  const gate = checkExportGate(state.review.session);
-  if (!gate.allowed) {
-    showToast(`导出已阻止：${gate.message}`, 'error');
-    state.review.drawerOpen = true;
-    renderApp();
-    return;
-  }
+  // 审阅包本身就是用于承载批注清单与问题快照供评审的，因此永远准予导出！
 
   const tEngine = state.editor.engine || state.matching.templateEngine;
   if (!tEngine) {
