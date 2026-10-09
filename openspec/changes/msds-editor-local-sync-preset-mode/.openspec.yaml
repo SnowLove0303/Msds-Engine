@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-10-09
+change_id: msds-editor-local-sync-preset-mode
+title: 编辑器局部同步覆写模式 (Template-Agnostic Local Preset Overlay & Multi-Export)
