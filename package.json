@@ -1,0 +1,23 @@
+{
+  "name": "msds-engine",
+  "version": "1.2.0",
+  "description": "MSDS Engine - Universal Multi-Format Chemical Safety Data Sheet Standardization System",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm run dev --prefix web",
+    "build": "npm run build --prefix web",
+    "start": "npm run start --prefix web",
+    "update:win": "powershell -ExecutionPolicy Bypass -File scripts/update.ps1",
+    "update:linux": "bash scripts/update.sh"
+  },
+  "keywords": [
+    "msds",
+    "sds",
+    "docx",
+    "chemical-safety",
+    "docker"
+  ],
+  "author": "Guanzhi / Guocai Team",
+  "license": "UNLICENSED"
+}

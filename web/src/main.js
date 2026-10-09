@@ -64,6 +64,7 @@ import {
   computeContentHash,
   computeRowFingerprint,
 } from './annotation-engine.js';
+import { APP_VERSION, APP_BUILD_DATE, RELEASE_NOTES, UPDATE_COMMANDS } from './version.js';
 import './styles.css';
 
 const root = document.querySelector('#app');
@@ -94,6 +95,7 @@ const state = {
     presets: PresetStore.loadPresets(),
     exportModalOpen: false,
     managerModalOpen: false,
+    versionModalOpen: false,
   },
   review: {
     session: null,
@@ -171,7 +173,7 @@ function navMarkup() {
           <span class="nav-icon">✦</span><span>模板编辑器</span><small>03</small>
         </button>
       </nav>
-      <div class="topbar-meta"><span class="local-dot"></span>浏览器本地处理 <span class="topbar-divider"></span><span>16 sections ready</span></div>
+      <div class="topbar-meta"><button class="nav-version-badge" data-action="open-version-modal" type="button" title="点击查看系统版本与极速更新中心"><span class="version-dot"></span>v${APP_VERSION}</button><span class="topbar-divider"></span><span class="local-dot"></span>浏览器本地处理<span class="topbar-divider"></span><span>16 sections ready</span></div>
     </header>
   `;
 }
@@ -419,8 +421,8 @@ function renderPresetExportModal() {
   });
 
   return `
-    <div class="modal-backdrop" data-action="close-preset-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:9999;">
-      <div class="modal-card preset-export-dialog" onclick="event.stopPropagation()" style="background:#0b192c;border:1px solid rgba(91,214,210,.3);border-radius:12px;width:540px;max-width:92vw;box-shadow:0 20px 40px rgba(0,0,0,.6);overflow:hidden;">
+    <div class="modal-backdrop" data-backdrop="true" style="position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:9999;">
+      <div class="modal-card preset-export-dialog" style="background:#0b192c;border:1px solid rgba(91,214,210,.3);border-radius:12px;width:540px;max-width:92vw;box-shadow:0 20px 40px rgba(0,0,0,.6);overflow:hidden;">
         <div class="modal-header" style="padding:14px 20px;border-bottom:1px solid rgba(142,177,214,.2);display:flex;justify-content:space-between;align-items:center;">
           <div class="modal-title" style="font-weight:700;font-size:15px;color:#e2e8f0;display:flex;align-items:center;gap:8px;">
             <span>📦</span> 同步覆写多版本批量导出
@@ -466,8 +468,8 @@ function renderPresetExportModal() {
 function renderPresetManagerModal() {
   if (!state.editor.managerModalOpen) return '';
   return `
-    <div class="modal-backdrop" data-action="close-preset-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:9999;">
-      <div class="modal-card" onclick="event.stopPropagation()" style="background:#0b192c;border:1px solid rgba(91,214,210,.3);border-radius:12px;width:600px;max-width:92vw;box-shadow:0 20px 40px rgba(0,0,0,.6);overflow:hidden;">
+    <div class="modal-backdrop" data-backdrop="true" style="position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:9999;">
+      <div class="modal-card" style="background:#0b192c;border:1px solid rgba(91,214,210,.3);border-radius:12px;width:600px;max-width:92vw;box-shadow:0 20px 40px rgba(0,0,0,.6);overflow:hidden;">
         <div class="modal-header" style="padding:14px 20px;border-bottom:1px solid rgba(142,177,214,.2);display:flex;justify-content:space-between;align-items:center;">
           <div class="modal-title" style="font-weight:700;font-size:15px;color:#e2e8f0;display:flex;align-items:center;gap:8px;">
             <span>⚙️</span> 预设图层配置管理
@@ -507,13 +509,79 @@ function renderPresetManagerModal() {
   `;
 }
 
+function renderVersionModal() {
+  if (!state.editor.versionModalOpen) return '';
+  return `
+    <div class="modal-backdrop" data-backdrop="true" style="position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:99999;">
+      <div class="modal-card version-modal-card" style="background:#0b192c;border:1px solid rgba(56,189,248,.35);border-radius:14px;width:680px;max-width:94vw;box-shadow:0 24px 50px rgba(0,0,0,.75);overflow:hidden;color:#e2e8f0;">
+        <div class="modal-header" style="padding:16px 24px;border-bottom:1px solid rgba(148,163,184,.2);display:flex;justify-content:space-between;align-items:center;background:#0f2238;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#0284c7,#38bdf8);display:flex;align-items:center;justify-content:center;font-size:20px;">🚀</div>
+            <div>
+              <div style="font-weight:700;font-size:16px;color:#f8fafc;display:flex;align-items:center;gap:8px;">
+                <span>MSDS Engine</span>
+                <span style="font-size:12px;background:#0369a1;color:#bae6fd;padding:2px 8px;border-radius:999px;font-weight:600;">v${APP_VERSION}</span>
+              </div>
+              <div style="font-size:12px;color:#94a3b8;margin-top:2px;">构建日期: ${APP_BUILD_DATE} · 生产/开发混合自适应环境</div>
+            </div>
+          </div>
+          <button class="modal-close" data-action="close-version-modal" type="button" style="background:transparent;border:none;color:#94a3b8;font-size:22px;cursor:pointer;">×</button>
+        </div>
+        <div class="modal-body" style="padding:22px 24px;max-height:70vh;overflow-y:auto;display:flex;flex-direction:column;gap:18px;">
+          <!-- 核心特性 -->
+          <div style="background:rgba(15,23,42,.6);border:1px solid rgba(56,189,248,.2);border-radius:10px;padding:14px 16px;">
+            <div style="font-size:13px;font-weight:700;color:#38bdf8;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+              <span>✨</span> 本次版本核心特性 (v${APP_VERSION})
+            </div>
+            <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7;color:#cbd5e1;">
+              ${RELEASE_NOTES.map((item) => `<li><strong>${escapeHtml(item.title)}</strong>：${escapeHtml(item.desc)}</li>`).join('')}
+            </ul>
+          </div>
+
+          <!-- Docker 快速更新方案 -->
+          <div style="background:rgba(15,23,42,.8);border:1px solid rgba(148,163,184,.2);border-radius:10px;padding:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <div style="font-size:13px;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:6px;">
+                <span>🐳</span> <strong>Docker 容器部署与一键更新</strong>
+              </div>
+              <button class="button button-quiet button-xs" data-action="copy-docker-cmd" type="button" style="font-size:12px;color:#38bdf8;border-color:rgba(56,189,248,.4);">📋 复制命令</button>
+            </div>
+            <p style="font-size:12px;color:#94a3b8;margin:0 0 8px 0;line-height:1.5;">如果在 Docker 环境运行，在宿主机项目根目录执行以下一行命令即可秒级拉取更新并重构启动：</p>
+            <pre id="docker-update-cmd" style="background:#030712;padding:10px 14px;border-radius:6px;border:1px solid #1e293b;font-family:Consolas, Monaco, monospace;font-size:12px;color:#a5f3fc;margin:0;overflow-x:auto;">${escapeHtml(UPDATE_COMMANDS.docker)}</pre>
+          </div>
+
+          <!-- 本地开发/运行快速更新方案 -->
+          <div style="background:rgba(15,23,42,.8);border:1px solid rgba(148,163,184,.2);border-radius:10px;padding:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <div style="font-size:13px;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:6px;">
+                <span>⚡</span> <strong>本地一键更新脚本 (Windows / Linux)</strong>
+              </div>
+              <button class="button button-quiet button-xs" data-action="copy-local-cmd" type="button" style="font-size:12px;color:#38bdf8;border-color:rgba(56,189,248,.4);">📋 复制命令</button>
+            </div>
+            <p style="font-size:12px;color:#94a3b8;margin:0 0 8px 0;line-height:1.5;">支持调用仓库内置的高可用更新脚本，自动检测依赖并重新构建：</p>
+            <pre id="local-update-cmd" style="background:#030712;padding:10px 14px;border-radius:6px;border:1px solid #1e293b;font-family:Consolas, Monaco, monospace;font-size:12px;color:#a5f3fc;margin:0;overflow-x:auto;"># Windows (PowerShell):
+${escapeHtml(UPDATE_COMMANDS.windows)}
+
+# Linux / macOS:
+${escapeHtml(UPDATE_COMMANDS.linux)}</pre>
+          </div>
+        </div>
+        <div class="modal-actions" style="padding:14px 24px;background:#081322;border-top:1px solid rgba(148,163,184,.15);display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:#64748b;">✨ MSDS Engine 自动化与快速热更新支持</span>
+          <button class="button button-quiet" type="button" data-action="close-version-modal">关闭窗口</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderApp() {
   let content = '';
   if (state.view === 'inspect') content = renderInspector();
   else if (state.view === 'matching') content = renderMatching();
   else content = renderEditor();
 
-  root.innerHTML = `${navMarkup()}<main class="page-shell ${state.view === 'matching' ? 'matching-shell' : ''}">${content}</main>${toastMarkup()}${renderAnnotationDrawer()}${renderAnnotationModal()}${renderPresetExportModal()}${renderPresetManagerModal()}`;
+  root.innerHTML = `${navMarkup()}<main class="page-shell ${state.view === 'matching' ? 'matching-shell' : ''}">${content}</main>${toastMarkup()}${renderAnnotationDrawer()}${renderAnnotationModal()}${renderPresetExportModal()}${renderPresetManagerModal()}${renderVersionModal()}`;
   bindEvents();
   window.requestAnimationFrame(renderPreviews);
 }
@@ -1866,7 +1934,7 @@ function bindEvents() {
         return;
       }
 
-      // 8. 打开预设同步导出弹窗
+      // 8. 预设批量导出弹窗打开
       const openExportModalBtn = e.target.closest('[data-action="open-preset-export-modal"]');
       if (openExportModalBtn) {
         e.preventDefault();
@@ -1876,13 +1944,68 @@ function bindEvents() {
         return;
       }
 
-      // 9. 关闭预设弹窗
+      // 8.2 打开系统版本与极速更新中心
+      const openVersionBtn = e.target.closest('[data-action="open-version-modal"]');
+      if (openVersionBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        state.editor.versionModalOpen = true;
+        renderApp();
+        return;
+      }
+
+      // 8.3 复制 Docker 更新命令
+      const copyDockerBtn = e.target.closest('[data-action="copy-docker-cmd"]');
+      if (copyDockerBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        navigator.clipboard?.writeText(UPDATE_COMMANDS.docker).then(() => {
+          showToast('Docker 更新命令已成功复制到剪贴板！', 'success');
+        }).catch(() => {
+          showToast('复制失败，请手动选取命令文本复制。', 'warning');
+        });
+        return;
+      }
+
+      // 8.4 复制本地更新命令
+      const copyLocalBtn = e.target.closest('[data-action="copy-local-cmd"]');
+      if (copyLocalBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        navigator.clipboard?.writeText(UPDATE_COMMANDS.windows).then(() => {
+          showToast('本地更新命令已成功复制到剪贴板！', 'success');
+        }).catch(() => {
+          showToast('复制失败，请手动选取命令文本复制。', 'warning');
+        });
+        return;
+      }
+
+      // 8.5 点击遮罩背景空白区域关闭弹窗 (点击弹窗卡片内容区域不会触发)
+      if (e.target.dataset.backdrop === 'true' || e.target.classList.contains('modal-backdrop')) {
+        e.preventDefault();
+        state.editor.exportModalOpen = false;
+        state.editor.managerModalOpen = false;
+        state.editor.versionModalOpen = false;
+        renderApp();
+        return;
+      }
+
+      // 9. 关闭预设弹窗与版本弹窗
       const closeModalBtn = e.target.closest('[data-action="close-preset-modal"]');
       if (closeModalBtn) {
         e.preventDefault();
         e.stopPropagation();
         state.editor.exportModalOpen = false;
         state.editor.managerModalOpen = false;
+        renderApp();
+        return;
+      }
+
+      const closeVersionBtn = e.target.closest('[data-action="close-version-modal"]');
+      if (closeVersionBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        state.editor.versionModalOpen = false;
         renderApp();
         return;
       }
@@ -2015,6 +2138,10 @@ function bindEvents() {
       if (p) {
         p.enabledForExport = e.target.checked;
         PresetStore.savePresets(state.editor.presets);
+      }
+      const item = chk.closest('.preset-export-item');
+      if (item) {
+        item.classList.toggle('active', e.target.checked);
       }
     });
   });
@@ -2662,6 +2789,7 @@ async function executeBatchPresetExport() {
       return;
     }
   }
+  tableRecords(baseEngine).forEach((r) => renumberRecord(r));
   const errors = auditEngine(baseEngine);
   if (errors.length) {
     showToast(`导出已阻止：请先处理 ${errors.length} 个审计问题。`, 'error');
@@ -2697,6 +2825,7 @@ async function executeBatchPresetExport() {
 
       // 核心：调用 applyPresetPriorityOverlay
       applyPresetPriorityOverlay(baseEngine, preset, presetEngine);
+      tableRecords(presetEngine).forEach((r) => renumberRecord(r));
 
       const presetFileName = getPresetExportFileName(preset, baseModel);
       const presetBuffer = await presetEngine.exportArrayBuffer();

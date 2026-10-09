@@ -1,0 +1,13 @@
+node_modules
+web/node_modules
+dist
+web/dist
+.git
+.github
+.gemini
+.vscode
+__pycache__
+*.pyc
+_work
+.DS_Store
+Thumbs.db

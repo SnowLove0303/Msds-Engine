@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  msds-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: msds-engine
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=production
+      - PORT=5173
+      - HOST=0.0.0.0

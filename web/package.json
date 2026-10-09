@@ -1,6 +1,6 @@
 {
   "name": "msds-studio",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,8 @@
     "api": "node src/api-server.mjs",
     "build": "vite build",
     "preview": "vite preview",
-    "test:smoke": "node tests/smoke.mjs"
+    "test:smoke": "node tests/smoke.mjs",
+    "start": "node server.mjs"
   },
   "dependencies": {
     "docx-preview": "^0.3.7",
