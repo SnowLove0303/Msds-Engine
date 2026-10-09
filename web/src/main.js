@@ -387,9 +387,8 @@ function renderEditorBanner() {
           <button type="button" class="button button-quiet button-sm btn-preset-new" data-action="create-new-preset" title="新建一个全新的空白预设">➕ 新建预设</button>
           <button type="button" class="button button-quiet button-sm btn-preset-clone" data-action="save-as-new-preset" title="将当前编辑的覆写另存为新预设">📋 另存为新预设</button>
           <button type="button" class="button button-quiet button-sm btn-preset-clear" data-action="clear-all-preset-overrides" title="清空本预设所有覆写字段，恢复全部留空继承">🧹 清空所有覆写</button>
-          ${state.editor.presets.length > 1 ? `
-            <button type="button" class="button button-quiet button-sm btn-preset-delete" data-action="delete-current-preset" title="删除当前正在编辑的预设">🗑️ 删除此预设</button>
-          ` : ''}
+          <button type="button" class="button button-quiet button-sm btn-preset-delete" data-action="delete-current-preset" title="删除当前正在编辑的预设">🗑️ 删除此预设</button>
+          <button type="button" class="button button-quiet button-sm btn-preset-manage" data-action="open-preset-manager-modal" title="查看并管理所有已存预设">📑 预设管理</button>
           <button type="button" class="button button-primary button-sm btn-preset-save" data-action="save-current-preset" title="保存对当前预设的覆写修改与名称">💾 保存预设</button>
           <button type="button" class="button button-quiet button-sm btn-preset-exit" data-action="exit-preset-editing" title="退出预设编辑，返回普通物料文档编辑">↩️ 退出预设 (返回普通模式)</button>
         </div>
@@ -403,8 +402,9 @@ function renderEditorBanner() {
         <span class="normal-preset-count">已存预设：${state.editor.presets.length} 个</span>
       </div>
       <div class="normal-banner-actions">
-        <button class="button button-quiet button-xs btn-normal-export-presets" data-action="open-preset-export-modal" title="勾选预设，局部优先级覆盖同步导出多版本 DOCX">📦 预设同步导出</button>
         <button class="button button-quiet button-xs btn-normal-enter-preset" data-action="enter-preset-mode" title="进入预设编辑模式，对 MSDS 整个模板进行局部覆写预设">⚙️ 进入预设编辑模式</button>
+        <button class="button button-quiet button-xs btn-normal-manager-presets" data-action="open-preset-manager-modal" title="查看、管理、新建或删除已存预设">📑 预设配置管理</button>
+        <button class="button button-quiet button-xs btn-normal-export-presets" data-action="open-preset-export-modal" title="勾选预设，局部优先级覆盖同步导出多版本 DOCX">📦 预设同步导出</button>
       </div>
     </div>
   `;
@@ -469,15 +469,18 @@ function renderPresetManagerModal() {
   if (!state.editor.managerModalOpen) return '';
   return `
     <div class="modal-backdrop" data-backdrop="true" style="position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:9999;">
-      <div class="modal-card" style="background:#0b192c;border:1px solid rgba(91,214,210,.3);border-radius:12px;width:600px;max-width:92vw;box-shadow:0 20px 40px rgba(0,0,0,.6);overflow:hidden;">
+      <div class="modal-card" style="background:#0b192c;border:1px solid rgba(91,214,210,.3);border-radius:12px;width:620px;max-width:92vw;box-shadow:0 20px 40px rgba(0,0,0,.6);overflow:hidden;">
         <div class="modal-header" style="padding:14px 20px;border-bottom:1px solid rgba(142,177,214,.2);display:flex;justify-content:space-between;align-items:center;">
           <div class="modal-title" style="font-weight:700;font-size:15px;color:#e2e8f0;display:flex;align-items:center;gap:8px;">
-            <span>⚙️</span> 预设图层配置管理
+            <span>📑</span> 预设配置管理中心
           </div>
-          <button class="modal-close" data-action="close-preset-modal" style="background:transparent;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">×</button>
+          <button class="modal-close" data-action="close-preset-modal" type="button" style="background:transparent;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">×</button>
         </div>
         <div class="modal-body" style="padding:20px;max-height:65vh;overflow-y:auto;">
-          <p style="color:#94a3b8;font-size:13px;margin:0 0 14px 0;">管理系统内置与自定义衍生预设。预设与语义化键强绑定，跨模板切换永不失效：</p>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <p style="color:#94a3b8;font-size:13px;margin:0;line-height:1.5;">在此查看、切换编辑或删除系统所有衍生预设。预设支持独立覆写与命名：</p>
+            <button class="button button-quiet button-xs" data-action="create-new-preset" type="button" style="color:#34d399;border-color:rgba(52,211,153,.4);font-size:12px;white-space:nowrap;margin-left:12px;">➕ 新建预设</button>
+          </div>
           <div style="display:flex;flex-direction:column;gap:12px;">
             ${state.editor.presets.map((p) => `
               <div style="padding:12px 14px;background:rgba(15,23,42,.7);border:1px solid rgba(148,163,184,.2);border-radius:8px;">
@@ -485,24 +488,25 @@ function renderPresetManagerModal() {
                   <div>
                     <strong style="color:#f1f5f9;font-size:13px;">${escapeHtml(p.name)}</strong>
                     <span style="font-size:11px;color:#38bdf8;margin-left:6px;background:rgba(56,189,248,.1);padding:1px 6px;border-radius:3px;">${escapeHtml(p.targetTemplate)}</span>
-                    ${p.isBuiltin ? '<span style="font-size:10px;color:#94a3b8;margin-left:4px;">(系统内置)</span>' : ''}
+                    ${p.isBuiltin ? '<span style="font-size:10px;color:#94a3b8;margin-left:4px;">(系统初始)</span>' : ''}
                   </div>
-                  <div>
-                    ${!p.isBuiltin ? `<button class="button button-quiet button-xs" data-action="delete-preset" data-preset-id="${escapeHtml(p.id)}" style="color:#ef4444;font-size:11px;">删除</button>` : ''}
+                  <div style="display:flex;gap:6px;">
+                    <button class="button button-quiet button-xs" data-action="edit-preset-from-manager" data-preset-id="${escapeHtml(p.id)}" type="button" style="color:#38bdf8;font-size:11px;border-color:rgba(56,189,248,.35);" title="切换并直接进入该预设编辑模式">✏️ 进入编辑</button>
+                    <button class="button button-quiet button-xs" data-action="delete-preset" data-preset-id="${escapeHtml(p.id)}" type="button" style="color:#ef4444;font-size:11px;border-color:rgba(239,68,68,.35);" title="${state.editor.presets.length <= 1 ? '至少需保留一个预设，无法删除' : '删除此预设'}">🗑️ 删除</button>
                   </div>
                 </div>
                 <div style="font-size:12px;color:#94a3b8;display:flex;flex-direction:column;gap:3px;">
-                  <div>发布主体：<span style="color:#e2e8f0;">${escapeHtml(p.headerFooterOverrides?.company || '同基准')}</span></div>
+                  <div>发布主体：<span style="color:#e2e8f0;">${escapeHtml(p.headerFooterOverrides?.company || '同基准 (继承)')}</span></div>
                   <div>命名规则：<code style="color:#5bd6d2;font-size:11px;">${escapeHtml(p.headerFooterOverrides?.customFileNamePattern || '标准命名')}</code></div>
-                  <div>覆写字段：<span style="color:#fbbf24;font-weight:600;">${Object.keys(p.fieldOverrides || {}).length} 项</span></div>
+                  <div>覆写字段：<span style="color:#38bdf8;font-weight:600;">${Object.keys(p.fieldOverrides || {}).length} 项专属覆写</span></div>
                 </div>
               </div>
             `).join('')}
           </div>
         </div>
         <div class="modal-actions" style="padding:12px 20px;background:#081322;border-top:1px solid rgba(142,177,214,.15);display:flex;justify-content:space-between;align-items:center;">
-          <button class="button button-quiet button-sm" data-action="reset-presets-to-default" style="color:#f59e0b;">↺ 恢复系统默认预设</button>
-          <button class="button button-quiet" data-action="close-preset-modal">关闭</button>
+          <button class="button button-quiet button-sm" data-action="reset-presets-to-default" type="button" style="color:#f59e0b;">↺ 恢复系统初始预设</button>
+          <button class="button button-quiet" data-action="close-preset-modal" type="button">关闭</button>
         </div>
       </div>
     </div>
@@ -1059,10 +1063,7 @@ function renderHeaderFooterEditor(engine, records, query) {
       ${state.editor.isPresetEditing ? `
         <button class="button button-quiet" data-action="save-current-preset" style="color:#000;background:#f59e0b;font-weight:700;"><span>💾</span> 保存预设</button>
         <button class="button button-quiet" data-action="exit-preset-editing" style="color:#fff;background:rgba(255,255,255,0.15);"><span>↩️</span> 退出预设</button>
-      ` : `
-        <button class="button button-quiet" data-action="enter-preset-mode" style="color:#f59e0b;border-color:rgba(245,158,11,.6);font-weight:600;"><span>⚙️</span> 进入预设编辑</button>
-      `}
-      <button class="button button-quiet" data-action="open-preset-export-modal" style="color:#38bdf8;border-color:rgba(56,189,248,.6);font-weight:600;" title="勾选预设，局部优先级覆盖同步导出多版本 DOCX"><span>📦</span> 预设同步导出</button>
+      ` : ''}
       <button class="button button-quiet" data-action="reset-all-template" title="清空全部修改并恢复至初始模板状态">↺ 恢复整份模板</button>
       <button class="button button-quiet" data-action="run-audit">审计</button>
       <button class="button button-quiet" data-action="toggle-review-drawer" title="查看或管理批注与问题清单"><span>💬</span> 批注 (${(state.review.session?.annotations || []).filter((a) => a.status === 'open').length})</button>
@@ -1243,10 +1244,7 @@ function renderEditor() {
       ${state.editor.isPresetEditing ? `
         <button class="button button-quiet" data-action="save-current-preset" style="color:#000;background:#f59e0b;font-weight:700;"><span>💾</span> 保存预设</button>
         <button class="button button-quiet" data-action="exit-preset-editing" style="color:#fff;background:rgba(255,255,255,0.15);"><span>↩️</span> 退出预设</button>
-      ` : `
-        <button class="button button-quiet" data-action="enter-preset-mode" style="color:#f59e0b;border-color:rgba(245,158,11,.6);font-weight:600;"><span>⚙️</span> 进入预设编辑</button>
-      `}
-      <button class="button button-quiet" data-action="open-preset-export-modal" style="color:#38bdf8;border-color:rgba(56,189,248,.6);font-weight:600;" title="勾选预设，局部优先级覆盖同步导出多版本 DOCX"><span>📦</span> 预设同步导出</button>
+      ` : ''}
       <button class="button button-quiet" data-action="reset-all-template" title="清空全部修改并恢复至初始模板状态">↺ 恢复整份模板</button>
       <button class="button button-quiet" data-action="run-audit">审计</button>
       <button class="button button-quiet" data-action="toggle-review-drawer" title="查看或管理批注与问题清单"><span>💬</span> 批注 (${(state.review.session?.annotations || []).filter((a) => a.status === 'open').length})</button>
@@ -1931,6 +1929,54 @@ function bindEvents() {
         e.preventDefault();
         e.stopPropagation();
         handleClearAllPresetOverrides();
+        return;
+      }
+
+      // 7.8 打开预设管理中心弹窗
+      const openMgrModalBtn = e.target.closest('[data-action="open-preset-manager-modal"]');
+      if (openMgrModalBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        state.editor.managerModalOpen = true;
+        renderApp();
+        return;
+      }
+
+      // 7.9 从预设管理中心直接进入编辑指定预设
+      const editFromMgrBtn = e.target.closest('[data-action="edit-preset-from-manager"]');
+      if (editFromMgrBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const pId = editFromMgrBtn.dataset.presetId;
+        state.editor.managerModalOpen = false;
+        enterPresetEditing(pId);
+        return;
+      }
+
+      // 7.95 从预设管理中心删除预设
+      const deletePresetItemBtn = e.target.closest('[data-action="delete-preset"]');
+      if (deletePresetItemBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const pId = deletePresetItemBtn.dataset.presetId;
+        if (state.editor.presets.length <= 1) {
+          showToast('至少需保留一个预设，无法删除最后一份预设。', 'warning');
+          return;
+        }
+        const p = state.editor.presets.find((x) => x.id === pId);
+        if (window.confirm(`确定要删除预设【${p?.name || pId}】吗？删除后不可恢复。`)) {
+          state.editor.presets = state.editor.presets.filter((x) => x.id !== pId);
+          PresetStore.savePresets(state.editor.presets);
+          if (state.editor.editingPresetId === pId) {
+            state.editor.editingPresetId = state.editor.presets[0]?.id || null;
+            if (state.editor.isPresetEditing) {
+              enterPresetEditing(state.editor.editingPresetId);
+              return;
+            }
+          }
+          showToast(`已成功删除预设【${p?.name || pId}】。`, 'info');
+          renderApp();
+        }
         return;
       }
 
@@ -2701,7 +2747,7 @@ function handleCreateNewPreset() {
 
 function handleDeleteCurrentPreset() {
   if (state.editor.presets.length <= 1) {
-    showToast('至少需保留一个预设，无法删除最后一份预设。', 'warning');
+    showToast('当前仅剩唯一预设，无法删除最后一份预设（可使用【清空所有覆写】恢复全部留空继承）。', 'warning');
     return;
   }
   const curP = state.editor.presets.find((p) => p.id === state.editor.editingPresetId);
