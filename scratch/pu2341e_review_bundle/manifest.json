@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "msds-review-bundle/v1",
+  "reviewSessionId": "RS-mv21163u-5zbmqp",
+  "productModel": "PU-2341E msds_CN 冠志.docx",
+  "sourceFileName": "PU-2341E msds_CN 冠志.docx",
+  "sourceHash": "55bbbb3c",
+  "templateName": "CN 冠志",
+  "templateHash": "965b853c",
+  "matchingRunId": "RUN-mv21163u",
+  "editorRevision": 0,
+  "annotationCount": 20,
+  "openCount": 20,
+  "blockerCount": 0,
+  "errorCount": 0,
+  "warningCount": 20,
+  "staleCount": 0,
+  "orphanedCount": 0,
+  "finalMsdsFile": "PEA-4139 msds_CN 冠志.docx",
+  "generatedAt": "2026-10-10T06:54:15.480Z",
+  "exportStatus": "allowed_with_warnings",
+  "gateMessage": "准予导出（带警告）：存在 20 项警告，0 项陈旧批注，0 项孤儿批注。"
+}

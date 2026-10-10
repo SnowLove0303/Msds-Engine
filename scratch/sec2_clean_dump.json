@@ -1,0 +1,3062 @@
+[
+  {
+    "model": "PU-1007",
+    "file_name": "PU-1007 msds_CN 冠志.docx",
+    "overall_status": "HAS_CONFLICTS",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "GHS分类：\n根据GHS不属于危险物",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： GHS分类：\n根据GHS不属于危险物"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "GHS象形图： "
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "无信号词",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 无信号词"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  },
+  {
+    "model": "PU-1034",
+    "file_name": "PU-1034 msds_CN 冠志.docx",
+    "overall_status": "HAS_CONFLICTS",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "GHS分类：\n根据GHS不属于危险物",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： GHS分类：\n根据GHS不属于危险物"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "GHS象形图： "
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "无信号词",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 无信号词"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  },
+  {
+    "model": "PU-1036",
+    "file_name": "PU-1036 msds_CN 冠志.docx",
+    "overall_status": "HAS_UNMATCHED",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "根据GHS不属于危害化学品\n2.2",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： 根据GHS不属于危害化学品\n2.2"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "MATCHED",
+        "value": "根据GHS不属于危害化学品",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "GHS象形图： 根据GHS不属于危害化学品"
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "无信号词",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 无信号词"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  },
+  {
+    "model": "PU-1102",
+    "file_name": "PU-1102 msds_CN 冠志.docx",
+    "overall_status": "PERFECT",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "GHS分类：\n根据GHS不属于危险物",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： GHS分类：\n根据GHS不属于危险物"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "GHS象形图： "
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "无信号词",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 无信号词"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  },
+  {
+    "model": "PU-1107",
+    "file_name": "PU-1107 msds_CN 冠志.docx",
+    "overall_status": "PERFECT",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "GHS分类：\n根据GHS不属于危险物",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： GHS分类：\n根据GHS不属于危险物"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "GHS象形图： "
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "无信号词",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 无信号词"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  },
+  {
+    "model": "PU-202A",
+    "file_name": "PU-202A msds_CN 冠志.docx",
+    "overall_status": "HAS_UNMATCHED",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "急性毒性（吸入），类别4（H332）\n皮肤腐蚀/刺激，类别3（H316）\n严重眼睛损伤/眼睛刺激性，类别2B（H320）\n生殖毒性物质，类别1B（H360）\n特异性靶器官系统毒性 一次接触，类别1（H370）\n特异性靶器官系统毒性 反复接触，类别2（H373）",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： 急性毒性（吸入），类别4（H332）\n皮肤腐蚀/刺激，类别3（H316）\n严重眼睛损伤/眼睛刺激性，类别2B（H320）\n生殖毒性物质，类别1B（H360）\n特异性靶器官系统毒性 一次接触，类别1（H370）\n特异性靶器官系统毒性 反复接触，类别2（H373）"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "MATCHED",
+        "value": "[象形图]",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": true,
+        "rawSnippet": "GHS象形图： [象形图]"
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "危险",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 危险"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "MATCHED",
+        "value": "H316造成轻微皮肤刺激。\nH320造成眼睛刺激。\nH332吸入有害。\nH360可能对生育能力或胎儿造成伤害。\nH370可能对器官的伤害。\nH373长期或重复暴露可能会对器官造成伤害（肝）。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.5  危险性说明： H316造成轻微皮肤刺激。\nH320造成眼睛刺激。\nH332吸入有害。\nH360可能对生育能力或胎儿造成伤害。\nH370可能对器官的伤害。\nH373长期或重复暴露可能会对器官造成伤害（肝）。"
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "MATCHED",
+        "value": "预防措施：\nP201 在使用前获取特别指示。\nP202 在阅读并了解所有安全预防措施之前，切勿操作与处置。\nP260 不要吸入粉尘/烟/气体/气雾/蒸气/喷雾。\nP264 操作后彻底清洗双手。\nP270 使用本产品时不要进食、饮水或吸烟。\nP271 只能在室外或通风良好处使用。\nP280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。\n事故响应：\nP304+P340 如误吸入：将人转移到空气新鲜处，保持呼吸舒适体位。\nP305+P351+P338 如果进入眼睛：用水小心地冲洗几分钟。如简便易行，摘除隐形眼镜，继续冲洗。\nP308+P313 如果接触到或有疑虑：求医/就诊。\nP337+P313 如眼刺激持续不退：求医/就诊。\nP370+P378 火灾时：使用泡沫，干粉灭火器或二氧化碳灭火。\n安全储存：\nP405 储存处须加锁。\n废弃处置：\nP501 处置内装物/容器按照当地规章。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.6  防范说明： P201 在使用前获取特别指示。\nP202 在阅读并了解所有安全预防措施之前，切勿操作与处置。\nP260不要吸入粉尘/烟/气体/气雾/蒸气/喷雾。\nP264操作后彻底清洗双手。\nP270使用本产品时不要进食、饮水或吸烟。\nP271只能在室外或通风良好处使用。\nP280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。\nP304+P340如误吸入：将人转移到空气新鲜处，保持呼吸舒适体位。\nP305+P351+P338 如果进入眼睛：用水小心地冲洗几分钟。如简便易行，摘除隐形眼镜，继续冲洗。\nP308+P313如果接触到或有疑虑：求医/就诊。\nP337+P313如眼刺激持续不退：求医/就诊。\nP370+P378火灾时：使用泡沫，干粉灭火器或二氧化碳灭火。\nP405 储存处须加锁。\nP501 处置内装物/容器按照当地规章。"
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "MATCHED",
+        "value": "吸入：正常使用时无危害。",
+        "reason": "实质否定结论受全局白名单绝对保护，严禁剪枝",
+        "hasDrawing": false,
+        "rawSnippet": "2.8  健康危害： 吸入：正常使用时无危害。"
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "MATCHED",
+        "value": "吸入：正常使用时无危害。",
+        "reason": "实质否定结论受全局白名单绝对保护，严禁剪枝",
+        "hasDrawing": false,
+        "rawSnippet": "吸入： 吸入：正常使用时无危害。"
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "MATCHED",
+        "value": "皮肤：H316造成轻微皮肤刺激。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "皮肤： 皮肤：H316造成轻微皮肤刺激。"
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "MATCHED",
+        "value": "眼睛：H320造成眼睛刺激。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "眼睛： 眼睛：H320造成眼睛刺激。"
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "MATCHED",
+        "value": "症状和体征：H316造成轻微皮肤刺激。\nH320造成眼睛刺激。\nH332吸入有害。\nH360可能对生育能力或胎儿造成伤害。\nH370可能对器官的伤害。\nH373长期或重复暴露可能会对器官造成伤害（肝）。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "症状和体征： 症状和体征：H316造成轻微皮肤刺激。\nH320造成眼睛刺激。\nH332吸入有害。\nH360可能对生育能力或胎儿造成伤害。\nH370可能对器官的伤害。\nH373长期或重复暴露可能会对器官造成伤害（肝）。"
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  },
+  {
+    "model": "PU-202B",
+    "file_name": "PU-202B msds_CN 冠志.docx",
+    "overall_status": "HAS_UNMATCHED",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "生殖毒性物质，类别1B（H360）",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： 生殖毒性物质，类别1B（H360）"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "MATCHED",
+        "value": "[象形图]",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": true,
+        "rawSnippet": "GHS象形图： [象形图]"
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "危险",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 危险"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "MATCHED",
+        "value": "H360可能对胎儿造成伤害。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.5  危险性说明： H360可能对胎儿造成伤害。"
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "MATCHED",
+        "value": "预防措施：\nP201 在使用前获取特别指示。\nP202 在阅读并了解所有安全预防措施之前，切勿操作与处置。\nP280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。\n事故响应：\nP308+P313 如接触到或有疑虑：求医/就诊。\n安全储存：\nP405 储存处须加锁。\n废弃处置：\nP501 处置内装物/容器按照当地规章。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.6  防范说明： P201 在使用前获取特别指示。\nP202 在阅读并了解所有安全预防措施之前，切勿操作与处置。\nP280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。\nP308+P313如接触到或有疑虑：求医/就诊。\nP405 储存处须加锁。\nP501 处置内装物/容器按照当地规章。"
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "MATCHED",
+        "value": "吸入：正常使用时无危害。",
+        "reason": "实质否定结论受全局白名单绝对保护，严禁剪枝",
+        "hasDrawing": false,
+        "rawSnippet": "2.8  健康危害： 吸入：正常使用时无危害。"
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "MATCHED",
+        "value": "吸入：正常使用时无危害。",
+        "reason": "实质否定结论受全局白名单绝对保护，严禁剪枝",
+        "hasDrawing": false,
+        "rawSnippet": "吸入： 吸入：正常使用时无危害。"
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "MATCHED",
+        "value": "症状和体征：H360可能对胎儿造成伤害。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "症状和体征： 症状和体征：H360可能对胎儿造成伤害。"
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "可能存在透皮吸收N－甲基吡咯烷酮的危险。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 可能存在透皮吸收N－甲基吡咯烷酮的危险。"
+      }
+    ]
+  },
+  {
+    "model": "PU-202C",
+    "file_name": "PU-202C msds_CN 冠志.docx",
+    "overall_status": "HAS_UNMATCHED",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "急性毒性（吸入），类别4（H332）\n皮肤腐蚀/刺激，类别3（H316）\n严重眼睛损伤/眼睛刺激性，类别2B（H320）\n生殖毒性物质，类别1B（H360）\n特异性靶器官系统毒性 一次接触，类别1（H370）\n特异性靶器官系统毒性 反复接触，类别2（H373）",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： 急性毒性（吸入），类别4（H332）\n皮肤腐蚀/刺激，类别3（H316）\n严重眼睛损伤/眼睛刺激性，类别2B（H320）\n生殖毒性物质，类别1B（H360）\n特异性靶器官系统毒性 一次接触，类别1（H370）\n特异性靶器官系统毒性 反复接触，类别2（H373）"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "MATCHED",
+        "value": "[象形图]",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": true,
+        "rawSnippet": "GHS象形图： [象形图]"
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "危险",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 危险"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "MATCHED",
+        "value": "H316造成轻微皮肤刺激。\nH320造成眼睛刺激。\nH332吸入有害。\nH360可能对生育能力或胎儿造成伤害。\nH370可能对器官的伤害。\nH373长期或重复暴露可能会对器官造成伤害（肝）。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.5  危险性说明： H316造成轻微皮肤刺激。\nH320造成眼睛刺激。\nH332吸入有害。\nH360可能对生育能力或胎儿造成伤害。\nH370可能对器官的伤害。\nH373长期或重复暴露可能会对器官造成伤害（肝）。"
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "MATCHED",
+        "value": "预防措施：\nP201 在使用前获取特别指示。\nP202 在阅读并了解所有安全预防措施之前，切勿操作与处置。\nP260 不要吸入粉尘/烟/气体/气雾/蒸气/喷雾。\nP264 操作后彻底清洗双手。\nP270 使用本产品时不要进食、饮水或吸烟。\nP271 只能在室外或通风良好处使用。\nP280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。\n事故响应：\nP304+P340 如误吸入：将人转移到空气新鲜处，保持呼吸舒适体位。\nP305+P351+P338 如果进入眼睛：用水小心地冲洗几分钟。如简便易行，摘除隐形眼镜，继续冲洗。\nP308+P313 如果接触到或有疑虑：求医/就诊。\nP337+P313 如眼刺激持续不退：求医/就诊。\nP370+P378 火灾时：使用泡沫，干粉灭火器或二氧化碳灭火。\n安全储存：\nP405 储存处须加锁。\n废弃处置：\nP501 处置内装物/容器按照当地规章。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.6  防范说明： P201 在使用前获取特别指示。\nP202 在阅读并了解所有安全预防措施之前，切勿操作与处置。\nP260不要吸入粉尘/烟/气体/气雾/蒸气/喷雾。\nP264操作后彻底清洗双手。\nP270使用本产品时不要进食、饮水或吸烟。\nP271只能在室外或通风良好处使用。\nP280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。\nP304+P340如误吸入：将人转移到空气新鲜处，保持呼吸舒适体位。\nP305+P351+P338 如果进入眼睛：用水小心地冲洗几分钟。如简便易行，摘除隐形眼镜，继续冲洗。\nP308+P313如果接触到或有疑虑：求医/就诊。\nP337+P313如眼刺激持续不退：求医/就诊。\nP370+P378火灾时：使用泡沫，干粉灭火器或二氧化碳灭火。\nP405 储存处须加锁。\nP501 处置内装物/容器按照当地规章。"
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "MATCHED",
+        "value": "吸入：正常使用时无危害。",
+        "reason": "实质否定结论受全局白名单绝对保护，严禁剪枝",
+        "hasDrawing": false,
+        "rawSnippet": "2.8  健康危害： 吸入：正常使用时无危害。"
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "MATCHED",
+        "value": "吸入：正常使用时无危害。",
+        "reason": "实质否定结论受全局白名单绝对保护，严禁剪枝",
+        "hasDrawing": false,
+        "rawSnippet": "吸入： 吸入：正常使用时无危害。"
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "MATCHED",
+        "value": "皮肤：H316造成轻微皮肤刺激。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "皮肤： 皮肤：H316造成轻微皮肤刺激。"
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "MATCHED",
+        "value": "眼睛：H320造成眼睛刺激。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "眼睛： 眼睛：H320造成眼睛刺激。"
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "MATCHED",
+        "value": "症状和体征：H316造成轻微皮肤刺激。\nH320造成眼睛刺激。\nH332吸入有害。\nH360可能对生育能力或胎儿造成伤害。\nH370可能对器官的伤害。\nH373长期或重复暴露可能会对器官造成伤害（肝）。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "症状和体征： 症状和体征：H316造成轻微皮肤刺激。\nH320造成眼睛刺激。\nH332吸入有害。\nH360可能对生育能力或胎儿造成伤害。\nH370可能对器官的伤害。\nH373长期或重复暴露可能会对器官造成伤害（肝）。"
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  },
+  {
+    "model": "PU-2060",
+    "file_name": "PU-2060 msds_CN 冠志.docx",
+    "overall_status": "HAS_UNMATCHED",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "根据GHS不属于危害化学品\n2.2",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： 根据GHS不属于危害化学品\n2.2"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "MATCHED",
+        "value": "根据GHS不属于危害化学品",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "GHS象形图： 根据GHS不属于危害化学品"
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "无信号词",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 无信号词"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  },
+  {
+    "model": "PU-2186",
+    "file_name": "PU-2186 msds_CN 冠志.docx",
+    "overall_status": "HAS_UNMATCHED",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "急性毒性（吸入），类别4（H332）\n皮肤腐蚀/刺激，类别3（H316）\n严重眼睛损伤/眼睛刺激性，类别2B（H320）\n生殖毒性物质，类别1B（H360）\n特异性靶器官系统毒性 一次接触，类别1（H370）\n特异性靶器官系统毒性 反复接触，类别2（H373）",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： 急性毒性（吸入），类别4（H332）\n皮肤腐蚀/刺激，类别3（H316）\n严重眼睛损伤/眼睛刺激性，类别2B（H320）\n生殖毒性物质，类别1B（H360）\n特异性靶器官系统毒性 一次接触，类别1（H370）\n特异性靶器官系统毒性 反复接触，类别2（H373）"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "MATCHED",
+        "value": "[象形图]",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": true,
+        "rawSnippet": "GHS象形图： [象形图]"
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "危险",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 危险"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "MATCHED",
+        "value": "H316造成轻微皮肤刺激。\nH320造成眼睛刺激。\nH332吸入有害。\nH360可能对生育能力或胎儿造成伤害。\nH370可能对器官的伤害。\nH373长期或重复暴露可能会对器官造成伤害（肝）。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.5  危险性说明： H316造成轻微皮肤刺激。\nH320造成眼睛刺激。\nH332吸入有害。\nH360可能对生育能力或胎儿造成伤害。\nH370可能对器官的伤害。\nH373长期或重复暴露可能会对器官造成伤害（肝）。"
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "MATCHED",
+        "value": "预防措施：\nP201 在使用前获取特别指示。\nP202 在阅读并了解所有安全预防措施之前，切勿操作与处置。\nP260 不要吸入粉尘/烟/气体/气雾/蒸气/喷雾。\nP264 操作后彻底清洗双手。\nP270 使用本产品时不要进食、饮水或吸烟。\nP271 只能在室外或通风良好处使用。\nP280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。\n事故响应：\nP304+P340 如误吸入：将人转移到空气新鲜处，保持呼吸舒适体位。\nP305+P351+P338 如果进入眼睛：用水小心地冲洗几分钟。如简便易行，摘除隐形眼镜，继续冲洗。\nP308+P313 如果接触到或有疑虑：求医/就诊。\nP337+P313 如眼刺激持续不退：求医/就诊。\nP370+P378 火灾时：使用泡沫，干粉灭火器或二氧化碳灭火。\n安全储存：\nP405 储存处须加锁。\n废弃处置：\nP501 处置内装物/容器按照当地规章。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.6  防范说明： P201 在使用前获取特别指示。\nP202 在阅读并了解所有安全预防措施之前，切勿操作与处置。\nP260不要吸入粉尘/烟/气体/气雾/蒸气/喷雾。\nP264操作后彻底清洗双手。\nP270使用本产品时不要进食、饮水或吸烟。\nP271只能在室外或通风良好处使用。\nP280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。\nP304+P340如误吸入：将人转移到空气新鲜处，保持呼吸舒适体位。\nP305+P351+P338 如果进入眼睛：用水小心地冲洗几分钟。如简便易行，摘除隐形眼镜，继续冲洗。\nP308+P313如果接触到或有疑虑：求医/就诊。\nP337+P313如眼刺激持续不退：求医/就诊。\nP370+P378火灾时：使用泡沫，干粉灭火器或二氧化碳灭火。\nP405 储存处须加锁。\nP501 处置内装物/容器按照当地规章。"
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "MATCHED",
+        "value": "吸入：正常使用时无危害。",
+        "reason": "实质否定结论受全局白名单绝对保护，严禁剪枝",
+        "hasDrawing": false,
+        "rawSnippet": "2.8  健康危害： 吸入：正常使用时无危害。"
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "MATCHED",
+        "value": "吸入：正常使用时无危害。",
+        "reason": "实质否定结论受全局白名单绝对保护，严禁剪枝",
+        "hasDrawing": false,
+        "rawSnippet": "吸入： 吸入：正常使用时无危害。"
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "MATCHED",
+        "value": "皮肤：H316造成轻微皮肤刺激。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "皮肤： 皮肤：H316造成轻微皮肤刺激。"
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "MATCHED",
+        "value": "眼睛：H320造成眼睛刺激。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "眼睛： 眼睛：H320造成眼睛刺激。"
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "MATCHED",
+        "value": "症状和体征：H316造成轻微皮肤刺激。\nH320造成眼睛刺激。\nH332吸入有害。\nH360可能对生育能力或胎儿造成伤害。\nH370可能对器官的伤害。\nH373长期或重复暴露可能会对器官造成伤害（肝）。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "症状和体征： 症状和体征：H316造成轻微皮肤刺激。\nH320造成眼睛刺激。\nH332吸入有害。\nH360可能对生育能力或胎儿造成伤害。\nH370可能对器官的伤害。\nH373长期或重复暴露可能会对器官造成伤害（肝）。"
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  },
+  {
+    "model": "PU-2186E",
+    "file_name": "PU-2186E msds_CN 冠志.docx",
+    "overall_status": "HAS_UNMATCHED",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "根据GHS不属于危害化学品\n2.2",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： 根据GHS不属于危害化学品\n2.2"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "MATCHED",
+        "value": "根据GHS不属于危害化学品",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "GHS象形图： 根据GHS不属于危害化学品"
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "无信号词",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 无信号词"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  },
+  {
+    "model": "PU-2188",
+    "file_name": "PU-2188 msds_CN 冠志.docx",
+    "overall_status": "HAS_UNMATCHED",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "严重眼睛损伤/眼睛刺激性，类别1（H318）\n生殖毒性物质，类别1B（H360）",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： 严重眼睛损伤/眼睛刺激性，类别1（H318）\n生殖毒性物质，类别1B（H360）"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "MATCHED",
+        "value": "[象形图]",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": true,
+        "rawSnippet": "GHS象形图： [象形图]"
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "危险",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 危险"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "MATCHED",
+        "value": "H318造成严重眼损伤。\nH360可能对生育能力或胎儿造成伤害。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.5  危险性说明： H318造成严重眼损伤。\nH360可能对生育能力或胎儿造成伤害。"
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "MATCHED",
+        "value": "预防措施：\nP201 在使用前获取特别指示。\nP202 在阅读并了解所有安全预防措施之前，切勿操作与处置。\nP280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。\n事故响应：\nP305+P351+P338 如果进入眼睛：用水小心地冲洗几分钟。如简便易行，摘除隐形眼镜，继续冲洗。\nP308+P313 如果接触到或有疑虑：求医/就诊。\n安全储存：\nP405 储存处须加锁。\n废弃处置：\nP501 处置内装物/容器按照当地规章。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.6  防范说明： P201 在使用前获取特别指示。\nP202 在阅读并了解所有安全预防措施之前，切勿操作与处置。\nP280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。\nP305+P351+P338 如果进入眼睛：用水小心地冲洗几分钟。如简便易行，摘除隐形眼镜，继续冲洗。\nP308+P313如果接触到或有疑虑：求医/就诊。\nP405 储存处须加锁。\nP501 处置内装物/容器按照当地规章。"
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "MATCHED",
+        "value": "吸入：正常使用时无危害。",
+        "reason": "实质否定结论受全局白名单绝对保护，严禁剪枝",
+        "hasDrawing": false,
+        "rawSnippet": "2.8  健康危害： 吸入：正常使用时无危害。"
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "MATCHED",
+        "value": "吸入：正常使用时无危害。",
+        "reason": "实质否定结论受全局白名单绝对保护，严禁剪枝",
+        "hasDrawing": false,
+        "rawSnippet": "吸入： 吸入：正常使用时无危害。"
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "MATCHED",
+        "value": "症状和体征：H318造成严重眼损伤。\nH360可能对生育能力或胎儿造成伤害。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "症状和体征： 症状和体征：H318造成严重眼损伤。\nH360可能对生育能力或胎儿造成伤害。"
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  },
+  {
+    "model": "PU-218A",
+    "file_name": "PU-218A msds_CN 冠志.docx",
+    "overall_status": "HAS_UNMATCHED",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "急性毒性（吸入），类别4（H332）\n皮肤腐蚀/刺激，类别3（H316）\n严重眼睛损伤/眼睛刺激性，类别2B（H320）\n生殖毒性物质，类别1B（H360）\n特异性靶器官系统毒性 一次接触，类别1（H370）\n特异性靶器官系统毒性 反复接触，类别2（H373）",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： 急性毒性（吸入），类别4（H332）\n皮肤腐蚀/刺激，类别3（H316）\n严重眼睛损伤/眼睛刺激性，类别2B（H320）\n生殖毒性物质，类别1B（H360）\n特异性靶器官系统毒性 一次接触，类别1（H370）\n特异性靶器官系统毒性 反复接触，类别2（H373）"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "MATCHED",
+        "value": "[象形图]",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": true,
+        "rawSnippet": "GHS象形图： [象形图]"
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "危险",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 危险"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "MATCHED",
+        "value": "H316造成轻微皮肤刺激。\nH320造成眼睛刺激。\nH332吸入有害。\nH360可能对生育能力或胎儿造成伤害。\nH370可能对器官的伤害。\nH373长期或重复暴露可能会对器官造成伤害（肝）。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.5  危险性说明： H316造成轻微皮肤刺激。\nH320造成眼睛刺激。\nH332吸入有害。\nH360可能对生育能力或胎儿造成伤害。\nH370可能对器官的伤害。\nH373长期或重复暴露可能会对器官造成伤害（肝）。"
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "MATCHED",
+        "value": "预防措施：\nP201 在使用前获取特别指示。\nP202 在阅读并了解所有安全预防措施之前，切勿操作与处置。\nP260 不要吸入粉尘/烟/气体/气雾/蒸气/喷雾。\nP264 操作后彻底清洗双手。\nP270 使用本产品时不要进食、饮水或吸烟。\nP271 只能在室外或通风良好处使用。\nP280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。\n事故响应：\nP304+P340 如误吸入：将人转移到空气新鲜处，保持呼吸舒适体位。\nP305+P351+P338 如果进入眼睛：用水小心地冲洗几分钟。如简便易行，摘除隐形眼镜，继续冲洗。\nP308+P313 如果接触到或有疑虑：求医/就诊。\nP337+P313 如眼刺激持续不退：求医/就诊。\nP370+P378 火灾时：使用泡沫，干粉灭火器或二氧化碳灭火。\n安全储存：\nP405 储存处须加锁。\n废弃处置：\nP501 处置内装物/容器按照当地规章。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.6  防范说明： P201 在使用前获取特别指示。\nP202 在阅读并了解所有安全预防措施之前，切勿操作与处置。\nP260不要吸入粉尘/烟/气体/气雾/蒸气/喷雾。\nP264操作后彻底清洗双手。\nP270使用本产品时不要进食、饮水或吸烟。\nP271只能在室外或通风良好处使用。\nP280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。\nP304+P340如误吸入：将人转移到空气新鲜处，保持呼吸舒适体位。\nP305+P351+P338 如果进入眼睛：用水小心地冲洗几分钟。如简便易行，摘除隐形眼镜，继续冲洗。\nP308+P313如果接触到或有疑虑：求医/就诊。\nP337+P313如眼刺激持续不退：求医/就诊。\nP370+P378火灾时：使用泡沫，干粉灭火器或二氧化碳灭火。\nP405 储存处须加锁。\nP501 处置内装物/容器按照当地规章。"
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "MATCHED",
+        "value": "吸入：正常使用时无危害。",
+        "reason": "实质否定结论受全局白名单绝对保护，严禁剪枝",
+        "hasDrawing": false,
+        "rawSnippet": "2.8  健康危害： 吸入：正常使用时无危害。"
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "MATCHED",
+        "value": "吸入：正常使用时无危害。",
+        "reason": "实质否定结论受全局白名单绝对保护，严禁剪枝",
+        "hasDrawing": false,
+        "rawSnippet": "吸入： 吸入：正常使用时无危害。"
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "MATCHED",
+        "value": "皮肤：H316造成轻微皮肤刺激。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "皮肤： 皮肤：H316造成轻微皮肤刺激。"
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "MATCHED",
+        "value": "眼睛：H320造成眼睛刺激。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "眼睛： 眼睛：H320造成眼睛刺激。"
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "MATCHED",
+        "value": "症状和体征：H316造成轻微皮肤刺激。\nH320造成眼睛刺激。\nH332吸入有害。\nH360可能对生育能力或胎儿造成伤害。\nH370可能对器官的伤害。\nH373长期或重复暴露可能会对器官造成伤害（肝）。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "症状和体征： 症状和体征：H316造成轻微皮肤刺激。\nH320造成眼睛刺激。\nH332吸入有害。\nH360可能对生育能力或胎儿造成伤害。\nH370可能对器官的伤害。\nH373长期或重复暴露可能会对器官造成伤害（肝）。"
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  },
+  {
+    "model": "PU-2303",
+    "file_name": "PU-2303 msds_CN 冠志.docx",
+    "overall_status": "HAS_UNMATCHED",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "严重眼睛损伤/眼睛刺激性，类别1（H318）\n生殖毒性物质，类别1B（H360）",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： 严重眼睛损伤/眼睛刺激性，类别1（H318）\n生殖毒性物质，类别1B（H360）"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "MATCHED",
+        "value": "[象形图]",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": true,
+        "rawSnippet": "GHS象形图： [象形图]"
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "危险",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 危险"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "MATCHED",
+        "value": "H318造成严重眼损伤。\nH360可能对生育能力或胎儿造成伤害。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.5  危险性说明： H318造成严重眼损伤。\nH360可能对生育能力或胎儿造成伤害。"
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "MATCHED",
+        "value": "预防措施：\nP201 在使用前获取特别指示。\nP202 在阅读并了解所有安全预防措施之前，切勿操作与处置。\nP280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。\n事故响应：\nP305+P351+P338 如果进入眼睛：用水小心地冲洗几分钟。如简便易行，摘除隐形眼镜，继续冲洗。\nP308+P313 如果接触到或有疑虑：求医/就诊。\n安全储存：\nP405 储存处须加锁。\n废弃处置：\nP501 处置内装物/容器按照当地规章。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.6  防范说明： P201 在使用前获取特别指示。\nP202 在阅读并了解所有安全预防措施之前，切勿操作与处置。\nP280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。\nP305+P351+P338 如果进入眼睛：用水小心地冲洗几分钟。如简便易行，摘除隐形眼镜，继续冲洗。\nP308+P313如果接触到或有疑虑：求医/就诊。\nP405 储存处须加锁。\nP501 处置内装物/容器按照当地规章。"
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "MATCHED",
+        "value": "吸入：正常使用时无危害。",
+        "reason": "实质否定结论受全局白名单绝对保护，严禁剪枝",
+        "hasDrawing": false,
+        "rawSnippet": "2.8  健康危害： 吸入：正常使用时无危害。"
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "MATCHED",
+        "value": "吸入：正常使用时无危害。",
+        "reason": "实质否定结论受全局白名单绝对保护，严禁剪枝",
+        "hasDrawing": false,
+        "rawSnippet": "吸入： 吸入：正常使用时无危害。"
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "MATCHED",
+        "value": "症状和体征：H318造成严重眼损伤。\nH360可能对生育能力或胎儿造成伤害。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "症状和体征： 症状和体征：H318造成严重眼损伤。\nH360可能对生育能力或胎儿造成伤害。"
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  },
+  {
+    "model": "PU-2304",
+    "file_name": "PU-2304 msds_CN 冠志.docx",
+    "overall_status": "HAS_UNMATCHED",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "严重眼睛刺激性，类别2（H319）\n生殖毒性物质，类别1B（H360）",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： 严重眼睛刺激性，类别2（H319）\n生殖毒性物质，类别1B（H360）"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "MATCHED",
+        "value": "[象形图]",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": true,
+        "rawSnippet": "GHS象形图： [象形图]"
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "危险",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 危险"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "MATCHED",
+        "value": "H319造成严重眼刺激。\nH360可能对生育能力或胎儿造成伤害。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.5  危险性说明： H319造成严重眼刺激。\nH360可能对生育能力或胎儿造成伤害。"
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.6  防范说明： "
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "MATCHED",
+        "value": "吸入：正常使用时无危害。",
+        "reason": "实质否定结论受全局白名单绝对保护，严禁剪枝",
+        "hasDrawing": false,
+        "rawSnippet": "2.8  健康危害： 吸入：正常使用时无危害。"
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "MATCHED",
+        "value": "吸入：正常使用时无危害。",
+        "reason": "实质否定结论受全局白名单绝对保护，严禁剪枝",
+        "hasDrawing": false,
+        "rawSnippet": "吸入： 吸入：正常使用时无危害。"
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "MATCHED",
+        "value": "症状和体征：H319造成严重眼刺激。\nH360可能对生育能力或胎儿造成伤害。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "症状和体征： 症状和体征：H319造成严重眼刺激。\nH360可能对生育能力或胎儿造成伤害。"
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  },
+  {
+    "model": "PU-2305",
+    "file_name": "PU-2305 msds_CN 冠志.docx",
+    "overall_status": "PERFECT",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "根据GHS不属于危害化学品",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： 根据GHS不属于危害化学品"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "MATCHED",
+        "value": "根据GHS不属于危害化学品",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "GHS象形图： 根据GHS不属于危害化学品"
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "无信号词",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 无信号词"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  },
+  {
+    "model": "PU-2306",
+    "file_name": "PU-2306 msds_CN 冠志.docx",
+    "overall_status": "HAS_UNMATCHED",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "严重眼睛刺激性，类别2（H319）\n生殖毒性物质，类别1B（H360）",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： 严重眼睛刺激性，类别2（H319）\n生殖毒性物质，类别1B（H360）"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "MATCHED",
+        "value": "[象形图]",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": true,
+        "rawSnippet": "GHS象形图： [象形图]"
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "危险",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 危险"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "MATCHED",
+        "value": "H319造成严重眼刺激。\nH360可能对生育能力或胎儿造成伤害。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.5  危险性说明： H319造成严重眼刺激。\nH360可能对生育能力或胎儿造成伤害。"
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.6  防范说明： "
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "MATCHED",
+        "value": "吸入：正常使用时无危害。",
+        "reason": "实质否定结论受全局白名单绝对保护，严禁剪枝",
+        "hasDrawing": false,
+        "rawSnippet": "2.8  健康危害： 吸入：正常使用时无危害。"
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "MATCHED",
+        "value": "吸入：正常使用时无危害。",
+        "reason": "实质否定结论受全局白名单绝对保护，严禁剪枝",
+        "hasDrawing": false,
+        "rawSnippet": "吸入： 吸入：正常使用时无危害。"
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "MATCHED",
+        "value": "症状和体征：H319造成严重眼刺激。\nH360可能对生育能力或胎儿造成伤害。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "症状和体征： 症状和体征：H319造成严重眼刺激。\nH360可能对生育能力或胎儿造成伤害。"
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  },
+  {
+    "model": "PU-2340",
+    "file_name": "PU-2340 msds_CN 冠志.docx",
+    "overall_status": "HAS_UNMATCHED",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "根据GHS不属于危害化学品\n2.2",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： 根据GHS不属于危害化学品\n2.2"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "MATCHED",
+        "value": "根据GHS不属于危害化学品",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "GHS象形图： 根据GHS不属于危害化学品"
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "无信号词",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 无信号词"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  },
+  {
+    "model": "PU-2341",
+    "file_name": "PU-2341 msds_CN 冠志.docx",
+    "overall_status": "HAS_UNMATCHED",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "根据GHS不属于危害化学品\n2.2",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： 根据GHS不属于危害化学品\n2.2"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "MATCHED",
+        "value": "根据GHS不属于危害化学品",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "GHS象形图： 根据GHS不属于危害化学品"
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "无信号词",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 无信号词"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  },
+  {
+    "model": "PU-2341E",
+    "file_name": "PU-2341E msds_CN 冠志.docx",
+    "overall_status": "HAS_UNMATCHED",
+    "raw_rows_count": 2,
+    "matched_rows_count": 16,
+    "rows": [
+      {
+        "key": "emergency_overview",
+        "label": "2.1  紧急情况概述：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "ghs_classification",
+        "label": "2.2  GHS危险性类别：",
+        "status": "MATCHED",
+        "value": "根据GHS不属于危害化学品\n2.2",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.2  GHS危险性类别： 根据GHS不属于危害化学品\n2.2"
+      },
+      {
+        "key": "label_elements",
+        "label": "2.3  GHS标签要素：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档该字段无数据或未提供",
+        "hasDrawing": false,
+        "rawSnippet": "2.3  GHS标签要素： "
+      },
+      {
+        "key": "pictogram",
+        "label": "GHS象形图：",
+        "status": "MATCHED",
+        "value": "根据GHS不属于危害化学品",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "GHS象形图： 根据GHS不属于危害化学品"
+      },
+      {
+        "key": "signal_word",
+        "label": "2.4  信号词：",
+        "status": "MATCHED",
+        "value": "无信号词",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.4  信号词： 无信号词"
+      },
+      {
+        "key": "hazard_statements",
+        "label": "2.5  危险性说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "precautionary_statements",
+        "label": "2.6  防范说明：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "physical_hazards",
+        "label": "2.7  物理和化学危险：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazards",
+        "label": "2.8  健康危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_inhalation",
+        "label": "吸入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_ingestion",
+        "label": "食入：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_skin",
+        "label": "皮肤：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_eye",
+        "label": "眼睛：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "health_hazard_symptoms",
+        "label": "症状和体征：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "environmental_hazards",
+        "label": "2.9  环境危害：",
+        "status": "EMPTY",
+        "value": "",
+        "reason": "源文档未检出该字段",
+        "hasDrawing": false,
+        "rawSnippet": ""
+      },
+      {
+        "key": "other_hazards",
+        "label": "2.10 其他危害：",
+        "status": "MATCHED",
+        "value": "无适用资料。",
+        "reason": "精确/别名/关键词路由命中标准插槽",
+        "hasDrawing": false,
+        "rawSnippet": "2.10 其他危害： 无适用资料。"
+      }
+    ]
+  }
+]

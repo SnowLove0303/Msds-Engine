@@ -74,12 +74,36 @@ const TEMPLATE_OPTIONS = {
   'EN 冠志': '正式模板_MSDS_EN_冠志(1).docx',
 };
 
+// ==========================================
+// 全局高性能多级内存池 (Instant Switch Cache)
+// ==========================================
+const templateBufferCache = new Map(); // templateName -> ArrayBuffer
+const repoRecordMemoryCache = new Map(); // recordId -> record JSON
+const repoEngineMemoryCache = new Map(); // recordId -> { inspectEngine, tplEngine, preview, matchResult }
+
 const state = {
   view: 'inspect', // 'inspect' | 'matching' | 'editor'
+  repo: {
+    records: [],
+    batches: [],
+    selectedBatchId: 'all',
+    query: '',
+    statusFilter: 'all', // 'all' | 'perfect' | 'conflict' | 'unmatched' | 'annotated'
+    loading: false,
+    activeRecordId: null,
+    stats: { totalRecords: 0, perfectCount: 0, conflictCount: 0, unmatchedCount: 0, annotatedCount: 0, batchCount: 0 },
+    catalogModalOpen: false,
+    batchModalOpen: false,
+    batchScanDir: '',
+    batchTargetTemplate: 'CN 冠志',
+    batchNameInput: '',
+    batchRecursive: true,
+    batchImportProgress: null,
+  },
   toast: null,
   sourcePreview: null, // { name: string, type: 'docx' | 'pdf' | 'doc', blobUrl?: string, file?: File }
   inspector: { engine: null, selectedRecordId: null, selectedCellId: null, query: '', showPreview: true, zoomScale: 'fit' },
-  matching: { template: 'CN 冠志', templateEngine: null, result: null, selectedSectionNumber: 1, query: '', compareMode: 'doc-match', zoomScale: 'fit', isWidePreview: false },
+  matching: { template: 'CN 冠志', templateEngine: null, result: null, selectedSectionNumber: 1, query: '', compareMode: 'doc-match', zoomScale: 'fit', isWidePreview: false, modelDropdownOpen: false, modelQuery: '' },
   editor: {
     engine: null,
     template: 'CN 冠志',
@@ -650,6 +674,266 @@ ${escapeHtml(UPDATE_COMMANDS.linux)}</pre>
   `;
 }
 
+
+// ==========================================
+// 数据库型号目录与批量 API 支持 (MSDS Catalog & Repo API)
+// ==========================================
+
+async function fetchRepoData() {
+  try {
+    state.repo.loading = true;
+    const batchParam = state.repo.selectedBatchId || 'all';
+    const statusParam = state.repo.statusFilter || 'all';
+    const qParam = encodeURIComponent(state.repo.query || '');
+    
+    const [statsRes, batchesRes, recordsRes] = await Promise.all([
+      fetch('/api/msds/repo/stats').then((r) => r.json()).catch(() => ({ success: false })),
+      fetch('/api/msds/repo/batches').then((r) => r.json()).catch(() => ({ success: false })),
+      fetch(`/api/msds/repo/records?batchId=${encodeURIComponent(batchParam)}&status=${encodeURIComponent(statusParam)}&q=${qParam}`).then((r) => r.json()).catch(() => ({ success: false })),
+    ]);
+
+    if (statsRes.success) state.repo.stats = statsRes.data;
+    if (batchesRes.success) state.repo.batches = Array.isArray(batchesRes.data) ? batchesRes.data : (batchesRes.data?.batches || []);
+    if (recordsRes.success) state.repo.records = Array.isArray(recordsRes.data) ? recordsRes.data : (recordsRes.data?.records || []);
+  } catch (err) {
+    console.error('Failed to fetch repo data:', err);
+  } finally {
+    state.repo.loading = false;
+    renderApp();
+  }
+}
+
+async function loadRecordToThreePane(recordId) {
+  try {
+    // 0. 优先从内存池命中瞬时缓存 (0ms 极速秒切)
+    state.matching.modelDropdownOpen = false;
+    const targetModelName = (state.repo.records || []).find((r) => r.id === recordId)?.model || '所选型号';
+
+    if (repoEngineMemoryCache.has(recordId)) {
+      const cached = repoEngineMemoryCache.get(recordId);
+      state.inspector.engine = cached.inspectEngine;
+      state.inspector.selectedRecordId = firstSectionRecord(cached.inspectEngine)?.id || null;
+      state.sourcePreview = cached.preview;
+      state.matching.template = cached.targetTpl;
+      state.matching.templateEngine = cached.tplEngine;
+      state.matching.result = cached.matchResult;
+      state.matching.selectedSectionNumber = 1;
+
+      if (!state.review.session || state.review.session.sourceEngine !== cached.inspectEngine) {
+        state.review.session = initReviewSession({
+          sourceEngine: cached.inspectEngine,
+          matchResult: cached.matchResult,
+          templateEngine: cached.tplEngine,
+          productModel: cached.matchResult?.summary?.productName || cached.inspectEngine.sourceName || '',
+          templateName: cached.targetTpl,
+        });
+      }
+      if (cached.annotations && state.review.session) {
+        state.review.session.annotations = cached.annotations;
+      }
+
+      state.repo.activeRecordId = recordId;
+      state.view = 'matching';
+      renderApp();
+      showToast(`⚡ 瞬间呈现【${targetModelName}】三屏通览！`, 'success');
+      return;
+    }
+
+    // 1. 读取记录详情 (优先消费本地缓存)
+    let record = repoRecordMemoryCache.get(recordId);
+    if (!record) {
+      const recRes = await fetch(`/api/msds/repo/records/${recordId}`).then((r) => r.json());
+      if (!recRes.success || !recRes.data) {
+        throw new Error(recRes.error?.message || recRes.error || '获取记录详情失败');
+      }
+      record = recRes.data;
+      repoRecordMemoryCache.set(recordId, record);
+    }
+
+    const targetTpl = record.target_template || 'CN 冠志';
+    state.matching.template = targetTpl;
+    state.matching.selectedSectionNumber = 1;
+
+    // 2. 并行拉取源 DOCX 与预热模板 (消除串行等待瀑布流)
+    const [docxBlob] = await Promise.all([
+      fetch(`/api/msds/repo/records/${recordId}/docx`).then((r) => {
+        if (!r.ok) throw new Error('拉取源 DOCX 二进制失败');
+        return r.blob();
+      }),
+      fetchTemplate(targetTpl),
+    ]);
+    const docxArrayBuffer = await docxBlob.arrayBuffer();
+
+    // 3. 装配源引擎
+    const inspectEngine = await loadDocx(docxArrayBuffer, record.file_name);
+    state.inspector.engine = inspectEngine;
+    state.inspector.selectedRecordId = firstSectionRecord(inspectEngine)?.id || null;
+
+    if (state.sourcePreview?.blobUrl) {
+      try { URL.revokeObjectURL(state.sourcePreview.blobUrl); } catch {}
+    }
+    const blobUrl = URL.createObjectURL(docxBlob);
+    state.sourcePreview = {
+      name: record.file_name,
+      type: 'docx',
+      blobUrl,
+      file: null,
+    };
+
+    // 4. 关键：直接复用数据库持久化的 record.matchResult，杜绝重复 runSmartMatching 重算！
+    await syncMatchingEngine(targetTpl, record.matchResult);
+
+    // 5. 恢复历史批注
+    if (state.review.session) {
+      state.review.session.annotations = (record.annotations && record.annotations.length > 0) ? record.annotations : [];
+    }
+
+    // 写入内存池，后续切换 0ms 瞬间呈现
+    repoEngineMemoryCache.set(recordId, {
+      inspectEngine,
+      tplEngine: state.matching.templateEngine,
+      preview: { ...state.sourcePreview },
+      targetTpl,
+      matchResult: state.matching.result,
+      annotations: record.annotations || [],
+    });
+
+    state.repo.activeRecordId = recordId;
+    state.view = 'matching';
+    renderApp();
+    showToast(`已就绪【${record.model || record.file_name}】三屏通览！`, 'success');
+  } catch (err) {
+    showToast(`载入三屏通览失败: ${err.message}`, 'error');
+  }
+}
+
+async function rematchRepoRecord(recordId) {
+  try {
+    showToast('正在使用最新匹配算法重新对标该样本...', 'info');
+    const res = await fetch(`/api/msds/repo/records/${recordId}/rematch`, { method: 'POST' }).then((r) => r.json());
+    if (!res.success) throw new Error(res.error || '重新匹配失败');
+    showToast(`重新匹配完成！覆盖率: ${res.data.summary.matchScore}%`, 'success');
+    repoRecordMemoryCache.delete(recordId);
+    repoEngineMemoryCache.delete(recordId);
+    await fetchRepoData();
+  } catch (err) {
+    showToast(`重新匹配失败: ${err.message}`, 'error');
+  }
+}
+
+async function deleteRepoRecord(recordId) {
+  if (!window.confirm('确定要从数据库中删除该 MSDS 样本及其原件吗？此操作不可逆。')) return;
+  try {
+    const res = await fetch(`/api/msds/repo/records/${recordId}`, { method: 'DELETE' }).then((r) => r.json());
+    if (!res.success) throw new Error(res.error || '删除失败');
+    showToast('记录已成功删除。', 'success');
+    if (state.repo.activeRecordId === recordId) state.repo.activeRecordId = null;
+    await fetchRepoData();
+  } catch (err) {
+    showToast(`删除失败: ${err.message}`, 'error');
+  }
+}
+
+async function batchRematchRepo(batchId = state.repo.selectedBatchId) {
+  const targetDesc = batchId === 'all' ? '全库所有样本' : '当前所选批次样本';
+  if (!window.confirm(`确定要使用最新算法引擎对【${targetDesc}】执行全量回归重匹配吗？`)) return;
+  try {
+    showToast('正在批量重跑智能匹配，请稍候...', 'info');
+    const res = await fetch(`/api/msds/repo/batch/${batchId}/rematch`, { method: 'POST' }).then((r) => r.json());
+    if (!res.success) throw new Error(res.error || '批量重匹配失败');
+    showToast(`全量回归重匹配完成！已重新计算 ${res.updatedCount} 份 MSDS。`, 'success');
+    await fetchRepoData();
+  } catch (err) {
+    showToast(`批量重匹配失败: ${err.message}`, 'error');
+  }
+}
+
+function downloadRepoDocx(recordId, fileName = 'msds_source.docx') {
+  const link = document.createElement('a');
+  link.href = `/api/msds/repo/records/${recordId}/docx`;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function renderBatchImportModal() {
+  if (!state.repo.batchModalOpen) return '';
+
+  const progress = state.repo.batchImportProgress;
+
+  return `
+    <div class="modal-backdrop">
+      <div class="modal-card batch-import-modal">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <span class="modal-icon">▤</span>
+            <h2>批量导入 MSDS 与自动化识别匹配</h2>
+          </div>
+          <button class="modal-close" data-action="close-batch-import-modal">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <p class="modal-desc">
+            选择本地文件夹路径或直接上传多个 MSDS DOCX 文件。系统将在后台调用识别与智能匹配引擎，将结构化事实与匹配结果完整入库，生成长久可复用的金标测试集。
+          </p>
+
+          <div class="batch-field-group">
+            <label class="field-label" for="batch-input-name">批次名称 (可选)：</label>
+            <input type="text" id="batch-input-name" class="field-input" placeholder="例如：2026-10 聚氨酯系列批次回归测试" value="${escapeHtml(state.repo.batchNameInput || '')}" />
+          </div>
+
+          <div class="batch-field-group">
+            <label class="field-label" for="batch-input-template">目标对标模板：</label>
+            <select id="batch-input-template" class="field-select">
+              <option value="CN 冠志" ${state.repo.batchTargetTemplate === 'CN 冠志' ? 'selected' : ''}>CN 冠志</option>
+              <option value="EN 冠志" ${state.repo.batchTargetTemplate === 'EN 冠志' ? 'selected' : ''}>EN 冠志</option>
+            </select>
+          </div>
+
+          <div class="batch-import-tabs">
+            <div class="batch-tab-item active">摄入方式 1：服务端/本地目录极速扫描 (推荐)</div>
+          </div>
+
+          <div class="batch-section-box">
+            <label class="field-label" for="batch-input-dir">扫描文件夹绝对路径：</label>
+            <input type="text" id="batch-input-dir" class="field-input" placeholder="例如：F:\\App Location\\Guanzhi Tong\\Skill\\MSDS-Engine\\问题研究报告" value="${escapeHtml(state.repo.batchScanDir || '')}" />
+            <div class="checkbox-row" style="margin-top:8px;">
+              <label><input type="checkbox" id="batch-input-recursive" ${state.repo.batchRecursive ? 'checked' : ''} /> 递归扫描子文件夹中的所有 .docx 文件</label>
+            </div>
+            <p class="field-hint">直接在服务端高速并发读取并解析磁盘中的 DOCX 文档，无需经过浏览器上传，适合百级大规模批量导入与回归测试。</p>
+          </div>
+
+          <div class="batch-divider"><span>或通过浏览器上传文件</span></div>
+
+          <div class="batch-section-box">
+            <label class="field-label">本地文件多选上传：</label>
+            <input type="file" id="batch-file-selector" multiple accept=".docx" class="field-file-input" />
+            <p class="field-hint">支持按住 Ctrl/Shift 选取多个本地 .docx 文件一次性批量上传并解析。</p>
+          </div>
+
+          ${progress ? `
+            <div class="batch-progress-box">
+              <div class="progress-status">正在批量处理中 (${progress.processed || 0}/${progress.total || 0})...</div>
+              <div class="progress-bar-wrap">
+                <div class="progress-bar-fill" style="width:${progress.total ? Math.round((progress.processed / progress.total) * 100) : 0}%"></div>
+              </div>
+              <div class="progress-current">${escapeHtml(progress.current || '')}</div>
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="modal-footer">
+          <button class="button button-quiet" data-action="close-batch-import-modal">取消</button>
+          <button class="button button-primary" data-action="submit-batch-import" style="background:#0891b2;border-color:#0891b2;color:#fff;font-weight:700;">
+            开始批量导入并匹配
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderApp() {
   // 保存当前原版式视口的实际滚动像素位置，防止 DOM 替换后滚动条弹回顶部
   root.querySelectorAll('.docx-preview-shell[data-preview]').forEach((el) => {
@@ -663,7 +947,7 @@ function renderApp() {
   else if (state.view === 'matching') content = renderMatching();
   else content = renderEditor();
 
-  root.innerHTML = `${navMarkup()}<main class="page-shell ${state.view === 'matching' ? 'matching-shell' : ''}">${content}</main>${toastMarkup()}${renderAnnotationDrawer()}${renderAnnotationModal()}${renderPresetExportModal()}${renderPresetManagerModal()}${renderVersionModal()}`;
+  root.innerHTML = `${navMarkup()}<main class="page-shell ${state.view === 'matching' ? 'matching-shell' : ''}">${content}</main>${toastMarkup()}${renderAnnotationDrawer()}${renderAnnotationModal()}${renderPresetExportModal()}${renderPresetManagerModal()}${renderVersionModal()}${renderBatchImportModal()}`;
   bindEvents();
   window.requestAnimationFrame(renderPreviews);
 }
@@ -951,17 +1235,19 @@ const SECTION_TITLES = [
   '废弃处置', '运输信息', '法规信息', '其他信息',
 ];
 
-async function syncMatchingEngine(templateName = state.matching.template || 'CN 冠志') {
-  if (!state.inspector.engine) return null;
+async function syncMatchingEngine(templateName = state.matching.template || 'CN 冠志', presetMatchResult = null) {
+  if (!state.inspector.engine && !presetMatchResult) return null;
   state.matching.template = templateName;
-  const result = runSmartMatching(state.inspector.engine.records);
+  // 核心优化：直接复用数据库持久化的 matchResult，严禁浪费 CPU 重算！
+  const result = presetMatchResult || (state.inspector.engine ? runSmartMatching(state.inspector.engine.records) : null);
+  if (!result) return null;
   state.matching.result = result;
   const tplEngine = await fetchTemplate(templateName);
   applyMatchResultToEditor(result, tplEngine);
   state.matching.templateEngine = tplEngine;
 
   // 初始化或同步审阅会话
-  if (!state.review.session) {
+  if (!state.review.session || state.review.session.sourceEngine !== state.inspector.engine) {
     state.review.session = initReviewSession({
       sourceEngine: state.inspector.engine,
       matchResult: result,
@@ -973,23 +1259,219 @@ async function syncMatchingEngine(templateName = state.matching.template || 'CN 
   return tplEngine;
 }
 
+
+function renderMatchingEmbeddedWorkspace() {
+  const stats = state.repo.stats || { totalRecords: 0, perfectCount: 0, conflictCount: 0, unmatchedCount: 0, annotatedCount: 0, batchCount: 0 };
+  const records = state.repo.records || [];
+  const batches = state.repo.batches || [];
+  const selectedBatch = state.repo.selectedBatchId || 'all';
+  const statusFilter = state.repo.statusFilter || 'all';
+
+  return `
+    <div class="matching-embedded-repo-shell">
+      <div class="embedded-repo-intro">
+        <div class="embedded-repo-intro-copy">
+          <h2><span>⇄</span> 智能匹配 · 数据库工作台</h2>
+          <p>当前记录库共有 <strong>${stats.totalRecords || 0}</strong> 份 MSDS 识别与匹配记录。点击任意样本即可直接激活<strong>三屏通览</strong>，或批量摄入新样本形成评测基准。</p>
+        </div>
+        <div class="embedded-repo-actions">
+          <button class="button button-quiet" data-action="go-inspect">
+            <span>⌁</span> 导入单个 DOCX
+          </button>
+          <button class="button button-quiet" data-action="repo-batch-rematch" title="使用最新匹配引擎重跑全库">
+            <span>⚡</span> 算法回归 Rematch
+          </button>
+          <button class="button button-primary" data-action="open-batch-import-modal" style="background:#0891b2;border-color:#0891b2;color:#fff;font-weight:700;">
+            <span>+</span> 批量导入 MSDS
+          </button>
+        </div>
+      </div>
+
+      <div class="repo-stats-row">
+        <div class="repo-stat-card">
+          <div class="repo-stat-label">总样本数</div>
+          <div class="repo-stat-value">${stats.totalRecords || 0}</div>
+          <div class="repo-stat-desc">已入库实例</div>
+        </div>
+        <div class="repo-stat-card stat-good">
+          <div class="repo-stat-label">完美对齐</div>
+          <div class="repo-stat-value">${stats.perfectCount || 0}</div>
+          <div class="repo-stat-desc">完全对标无冲突</div>
+        </div>
+        <div class="repo-stat-card stat-danger">
+          <div class="repo-stat-label">存在冲突</div>
+          <div class="repo-stat-value">${stats.conflictCount || 0}</div>
+          <div class="repo-stat-desc">多源冲突待复核</div>
+        </div>
+        <div class="repo-stat-card stat-warning">
+          <div class="repo-stat-label">未对标项</div>
+          <div class="repo-stat-value">${stats.unmatchedCount || 0}</div>
+          <div class="repo-stat-desc">源行未匹配</div>
+        </div>
+        <div class="repo-stat-card">
+          <div class="repo-stat-label">审阅批注</div>
+          <div class="repo-stat-value">${stats.annotatedCount || 0}</div>
+          <div class="repo-stat-desc">人工/Agent批注</div>
+        </div>
+        <div class="repo-stat-card">
+          <div class="repo-stat-label">测试批次</div>
+          <div class="repo-stat-value">${stats.batchCount || 0}</div>
+          <div class="repo-stat-desc">独立评测批次</div>
+        </div>
+      </div>
+
+      <div class="repo-toolbar">
+        <div class="repo-filter-group">
+          <div class="repo-batch-select-wrap">
+            <label for="repo-batch-select">批次：</label>
+            <select id="repo-batch-select">
+              <option value="all" ${selectedBatch === 'all' ? 'selected' : ''}>全部批次 (${stats.totalRecords || 0})</option>
+              ${batches.map((b) => `
+                <option value="${b.id}" ${selectedBatch === b.id ? 'selected' : ''}>${escapeHtml(b.name)} (${b.record_count} 份)</option>
+              `).join('')}
+            </select>
+          </div>
+          <div class="repo-status-tabs">
+            <button type="button" class="repo-status-tab ${statusFilter === 'all' ? 'active' : ''}" data-status="all">全部</button>
+            <button type="button" class="repo-status-tab ${statusFilter === 'perfect' ? 'active' : ''}" data-status="perfect">✓ 完美对齐</button>
+            <button type="button" class="repo-status-tab ${statusFilter === 'conflict' ? 'active' : ''}" data-status="conflict">⚠ 存在冲突</button>
+            <button type="button" class="repo-status-tab ${statusFilter === 'unmatched' ? 'active' : ''}" data-status="unmatched">? 未对标</button>
+            <button type="button" class="repo-status-tab ${statusFilter === 'annotated' ? 'active' : ''}" data-status="annotated">💬 含批注</button>
+          </div>
+        </div>
+        <label class="search-box" style="margin:0;width:280px;">
+          <span>⌕</span>
+          <input id="repo-search-input" type="search" placeholder="按型号、文件名搜索..." value="${escapeHtml(state.repo.query)}" />
+        </label>
+      </div>
+
+      <div class="repo-grid">
+        ${records.map((r) => {
+          let badgeHtml = '<span class="repo-badge badge-good">✓ 完美对齐</span>';
+          if (r.status_badge === 'conflict') {
+            badgeHtml = `<span class="repo-badge badge-danger">⚠ 冲突 ${r.review_ambiguous_fields} 项</span>`;
+          } else if (r.status_badge === 'unmatched') {
+            badgeHtml = `<span class="repo-badge badge-warning">? 未对标 ${r.unmatched_fields} 项</span>`;
+          }
+
+          return `
+            <div class="repo-card" data-record-id="${r.id}">
+              <div class="repo-card-header">
+                <div class="repo-card-title-group">
+                  <span class="repo-card-batch-tag">${escapeHtml(r.batch_name || '默认批次')}</span>
+                  <h3 class="repo-card-filename" title="${escapeHtml(r.file_name)}">${escapeHtml(r.file_name)}</h3>
+                </div>
+                ${badgeHtml}
+              </div>
+
+              <div class="repo-card-meta-list">
+                <div class="repo-card-meta-item">
+                  <span class="meta-label">产品型号</span>
+                  <span class="meta-value"><strong>${escapeHtml(r.model || '未提取')}</strong></span>
+                </div>
+                <div class="repo-card-meta-item">
+                  <span class="meta-label">企业主体</span>
+                  <span class="meta-value">${escapeHtml(r.entity || '冠志')}</span>
+                </div>
+                <div class="repo-card-meta-item">
+                  <span class="meta-label">目标模板</span>
+                  <span class="meta-value">${escapeHtml(r.target_template || 'CN 冠志')}</span>
+                </div>
+                <div class="repo-card-meta-item">
+                  <span class="meta-label">修订日期</span>
+                  <span class="meta-value">${escapeHtml(r.revision_date || '—')}</span>
+                </div>
+              </div>
+
+              <div class="repo-card-metrics">
+                <div class="repo-metric-pill" title="对标率"><span class="metric-num">${r.match_score || 0}%</span><span class="metric-title">对标率</span></div>
+                <div class="repo-metric-pill" title="对齐字段"><span class="metric-num">${r.matched_fields || 0}</span><span class="metric-title">对齐项</span></div>
+                <div class="repo-metric-pill" title="冲突项"><span class="metric-num" style="color:${r.review_ambiguous_fields > 0 ? '#ef4444' : 'inherit'}">${r.review_ambiguous_fields || 0}</span><span class="metric-title">冲突项</span></div>
+                <div class="repo-metric-pill" title="未对标"><span class="metric-num" style="color:${r.unmatched_fields > 0 ? '#f59e0b' : 'inherit'}">${r.unmatched_fields || 0}</span><span class="metric-title">未对标</span></div>
+                <div class="repo-metric-pill" title="批注"><span class="metric-num" style="color:${r.annotation_count > 0 ? '#06b6d4' : 'inherit'}">${r.annotation_count || 0}</span><span class="metric-title">批注</span></div>
+              </div>
+
+              <div class="repo-card-actions">
+                <button class="repo-btn repo-btn-primary" data-repo-action="view-three-pane" data-id="${r.id}" title="进入三屏通览查看 DOCX 原版式 + 识别表格 + 标准插槽">
+                  <span>⇄</span> 三屏通览
+                </button>
+                <button class="repo-btn repo-btn-quiet" data-repo-action="rematch" data-id="${r.id}" title="使用最新算法重新计算匹配">
+                  <span>↺</span> 重算
+                </button>
+                <button class="repo-btn repo-btn-accent" data-repo-action="commit-editor" data-id="${r.id}" title="将匹配数据灌入模板编辑器直接定稿导出">
+                  <span>✦</span> 编辑
+                </button>
+                <button class="repo-btn repo-btn-quiet" data-repo-action="download-docx" data-id="${r.id}" data-filename="${escapeHtml(r.file_name)}" title="下载数据库中的原始 DOCX">
+                  <span>⇣</span> 原件
+                </button>
+                <button class="repo-btn repo-btn-danger" data-repo-action="delete" data-id="${r.id}" title="从记录库中删除此记录">
+                  <span>✕</span>
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
 function renderMatching() {
   const inspectEngine = state.inspector.engine;
+  const records = state.repo.records || [];
+  const selectedSecNum = state.matching.selectedSectionNumber || 1;
+  const query = (state.matching.query || '').trim().toLowerCase();
+  const modelQuery = (state.matching.modelQuery || '').trim().toLowerCase();
+
+  const filteredModels = records.filter((r) => {
+    if (!modelQuery) return true;
+    const name = (r.model || r.file_name || '').toLowerCase();
+    return name.includes(modelQuery);
+  });
+
+  const currentActiveRecord = records.find((r) => r.id === state.repo.activeRecordId);
+  const activeModelTitle = currentActiveRecord?.model || (currentActiveRecord?.file_name ? currentActiveRecord.file_name.replace(/\.docx$/i, '') : '切换型号');
+
+  const modelPickerPopoverMarkup = (isCentered = false) => `
+    <div class="model-picker-wrap" style="${isCentered ? 'display:inline-block;' : ''}">
+      <button class="${isCentered ? 'button button-primary' : 'model-picker-btn'}" data-action="toggle-model-dropdown" title="唤起数据库型号目录，切换查看其他样本">
+        <span>▤</span> <strong>${isCentered ? `唤起数据库型号目录 (${records.length}) ▾` : `${escapeHtml(activeModelTitle)} ▾`}</strong>
+      </button>
+
+      ${state.matching.modelDropdownOpen ? `
+        <div class="dropdown-backdrop-transparent" data-action="close-model-dropdown"></div>
+        <div class="model-dropdown-popover" style="${isCentered ? 'left:50%;transform:translateX(-50%);text-align:left;' : ''}" onclick="event.stopPropagation()">
+          <div class="model-dropdown-search">
+            <input id="popover-model-search" type="search" placeholder="搜索型号…" value="${escapeHtml(state.matching.modelQuery || '')}" />
+          </div>
+          <div class="model-dropdown-list">
+            ${filteredModels.length === 0 ? `
+              <div style="padding:12px;text-align:center;color:#94a3b8;font-size:12px;">未找到匹配型号</div>
+            ` : filteredModels.map((m) => `
+              <button class="model-dropdown-item ${state.repo.activeRecordId === m.id ? 'active' : ''}" data-model-id="${m.id}">
+                ${escapeHtml(m.model || m.file_name)}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+
   if (!inspectEngine) {
     return `
       ${headerBand('智能匹配', '02 / SMART MATCHING', '将非标识别结果匹配进模板标准插槽，呈现三模块同屏对照。')}
       <section class="empty-workspace">
-        <h1>请先导入并识别 DOCX</h1>
-        <p>智能匹配需要基于 DOCX 识别结果进行标准化结构提取。请先前往第一步导入源文件。</p>
+        <h1>请选择或导入 MSDS 进行智能匹配</h1>
+        <p>支持从第一步【DOCX 识别】载入源文件，或点击下方按钮唤起数据库型号目录一键切换样本。</p>
         <div class="empty-actions">
-          <button class="button button-primary" data-action="go-inspect">前往 DOCX 识别</button>
+          ${modelPickerPopoverMarkup(true)}
+          <button class="button button-quiet" data-action="go-inspect">前往 DOCX 识别导入</button>
+          <button class="button button-quiet" data-action="open-batch-import-modal"><span>+</span> 批量导入新样本</button>
         </div>
       </section>
     `;
   }
-
-  const selectedSecNum = state.matching.selectedSectionNumber || 1;
-  const query = (state.matching.query || '').trim().toLowerCase();
 
   // 模块一：原始识别记录
   const rawRecord = (inspectEngine.records || []).find((r) => r.kind === 'table' && r.sectionNumber === selectedSecNum);
@@ -1002,13 +1484,10 @@ function renderMatching() {
       <div class="matching-topbar">
         <div class="matching-brand-group">
           <h2 class="matching-title"><span>⇄</span>智能匹配</h2>
-          <div class="matching-meta-ribbon">
-            <span class="meta-tag"><strong>型号：</strong>${escapeHtml(state.matching.result?.headerFooter?.model || state.matching.templateEngine?.headerFooterData?.model || '—')}</span>
-            <span class="meta-tag"><strong>主体：</strong>${escapeHtml(state.matching.result?.fileNaming?.entity || state.matching.templateEngine?.headerFooterData?.entity || '冠志')}</span>
-            <span class="meta-tag"><strong>语言：</strong>${escapeHtml(state.matching.result?.fileNaming?.language || 'CN')}</span>
-            <span class="meta-tag"><strong>修订：</strong>${escapeHtml(state.matching.result?.headerFooter?.revisionDate || state.matching.templateEngine?.headerFooterData?.revisionDate || '—')}</span>
-            <span class="meta-tag meta-filename"><strong>推荐导出名：</strong><code>${escapeHtml(state.matching.result?.fileNaming?.recommendedFileName || (state.matching.templateEngine ? buildExportDocxName(state.matching.templateEngine) : ''))}</code></span>
-          </div>
+
+          <!-- 顶部按钮唤起型号目录下拉浮层 (零独立窗口，零遮挡) -->
+          ${modelPickerPopoverMarkup(false)}
+
           <div class="matching-template-select-wrap">
             <label for="matching-template-select">选择模板：</label>
             <select id="matching-template-select">
@@ -1030,12 +1509,6 @@ function renderMatching() {
           </div>
         </div>
         <div class="matching-actions">
-          <div class="matching-audit-summary">
-            <span class="audit-pill audit-pill-good" title="源事实与模板插槽精准对齐">✓ 对齐 ${state.matching.result?.summary?.matchedFields || 0}</span>
-            <span class="audit-pill audit-pill-clean" title="源未提供字段已安全清空，杜绝模板示例残留">⊘ 已安全清空</span>
-            ${(state.matching.result?.summary?.reviewAmbiguousFields || 0) > 0 ? `<span class="audit-pill audit-pill-danger" title="存在多处矛盾或存疑项">⚠ 冲突 ${state.matching.result.summary.reviewAmbiguousFields}</span>` : ''}
-            ${(state.matching.result?.summary?.unmatchedFields || 0) > 0 ? `<span class="audit-pill audit-pill-warning" title="存在未对标源行">? 未对标 ${state.matching.result.summary.unmatchedFields}</span>` : ''}
-          </div>
           <button class="button button-quiet button-sm" data-action="toggle-review-drawer" title="查看或管理批注与问题清单"><span>💬</span> 批注 (${(state.review.session?.annotations || []).filter((a) => a.status === 'open').length})</button>
           <button class="button button-dark button-sm" data-action="export-review-bundle" title="导出正式 DOCX 与 Agent 审阅包"><span>📦</span> 导出审阅包</button>
           <button class="button button-quiet button-sm" data-action="re-run-matching">重新匹配</button>
@@ -1046,7 +1519,7 @@ function renderMatching() {
       </div>
 
       <div class="matching-layout">
-        <!-- 侧边栏：16 节紧凑导航 -->
+        <!-- 侧边栏：100% 原始纯粹 16 章节紧凑导航 -->
         <aside class="side-panel matching-side">
           <div class="side-heading">
             <h2>Section</h2>
@@ -1076,7 +1549,7 @@ function renderMatching() {
           </div>
         </aside>
 
-        <!-- 核心区域：多态对照网格 -->
+        <!-- 核心区域：100% 原始横向多态对照网格 -->
         <div class="matching-content-grid matching-grid-${state.matching.compareMode || 'doc-match'} ${state.matching.isWidePreview ? 'preview-expanded' : ''}">
           <!-- 模块：源文件原版式 (在 'doc-match' 和 'all-three' 下展示) -->
           ${state.matching.compareMode !== 'raw-match' ? `
@@ -1126,7 +1599,6 @@ function renderMatching() {
     </div>
   `;
 }
-
 function renderHeaderFooterEditor(engine, records, query) {
   const hf = engine?.headerFooterData || extractHeaderFooterData(engine) || {};
   const currentExportName = buildExportDocxName(engine, {
@@ -1814,6 +2286,13 @@ function bindEvents() {
     });
 
     state.review.session.addAnnotation(ann);
+    if (state.repo.activeRecordId) {
+      fetch(`/api/msds/repo/records/${state.repo.activeRecordId}/annotations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ annotations: state.review.session.annotations }),
+      }).catch((err) => console.error('Failed to sync annotations to repo:', err));
+    }
     state.review.modal = null;
     renderApp();
     showToast(`批注已保存 (${ann.annotationId})。`, 'success');
@@ -2322,6 +2801,143 @@ function bindEvents() {
       }
     });
   });
+  // ==========================================
+  // 按钮唤起型号下拉浮层事件 (零独立窗口，零遮挡)
+  // ==========================================
+  root.querySelectorAll('[data-action="toggle-model-dropdown"]').forEach((btn) => btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    state.matching.modelDropdownOpen = !state.matching.modelDropdownOpen;
+    renderApp();
+    if (state.matching.modelDropdownOpen) {
+      setTimeout(() => {
+        const inp = root.querySelector('#popover-model-search');
+        if (inp) inp.focus();
+      }, 50);
+    }
+  }));
+
+  root.querySelectorAll('[data-action="close-model-dropdown"]').forEach((el) => el.addEventListener('click', () => {
+    state.matching.modelDropdownOpen = false;
+    renderApp();
+  }));
+
+  root.querySelectorAll('[data-model-id]').forEach((btn) => btn.addEventListener('click', (e) => {
+    const id = e.currentTarget.dataset.modelId;
+    if (id) {
+      state.matching.modelDropdownOpen = false;
+      loadRecordToThreePane(id);
+    }
+  }));
+
+  const popoverSearchInput = root.querySelector('#popover-model-search');
+  if (popoverSearchInput) {
+    let timer;
+    popoverSearchInput.addEventListener('input', (e) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        state.matching.modelQuery = e.target.value;
+        renderApp();
+        const reInput = root.querySelector('#popover-model-search');
+        if (reInput) {
+          reInput.focus();
+          reInput.setSelectionRange(reInput.value.length, reInput.value.length);
+        }
+      }, 100);
+    });
+  }
+
+  root.querySelectorAll('[data-action="open-batch-import-modal"]').forEach((btn) => btn.addEventListener('click', () => {
+    state.repo.batchModalOpen = true;
+    renderApp();
+  }));
+
+  root.querySelectorAll('[data-action="close-batch-import-modal"]').forEach((btn) => btn.addEventListener('click', () => {
+    state.repo.batchModalOpen = false;
+    renderApp();
+  }));
+
+  // 提交批量导入
+  root.querySelector('[data-action="submit-batch-import"]')?.addEventListener('click', async () => {
+    const dirInput = root.querySelector('#batch-input-dir')?.value?.trim();
+    const nameInput = root.querySelector('#batch-input-name')?.value?.trim();
+    const tplSelect = root.querySelector('#batch-input-template')?.value;
+    const recursiveCheck = root.querySelector('#batch-input-recursive')?.checked ?? true;
+    const fileSelector = root.querySelector('#batch-file-selector');
+
+    state.repo.batchScanDir = dirInput || '';
+    state.repo.batchNameInput = nameInput || '';
+    state.repo.batchTargetTemplate = tplSelect || 'CN 冠志';
+    state.repo.batchRecursive = recursiveCheck;
+
+    const files = fileSelector?.files;
+
+    try {
+      if (files && files.length > 0) {
+        showToast(`正在读取并上传 ${files.length} 个文件...`, 'info');
+        state.repo.batchImportProgress = { total: files.length, processed: 0, current: '正在读取文件...' };
+        renderApp();
+
+        const filePayloads = [];
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const res = reader.result;
+              resolve(res.split(',')[1]);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          filePayloads.push({ fileName: file.name, base64 });
+        }
+
+        const res = await fetch('/api/msds/repo/batch/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            files: filePayloads,
+            batchName: nameInput,
+            targetTemplate: tplSelect,
+          }),
+        }).then((r) => r.json());
+
+        if (!res.success) throw new Error(res.error || '批量导入失败');
+        state.repo.batchModalOpen = false;
+        state.repo.batchImportProgress = null;
+        showToast(`🎉 批量导入成功！新增 ${res.importedCount} 份 MSDS 记录。`, 'success');
+        await fetchRepoData();
+      } else if (dirInput) {
+        showToast('正在服务端扫描目录并并发导入...', 'info');
+        state.repo.batchImportProgress = { total: 0, processed: 0, current: '正在扫描目录并解析...' };
+        renderApp();
+
+        const res = await fetch('/api/msds/repo/batch/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dirPath: dirInput,
+            recursive: recursiveCheck,
+            batchName: nameInput,
+            targetTemplate: tplSelect,
+          }),
+        }).then((r) => r.json());
+
+        if (!res.success) throw new Error(res.error || '服务端扫描导入失败');
+        state.repo.batchModalOpen = false;
+        state.repo.batchImportProgress = null;
+        showToast(`🎉 批量导入成功！扫描导入 ${res.importedCount} 份 MSDS 记录。`, 'success');
+        await fetchRepoData();
+      } else {
+        showToast('请指定要扫描的本地目录路径，或者选择上传文件。', 'warning');
+      }
+    } catch (err) {
+      state.repo.batchImportProgress = null;
+      renderApp();
+      showToast(`批量导入失败: ${err.message}`, 'error');
+    }
+  });
+
 }
 
 function renderZoomBar(targetId, currentZoom = 'fit') {
@@ -2673,9 +3289,15 @@ async function loadEditorTemplate(name) {
 }
 
 async function fetchTemplate(name) {
-  const response = await fetch(`/templates/${encodeURIComponent(TEMPLATE_OPTIONS[name])}`);
-  if (!response.ok) throw new DocxEngineError(`无法读取内嵌模板：${response.status}`, 'TEMPLATE_FETCH');
-  return loadDocx(await response.arrayBuffer(), TEMPLATE_OPTIONS[name]);
+  const fileName = TEMPLATE_OPTIONS[name];
+  if (!fileName) throw new DocxEngineError(`未知模板配置：${name}`, 'TEMPLATE_FETCH');
+  if (!templateBufferCache.has(name)) {
+    const response = await fetch(`/templates/${encodeURIComponent(fileName)}`);
+    if (!response.ok) throw new DocxEngineError(`无法读取内嵌模板：${response.status}`, 'TEMPLATE_FETCH');
+    templateBufferCache.set(name, await response.arrayBuffer());
+  }
+  const buf = templateBufferCache.get(name);
+  return loadDocx(buf.slice(0), fileName);
 }
 
 
@@ -3113,6 +3735,7 @@ async function handleExportReviewBundle() {
 
 async function bootstrap() {
   renderApp();
+  fetchRepoData();
   try {
     await loadEditorTemplate('CN 冠志');
   } catch (error) {

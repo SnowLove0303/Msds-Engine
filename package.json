@@ -1,6 +1,6 @@
 {
   "name": "msds-engine",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "MSDS Engine - Universal Multi-Format Chemical Safety Data Sheet Standardization System",
   "private": true,
   "type": "module",

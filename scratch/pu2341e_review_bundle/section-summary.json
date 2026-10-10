@@ -1,0 +1,146 @@
+{
+  "section_1": {
+    "sectionNumber": 1,
+    "totalAnnotations": 0,
+    "open": 0,
+    "resolved": 0,
+    "blocker": 0,
+    "error": 0,
+    "warning": 0
+  },
+  "section_2": {
+    "sectionNumber": 2,
+    "totalAnnotations": 6,
+    "open": 6,
+    "resolved": 0,
+    "blocker": 0,
+    "error": 0,
+    "warning": 6
+  },
+  "section_3": {
+    "sectionNumber": 3,
+    "totalAnnotations": 1,
+    "open": 1,
+    "resolved": 0,
+    "blocker": 0,
+    "error": 0,
+    "warning": 1
+  },
+  "section_4": {
+    "sectionNumber": 4,
+    "totalAnnotations": 0,
+    "open": 0,
+    "resolved": 0,
+    "blocker": 0,
+    "error": 0,
+    "warning": 0
+  },
+  "section_5": {
+    "sectionNumber": 5,
+    "totalAnnotations": 0,
+    "open": 0,
+    "resolved": 0,
+    "blocker": 0,
+    "error": 0,
+    "warning": 0
+  },
+  "section_6": {
+    "sectionNumber": 6,
+    "totalAnnotations": 0,
+    "open": 0,
+    "resolved": 0,
+    "blocker": 0,
+    "error": 0,
+    "warning": 0
+  },
+  "section_7": {
+    "sectionNumber": 7,
+    "totalAnnotations": 0,
+    "open": 0,
+    "resolved": 0,
+    "blocker": 0,
+    "error": 0,
+    "warning": 0
+  },
+  "section_8": {
+    "sectionNumber": 8,
+    "totalAnnotations": 1,
+    "open": 1,
+    "resolved": 0,
+    "blocker": 0,
+    "error": 0,
+    "warning": 1
+  },
+  "section_9": {
+    "sectionNumber": 9,
+    "totalAnnotations": 1,
+    "open": 1,
+    "resolved": 0,
+    "blocker": 0,
+    "error": 0,
+    "warning": 1
+  },
+  "section_10": {
+    "sectionNumber": 10,
+    "totalAnnotations": 0,
+    "open": 0,
+    "resolved": 0,
+    "blocker": 0,
+    "error": 0,
+    "warning": 0
+  },
+  "section_11": {
+    "sectionNumber": 11,
+    "totalAnnotations": 11,
+    "open": 11,
+    "resolved": 0,
+    "blocker": 0,
+    "error": 0,
+    "warning": 11
+  },
+  "section_12": {
+    "sectionNumber": 12,
+    "totalAnnotations": 0,
+    "open": 0,
+    "resolved": 0,
+    "blocker": 0,
+    "error": 0,
+    "warning": 0
+  },
+  "section_13": {
+    "sectionNumber": 13,
+    "totalAnnotations": 0,
+    "open": 0,
+    "resolved": 0,
+    "blocker": 0,
+    "error": 0,
+    "warning": 0
+  },
+  "section_14": {
+    "sectionNumber": 14,
+    "totalAnnotations": 0,
+    "open": 0,
+    "resolved": 0,
+    "blocker": 0,
+    "error": 0,
+    "warning": 0
+  },
+  "section_15": {
+    "sectionNumber": 15,
+    "totalAnnotations": 0,
+    "open": 0,
+    "resolved": 0,
+    "blocker": 0,
+    "error": 0,
+    "warning": 0
+  },
+  "section_16": {
+    "sectionNumber": 16,
+    "totalAnnotations": 0,
+    "open": 0,
+    "resolved": 0,
+    "blocker": 0,
+    "error": 0,
+    "warning": 0
+  }
+}

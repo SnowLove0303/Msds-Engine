@@ -270,7 +270,10 @@ function parseParagraph(paragraph, numbering = null) {
     if (run.text) segments.push({ type: 'text', text: run.text, run });
     for (const image of run.images) segments.push({ type: 'image', image, run });
   }
-  const rawText = segments.filter((segment) => segment.type === 'text').map((segment) => segment.text).join('');
+  let rawText = segments.filter((segment) => segment.type === 'text').map((segment) => segment.text).join('');
+  if (!rawText && segments.some((segment) => segment.type === 'image')) {
+    rawText = '[象形图]';
+  }
   const numberingText = numberingTextForParagraph(paragraph, numbering);
   return {
     node: paragraph,
@@ -1151,6 +1154,12 @@ export async function loadDocx(source, sourceName = 'document.docx') {
     if (/^word\/(?:header|footer)\d+\.xml$/.test(entry.name)) supportingXml[entry.name] = await entry.async('string');
   }
   const numberingDefinitions = parseNumberingDefinitions(supportingXml['word/numbering.xml']);
+  const mediaFiles = new Map();
+  for (const [name, file] of Object.entries(zip.files)) {
+    if (name.startsWith('word/media/') && !file.dir) {
+      mediaFiles.set(name, await file.async('uint8array'));
+    }
+  }
   const engine = {
     sourceName,
     originalBytes: new Uint8Array(bytes),
@@ -1164,6 +1173,8 @@ export async function loadDocx(source, sourceName = 'document.docx') {
     coverage: {},
     roleStyles: { label: { bold: true }, value: { bold: false } },
     headerFooterData: null,
+    relsText: relsText || '',
+    mediaFiles,
     refresh() {
       this.records = [];
       this.warnings = [];
@@ -1190,10 +1201,31 @@ export async function loadDocx(source, sourceName = 'document.docx') {
         const xml = entry.name === 'word/document.xml' ? serializer().serializeToString(this.documentXml) : this.supportingXml[entry.name];
         if (xml) this.warnings.push(...countUnsupported(xml));
       }
+      for (const record of this.records) {
+        record.engine = this;
+      }
       this.headerFooterData = extractHeaderFooterData(this);
       return this;
     },
     async exportArrayBuffer() {
+      const output = await JSZip.loadAsync(this.originalBytes);
+      output.file('word/document.xml', serializer().serializeToString(this.documentXml));
+      if (this.relsText) {
+        output.file('word/_rels/document.xml.rels', this.relsText);
+      }
+      if (this.mediaFiles) {
+        for (const [name, bytes] of this.mediaFiles.entries()) {
+          output.file(name, bytes);
+        }
+      }
+      for (const [name, text] of Object.entries(this.supportingXml)) {
+        if (/^word\/(?:header|footer)\d+\.xml$/.test(name)) {
+          output.file(name, text);
+        }
+      }
+      return output.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE' });
+    },
+    async exportArrayBufferOld() {
       const output = await JSZip.loadAsync(this.originalBytes);
       output.file('word/document.xml', serializer().serializeToString(this.documentXml));
       for (const [name, text] of Object.entries(this.supportingXml)) {
@@ -1413,6 +1445,67 @@ function replaceCellValueContent(cell, value, roleStyle) {
     }
   }
   cell.paragraphs = keptParagraphs;
+}
+
+/**
+ * 跨文档图片迁移：从源文档复制 drawing 节点及对应的图片二进制文件与 relationships 关系
+ */
+export function transferDrawingToCell(srcEngine, targetEngine, srcDrawingNode, targetCell) {
+  if (!srcDrawingNode || !targetCell?.node) return false;
+
+  const srcEng = srcEngine?.engine || srcEngine;
+  const tgtEng = targetEngine?.engine || targetEngine;
+  if (!srcEng || !tgtEng) return false;
+
+  const blip = srcDrawingNode.getElementsByTagNameNS('*', 'blip')[0];
+  if (!blip) return false;
+  const embedId = blip.getAttribute('r:embed') || blip.getAttributeNS(R_NS, 'embed') || blip.getAttribute('ns1:embed');
+  if (!embedId) return false;
+
+  const rel = srcEng.relationshipMap?.get(embedId) || 'media/image1.png';
+  let targetPath = rel.startsWith('word/') ? rel : `word/${rel.replace(/^\//, '')}`;
+  const imgBytes = srcEng.mediaFiles?.get(targetPath);
+  if (!imgBytes) return false;
+
+  const ext = targetPath.split('.').pop() || 'png';
+  const relsText = tgtEng.relsText || '';
+  const rIdNums = [...relsText.matchAll(/Id=["']rId(\d+)["']/g)].map((m) => parseInt(m[1], 10));
+  const maxRId = Math.max(0, ...rIdNums);
+  const newRId = `rId${maxRId + 10}`;
+  const newMediaPath = `word/media/image_ghs_${Date.now()}.${ext}`;
+  const newRelTarget = `media/${newMediaPath.split('/').pop()}`;
+
+  if (!tgtEng.mediaFiles) tgtEng.mediaFiles = new Map();
+  tgtEng.mediaFiles.set(newMediaPath, imgBytes);
+  tgtEng.zip?.file(newMediaPath, imgBytes);
+  tgtEng.relationshipMap?.set(newRId, newRelTarget);
+
+  const newRelTag = `<Relationship Id="${newRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${newRelTarget}"/>`;
+  tgtEng.relsText = relsText.includes('</Relationships>')
+    ? relsText.replace('</Relationships>', `${newRelTag}</Relationships>`)
+    : `${relsText}\n${newRelTag}`;
+
+  const clonedDrawing = targetCell.node.ownerDocument.importNode(srcDrawingNode, true);
+  const clonedBlip = clonedDrawing.getElementsByTagNameNS('*', 'blip')[0];
+  if (clonedBlip) {
+    clonedBlip.setAttributeNS(R_NS, 'r:embed', newRId);
+  }
+
+  let p = targetCell.node.getElementsByTagNameNS(W_NS, 'p')[0];
+  if (!p) {
+    p = targetCell.node.ownerDocument.createElementNS(W_NS, 'w:p');
+    targetCell.node.appendChild(p);
+  }
+  const existingRuns = [...p.getElementsByTagNameNS(W_NS, 'r')];
+  existingRuns.forEach((r) => p.removeChild(r));
+
+  const run = targetCell.node.ownerDocument.createElementNS(W_NS, 'w:r');
+  run.appendChild(clonedDrawing);
+  p.appendChild(run);
+
+  targetCell.text = '[象形图]';
+  targetCell.valueText = '[象形图]';
+  return true;
 }
 
 export function setCellAlignment(cell, align = 'center') {
