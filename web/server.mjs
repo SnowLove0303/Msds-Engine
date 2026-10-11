@@ -11,7 +11,12 @@ const DIST_DIR = path.resolve(__dirname, 'dist');
 
 const PORT = Number(process.env.PORT) || 5173;
 const HOST = process.env.HOST || '0.0.0.0';
-const VERSION = '1.2.0';
+
+let VERSION = '1.5.0';
+try {
+  const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf8'));
+  if (pkg.version) VERSION = pkg.version;
+} catch {}
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -55,8 +60,17 @@ const server = http.createServer(async (req, res) => {
     if (handled) return;
   }
 
-  // 3. 生产静态资源托管 (web/dist)
-  let filePath = path.join(DIST_DIR, pathname);
+  // 3. 生产静态资源托管 (web/dist 与 web/public 回退)
+  let decodedPath = pathname;
+  try {
+    decodedPath = decodeURIComponent(pathname);
+  } catch {
+    decodedPath = pathname;
+  }
+
+  // 路径安全规整 (消除目录穿越风险并移除首斜杠)
+  const safeRelativePath = path.normalize(decodedPath).replace(/^(\.\.[\/\\])+/, '').replace(/^[\/\\]+/, '');
+  let filePath = path.join(DIST_DIR, safeRelativePath);
   try {
     let stats = await fs.promises.stat(filePath).catch(() => null);
     if (stats && stats.isDirectory()) {
@@ -64,8 +78,28 @@ const server = http.createServer(async (req, res) => {
       stats = await fs.promises.stat(filePath).catch(() => null);
     }
 
-    // SPA Fallback: 若文件不存在且非 API 请求，回退到 index.html
+    // 次选回退：若 dist 目录未命中，尝试查找 public 目录
     if (!stats) {
+      const publicPath = path.join(__dirname, 'public', safeRelativePath);
+      const publicStats = await fs.promises.stat(publicPath).catch(() => null);
+      if (publicStats && !publicStats.isDirectory()) {
+        filePath = publicPath;
+        stats = publicStats;
+      }
+    }
+
+    const ext = path.extname(safeRelativePath).toLowerCase();
+    const isStaticAsset = Boolean(ext) && ext !== '.html';
+
+    // SPA Fallback 规则：
+    // 若请求带有静态文件后缀（如 .docx, .js, .css 等）且未找到文件，严格返回 404，绝不冒充 index.html！
+    if (!stats) {
+      if (isStaticAsset) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end(`404 Not Found: Static asset '${decodedPath}' not found.`);
+        return;
+      }
+
       filePath = path.join(DIST_DIR, 'index.html');
       stats = await fs.promises.stat(filePath).catch(() => null);
     }
@@ -76,12 +110,12 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const ext = path.extname(filePath).toLowerCase();
-    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+    const finalExt = path.extname(filePath).toLowerCase();
+    const contentType = MIME_TYPES[finalExt] || 'application/octet-stream';
     res.writeHead(200, {
       'Content-Type': contentType,
       'Content-Length': stats.size,
-      'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable',
+      'Cache-Control': finalExt === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable',
     });
     const stream = fs.createReadStream(filePath);
     stream.pipe(res);

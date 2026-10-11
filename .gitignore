@@ -6,12 +6,16 @@ web/node_modules/
 dist/
 web/dist/
 
-# Logs
+# Logs & Reports
 *.log
 web/*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Export outputs (preserve test fixture)
+output/*
+!output/user_correct_2341.docx
 
 # Python caches & virtual environments
 **/__pycache__/

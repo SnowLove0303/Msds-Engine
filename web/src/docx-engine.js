@@ -1547,22 +1547,30 @@ export function writeCellValue(cell, value, roleStyle = null) {
 
 export function writeCellLabel(cell, value, allowLabelEdit = false, roleStyle = null) {
   if (!allowLabelEdit) throw new DocxEngineError('标签默认锁定，请先开启“允许修改标签文本”。', 'LOCKED_LABEL');
-  if (cell?.record?.sectionNumber && cell.record.sectionNumber !== 9 && cell.record.sectionNumber !== 11) {
-    throw new DocxEngineError('只有第9部分与第11部分允许根据源文件微调特殊标签，其他章节标签完全锁定。', 'LABEL_MUTATION_FORBIDDEN');
+  if (cell?.record?.sectionNumber && ![2, 9, 10, 11, 12].includes(cell.record.sectionNumber)) {
+    throw new DocxEngineError('只有第2、9、10、11、12部分允许根据源文件微调特殊标签，其他章节标签完全锁定。', 'LABEL_MUTATION_FORBIDDEN');
   }
   if (!cell?.labelNodes?.length) throw new DocxEngineError('该单元格没有可编辑的标签运行区。', 'NO_LABEL');
   let clean = String(value ?? '').trim();
-  if (cell.row >= 1 && /^\s*9\.\d+/.test(cell.text)) {
-    clean = clean.replace(/^\s*9\.\d+\s*/, '').trim();
-    if (!/[：:]$/.test(clean)) clean += '：';
-    const prefixMatch = cell.text.match(/^\s*(9\.\d+)/);
-    const prefix = prefixMatch ? `${prefixMatch[1]}${' '.repeat(Math.max(1, 5 - prefixMatch[1].length))}` : '';
-    clean = prefix + clean;
-  } else if (cell.row >= 1 && /^\s*11\.\d+/.test(cell.text)) {
-    clean = clean.replace(/^\s*11\.\d+\s*/, '').trim();
-    if (!/[：:]$/.test(clean)) clean += '：';
-    const prefixMatch = cell.text.match(/^\s*(11\.\d+)/);
-    const prefix = prefixMatch ? `${prefixMatch[1]}${' '.repeat(Math.max(1, 6 - prefixMatch[1].length))}` : '';
+  const callerPrefixMatch = clean.match(/^(\d+\.\d+)(\s+)(.*)$/);
+  if (callerPrefixMatch) {
+    let core = callerPrefixMatch[3].trim();
+    if (!/[：:]$/.test(core) && !core.includes('其他危害')) core += '：';
+    const num = callerPrefixMatch[1];
+    const secNum = parseInt(num.split('.')[0], 10);
+    const padLen = secNum === 11 ? 6 : (secNum === 9 ? 5 : 5);
+    const spaceCount = num === '11.10' ? 2 : Math.max(1, padLen - num.length);
+    const prefix = `${num}${' '.repeat(spaceCount)}`;
+    clean = prefix + core;
+  } else if (cell.row >= 1 && /^\s*(\d+\.\d+)/.test(cell.text)) {
+    const existingPrefixMatch = cell.text.match(/^\s*(\d+\.\d+)/);
+    const num = existingPrefixMatch[1];
+    const secNum = parseInt(num.split('.')[0], 10);
+    const padLen = secNum === 11 ? 6 : (secNum === 9 ? 5 : 5);
+    clean = clean.replace(/^\s*\d+\.\d+\s*/, '').trim();
+    if (!/[：:]$/.test(clean) && !core.includes('其他危害')) clean += '：';
+    const spaceCount = num === '11.10' ? 2 : Math.max(1, padLen - num.length);
+    const prefix = `${num}${' '.repeat(spaceCount)}`;
     clean = prefix + clean;
   }
   distributeText(cell.labelNodes, clean);

@@ -1,9 +1,9 @@
 # ==========================================
-# MSDS Engine - Multi-Stage Production Dockerfile
+# MSDS Engine - Multi-Stage Production Dockerfile (v1.4.0)
 # ==========================================
 
-# 阶段一：构建前端 SPA
-FROM node:20-alpine AS builder
+# 阶段一：构建前端 SPA (Node 22 编译环境)
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -18,9 +18,9 @@ COPY . .
 RUN cd web && npm run build
 
 # ==========================================
-# 阶段二：生产运行环境 (轻量精简镜像)
+# 阶段二：生产运行环境 (Node 22 原生支持 node:sqlite)
 # ==========================================
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /app/web
 
@@ -28,14 +28,15 @@ ENV NODE_ENV=production
 ENV PORT=5173
 ENV HOST=0.0.0.0
 
-# 复制依赖配置并仅安装生产运行依赖
+# 复制依赖配置并安装生产所需全部依赖 (包含 jsdom / xmldom)
 COPY web/package*.json ./
-RUN npm install --omit=dev
+RUN npm install
 
-# 复制前端编译产物与后端核心
+# 复制前端编译产物与后端核心代码
 COPY --from=builder /app/web/dist ./dist
 COPY web/src ./src
 COPY web/public ./public
+COPY web/data ./data
 COPY web/server.mjs ./server.mjs
 
 EXPOSE 5173

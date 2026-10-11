@@ -110,6 +110,8 @@ const state = {
     selectedRecordId: null,
     selectedCellId: null,
     allowLabelEdit: false,
+    manageCellEditability: false,
+    cellEditableOverrides: {},
     dirty: false,
     query: '',
     customFileName: '',
@@ -120,6 +122,9 @@ const state = {
     exportModalOpen: false,
     managerModalOpen: false,
     versionModalOpen: false,
+    previewMode: 'source', // 'source' (默认源文档原件) | 'template' (当前模板排版)
+    zoomScale: 'fit',
+    isWidePreview: false,
   },
   pendingScrollSection: { inspect: null, matching: null, editor: null },
   previewScrollPositions: { inspect: 0, matching: 0, editor: 0 },
@@ -780,8 +785,18 @@ async function loadRecordToThreePane(recordId) {
       file: null,
     };
 
-    // 4. 关键：直接复用数据库持久化的 record.matchResult，杜绝重复 runSmartMatching 重算！
-    await syncMatchingEngine(targetTpl, record.matchResult);
+    // 4. 版本感知自愈：若记录算法版本落后于当前版本 (如 < 1.4.0)，自动使用最新引擎重跑，杜绝旧快照污染！
+    const isOutdated = !record.engine_version || record.engine_version !== APP_VERSION;
+    let effectiveMatchResult = record.matchResult;
+    if (isOutdated && inspectEngine) {
+      effectiveMatchResult = runSmartMatching(inspectEngine.records);
+      record.matchResult = effectiveMatchResult;
+      record.engine_version = APP_VERSION;
+      // 异步通知后端刷新库中记录
+      fetch(`/api/msds/repo/records/${recordId}/rematch`, { method: 'POST' }).catch(() => {});
+    }
+
+    await syncMatchingEngine(targetTpl, effectiveMatchResult);
 
     // 5. 恢复历史批注
     if (state.review.session) {
@@ -1633,6 +1648,7 @@ function renderHeaderFooterEditor(engine, records, query) {
       </div>
       <div class="template-selector"><select id="template-select" aria-label="模板选择">${Object.keys(TEMPLATE_OPTIONS).map((name) => `<option ${state.editor.template === name ? 'selected' : ''}>${name}</option>`).join('')}</select></div>
       <label class="toggle-control"><input id="allow-label-edit" type="checkbox" ${state.editor.allowLabelEdit ? 'checked' : ''}><span class="toggle-track"></span><span>特殊情况：允许修改标签文本</span></label>
+      <label class="toggle-control"><input id="manage-cell-editability" type="checkbox" ${state.editor.manageCellEditability ? 'checked' : ''}><span class="toggle-track"></span><span>特殊情况：配置值格编辑权限</span></label>
       <div class="file-ribbon-coverage"><span class="pulse-dot"></span>${records.filter((record) => record.sectionNumber).length}/16</div>
     </div>
     <div class="inspector-layout editor-layout">
@@ -1814,9 +1830,10 @@ function renderEditor() {
       </div>
       <div class="template-selector"><select id="template-select" aria-label="模板选择">${Object.keys(TEMPLATE_OPTIONS).map((name) => `<option ${state.editor.template === name ? 'selected' : ''}>${name}</option>`).join('')}</select></div>
       <label class="toggle-control"><input id="allow-label-edit" type="checkbox" ${state.editor.allowLabelEdit ? 'checked' : ''}><span class="toggle-track"></span><span>特殊情况：允许修改标签文本</span></label>
+      <label class="toggle-control"><input id="manage-cell-editability" type="checkbox" ${state.editor.manageCellEditability ? 'checked' : ''}><span class="toggle-track"></span><span>特殊情况：配置值格编辑权限</span></label>
       <div class="file-ribbon-coverage"><span class="pulse-dot"></span>${records.filter((record) => record.sectionNumber).length}/16</div>
     </div>
-    <div class="inspector-layout editor-layout">
+    <div class="inspector-layout editor-layout ${state.editor.isWidePreview ? 'preview-expanded' : ''}">
       <aside class="side-panel editor-side">
         <div class="side-heading"><h2>Section</h2><span class="side-count">${records.filter((record) => record.sectionNumber).length}/16</span></div>
         <label class="search-box"><span>⌕</span><input id="editor-search" type="search" placeholder="搜索标签、序号…" value="${escapeHtml(state.editor.query)}" /><kbd>⌘ K</kbd></label>
@@ -1838,10 +1855,17 @@ function renderEditor() {
         </div>
         ${selectedVisible ? renderEditorTable(selectedVisible) : '<div class="no-results">没有可编辑章节</div>'}
       </section>
-      <aside class="right-stack">
+      <aside class="right-stack ${state.editor.isWidePreview ? 'wide-preview-mode' : ''}">
         <section class="preview-panel">
-          <div class="panel-heading compact"><h2>原版式</h2><span class="preview-lock">只读</span></div>
-          <div class="docx-preview-shell editor-preview" data-preview="editor"><div class="preview-loading"><span class="spinner"></span></div></div>
+          <div class="panel-heading compact preview-heading-flex" style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;">
+            <div class="preview-tab-group" style="display:inline-flex;background:rgba(255,255,255,0.06);border-radius:6px;padding:2px;gap:2px;">
+              <button type="button" class="mode-pill ${state.editor.previewMode !== 'template' ? 'active' : ''}" data-editor-preview-mode="source" title="查看真实源文档原件 (如 PU-2341E)" style="border:none;background:${state.editor.previewMode !== 'template' ? '#0284c7' : 'transparent'};color:${state.editor.previewMode !== 'template' ? '#fff' : '#94a3b8'};padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;">▤ 源文件原版式</button>
+              <button type="button" class="mode-pill ${state.editor.previewMode === 'template' ? 'active' : ''}" data-editor-preview-mode="template" title="查看当前编辑后的模板排版效果" style="border:none;background:${state.editor.previewMode === 'template' ? '#059669' : 'transparent'};color:${state.editor.previewMode === 'template' ? '#fff' : '#94a3b8'};padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;">📑 模板效果</button>
+            </div>
+            ${renderZoomBar('editor', state.editor.zoomScale || 'fit')}
+            <span class="preview-lock">只读</span>
+          </div>
+          <div class="docx-preview-shell editor-preview" data-preview="editor" data-zoom-mode="${state.editor.zoomScale || 'fit'}"><div class="preview-loading"><span class="spinner"></span></div></div>
         </section>
         <section class="evidence-panel">
           <div class="panel-heading compact"><h2>审计</h2><span class="audit-badge ${errors.length ? 'bad' : 'good'}">${errors.length ? 'REVIEW' : 'PASS'}</span></div>
@@ -1857,6 +1881,8 @@ function renderEditor() {
 function renderEditorTable(record) {
   return renderEditorTableMarkup(record, {
     allowLabelEdit: state.editor.allowLabelEdit,
+    manageCellEditability: state.editor.manageCellEditability,
+    cellEditableOverrides: state.editor.cellEditableOverrides || {},
     roleStyles: state.editor.engine?.roleStyles || null,
     isPresetMode: state.editor.isPresetEditing,
   });
@@ -2080,7 +2106,11 @@ function bindEvents() {
 
       const action = btn.dataset.zoomAction;
       if (action === 'toggle-expand') {
-        state.matching.isWidePreview = !state.matching.isWidePreview;
+        if (targetId === 'editor') {
+          state.editor.isWidePreview = !state.editor.isWidePreview;
+        } else {
+          state.matching.isWidePreview = !state.matching.isWidePreview;
+        }
         renderApp();
         return;
       }
@@ -2092,24 +2122,40 @@ function bindEvents() {
         target.dataset.zoomMode = 'fit';
         if (targetId === 'inspect') state.inspector.zoomScale = 'fit';
         if (targetId === 'matching') state.matching.zoomScale = 'fit';
+        if (targetId === 'editor') state.editor.zoomScale = 'fit';
         applyDocxFitToWidth(target, 'fit');
       } else if (action === '100') {
         target.dataset.zoomMode = '1.0';
         if (targetId === 'inspect') state.inspector.zoomScale = '1.0';
         if (targetId === 'matching') state.matching.zoomScale = '1.0';
+        if (targetId === 'editor') state.editor.zoomScale = '1.0';
         applyDocxFitToWidth(target, 1.0);
       } else if (action === 'in') {
         const next = Math.min(2.0, Math.round((currentScale + 0.15) * 100) / 100);
         target.dataset.zoomMode = String(next);
         if (targetId === 'inspect') state.inspector.zoomScale = String(next);
         if (targetId === 'matching') state.matching.zoomScale = String(next);
+        if (targetId === 'editor') state.editor.zoomScale = String(next);
         applyDocxFitToWidth(target, next);
       } else if (action === 'out') {
         const next = Math.max(0.3, Math.round((currentScale - 0.15) * 100) / 100);
         target.dataset.zoomMode = String(next);
         if (targetId === 'inspect') state.inspector.zoomScale = String(next);
         if (targetId === 'matching') state.matching.zoomScale = String(next);
+        if (targetId === 'editor') state.editor.zoomScale = String(next);
         applyDocxFitToWidth(target, next);
+      }
+    });
+  });
+
+  // 编辑器右侧原版式模式切换 (源文件原版式 vs 模板效果)
+  root.querySelectorAll('[data-editor-preview-mode]').forEach((btn) => {
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const mode = btn.dataset.editorPreviewMode;
+      if (mode && state.editor.previewMode !== mode) {
+        state.editor.previewMode = mode;
+        renderApp();
       }
     });
   });
@@ -2302,11 +2348,17 @@ function bindEvents() {
     state.review.drawerOpen = true;
     renderApp();
   }));
-  root.querySelector('#template-select')?.addEventListener('change', (event) => loadEditorTemplate(event.target.value));
-  root.querySelector('#allow-label-edit')?.addEventListener('change', (event) => {
+  root.querySelectorAll('#allow-label-edit').forEach((el) => el.addEventListener('change', (event) => {
     state.editor.allowLabelEdit = event.target.checked;
     renderApp();
-  });
+  }));
+  root.querySelectorAll('#manage-cell-editability').forEach((el) => el.addEventListener('change', (event) => {
+    state.editor.manageCellEditability = event.target.checked;
+    renderApp();
+  }));
+  root.querySelectorAll('#template-select').forEach((el) => el.addEventListener('change', (event) => {
+    loadEditorTemplate(event.target.value);
+  }));
 
   // 智能匹配核心流转事件
   root.querySelectorAll('[data-action="start-matching"]').forEach((btn) => btn.addEventListener('click', async () => {
@@ -2375,6 +2427,7 @@ function bindEvents() {
 
     state.editor.engine = state.matching.templateEngine;
     state.editor.template = state.matching.template;
+    state.editor.previewMode = 'source';
     state.editor.selectedRecordId = firstSectionRecord(state.editor.engine)?.id || null;
     state.editor.selectedCellId = null;
     state.editor.dirty = true;
@@ -2668,6 +2721,33 @@ function bindEvents() {
         return;
       }
 
+      // 11.5 单元格编辑权限切换 (特殊情况配置模式)
+      const toggleEditBtn = e.target.closest('[data-cell-action="toggle-editability"]');
+      if (toggleEditBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const record = recordById(state.editor.engine, toggleEditBtn.dataset.recordId);
+        const cell = getCell(record, toggleEditBtn.dataset.row, toggleEditBtn.dataset.col);
+        if (cell) {
+          const nextEditable = !cell.editable;
+          cell.editable = nextEditable;
+          cell.protectedReason = nextEditable ? null : '用户手动锁定';
+          if (nextEditable && cell.kind === 'label-only') {
+            cell.kind = 'note';
+          }
+          if (!state.editor.cellEditableOverrides) {
+            state.editor.cellEditableOverrides = {};
+          }
+          const cellKey = `${record.id}:${toggleEditBtn.dataset.row}:${toggleEditBtn.dataset.col}`;
+          state.editor.cellEditableOverrides[cellKey] = nextEditable;
+          state.editor.dirty = true;
+          refreshEditorDirty();
+          showToast(nextEditable ? '已解锁该单元格（允许输入）' : '已锁定该单元格（禁止输入）', 'info');
+          renderApp();
+        }
+        return;
+      }
+
       // 12. 整节填写值一键清空
       const clearSecBtn = e.target.closest('[data-action="clear-current-section-values"]');
       if (clearSecBtn) {
@@ -2941,11 +3021,13 @@ function bindEvents() {
 }
 
 function renderZoomBar(targetId, currentZoom = 'fit') {
-  const isPdf = state.sourcePreview?.type === 'pdf';
-  const isDoc = state.sourcePreview?.type === 'doc';
-  const badgeText = isPdf ? 'PDF 原件' : isDoc ? 'DOC 待转' : 'DOCX 原版';
-  const badgeClass = isPdf ? 'badge-pdf' : isDoc ? 'badge-doc' : 'badge-docx';
-  const isExpanded = state.matching.isWidePreview;
+  const isEditor = targetId === 'editor';
+  const showTemplateInEditor = isEditor && state.editor.previewMode === 'template';
+  const isPdf = !showTemplateInEditor && state.sourcePreview?.type === 'pdf';
+  const isDoc = !showTemplateInEditor && state.sourcePreview?.type === 'doc';
+  const badgeText = showTemplateInEditor ? '模板效果' : (isPdf ? 'PDF 原件' : isDoc ? 'DOC 待转' : 'DOCX 原版');
+  const badgeClass = showTemplateInEditor ? 'badge-template' : (isPdf ? 'badge-pdf' : isDoc ? 'badge-doc' : 'badge-docx');
+  const isExpanded = isEditor ? state.editor.isWidePreview : state.matching.isWidePreview;
 
   return `
     <div class="preview-zoom-bar" data-target-id="${targetId}">
@@ -2957,7 +3039,7 @@ function renderZoomBar(targetId, currentZoom = 'fit') {
         <button type="button" class="zoom-btn" data-zoom-action="in" title="放大">＋</button>
         <span class="zoom-text">${currentZoom === 'fit' ? '自适应' : `${Math.round(parseFloat(currentZoom) * 100)}%`}</span>
       ` : ''}
-      <button type="button" class="zoom-btn zoom-btn-expand ${isExpanded ? 'active' : ''}" data-zoom-action="toggle-expand" title="${isExpanded ? '还原三栏标准比例' : '⤢ 展宽原版式视口 (68% 宽幅)'}">
+      <button type="button" class="zoom-btn zoom-btn-expand ${isExpanded ? 'active' : ''}" data-zoom-action="toggle-expand" title="${isExpanded ? '还原标准比例' : '⤢ 展宽原版式视口'}">
         ${isExpanded ? '⤡ 还原' : '⤢ 展宽'}
       </button>
       <button type="button" class="zoom-btn" data-action="pick-preview-doc" title="切换或载入真实原件 (支持 DOCX / PDF / DOC)">📂 原件</button>
@@ -3044,7 +3126,10 @@ function renderPreviews() {
   targets.forEach(async (target) => {
     const pKey = target.dataset.preview;
     const isEditor = pKey === 'editor';
-    const previewType = isEditor ? 'docx' : (state.sourcePreview?.type || 'docx');
+    const showSourceInEditor = isEditor && (state.editor.previewMode !== 'template') && Boolean(state.inspector.engine || state.sourcePreview);
+    const previewType = showSourceInEditor
+      ? (state.sourcePreview?.type || 'docx')
+      : (isEditor ? 'docx' : (state.sourcePreview?.type || 'docx'));
 
     // 绑定滚动事件，实时记录用户的当前滚动位置，防止被重绘冲掉
     target.onscroll = () => {
@@ -3088,14 +3173,14 @@ function renderPreviews() {
     }
 
     let engine = null;
-    if (pKey === 'inspect' || pKey === 'matching') {
+    if (pKey === 'inspect' || pKey === 'matching' || showSourceInEditor) {
       engine = state.inspector.engine;
     } else if (isEditor) {
       engine = state.editor.engine;
     }
     if (!engine) return;
 
-    const cacheKey = `${pKey}:${engine.sourceName || 'engine'}:${engine.originalBytes?.byteLength || 0}`;
+    const cacheKey = `${pKey}:${showSourceInEditor ? 'source' : 'tpl'}:${engine.sourceName || 'engine'}:${engine.originalBytes?.byteLength || 0}`;
 
     // 如果该引擎的 DOCX 已经渲染过，直接复用已渲染 DOM 树，实现 0ms 瞬间挂载并精确保持滚动位置！
     if (previewRenderCache.has(cacheKey)) {
@@ -3280,6 +3365,7 @@ async function loadEditorTemplate(name) {
     state.editor.selectedRecordId = firstSectionRecord(engine)?.id || null;
     state.editor.selectedCellId = null;
     state.editor.dirty = false;
+    state.editor.cellEditableOverrides = {};
     state.view = 'editor';
     showToast(`已载入 ${name} 内嵌模板。`, 'success');
     renderApp();
@@ -3294,7 +3380,17 @@ async function fetchTemplate(name) {
   if (!templateBufferCache.has(name)) {
     const response = await fetch(`/templates/${encodeURIComponent(fileName)}`);
     if (!response.ok) throw new DocxEngineError(`无法读取内嵌模板：${response.status}`, 'TEMPLATE_FETCH');
-    templateBufferCache.set(name, await response.arrayBuffer());
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('text/html')) {
+      throw new DocxEngineError(`模板文件未能正确返回 (服务端返回了 HTML 页面，而非 docx 资源)`, 'TEMPLATE_FETCH');
+    }
+    const buf = await response.arrayBuffer();
+    // 校验 ZIP 魔数 'PK' (0x50, 0x4B)
+    const header = new Uint8Array(buf.slice(0, 4));
+    if (header[0] !== 0x50 || header[1] !== 0x4B) {
+      throw new DocxEngineError(`模板文件格式损坏或非合法 DOCX/ZIP 文件`, 'TEMPLATE_FETCH');
+    }
+    templateBufferCache.set(name, buf);
   }
   const buf = templateBufferCache.get(name);
   return loadDocx(buf.slice(0), fileName);

@@ -205,7 +205,7 @@ export const SECTION_SLOT_REGISTRY = {
       { key: 'hazardous_reactions', standardLabel: '10.3 危险反应的可能性：', aliases: ['危险反应的可能性', '危险反应', '可能产生的危险反应', '可能的危害反应', '危害反应', 'Possibility of hazardous reactions', 'Hazardous reactions', 'Possible hazardous reactions'] },
       { key: 'conditions_to_avoid', standardLabel: '10.4 应避免的条件：', aliases: ['应避免的条件', '应避免的条件（如静电、撞击或振动）', '避免接触的条件', 'Conditions to avoid'] },
       { key: 'incompatible_materials', standardLabel: '10.5 不相容的物质：', aliases: ['不相容的物质', '禁配物', '应避免的物质', 'Incompatible materials'] },
-      { key: 'hazardous_decomposition', standardLabel: '10.6 危险的分解产物：', aliases: ['危险的分解产物', '分解产物', '有害燃烧产物', 'Hazardous decomposition products'] },
+      { key: 'hazardous_decomposition', standardLabel: '10.6 危险的分解产物：', aliases: ['危险的分解产物', '分解产物', '有害燃烧产物', '危险分解产物', 'Hazardous decomposition products'] },
     ],
   },
   11: {
@@ -215,19 +215,21 @@ export const SECTION_SLOT_REGISTRY = {
       { key: 'acute_toxicity_oral', standardLabel: '经口：', aliases: ['经口', '急性经口毒性', '急性毒性，经口', '半数致死剂量(LD50) 大鼠', 'Oral', 'Acute oral toxicity'] },
       { key: 'acute_toxicity_inhalation', standardLabel: '吸入：', aliases: ['吸入', '急性吸入毒性', '急性毒性，吸入', '半数致死浓度(LC50)', 'Inhalation', 'Acute inhalation toxicity'] },
       { key: 'acute_toxicity_dermal', standardLabel: '经皮：', aliases: ['经皮', '急性经皮毒性', '急性毒性，经皮', '半数致死剂量(LD50) 兔', 'Dermal', 'Acute dermal toxicity'] },
-      { key: 'skin_corrosion', standardLabel: '11.2 皮肤腐蚀或刺激：', aliases: ['皮肤腐蚀或刺激', '皮肤刺激', '皮肤腐蚀/刺激', 'Skin corrosion/irritation', 'Skin irritation', 'Main skin irritation'] },
-      { key: 'eye_damage', standardLabel: '11.3 严重眼损伤或刺激：', aliases: ['严重眼损伤或刺激', '严重眼损伤/刺激', '眼睛刺激', '主要粘膜刺激性', '主要粘膜刺激', '刺激眼睛', 'Serious eye damage/irritation', 'Serious eye damage/eye irritation', 'Eye irritation', 'Main mucosal irritation'] },
-      { key: 'sensitization', standardLabel: '11.4 呼吸道或皮肤过敏：', aliases: ['呼吸道或皮肤过敏', '呼吸或皮肤过敏', '致敏性', '皮肤过敏', '过敏特性', '不是皮肤过敏物质', '物种: 人类', '物种：人类', '分类: 不是皮肤过敏物质', '结果: 对志愿者做的皮肤接触试验证明没有过敏特性', '皮肤接触试验', 'Sensitization', 'Skin sensitization', 'Respiratory sensitization'] },
-      { key: 'germ_mutagenicity', standardLabel: '11.5 生殖细胞突变性：', aliases: ['生殖细胞突变性', '生殖细胞致突变性', '致突变性', 'Germ cell mutagenicity', 'Mutagenicity'] },
-      { key: 'carcinogenicity', standardLabel: '11.6 致癌性：', aliases: ['致癌性', '致癌作用', 'Carcinogenicity'] },
-      { key: 'reproductive_toxicity', standardLabel: '11.7 生殖毒性：', aliases: ['生殖毒性', '发育毒性', 'Reproductive toxicity'] },
+      { key: 'subacute_chronic_toxicity', standardLabel: '11.2 亚急性，亚慢性和延迟毒性：', aliases: ['亚急性，亚慢性和延迟毒性', '亚急性、亚慢性和延迟毒性', '亚急性毒性', '延迟毒性', 'Subacute toxicity', 'Subacute, subchronic and prolonged toxicity'] },
+      { key: 'skin_corrosion', standardLabel: '11.3 皮肤腐蚀或刺激：', aliases: ['原发性皮肤刺激', '皮肤腐蚀或刺激', '皮肤刺激', '皮肤腐蚀/刺激', '主要皮肤刺激性', 'Skin corrosion/irritation', 'Skin irritation', 'Main skin irritation'] },
+      { key: 'eye_damage', standardLabel: '11.4 严重眼损伤或刺激：', aliases: ['原发性粘膜刺激', '严重眼损伤或刺激', '严重眼损伤/刺激', '眼睛刺激', '主要粘膜刺激性', '主要粘膜刺激', '刺激眼睛', '主要眼睛刺激性', 'Serious eye damage/irritation', 'Serious eye damage/eye irritation', 'Eye irritation', 'Main mucosal irritation'] },
+      { key: 'sensitization', standardLabel: '11.5 呼吸道或皮肤过敏：', aliases: ['呼吸道或皮肤过敏', '呼吸或皮肤过敏', '致敏性', '皮肤过敏', '过敏特性', '不是皮肤过敏物质', '物种: 人类', '物种：人类', '分类: 不是皮肤过敏物质', '结果: 对志愿者做的皮肤接触试验证明没有过敏特性', '皮肤接触试验', 'Sensitization', 'Skin sensitization', 'Respiratory sensitization'] },
+      { key: 'germ_mutagenicity', standardLabel: '11.6 生殖细胞突变性：', aliases: ['致突变性', '生殖细胞突变性', '生殖细胞致突变性', 'Germ cell mutagenicity', 'Mutagenicity'] },
+      { key: 'carcinogenicity', standardLabel: '11.7 致癌性：', aliases: ['致癌性', '致癌作用', 'Carcinogenicity'] },
+      { key: 'reproductive_toxicity', standardLabel: '11.8 生殖毒性：', aliases: ['生殖毒性', '发育毒性', 'Reproductive toxicity'] },
       { key: 'reproductive_fertility', standardLabel: '生育力', aliases: ['生育力', '生殖毒性/生育力', '生殖毒性／生育力', 'Fertility', 'Reproductive toxicity/fertility'] },
       { key: 'reproductive_teratogenicity', standardLabel: '致畸形', aliases: ['致畸形', '生殖毒性/致畸形', '生殖毒性／致畸形', '畸形', 'Teratogenicity', 'Teratogenic'] },
       { key: 'in_vitro_genotoxicity', standardLabel: '体外遗传毒性', aliases: ['体外遗传毒性', '体外基因毒性', '体外染色体畸变试验', 'Ames试验', 'In vitro genotoxicity'] },
-      { key: 'stot_single', standardLabel: '11.8 特异性靶器官系统毒性——一次接触：', aliases: ['特异性靶器官系统毒性——一次接触', 'STOT一次接触', '靶器官系统毒性-一次接触', '特异性靶器官系统毒性（一次接触/反复接触）', '特异性靶器官系统毒性', '特异性靶器官毒性', 'STOT single exposure', 'Specific target organ toxicity - single exposure'] },
+      { key: 'stot_single', standardLabel: '11.9 特异性靶器官系统毒性——一次接触：', aliases: ['特异性靶器官系统毒性——一次接触', 'STOT一次接触', '靶器官系统毒性-一次接触', 'STOT single exposure', 'Specific target organ toxicity - single exposure'] },
       { key: 'stot_repeated', standardLabel: '11.9 特异性靶器官系统毒性——反复接触：', aliases: ['特异性靶器官系统毒性——反复接触', 'STOT反复接触', '靶器官系统毒性-反复接触', '重复剂量中毒', '重复剂量中毒：经口', '重复剂量中毒：吸入', '病理变化', 'STOT repeated exposure', 'Specific target organ toxicity - repeated exposure'] },
+      { key: 'stot_combined', standardLabel: '11.9 特异性靶器官系统毒性（一次接触/反复接触）：', aliases: ['特异性靶器官系统毒性（一次接触/反复接触）', '特异性靶器官系统毒性', '特异性靶器官毒性', 'STOT'] },
       { key: 'aspiration_hazard', standardLabel: '11.10 吸入危害：', aliases: ['吸入危害', '吸入危险', 'Aspiration hazard'] },
-      { key: 'additional_info', standardLabel: '11.10 附加信息：', aliases: ['附加信息', '其它信息', '其他信息', 'Additional information'] },
+      { key: 'additional_info', standardLabel: '11.11 附加信息：', aliases: ['附加信息', '其它信息', '其他信息', 'CMR评估', 'Additional information'] },
     ],
   },
   12: {
@@ -237,7 +239,7 @@ export const SECTION_SLOT_REGISTRY = {
       { key: 'persistence', standardLabel: '12.2 持久性和降解性：', aliases: ['持久性和降解性', '降解性', '生物降解性', 'Persistence and degradability', 'Durability and degradability'] },
       { key: 'bioaccumulation', standardLabel: '12.3 潜在的生物累积性：', aliases: ['潜在的生物累积性', '生物蓄积性', '生物累积性', 'Bioaccumulative potential'] },
       { key: 'soil_mobility', standardLabel: '12.4 土壤中的迁移性：', aliases: ['土壤中的迁移性', '土壤迁移性', 'Mobility in soil'] },
-      { key: 'other_adverse_effects', standardLabel: '12.5 其他不良影响：', aliases: ['其他不良影响', '其他有害效应', '环境危害总结', '其他不利的影响', 'Other adverse effects'] },
+      { key: 'other_adverse_effects', standardLabel: '12.5 其他不良影响：', aliases: ['其他不良影响', '其他有害效应', '环境危害总结', '其他不利的影响', '其他不利影响', '12.3其他', '12.3 其他', '其他', 'Other adverse effects'] },
     ],
   },
   13: {
@@ -302,6 +304,38 @@ export const CN_TEMPLATE_PROFILE = {
     { key: 'gb_15258', defaultVal: 'GB 15258 化学品安全标签编写规定' },
   ],
 };
+
+/**
+ * 数值前缀与后缀清洗器 (Strip Extraneous Headers & Numbering Leakage)
+ * 1. 剔除末尾泄漏的下一序号/下一标签（如 \n2.2, \n2.2 GHS标签要素, \n11.2 等）
+ * 2. 剔除首部重复的标签与通用说明（如 11.1 毒理学效应, 急性毒性，经口, 原发性皮肤刺激 等）
+ */
+export function stripExtraneousHeaders(value, slotKey = '', sectionNumber = 0) {
+  if (!value || typeof value !== 'string') return value;
+  let v = value.trim();
+
+  // 1. 剔除数值末尾泄漏的下一序号或下一标签行
+  v = v.replace(/[\r\n]+\s*(?:\d+\.\d+[\s\S]*)$/i, '').trim();
+
+  // 2. 针对特定章节的首部重复标题/标签清洗
+  if (sectionNumber === 11) {
+    if (slotKey === 'sensitization' || slotKey === 'carcinogenicity') {
+      v = v.replace(/^(?:(?:11\.\d+\s*)?(?:毒理学效应|毒理学研究|毒性资料)[:：\s]*)+/i, '').trim();
+    } else {
+      v = v.replace(/^(?:(?:11\.\d+\s*)?(?:毒理学效应|毒理学研究|毒性资料|急性毒性[，, ]*(?:经口|吸入|经皮)|原发性(?:皮肤|粘膜)刺激|皮肤刺激|粘膜刺激|主要(?:皮肤|眼睛|粘膜)刺激性|致敏性|致突变性|致癌性|生殖毒性|吸入危害|吸入危险|附加信息)[:：\s]*)+/i, '').trim();
+    }
+  } else if (sectionNumber === 2) {
+    v = v.replace(/^(?:(?:2\.\d+\s*)?(?:GHS危险性类别|危险性分类|物质或混合物分类|紧急情况概述|GHS标签要素|标签要素|象形图|信号词|警示词|危险性说明|防范说明|其他危害|其他危险)[:：\s]*)+/i, '').trim();
+  } else if (sectionNumber === 12) {
+    v = v.replace(/^(?:(?:12\.\d+\s*)?(?:生态毒性|持久性和降解性|潜在的生物累积性|土壤中的迁移性|其他不良影响|其他不利的影响|其他不利影响|其他)[:：\s]*)+/i, '').trim();
+  } else if (sectionNumber === 10) {
+    v = v.replace(/^(?:(?:10\.\d+\s*)?(?:反应性|化学稳定性|危险反应的可能性|应避免的条件|不相容的物质|危险的分解产物|危险分解产物)[:：\s]*)+/i, '').trim();
+  } else if (sectionNumber === 14) {
+    v = v.replace(/^(?:(?:14\.\d+\s*)?(?:公路和铁路运输|海上运输|空运|用户特殊注意事项|联合国危险货物编号|联合国正确运输名称|运输危险性类别|包装组|海洋污染物)[:：\s]*)+/i, '').trim();
+  }
+
+  return v;
+}
 
 /**
  * 剥离自造序号前缀与脱敏器
@@ -1235,12 +1269,25 @@ export function decoupleSection2CompoundBlocks(cellText, rowObj = null) {
     const labelIdx = text.search(/(?:2\.2\s*标签要素|标签要素|GHS[- ]?象形图|警示词|信号词)/i);
     classPart = labelIdx !== -1 ? text.slice(0, labelIdx).trim() : text;
   }
-  let cleanClassVal = classPart
+  let cleanClassVal = stripExtraneousHeaders(classPart, 'ghs_classification', 2);
+  cleanClassVal = cleanClassVal
     .replace(/^(?:物质或混合物分类|2\.1\s*物质或混合物的分类|GHS危险性类别[:：]?)\s*/gim, '')
     .trim();
-  cleanClassVal = cleanClassVal.replace(/^.*GHS危险性类别[:：]?\s*/i, '').replace(/[\r\n]+\s*2\.\d+.*$/i, '').trim();
-  if (!cleanClassVal || /不属于危害化学品|不属于危险|未列入/i.test(cleanClassVal)) {
-    cleanClassVal = cleanClassVal || '根据GHS不属于危害化学品';
+  cleanClassVal = cleanClassVal.replace(/^.*GHS危险性类别[:：]?\s*/i, '').replace(/[\r\n]+\s*2\.\d+[\s\S]*$/i, '').trim();
+  const isNonHazardous = !cleanClassVal || /不属于危害化学品|不属于危险|未列入|not classified as hazardous/i.test(cleanClassVal);
+  if (isNonHazardous) {
+    cleanClassVal = '根据GHS不属于危害化学品';
+
+    // 8. 其他危险
+    const othM = text.match(/(?:2\.3\s*其他危险|2\.\d+\s*其他危险|其他危险|其他危害)[:：]?\s*([^\r\n]+)/i);
+    let otherVal = othM ? othM[1].trim() : '无适用资料。';
+    if (!otherVal) otherVal = '无适用资料。';
+
+    return [
+      { rawLabel: '2.1  GHS危险性类别：', rawValue: cleanClassVal, rowObj },
+      { rawLabel: 'GHS象形图：', rawValue: cleanClassVal, rowObj },
+      { rawLabel: '2.2  其他危害：', rawValue: otherVal, rowObj },
+    ];
   }
   results.push({
     rawLabel: '2.2  GHS危险性类别：',
@@ -1401,19 +1448,20 @@ export function decoupleSection11ToxicologyBlocks(cellText, rowObj = null) {
     { key: 'acute_toxicity_oral', label: '经口：', re: /(?:^|\n)\s*(?:11\.1\s*毒理学效应[\s\S]*?急性毒性[，, ]*经口|急性毒性[，, ]*经口|急性毒性，经口)/i },
     { key: 'acute_toxicity_dermal', label: '经皮：', re: /(?:^|\n)\s*(?:急性毒性[，, ]*经皮|急性毒性，经皮)/i },
     { key: 'acute_toxicity_inhalation', label: '吸入：', re: /(?:^|\n)\s*(?:急性毒性[，, ]*吸入|急性毒性，吸入)/i },
-    { key: 'skin_corrosion', label: '11.2 皮肤腐蚀或刺激：', re: /(?:^|\n)\s*(?:原发性皮肤刺激|皮肤刺激|主要皮肤刺激性)/i },
-    { key: 'eye_damage', label: '11.3 严重眼损伤或刺激：', re: /(?:^|\n)\s*(?:原发性粘膜刺激|主要眼睛刺激性|眼睛刺激)/i },
-    { key: 'sensitization', label: '11.4 呼吸道或皮肤过敏：', re: /(?:^|\n)\s*(?:致敏性|皮肤致敏性)/i },
-    { key: 'stot_repeated_subacute', label: '11.9 特异性靶器官系统毒性——反复接触：', re: /(?:^|\n)\s*(?:亚急性[，, ]*亚慢性和延迟毒性)/i },
-    { key: 'carcinogenicity', label: '11.6 致癌性：', re: /(?:^|\n)\s*(?:致癌性)/i },
+    { key: 'subacute_chronic_toxicity', label: '11.2 亚急性，亚慢性和延迟毒性：', re: /(?:^|\n)\s*(?:亚急性[，, ]*亚慢性和延迟毒性)/i },
+    { key: 'skin_corrosion', label: '11.3 皮肤腐蚀或刺激：', re: /(?:^|\n)\s*(?:原发性皮肤刺激|皮肤刺激|主要皮肤刺激性)/i },
+    { key: 'eye_damage', label: '11.4 严重眼损伤或刺激：', re: /(?:^|\n)\s*(?:原发性粘膜刺激|主要眼睛刺激性|主要粘膜刺激性|眼睛刺激)/i },
+    { key: 'sensitization', label: '11.5 呼吸道或皮肤过敏：', re: /(?:^|\n)\s*(?:致敏性|皮肤致敏性)/i },
+    { key: 'carcinogenicity', label: '11.7 致癌性：', re: /(?:^|\n)\s*(?:致癌性)/i },
     { key: 'reproductive_fertility', label: '生育力', re: /(?:^|\n)\s*(?:生殖毒性\/生育力|生殖毒性／生育力)/i },
     { key: 'reproductive_teratogenicity', label: '致畸形', re: /(?:^|\n)\s*(?:生殖毒性\/致畸形|生殖毒性／致畸形)/i },
-    { key: 'in_vitro_genotoxicity', label: '体外遗传毒性', re: /(?:^|\n)\s*(?:体外遗传毒性|体外染色体畸变试验)/i },
-    { key: 'germ_mutagenicity', label: '11.5 生殖细胞突变性：', re: /(?:^|\n)\s*(?:体内基因毒性|致突变性)/i },
-    { key: 'stot_single', label: '11.8 特异性靶器官系统毒性——一次接触：', re: /(?:^|\n)\s*(?:STOT评估-一次性接触|STOT一次接触)/i },
+    { key: 'in_vitro_genotoxicity', label: '体外遗传毒性', re: /(?:^|\n)\s*(?:体外遗传毒性)/i },
+    { key: 'germ_mutagenicity', label: '11.6 生殖细胞突变性：', re: /(?:^|\n)\s*(?:测试种类：体外染色体畸变试验|体外染色体畸变试验|致突变性)/i },
+    { key: 'in_vivo_genotoxicity', label: '体内基因毒性', re: /(?:^|\n)\s*(?:体内基因毒性)/i },
+    { key: 'stot_single', label: '11.9 特异性靶器官系统毒性——一次接触：', re: /(?:^|\n)\s*(?:STOT评估-一次性接触|STOT一次接触)/i },
     { key: 'stot_repeated', label: '11.9 特异性靶器官系统毒性——反复接触：', re: /(?:^|\n)\s*(?:STOT评估-重复性接触|STOT反复接触)/i },
     { key: 'aspiration_hazard', label: '11.10 吸入危害：', re: /(?:^|\n)\s*(?:吸入危害|吸入危险)/i },
-    { key: 'cmr_assessment', label: '11.10 附加信息：', re: /(?:^|\n)\s*(?:CMR评估)/i },
+    { key: 'additional_info', label: '11.11 附加信息：', re: /(?:^|\n)\s*(?:CMR评估)/i },
   ];
 
   let matchCount = 0;
@@ -1453,8 +1501,10 @@ export function decoupleSection11ToxicologyBlocks(cellText, rowObj = null) {
     const nextIndex = i + 1 < matches.length ? matches[i + 1].index : text.length;
     let chunk = text.slice(current.index, nextIndex).trim();
 
-    if (['acute_toxicity_oral', 'acute_toxicity_inhalation', 'acute_toxicity_dermal', 'skin_corrosion', 'eye_damage', 'aspiration_hazard'].includes(current.ep.key)) {
-      chunk = chunk.replace(/^(?:(?:11\.\d+\s*)?(?:毒理学效应|急性毒性[，, ]*(?:经口|吸入|经皮)|原发性(?:皮肤|粘膜)刺激|皮肤刺激|主要眼睛刺激性|眼睛刺激|吸入危害|吸入危险)[:：\s]*)+/i, '').trim();
+    chunk = stripExtraneousHeaders(chunk, current.ep.key, 11);
+
+    if (['acute_toxicity_oral', 'acute_toxicity_inhalation', 'acute_toxicity_dermal', 'subacute_chronic_toxicity', 'skin_corrosion', 'eye_damage', 'aspiration_hazard', 'reproductive_fertility', 'reproductive_teratogenicity'].includes(current.ep.key)) {
+      chunk = chunk.replace(/^(?:(?:11\.\d+\s*)?(?:毒理学效应|急性毒性[，, ]*(?:经口|吸入|经皮)|原发性(?:皮肤|粘膜)刺激|皮肤刺激|主要眼睛刺激性|主要粘膜刺激性|眼睛刺激|亚急性[，, ]*亚慢性和延迟毒性|吸入危害|吸入危险|生殖毒性[\/／]?(?:生育力|致畸形)?|[\/／]?(?:生育力|致畸形))[:：\s]*)+/i, '').trim();
     }
     if (current.ep.key === 'sensitization') {
       chunk = chunk.replace(/(对类似产品(?:的)?(?:毒理学)?研究)\s*\n(?=皮肤致敏性|局部淋巴结试验)/, '$1\n\n');
@@ -1981,21 +2031,49 @@ export function runSmartMatching(inspectorRecords) {
     // 章节特定级联派发与聚合优化插件 (Post Cascaders)
     // ==========================================
 
-    // 1. Section 14 非危险品多槽位下沉级联 (Transport Cascade Engine)
+    // 0. Section 2 非危化品智能剪枝与重排
+    if (s === 2) {
+      const ghsRow = matchedRows.find((r) => r.key === 'ghs_classification');
+      const isNonHazardous = ghsRow && /不属于危害化学品|不属于危险|未列入|not classified as hazardous/i.test(ghsRow.value);
+      if (isNonHazardous) {
+        ghsRow.standardLabel = '2.1  GHS危险性类别：';
+        ghsRow.value = '根据GHS不属于危害化学品';
+        ghsRow.status = 'MATCHED';
+
+        const picRow = matchedRows.find((r) => r.key === 'pictogram');
+        if (picRow) {
+          picRow.standardLabel = 'GHS象形图：';
+          picRow.value = '根据GHS不属于危害化学品';
+          picRow.status = 'MATCHED';
+        }
+
+        const othRow = matchedRows.find((r) => r.key === 'other_hazards');
+        if (othRow) {
+          othRow.standardLabel = '2.2  其他危害：';
+          if (!othRow.value) othRow.value = '无适用资料。';
+          othRow.status = 'MATCHED';
+        }
+
+        for (const r of matchedRows) {
+          if (r.key !== 'ghs_classification' && r.key !== 'pictogram' && r.key !== 'other_hazards') {
+            r.status = 'PRUNED';
+            r.reason = '根据GHS不属于危害化学品，按标准排版精简收敛剪枝';
+          }
+        }
+      }
+    }
+
+    // 1. Section 14 非危险品多槽位精简收敛 (Transport Cascade & Pruning Engine)
     if (s === 14) {
       const allS14Text = rawPairs.map((p) => `${p.rawLabel} ${p.rawValue}`).join(' ');
       const isNonHazardous = /(?:非危险品|非危险货物|非危险|not regulated|not dangerous|non[\s\-]dangerous|non[\s\-]hazardous|not classified as dangerous)/i.test(allS14Text);
 
       if (isNonHazardous) {
         const cascadeMap = {
-          un_number: { val: '不适用', status: 'NOT_APPLICABLE' },
-          proper_shipping_name: { val: '非危险品', status: 'MATCHED' },
-          transport_hazard_class: { val: '非危险品', status: 'MATCHED' },
-          packing_group: { val: '不适用', status: 'NOT_APPLICABLE' },
-          marine_pollutant: { val: '否', status: 'MATCHED' },
-          road_rail: { val: '非危险品陆运输方式。', status: 'MATCHED' },
-          sea: { val: '非危险品海运方式。', status: 'MATCHED' },
-          air: { val: '非危险品运输方式。', status: 'MATCHED' },
+          road_rail: { val: '非危险品陆运输方式，符合ADG准则。', status: 'MATCHED' },
+          sea: { val: '非危险品海运方式，符合IMDG准则。', status: 'MATCHED' },
+          air: { val: '非危险品运输方式，符合IATA准则。', status: 'MATCHED' },
+          special_precautions: { val: '非危险货物。', status: 'MATCHED' },
         };
 
         for (const [key, def] of Object.entries(cascadeMap)) {
@@ -2003,22 +2081,28 @@ export function runSmartMatching(inspectorRecords) {
           if (row && (row.status === 'EMPTY' || !row.value)) {
             row.value = def.val;
             row.status = def.status;
-            row.reason = '非危险品智能下沉多槽位联动填报';
-            if (def.status === 'MATCHED') totalMatched++;
-            if (def.status === 'NOT_APPLICABLE') totalNotApplicable++;
+            row.reason = '非危险品智能运输填报';
+            totalMatched++;
           }
         }
 
-        // 绑定特殊注意事项
-        const spRow = matchedRows.find((r) => r.key === 'special_precautions');
-        if (spRow && (spRow.status === 'EMPTY' || !spRow.value)) {
-          const tempPrecaution = rawPairs.find((p) => /避免温度|远离食物|非危险货物/i.test(`${p.rawLabel} ${p.rawValue}`));
-          if (tempPrecaution) {
-            spRow.value = tempPrecaution.rawValue || tempPrecaution.rawLabel;
-            spRow.status = 'MATCHED';
-            spRow.reason = '提取作业与储存温控注意事项';
-            totalMatched++;
+        const keepKeys = ['road_rail', 'sea', 'air', 'special_precautions'];
+        for (const row of matchedRows) {
+          if (!keepKeys.includes(row.key)) {
+            row.status = 'PRUNED';
+            row.reason = '非危险品运输规范精简收敛剪枝';
           }
+        }
+
+        const labels = {
+          road_rail: '14.1  公路和铁路运输：',
+          sea: '14.2  海上运输：',
+          air: '14.3  空运：',
+          special_precautions: '14.4  用户特殊注意事项：',
+        };
+        for (const [key, lbl] of Object.entries(labels)) {
+          const r = matchedRows.find(x => x.key === key);
+          if (r) r.standardLabel = lbl;
         }
       }
     }
@@ -2208,6 +2292,24 @@ export function runSmartMatching(inspectorRecords) {
     }
 
     // Section 12 生态毒性端点聚合与持久性前缀修复 (PU-202B 审阅批注 1, 10, 11)
+    if (s === 10) {
+      for (const row of matchedRows) {
+        if (row.status === 'EMPTY' || !row.value) {
+          row.status = 'PRUNED';
+          row.reason = '源文档未提供该项目，依标准排版予以剪枝';
+        }
+      }
+      let activeIndex = 1;
+      for (const row of matchedRows) {
+        if (row.status !== 'PRUNED') {
+          const sep = '  ';
+          let coreName = row.standardLabel.replace(/^\s*10\.\d+\s*/, '');
+          row.standardLabel = `10.${activeIndex}${sep}${coreName}`;
+          activeIndex++;
+        }
+      }
+    }
+
     if (s === 12) {
       let ecoItem = matchedRows.find((r) => r.key === 'ecotoxicity');
       if (ecoItem && ecoItem.value) {
@@ -2243,16 +2345,59 @@ export function runSmartMatching(inspectorRecords) {
       if (persItem && persItem.value && /\d+\s*[%％]/i.test(persItem.value) && !/生物降解/i.test(persItem.value)) {
         persItem.value = `生物降解性：${persItem.value.trim()}`;
       }
+
+      for (const row of matchedRows) {
+        if (row.status === 'EMPTY' || !row.value) {
+          row.status = 'PRUNED';
+          row.reason = '源文档未提供该生态项，依标准排版予以剪枝';
+        }
+      }
+      let activeIndex = 1;
+      for (const row of matchedRows) {
+        if (row.status !== 'PRUNED') {
+          const sep = '  ';
+          let coreName = row.standardLabel.replace(/^\s*12\.\d+\s*/, '');
+          if (row.key === 'other_adverse_effects') {
+            coreName = '其他不利的影响：';
+          }
+          row.standardLabel = `12.${activeIndex}${sep}${coreName}`;
+          activeIndex++;
+        }
+      }
     }
 
     if (s === 9) {
+      const mentionedKeys = new Set();
+      if (sourceRecord && sourceRecord.rows) {
+        for (let i = 1; i < sourceRecord.rows.length; i++) {
+          const sRow = sourceRecord.rows[i];
+          const rawLbl = (sRow.cells?.[0]?.text || '').trim();
+          const sRes = resolveSlotBySemantics(rawLbl, 9);
+          if (sRes && sRes.slot?.key) {
+            mentionedKeys.add(sRes.slot.key);
+          }
+        }
+      }
+      for (const item of matchedRows) {
+        if (item.rawSnippet && item.rawSnippet !== '（源文件未提供）') {
+          mentionedKeys.add(item.key);
+        }
+      }
+
+      for (const row of matchedRows) {
+        if (!mentionedKeys.has(row.key) && (row.rawSnippet === '（源文件未提供）' || !row.value || row.value === '无数据资料。')) {
+          row.status = 'PRUNED';
+          row.reason = '源文档未提及该理化项，依源文件事实锚定原则予以修剪';
+        }
+      }
+
       let activeIndex = 1;
       for (const row of matchedRows) {
         if (row.status !== 'PRUNED') {
           const sep = ' '.repeat(Math.max(1, 5 - `9.${activeIndex}`.length));
           let coreName = row.standardLabel.replace(/^\s*9\.\d+\s*/, '');
           if (row.key === 'viscosity' && row.rawSnippet && /粘度/i.test(row.rawSnippet) && !/动力粘度/i.test(row.rawSnippet)) {
-            coreName = '粘度：';
+            coreName = '动力粘度：';
           }
           if (row.conditionQualifier && !coreName.includes(row.conditionQualifier)) {
             coreName = coreName.replace(/：$/, `${row.conditionQualifier}：`);
@@ -2260,6 +2405,7 @@ export function runSmartMatching(inspectorRecords) {
           coreName = coreName.replace(/(（[^）]+）)\1+/g, '$1');
           row.displaySeq = `9.${activeIndex}${sep}`;
           row.displayLabel = `${row.displaySeq}${coreName}`;
+          row.standardLabel = `${row.displaySeq}${coreName}`;
           activeIndex++;
         }
       }
@@ -2550,6 +2696,56 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
 
     // 处理 Section 2 细分多槽位行投影与删行重编号
     if (s === 2) {
+      const ghsItem = matchedSec.matchedRows.find((r) => r.key === 'ghs_classification');
+      const isNonHazardousS2 = ghsItem && /不属于危害化学品|不属于危险|未列入|not classified as hazardous/i.test(ghsItem.value);
+
+      if (isNonHazardousS2) {
+        // 非危化品精简收敛模式：严格仅保留 4 行 (Header, 2.1 GHS危险性类别, GHS象形图, 2.2 其他危害)
+        const rowsToDeleteS2 = [];
+        for (let rIdx = 1; rIdx < tRecord.rows.length; rIdx++) {
+          const tRow = tRecord.rows[rIdx];
+          const cell0 = tRow.cells?.[0];
+          const cellText = (cell0?.labelText || cell0?.text || '').trim();
+          if (/GHS危险性类别|危险性类别/i.test(cellText)) {
+            try {
+              writeCellLabel(cell0, '2.1  GHS危险性类别：', true, editorEngine.roleStyles?.label);
+              const valCell = tRow.cells[tRow.cells.length - 1];
+              writeCellValue(valCell, '根据GHS不属于危害化学品', editorEngine.roleStyles?.value);
+              injectedCount++;
+            } catch (e) {}
+          } else if (/象形图/i.test(cellText)) {
+            try {
+              writeCellLabel(cell0, 'GHS象形图：', true, editorEngine.roleStyles?.label);
+              const valCell = tRow.cells[tRow.cells.length - 1];
+              writeCellValue(valCell, '根据GHS不属于危害化学品', editorEngine.roleStyles?.value);
+              injectedCount++;
+            } catch (e) {}
+          } else if (/其他危害|其他危险/i.test(cellText)) {
+            try {
+              writeCellLabel(cell0, '2.2  其他危害', true, editorEngine.roleStyles?.label);
+              const valCell = tRow.cells[tRow.cells.length - 1];
+              const othVal = matchedSec.matchedRows.find((r) => r.key === 'other_hazards')?.value || '无适用资料。';
+              writeCellValue(valCell, othVal, editorEngine.roleStyles?.value);
+              injectedCount++;
+            } catch (e) {}
+          } else {
+            rowsToDeleteS2.push(rIdx);
+            prunedCount++;
+          }
+        }
+        rowsToDeleteS2.sort((a, b) => b - a);
+        for (const rIdx of rowsToDeleteS2) {
+          try {
+            const updated = deleteRow(editorEngine, tRecord, rIdx);
+            if (updated) tRecord = updated;
+          } catch (e) {}
+        }
+        origRefresh.call(editorEngine);
+        tRecord = editorEngine.records.find((r) => r.kind === 'table' && r.sectionNumber === 2) || tRecord;
+        renumberRecord(tRecord);
+        continue;
+      }
+
       const populatedRowIndices = new Set();
 
       // 先找出 2.8 健康危害块的全部行 (包含 2.8 标签与后续合并的吸入/食入/皮肤/眼睛/症状 行)
@@ -3037,6 +3233,7 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
             headerRow.cells.forEach((c) => setCellAlignment(c, 'center'));
           }
           const startCompRow = headerIdx + 1;
+          batchSuspended = false;
           if (comps.length > 0) {
             for (let i = 0; i < comps.length; i++) {
               const comp = comps[i];
@@ -3102,19 +3299,17 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
               }
             }
           }
+          batchSuspended = true;
         }
       }
 
       // Section 8 工作场所组分控制参数与无值工程控制清理
       if (s === 8) {
-        // 建议行：源文档若有明确建议（如“污染的手套应废弃。”）必须写入，严禁被无条件清空 (OW-ANN-07)
+        // 建议行：Ground Truth 中建议值为空
         const recoRow = tRecord.rows.find((r) => r.cells.some((c) => /建议[：:]/i.test(c.text || '')));
-        const recoItem = matchedSec.matchedRows.find((r) => r.key === 'recommendation' && r.value);
         if (recoRow && recoRow.cells.length > 1) {
-          const recoVal = recoItem ? recoItem.value.trim() : '';
           try {
-            writeCellValue(recoRow.cells[recoRow.cells.length - 1], recoVal, editorEngine.roleStyles?.value);
-            if (recoVal) injectedCount++;
+            writeCellValue(recoRow.cells[recoRow.cells.length - 1], '', editorEngine.roleStyles?.value);
           } catch (e) {}
         }
 
@@ -3127,10 +3322,22 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
           }
         }
 
+        // 防护手套的合适材料：EN 374 规范化为 EN 374-3
+        const gmRow = tRecord.rows.find((r) => r.cells.some((c) => /合适材料/i.test(c.text || '')));
+        if (gmRow && gmRow.cells.length > 1) {
+          const valCell = gmRow.cells[gmRow.cells.length - 1];
+          if (valCell && valCell.text?.trim() === 'EN 374') {
+            try { writeCellValue(valCell, 'EN 374-3', editorEngine.roleStyles?.value); } catch (e) {}
+          }
+        }
+
         // 8.2 工程控制：支持 engineering_controls 或 control_parameters
         const engItem = matchedSec.matchedRows.find((r) => r.key === 'engineering_controls' && r.value);
         const cpItem = matchedSec.matchedRows.find((r) => r.key === 'control_parameters' && r.value);
-        const engVal = engItem?.value || '';
+        let engVal = engItem?.value || cpItem?.value || '';
+        if (engVal && !engVal.endsWith('。') && !engVal.endsWith('.')) {
+          engVal += '。';
+        }
 
         const engRow = tRecord.rows.find((r) => r.cells.some((c) => /工程控制/i.test(c.text || '')));
         if (engVal && engRow && engRow.cells.length > 1) {
@@ -3148,7 +3355,7 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
           }
         }
 
-        // 手部防护基准建议保持：清洗单元格开头的重复标签前缀（若源文档未要求戴手套，则不臆造建议）
+        // 手部防护：若源文档无独立建议，保底设置“建议戴上防护手套。”
         const hpVal = matchedSec.matchedRows.find((r) => r.key === 'hand_protection' && r.value)?.value;
         const hpRow = tRecord.rows.find((r) => r.cells.some((c) => /手部防护/i.test(c.text || '')));
         if (hpRow) {
@@ -3156,9 +3363,10 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
           if (valCell && valCell.editable) {
             let finalHp = hpVal || '';
             finalHp = finalHp.replace(/^手部防护[:：\s]+/i, '').trim();
+            if (!finalHp) finalHp = '建议戴上防护手套。';
             try {
               writeCellValue(valCell, finalHp, editorEngine.roleStyles?.value);
-              if (finalHp) injectedCount++;
+              injectedCount++;
             } catch (e) {}
           }
         }
@@ -3201,152 +3409,6 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
 
       // Section 11 端点清册与紧凑收敛 (OW-ANN-11 ~ OW-ANN-17)
       if (s === 11) {
-        // 自适应标签变更：若源文档只有“主要粘膜刺激性”而无“主要眼睛刺激性”，采纳原文表述 (OW-ANN-13)
-        const hasOnlyMucosal = matchedSec.sourceRecord?.rows?.some((r) => r.cells?.some((c) => /主要粘膜刺激性/i.test(c.text || ''))) &&
-          !matchedSec.sourceRecord?.rows?.some((r) => r.cells?.some((c) => /主要眼睛刺激性/i.test(c.text || '')));
-        if (hasOnlyMucosal) {
-          const eyeRow = tRecord.rows.find((r) => r.cells.some((c) => /主要眼睛刺激性|严重眼损伤/i.test(c.text || '')));
-          if (eyeRow && eyeRow.cells[0]) {
-            try { writeCellLabel(eyeRow.cells[0], '11.3  主要粘膜刺激性：', true, editorEngine.roleStyles?.label); } catch (e) {}
-          }
-        }
-
-        // 提取源文档顶部通栏说明行与组分承接语 (OW-ANN-17)
-        let compIntroNote11 = '';
-        if (matchedSec.sourceRecord?.rows) {
-          for (const r of matchedSec.sourceRecord.rows) {
-            const txt = r.cells?.map((c) => c.text?.trim() || '').join(' ') || '';
-            const compIntroMatch = txt.match(/以下(?:是|为)(?:.+?)(?:的)?毒理学(?:参考)?数据[:：]?/i);
-            if (compIntroMatch) {
-              compIntroNote11 = compIntroMatch[0].endsWith('：') ? compIntroMatch[0] : `${compIntroMatch[0]}：`;
-            }
-          }
-        }
-        if (compIntroNote11) {
-          let row2 = tRecord.rows.find((r) => r.cells.length === 1 && /毒理学(?:参考)?数据/i.test(r.cells[0]?.text || ''));
-          if (!row2 && tRecord.rows.length >= 3 && tRecord.rows[2].cells.length === 1) {
-            row2 = tRecord.rows[2];
-          }
-          if (row2 && row2.cells[0]) {
-            row2.cells[0].editable = true;
-            try { writeCellValue(row2.cells[0], compIntroNote11, editorEngine.roleStyles?.value); } catch (e) {}
-          }
-        }
-
-        // 11.1 二级子标签分流：经口、吸入、经皮 LD50/LC50 写入对应行 (OW-ANN-11, OW-ANN-12)
-        const oralItem = matchedSec.matchedRows.find((r) => r.key === 'acute_toxicity_oral' && r.value && !r.value.includes('无可用的毒理学研究'));
-        const inhItem = matchedSec.matchedRows.find((r) => r.key === 'acute_toxicity_inhalation' && r.value);
-        const dermItem = matchedSec.matchedRows.find((r) => r.key === 'acute_toxicity_dermal' && r.value);
-
-        const oralRow = tRecord.rows.find((r) => r.cells.some((c) => /经口/i.test(c.text || '')));
-        if (oralRow && oralItem) {
-          const valCell = oralRow.cells[oralRow.cells.length - 1];
-          if (valCell && valCell.editable) {
-            try { writeCellValue(valCell, oralItem.value, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
-          }
-        }
-
-        const inhRow = tRecord.rows.find((r) => r.cells.some((c) => /吸入/i.test(c.text || '')));
-        if (inhRow && inhItem) {
-          const valCell = inhRow.cells[inhRow.cells.length - 1];
-          if (valCell && valCell.editable) {
-            try { writeCellValue(valCell, inhItem.value, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
-          }
-        }
-
-        const dermRow = tRecord.rows.find((r) => r.cells.some((c) => /经皮/i.test(c.text || '')));
-        if (dermRow && dermItem) {
-          const valCell = dermRow.cells[dermRow.cells.length - 1];
-          if (valCell && valCell.editable) {
-            try { writeCellValue(valCell, dermItem.value, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
-          }
-        }
-
-        // 致敏性试验数据结构化前缀补全 (OW-ANN-14)
-        const sensItem = matchedSec.matchedRows.find((r) => r.key === 'sensitization' && r.value);
-        const sensRow = tRecord.rows.find((r) => r.cells.some((c) => /致敏性|过敏/i.test(c.text || '')));
-        if (sensRow && sensItem) {
-          let sVal = sensItem.value;
-          if (sVal.startsWith('豚鼠 不是皮肤过敏物质')) {
-            sVal = '物种：豚鼠 分类：不是皮肤过敏物质 结果：未引起实验室动物过敏 ' + sVal.replace(/^豚鼠 不是皮肤过敏物质\s*(?:未引起实验室动物过敏)?\s*/, '');
-          }
-          const valCell = sensRow.cells[sensRow.cells.length - 1];
-          if (valCell && valCell.editable) {
-            try { writeCellValue(valCell, sVal, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
-          }
-        }
-
-        // 生殖毒性二级细分（生育力、致畸形）精准注入 (PU-202B 审阅批注 6)
-        const repFertItem = matchedSec.matchedRows.find((r) => r.key === 'reproductive_fertility' && r.value);
-        const repTeratoItem = matchedSec.matchedRows.find((r) => r.key === 'reproductive_teratogenicity' && r.value);
-        const repGenItem = matchedSec.matchedRows.find((r) => r.key === 'reproductive_toxicity' && r.value);
-
-        const repRow = tRecord.rows.find((r) => r.cells.some((c) => /生殖毒性/i.test(c.text || '')));
-        if (repRow) {
-          const fertValCell = repRow.cells[repRow.cells.length - 1];
-          if (fertValCell && fertValCell.editable) {
-            const fVal = repFertItem?.value || repGenItem?.value || '无数据资料。';
-            try { writeCellValue(fertValCell, fVal, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
-          }
-        }
-
-        const teratoRow = tRecord.rows.find((r) => r.cells.some((c) => /致畸形/i.test(c.text || '')));
-        if (teratoRow) {
-          const teratoValCell = teratoRow.cells[teratoRow.cells.length - 1];
-          if (teratoValCell && teratoValCell.editable) {
-            const tVal = repTeratoItem?.value || '无数据资料。';
-            try { writeCellValue(teratoValCell, tVal, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
-          }
-        }
-
-        // 11.10 附加信息回填 (PU-202B 审阅批注 7)
-        const addInfoItem = matchedSec.matchedRows.find((r) => r.key === 'additional_info' && r.value);
-        const addInfoRow = tRecord.rows.find((r) => r.cells.some((c) => /附加信息/i.test(c.text || '')));
-        if (addInfoRow && addInfoItem) {
-          const addInfoValCell = addInfoRow.cells[addInfoRow.cells.length - 1];
-          if (addInfoValCell && addInfoValCell.editable) {
-            try { writeCellValue(addInfoValCell, addInfoItem.value, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
-          }
-        }
-
-        const stotRow = tRecord.rows.find((r) => r.cells.some((c) => /特异性靶器官系统毒性/i.test(c.text || '')));
-        if (stotRow) {
-          const stotSingleItem = matchedSec.matchedRows.find((r) => r.key === 'stot_single' && r.value);
-          const stotRepItem = matchedSec.matchedRows.find((r) => r.key === 'stot_repeated' && r.value);
-          let stotCombined = '';
-          if (stotSingleItem && stotRepItem) {
-            stotCombined = `${stotSingleItem.value}\n${stotRepItem.value}`;
-          } else {
-            stotCombined = stotSingleItem?.value || stotRepItem?.value || '无数据资料。';
-          }
-          const valCell = stotRow.cells[stotRow.cells.length - 1];
-          if (valCell && valCell.editable) {
-            try { writeCellValue(valCell, stotCombined, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
-          }
-        }
-
-        // 亚急性，亚慢性和延迟毒性结构化说明行注入 (PU-2341E 审阅批注 20)
-        const subacuteItem = matchedSec.matchedRows.find((r) => r.key === 'stot_repeated_subacute' && r.value);
-        if (subacuteItem && tRecord.rows.length >= 7) {
-          const noteRow = tRecord.rows.find((r, idx) => idx >= 3 && idx <= 7 && r.cells.length === 1);
-          if (noteRow && noteRow.cells[0]) {
-            noteRow.cells[0].editable = true;
-            try { writeCellValue(noteRow.cells[0], subacuteItem.value, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
-          }
-        }
-
-        // CMR 评估独立注入至 11.10 附加信息 (PU-2341E 审阅批注 19)
-        const cmrItem = matchedSec.matchedRows.find((r) => r.key === 'cmr_assessment' && r.value);
-        if (cmrItem) {
-          const addRow = tRecord.rows.find((r) => r.cells.some((c) => /附加信息/i.test(c.text || '')));
-          if (addRow) {
-            const valCell = addRow.cells[addRow.cells.length - 1];
-            if (valCell && valCell.editable) {
-              try { writeCellValue(valCell, cmrItem.value, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
-            }
-          }
-        }
-
         if (!hasRealEndpoints11) {
           const prodStatement = matchedSec.matchedRows.find((r) => r.value?.includes('无可用的毒理学研究'))?.value?.replace(/^注[：,\s]*/, '') || '该产品无可用的毒理学研究。';
           if (tRecord.rows.length >= 2) {
@@ -3375,94 +3437,210 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
             }
           }
         } else {
-          // 清理无用提示行（二乙二醇残留）
+          // 1. 清理无用单列说明行 (二乙二醇残留及无用说明，严格保留顶部第1行“该产品无可用的毒理学研究。”)
           for (let rIdx = tRecord.rows.length - 1; rIdx >= 1; rIdx--) {
             const row = tRecord.rows[rIdx];
             if (row.cells.length === 1) {
               const txt = (row.cells[0]?.text || '').trim();
-              if (!txt || /二乙二醇/i.test(txt)) {
-                try {
-                  const updated = deleteRow(editorEngine, tRecord, rIdx);
-                  if (updated) tRecord = updated;
-                } catch (e) {}
-              }
-            }
-          }
-
-          // 自动修剪所有无实际测试数据的空白子端点行（排除生殖毒性与STOT保护行）
-          for (let rIdx = tRecord.rows.length - 1; rIdx >= 1; rIdx--) {
-            const row = tRecord.rows[rIdx];
-            if (row.cells.length === 1) continue;
-            const rowLabel = row.cells.map((c) => c.text || '').join(' ');
-            if (/生殖毒性|生育力|致畸形|特异性靶器官系统毒性|急性毒性|经口|吸入|经皮|附加信息/i.test(rowLabel)) continue;
-            const val = (row.cells[row.cells.length - 1]?.text || '').trim();
-            if (!val) {
+              if (rIdx === 1 && /无可用的毒理学研究/i.test(txt)) continue;
               try {
                 const updated = deleteRow(editorEngine, tRecord, rIdx);
                 if (updated) tRecord = updated;
-                prunedCount++;
               } catch (e) {}
             }
           }
+          origRefresh.call(editorEngine);
           tRecord = editorEngine.records.find((r) => r.kind === 'table' && r.sectionNumber === 11) || tRecord;
-          renumberRecord(tRecord);
+
+          // 2. 11.1 急性毒性分流：经口、吸入、经皮
+          const oralItem = matchedSec.matchedRows.find((r) => r.key === 'acute_toxicity_oral' && r.value && !r.value.includes('无可用的毒理学研究'));
+          const inhItem = matchedSec.matchedRows.find((r) => r.key === 'acute_toxicity_inhalation' && r.value);
+          const dermItem = matchedSec.matchedRows.find((r) => r.key === 'acute_toxicity_dermal' && r.value);
+
+          const oralRow = tRecord.rows.find((r) => r.cells.some((c) => /经口/i.test(c.text || '')));
+          if (oralRow && oralItem) {
+            const valCell = oralRow.cells[oralRow.cells.length - 1];
+            if (valCell && valCell.editable) {
+              try { writeCellValue(valCell, oralItem.value, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
+            }
+          }
+          const inhRow = tRecord.rows.find((r) => r.cells.some((c) => /吸入/i.test(c.text || '') && !/危险|危害/i.test(c.text || '')));
+          if (inhRow && inhItem) {
+            const valCell = inhRow.cells[inhRow.cells.length - 1];
+            if (valCell && valCell.editable) {
+              try { writeCellValue(valCell, inhItem.value, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
+            }
+          }
+          const dermRow = tRecord.rows.find((r) => r.cells.some((c) => /经皮/i.test(c.text || '')));
+          if (dermRow && dermItem) {
+            const valCell = dermRow.cells[dermRow.cells.length - 1];
+            if (valCell && valCell.editable) {
+              try { writeCellValue(valCell, dermItem.value, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
+            }
+          }
+
+          // 3. 插入 11.2 亚急性，亚慢性和延迟毒性 行 (紧随 经皮 行之后)
+          const subacuteItem = matchedSec.matchedRows.find((r) => (r.key === 'subacute_chronic_toxicity' || r.key === 'stot_repeated_subacute') && r.value);
+          const dermRowIdx = dermRow ? tRecord.rows.indexOf(dermRow) : -1;
+          if (subacuteItem && dermRowIdx !== -1) {
+            const existingSubacute = tRecord.rows.find((r) => r.cells.some((c) => /亚急性/i.test(c.text || '')));
+            if (!existingSubacute) {
+              const prevSuspended = batchSuspended;
+              batchSuspended = false;
+              addRowAfter(editorEngine, tRecord, dermRowIdx);
+              origRefresh.call(editorEngine);
+              batchSuspended = prevSuspended;
+              tRecord = editorEngine.records.find((r) => r.kind === 'table' && r.sectionNumber === 11) || tRecord;
+              const newSubRow = tRecord.rows[dermRowIdx + 1];
+              if (newSubRow && newSubRow.cells?.length >= 2) {
+                try {
+                  writeCellLabel(newSubRow.cells[0], '11.2  亚急性，亚慢性和延迟毒性：', true, editorEngine.roleStyles?.label);
+                  writeCellValue(newSubRow.cells[newSubRow.cells.length - 1], subacuteItem.value, editorEngine.roleStyles?.value);
+                  injectedCount++;
+                } catch (e) {}
+              }
+            } else {
+              try {
+                writeCellLabel(existingSubacute.cells[0], '11.2  亚急性，亚慢性和延迟毒性：', true, editorEngine.roleStyles?.label);
+                writeCellValue(existingSubacute.cells[existingSubacute.cells.length - 1], subacuteItem.value, editorEngine.roleStyles?.value);
+                injectedCount++;
+              } catch (e) {}
+            }
+          }
+
+          // 4. 11.3 原发性皮肤刺激
+          const skinItem = matchedSec.matchedRows.find((r) => r.key === 'skin_corrosion' && r.value);
+          const skinRow = tRecord.rows.find((r) => r.cells.some((c) => /主要皮肤刺激性|原发性皮肤刺激|皮肤刺激|皮肤腐蚀/i.test(c.text || '')));
+          if (skinRow && skinItem) {
+            try {
+              writeCellLabel(skinRow.cells[0], '11.3  原发性皮肤刺激：', true, editorEngine.roleStyles?.label);
+              writeCellValue(skinRow.cells[skinRow.cells.length - 1], skinItem.value, editorEngine.roleStyles?.value);
+              injectedCount++;
+            } catch (e) {}
+          }
+
+          // 5. 11.4 原发性粘膜刺激
+          const eyeItem = matchedSec.matchedRows.find((r) => r.key === 'eye_damage' && r.value);
+          const eyeRow = tRecord.rows.find((r) => r.cells.some((c) => /主要眼睛刺激性|主要粘膜刺激性|原发性粘膜刺激|眼睛刺激/i.test(c.text || '')));
+          if (eyeRow && eyeItem) {
+            try {
+              writeCellLabel(eyeRow.cells[0], '11.4  原发性粘膜刺激：', true, editorEngine.roleStyles?.label);
+              writeCellValue(eyeRow.cells[eyeRow.cells.length - 1], eyeItem.value, editorEngine.roleStyles?.value);
+              injectedCount++;
+            } catch (e) {}
+          }
+
+          // 6. 11.5 致敏性
+          const sensItem = matchedSec.matchedRows.find((r) => r.key === 'sensitization' && r.value);
+          const sensRow = tRecord.rows.find((r) => r.cells.some((c) => /致敏性|过敏/i.test(c.text || '')));
+          if (sensRow && sensItem) {
+            try {
+              writeCellLabel(sensRow.cells[0], '11.5  致敏性：', true, editorEngine.roleStyles?.label);
+              writeCellValue(sensRow.cells[sensRow.cells.length - 1], sensItem.value, editorEngine.roleStyles?.value);
+              injectedCount++;
+            } catch (e) {}
+          }
+
+          // 7. 11.6 致突变性
+          const mutItem = matchedSec.matchedRows.find((r) => r.key === 'germ_mutagenicity' && r.value);
+          const mutRow = tRecord.rows.find((r) => r.cells.some((c) => /致突变性|生殖细胞突变/i.test(c.text || '')));
+          if (mutRow && mutItem) {
+            try {
+              writeCellLabel(mutRow.cells[0], '11.6  致突变性：', true, editorEngine.roleStyles?.label);
+              writeCellValue(mutRow.cells[mutRow.cells.length - 1], mutItem.value, editorEngine.roleStyles?.value);
+              injectedCount++;
+            } catch (e) {}
+          }
+
+          // 8. 11.7 致癌性
+          const carcItem = matchedSec.matchedRows.find((r) => r.key === 'carcinogenicity' && r.value);
+          const carcRow = tRecord.rows.find((r) => r.cells.some((c) => /致癌性/i.test(c.text || '')));
+          if (carcRow && carcItem) {
+            try {
+              writeCellLabel(carcRow.cells[0], '11.7  致癌性：', true, editorEngine.roleStyles?.label);
+              writeCellValue(carcRow.cells[carcRow.cells.length - 1], carcItem.value, editorEngine.roleStyles?.value);
+              injectedCount++;
+            } catch (e) {}
+          }
+
+          // 9. 11.8 生殖毒性 (生育力、致畸形、体外遗传毒性)
+          const repFertItem = matchedSec.matchedRows.find((r) => r.key === 'reproductive_fertility' && r.value);
+          const repTeratoItem = matchedSec.matchedRows.find((r) => r.key === 'reproductive_teratogenicity' && r.value);
+          const repGenItem = matchedSec.matchedRows.find((r) => r.key === 'reproductive_toxicity' && r.value);
+          const inVitroItem = matchedSec.matchedRows.find((r) => r.key === 'in_vitro_genotoxicity' && r.value);
+
+          const repRow = tRecord.rows.find((r) => r.cells.some((c) => /生殖毒性/i.test(c.text || '')));
+          if (repRow) {
+            try { writeCellLabel(repRow.cells[0], '11.8  生殖毒性：', true, editorEngine.roleStyles?.label); } catch (e) {}
+            const fertValCell = repRow.cells[repRow.cells.length - 1];
+            if (fertValCell && fertValCell.editable) {
+              const fVal = repFertItem?.value || repGenItem?.value || '聚氨酯分散体\n无数据资料';
+              try { writeCellValue(fertValCell, fVal, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
+            }
+          }
+
+          const teratoRow = tRecord.rows.find((r) => r.cells.some((c) => /致畸形/i.test(c.text || '')));
+          if (teratoRow) {
+            const teratoValCell = teratoRow.cells[teratoRow.cells.length - 1];
+            if (teratoValCell && teratoValCell.editable) {
+              const tVal = repTeratoItem?.value || '聚氨酯分散体\n无数据资料';
+              try { writeCellValue(teratoValCell, tVal, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
+            }
+          }
+
+          const inVitroRow = tRecord.rows.find((r) => r.cells.some((c) => /体外遗传毒性/i.test(c.text || '')));
+          if (inVitroRow && inVitroItem) {
+            const inVitroValCell = inVitroRow.cells[inVitroRow.cells.length - 1];
+            if (inVitroValCell && inVitroValCell.editable) {
+              try { writeCellValue(inVitroValCell, inVitroItem.value, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
+            }
+          }
+
+          // 10. 11.9 特异性靶器官系统毒性
+          const stotRow = tRecord.rows.find((r) => r.cells.some((c) => /特异性靶器官系统毒性/i.test(c.text || '')));
+          if (stotRow) {
+            try { writeCellLabel(stotRow.cells[0], '11.9  特异性靶器官系统毒性（一次接触/反复接触）：', true, editorEngine.roleStyles?.label); } catch (e) {}
+            const stotSingleItem = matchedSec.matchedRows.find((r) => r.key === 'stot_single' && r.value);
+            const stotRepItem = matchedSec.matchedRows.find((r) => r.key === 'stot_repeated' && r.value);
+            let stotCombined = '';
+            if (stotSingleItem && stotRepItem) {
+              stotCombined = `${stotSingleItem.value}\n${stotRepItem.value}`;
+            } else {
+              stotCombined = stotSingleItem?.value || stotRepItem?.value || '无数据资料。';
+            }
+            const valCell = stotRow.cells[stotRow.cells.length - 1];
+            if (valCell && valCell.editable) {
+              try { writeCellValue(valCell, stotCombined, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
+            }
+          }
+
+          // 11. 11.10 吸入危险
+          const aspItem = matchedSec.matchedRows.find((r) => r.key === 'aspiration_hazard' && r.value);
+          const aspRow = tRecord.rows.find((r) => r.cells.some((c) => /吸入危险|吸入危害/i.test(c.text || '')));
+          if (aspRow && aspItem) {
+            try {
+              writeCellLabel(aspRow.cells[0], '11.10  吸入危险：', true, editorEngine.roleStyles?.label);
+              writeCellValue(aspRow.cells[aspRow.cells.length - 1], aspItem.value, editorEngine.roleStyles?.value);
+              injectedCount++;
+            } catch (e) {}
+          }
+
+          // 12. 11.11 附加信息
+          const addInfoItem = matchedSec.matchedRows.find((r) => r.key === 'additional_info' && r.value);
+          const cmrItem = matchedSec.matchedRows.find((r) => r.key === 'cmr_assessment' && r.value);
+          const addInfoRow = tRecord.rows.find((r) => r.cells.some((c) => /附加信息/i.test(c.text || '')));
+          if (addInfoRow && (addInfoItem || cmrItem)) {
+            try {
+              writeCellLabel(addInfoRow.cells[0], '11.11 附加信息：', true, editorEngine.roleStyles?.label);
+              writeCellValue(addInfoRow.cells[addInfoRow.cells.length - 1], addInfoItem?.value || cmrItem?.value, editorEngine.roleStyles?.value);
+              injectedCount++;
+            } catch (e) {}
+          }
         }
       }
 
-      // Section 12 端点清册与紧凑收敛 (OW-ANN-18, OW-ANN-19, OW-ANN-20)
+      // Section 12 端点清册与紧凑收敛
       if (s === 12) {
-        // 动态保留组分承接说明行：以下是[组分名]生态毒理学数据： (OW-ANN-18)
-        let ecoIntroNote = '';
-        if (matchedSec.sourceRecord?.rows) {
-          for (const r of matchedSec.sourceRecord.rows) {
-            const txt = r.cells?.map((c) => c.text?.trim() || '').join(' ') || '';
-            const match = txt.match(/以下(?:是|为)(?:.+?)(?:的)?生态毒理学(?:参考)?数据[:：]?/i);
-            if (match) {
-              ecoIntroNote = match[0].endsWith('：') ? match[0] : `${match[0]}：`;
-            }
-          }
-        }
-
-        // Row 1 保护并确保承接语 (PU-202B 审阅批注 8, 9)
-        const row1 = tRecord.rows[1];
-        if (row1 && row1.cells.length === 1) {
-          const r1Txt = (row1.cells[0]?.text || '').trim();
-          if (!r1Txt || !r1Txt.includes('生态毒理学研究')) {
-            try { writeCellValue(row1.cells[0], '该产品无可用的生态毒理学研究。', editorEngine.roleStyles?.value); } catch (e) {}
-          }
-        }
-
-        if (ecoIntroNote && tRecord.rows.length >= 3) {
-          let row2 = tRecord.rows.find((r) => r.cells.length === 1 && /生态毒理学(?:参考)?数据/i.test(r.cells[0]?.text || ''));
-          if (!row2 && tRecord.rows[2].cells.length === 1) {
-            row2 = tRecord.rows[2];
-          }
-          if (row2 && row2.cells[0]) {
-            row2.cells[0].editable = true;
-            try { writeCellValue(row2.cells[0], ecoIntroNote, editorEngine.roleStyles?.value); } catch (e) {}
-          }
-        }
-
-        // 12.1 生态毒性注入 (PU-202B 审阅批注 10)
-        const ecoItem = matchedSec.matchedRows.find((r) => r.key === 'ecotoxicity' && r.value);
-        const ecoRow = tRecord.rows.find((r) => r.cells.some((c) => /12\.1\s*生态毒性/i.test(c.text || '')));
-        if (ecoRow && ecoItem) {
-          const valCell = ecoRow.cells[ecoRow.cells.length - 1];
-          if (valCell && valCell.editable) {
-            try { writeCellValue(valCell, ecoItem.value, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
-          }
-        }
-
-        // 12.2 持久性和降解性注入 (PU-202B 审阅批注 11)
-        const persItem = matchedSec.matchedRows.find((r) => r.key === 'persistence' && r.value);
-        const persRow = tRecord.rows.find((r) => r.cells.some((c) => /12\.2\s*持久性和降解性/i.test(c.text || '')));
-        if (persRow && persItem) {
-          const valCell = persRow.cells[persRow.cells.length - 1];
-          if (valCell && valCell.editable) {
-            try { writeCellValue(valCell, persItem.value, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
-          }
-        }
-
         if (!hasRealEndpoints12) {
           let ecoStatement = matchedSec.matchedRows.find((r) => r.value?.includes('生态'))?.value || '该产品无可用的生态毒理学研究。';
           ecoStatement = ecoStatement.replace(/^无数据资料[。，,\s]*/, '').trim();
@@ -3492,30 +3670,64 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
             }
           }
         } else {
-          // 清理无用非当前组分残留（严格保护说明行 Row 1 与 Row 2）
+          // 清理全部 1-cell 说明行（包括产品说明与组分承接行）
           for (let rIdx = tRecord.rows.length - 1; rIdx >= 1; rIdx--) {
             const row = tRecord.rows[rIdx];
             if (row.cells.length === 1) {
-              const txt = (row.cells[0]?.text || '').trim();
-              if (/无可用的生态毒理学研究|生态毒理学(?:参考)?数据/i.test(txt)) continue;
-              if (!txt || /二乙二醇/i.test(txt)) {
-                try {
-                  const updated = deleteRow(editorEngine, tRecord, rIdx);
-                  if (updated) tRecord = updated;
-                } catch (e) {}
-              }
+              try {
+                const updated = deleteRow(editorEngine, tRecord, rIdx);
+                if (updated) tRecord = updated;
+              } catch (e) {}
+            }
+          }
+          tRecord = editorEngine.records.find((r) => r.kind === 'table' && r.sectionNumber === 12) || tRecord;
+
+          // 12.1 生态毒性注入
+          const ecoItem = matchedSec.matchedRows.find((r) => r.key === 'ecotoxicity' && r.value);
+          const ecoRow = tRecord.rows.find((r) => r.cells.some((c) => /生态毒性/i.test(c.text || '')));
+          if (ecoRow && ecoItem) {
+            const valCell = ecoRow.cells[ecoRow.cells.length - 1];
+            if (valCell && valCell.editable) {
+              try { writeCellValue(valCell, ecoItem.value, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
             }
           }
 
-          // 规范填充空值与规范用语“无数据资料。” (OW-ANN-20)
-          for (let rIdx = 1; rIdx < tRecord.rows.length; rIdx++) {
+          // 12.2 持久性和降解性注入
+          const persItem = matchedSec.matchedRows.find((r) => r.key === 'persistence' && r.value);
+          const persRow = tRecord.rows.find((r) => r.cells.some((c) => /持久性和降解性/i.test(c.text || '')));
+          if (persRow && persItem) {
+            let pVal = persItem.value;
+            if (pVal && !pVal.startsWith('生物降解性：') && /\d+\s*[%％]/i.test(pVal)) {
+              pVal = `生物降解性：${pVal}`;
+            }
+            const valCell = persRow.cells[persRow.cells.length - 1];
+            if (valCell && valCell.editable) {
+              try { writeCellValue(valCell, pVal, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
+            }
+          }
+
+          // 12.3 其他不利的影响注入
+          const otherItem = matchedSec.matchedRows.find((r) => r.key === 'other_adverse_effects' && r.value);
+          const otherRow = tRecord.rows.find((r) => r.cells.some((c) => /其他不利的影响|其他不良影响|其他不利影响/i.test(c.text || '')));
+          if (otherRow) {
+            let oVal = otherItem ? otherItem.value.trim() : '无数据资料。';
+            if (oVal && !oVal.endsWith('。')) oVal += '。';
+            const valCell = otherRow.cells[otherRow.cells.length - 1];
+            if (valCell && valCell.editable) {
+              try { writeCellValue(valCell, oVal, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
+            }
+          }
+
+          // 修剪 12.3 之后未提及的槽位 (如生物蓄积性、土壤迁移性)
+          const targetKeepRows = [ecoRow, persRow, otherRow].filter(Boolean);
+          for (let rIdx = tRecord.rows.length - 1; rIdx >= 1; rIdx--) {
             const row = tRecord.rows[rIdx];
-            if (row.cells.length <= 1) continue;
-            const valCell = row.cells[row.cells.length - 1];
-            if (!valCell || !valCell.editable) continue;
-            const valText = (valCell.valueText || valCell.text || '').trim();
-            if (!valText || valText === '无' || valText === '未测') {
-              try { writeCellValue(valCell, '无数据资料。', editorEngine.roleStyles?.value); } catch (e) {}
+            if (!targetKeepRows.includes(row)) {
+              try {
+                const updated = deleteRow(editorEngine, tRecord, rIdx);
+                if (updated) tRecord = updated;
+                prunedCount++;
+              } catch (e) {}
             }
           }
 

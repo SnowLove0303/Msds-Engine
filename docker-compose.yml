@@ -13,3 +13,7 @@ services:
       - NODE_ENV=production
       - PORT=5173
       - HOST=0.0.0.0
+    volumes:
+      - "F:/MSDS覆写:/data/msds-source"
+      - "./output:/app/web/output"
+      - "./web/data:/app/web/data"

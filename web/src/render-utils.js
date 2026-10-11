@@ -304,11 +304,23 @@ export function renderEditorCell(record, row, cell, tableWidth, fallbackGrid = f
   const isRow0 = row.index === 0;
   const allowLabelEdit = Boolean(options.allowLabelEdit);
   const isPresetMode = Boolean(options.isPresetMode);
+  const manageCellEditability = Boolean(options.manageCellEditability);
+
+  // 应用用户手动设置的值格编辑权限覆盖
+  const cellKey = `${record.id}:${row.index}:${cell.col}`;
+  if (options.cellEditableOverrides && cellKey in options.cellEditableOverrides) {
+    cell.editable = Boolean(options.cellEditableOverrides[cellKey]);
+    cell.protectedReason = cell.editable ? null : '用户手动锁定';
+    if (cell.editable && cell.kind === 'label-only') {
+      cell.kind = 'note';
+    }
+  }
+
   let innerMarkup = '';
 
   if (isRow0) {
     innerMarkup = renderCellContent(cell, '', record, roleStyles, row);
-  } else if (cell.editable && cell.valueNodes.length) {
+  } else if (cell.editable) {
     const labelPart = cell.labelText
       ? renderEditorLabelMarkup(cell.labelText, allowLabelEdit, record, row, cell)
       : '';
@@ -347,6 +359,10 @@ export function renderEditorCell(record, row, cell, tableWidth, fallbackGrid = f
     innerMarkup = renderCellContent(cell, '', record, roleStyles, row);
   }
 
+  const editabilityBadge = (!isRow0 && manageCellEditability)
+    ? `<div class="cell-editability-badge-wrap"><button type="button" class="cell-editability-toggle-badge ${cell.editable ? 'is-unlocked' : 'is-locked'}" data-cell-action="toggle-editability" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" data-col="${cell.col}" title="${cell.editable ? '当前状态：可填写。点击切换为锁定' : '当前状态：已锁定。点击切换为可填写'}"><span class="badge-icon">${cell.editable ? '🔓' : '🔒'}</span><span class="badge-text">${cell.editable ? '可填' : '锁定'}</span></button></div>`
+    : '';
+
   const canMoveUp = row.index > 1;
   const canMoveDown = row.index < (record.rows?.length || 1) - 1;
 
@@ -358,7 +374,7 @@ export function renderEditorCell(record, row, cell, tableWidth, fallbackGrid = f
   const maxPossibleSpan = Math.max(1, totalRows - (row.index ?? 0));
   const effectiveRowspan = Math.min(Number(cell.rowspan) || 1, maxPossibleSpan);
 
-  return `<td colspan="${cell.colspan}" rowspan="${effectiveRowspan}" style="${sourceCellStyle(cell, tableWidth, fallbackGrid, record)}" class="editor-cell ${cell.editable ? 'is-editable' : 'is-protected'}" data-anchor-section="${record.sectionNumber || ''}" data-anchor-row="${row.index}" data-anchor-col="${cell.col}" data-anchor-role="${cell.role || (cell.labelText ? 'label' : 'value')}">${innerMarkup}${floatingActions}</td>`;
+  return `<td colspan="${cell.colspan}" rowspan="${effectiveRowspan}" style="${sourceCellStyle(cell, tableWidth, fallbackGrid, record)}" class="editor-cell ${cell.editable ? 'is-editable' : 'is-protected'} ${manageCellEditability ? 'in-permission-config-mode' : ''}" data-anchor-section="${record.sectionNumber || ''}" data-anchor-row="${row.index}" data-anchor-col="${cell.col}" data-anchor-role="${cell.role || (cell.labelText ? 'label' : 'value')}">${editabilityBadge}${innerMarkup}${floatingActions}</td>`;
 }
 
 export function renderEditorTable(record, options = {}) {
