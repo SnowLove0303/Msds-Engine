@@ -287,7 +287,7 @@ function parseParagraph(paragraph, numbering = null) {
 }
 
 function cellText(cell) {
-  return cell.paragraphs.map((paragraph) => paragraph.text).join('\n').trim();
+  return cell.paragraphs.map((paragraph) => paragraph.text).join('\r\n').trim();
 }
 
 function isPunctuationOnly(str) {
@@ -337,7 +337,7 @@ export function cellRole(cell) {
       }
 
       // 2. Check for inline colon separating label and value within fully bold paragraph
-      const inlineColon = boldText.match(/^([^：:\n]{1,50}[：:])\s*(.+)$/);
+      const inlineColon = boldText.match(/^([^：:\r\n]{1,50}[：:])\s*(.+)$/);
       if (inlineColon) {
         const fullLabel = (num && !/^\s*(?:v)?\d+(?:[\.．、]\d+)*[\.．、\s]/i.test(inlineColon[1]))
           ? `${num}  ${inlineColon[1]}`
@@ -392,8 +392,8 @@ export function cellRole(cell) {
     }
   }
 
-  const labelText = labelParts.join('\n').trim();
-  const valueText = valueParts.join('\n').trim();
+  const labelText = labelParts.join('\r\n').trim();
+  const valueText = valueParts.join('\r\n').trim();
   const labelLike = labelText || (!valueText && /[：:]$/.test(cell.text) && cell.text.length < 100);
   const explicitLabelSequence = cell.col === 0 && Boolean(labelLike) && /^\s*(?:v)?\d+(?:[\.．、]\d+)*(?=\s|[、）:：.]|[\u4e00-\u9fffA-Za-z]|$)/i.test(cell.text);
   const sequence = Boolean(explicitLabelSequence) || cell.paragraphs.some((p) => Boolean(p.numberingText?.trim()));
@@ -472,7 +472,7 @@ function buildFieldCandidates(rows) {
   rows.forEach((row, rowIndex) => {
     row.cells.forEach((cell, cellIndex) => {
       if (!cell.text) return;
-      const colon = cell.text.match(/^([^：:\n\t]{1,80})[：:]/);
+      const colon = cell.text.match(/^([^：:\r\n\t]{1,80})[：:]/);
       const next = row.cells[cellIndex + 1];
       if (next && (colon || cell.labelText) && next.text) {
         candidates.push({
@@ -1205,9 +1205,11 @@ export async function loadDocx(source, sourceName = 'document.docx') {
         record.engine = this;
       }
       this.headerFooterData = extractHeaderFooterData(this);
+      enableCrossPageBreaksForAllSections(this);
       return this;
     },
     async exportArrayBuffer() {
+      enableCrossPageBreaksForAllSections(this);
       const output = await JSZip.loadAsync(this.originalBytes);
       output.file('word/document.xml', serializer().serializeToString(this.documentXml));
       if (this.relsText) {
@@ -1242,7 +1244,14 @@ export async function loadDocx(source, sourceName = 'document.docx') {
     async getImageDataUrl(target) {
       const normalized = String(target || '').replace(/^\//, '');
       const entryName = normalized.startsWith('word/') ? normalized : `word/${normalized}`;
-      const entry = this.zip.file(entryName);
+      const mediaBytes = this.mediaFiles?.get(entryName);
+      if (mediaBytes) {
+        const extension = entryName.split('.').pop().toLowerCase();
+        const mime = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp' }[extension] || 'application/octet-stream';
+        const base64 = typeof Buffer !== 'undefined' ? Buffer.from(mediaBytes).toString('base64') : btoa(String.fromCharCode(...mediaBytes));
+        return `data:${mime};base64,${base64}`;
+      }
+      const entry = this.zip ? this.zip.file(entryName) : null;
       if (!entry) return null;
       const extension = entryName.split('.').pop().toLowerCase();
       const mime = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp' }[extension] || 'application/octet-stream';
@@ -1289,7 +1298,7 @@ function refreshCellText(cell) {
 
 function distributeText(nodes, value) {
   if (!nodes.length) return;
-  const clean = String(value ?? '').replace(/\r\n?/g, '\n');
+  const clean = String(value ?? '').replace(/\r\n?/g, '\r\n');
   const weights = nodes.map((node) => Math.max((node.textContent || '').length, 1));
   const total = weights.reduce((sum, item) => sum + item, 0);
   let offset = 0;
@@ -1379,12 +1388,16 @@ function clearRunTextContent(run) {
 function writeRunTextContent(run, value) {
   clearRunTextContent(run);
   const text = String(value ?? '').replace(/\r\n?/g, '\n');
-  const tokens = text.split(/([\n\t])/);
+  const tokens = text.split(/(\n|\t)/);
   const anchor = directChildren(run).find((child) => localName(child) !== 'rPr') || null;
   const insert = (node) => run.insertBefore(node, anchor);
   for (const token of tokens) {
-    if (token === '\n' || token === '\t') {
-      insert(run.ownerDocument.createElementNS(W_NS, `w:${token === '\n' ? 'br' : 'tab'}`));
+    if (token === '\n') {
+      insert(run.ownerDocument.createElementNS(W_NS, 'w:br'));
+      continue;
+    }
+    if (token === '\t') {
+      insert(run.ownerDocument.createElementNS(W_NS, 'w:tab'));
       continue;
     }
     if (token || tokens.length === 1) {
@@ -1430,7 +1443,7 @@ function replaceCellValueContent(cell, value, roleStyle) {
 
   // 严格只清除非加粗运行区，绝不碰任何加粗标签
   const editableRuns = new Set(cell.paragraphs.flatMap((paragraph) => paragraph.runs
-    .filter((run) => !run.bold && (run.textNodes.length || /[\n\t]/.test(run.text || '')))
+    .filter((run) => !run.bold && (run.textNodes.length || /[\r\n\t]/.test(run.text || '')))
     .map((run) => run.node)));
   for (const run of editableRuns) clearRunTextContent(run);
   writeRunTextContent(destinationRun, value);
@@ -1450,46 +1463,29 @@ function replaceCellValueContent(cell, value, roleStyle) {
 /**
  * 跨文档图片迁移：从源文档复制 drawing 节点及对应的图片二进制文件与 relationships 关系
  */
-export function transferDrawingToCell(srcEngine, targetEngine, srcDrawingNode, targetCell) {
-  if (!srcDrawingNode || !targetCell?.node) return false;
+/**
+ * 全量移除所有表格行上的 <w:cantSplit/> 限制，强制激活全16章节表格跨页断行能力
+ */
+export function enableCrossPageBreaksForAllSections(engine) {
+  if (!engine?.documentXml) return;
+  const cantSplits = Array.from(engine.documentXml.getElementsByTagNameNS(W_NS, 'cantSplit') || []);
+  for (const node of cantSplits) {
+    node.parentNode?.removeChild(node);
+  }
+  const localCantSplits = Array.from(engine.documentXml.getElementsByTagName('cantSplit') || []);
+  for (const node of localCantSplits) {
+    node.parentNode?.removeChild(node);
+  }
+}
+
+export function transferDrawingToCell(srcEngine, targetEngine, srcDrawingNodes, targetCell) {
+  if (!srcDrawingNodes || !targetCell?.node) return false;
+  const nodes = Array.isArray(srcDrawingNodes) ? srcDrawingNodes : [srcDrawingNodes];
+  if (nodes.length === 0) return false;
 
   const srcEng = srcEngine?.engine || srcEngine;
   const tgtEng = targetEngine?.engine || targetEngine;
   if (!srcEng || !tgtEng) return false;
-
-  const blip = srcDrawingNode.getElementsByTagNameNS('*', 'blip')[0];
-  if (!blip) return false;
-  const embedId = blip.getAttribute('r:embed') || blip.getAttributeNS(R_NS, 'embed') || blip.getAttribute('ns1:embed');
-  if (!embedId) return false;
-
-  const rel = srcEng.relationshipMap?.get(embedId) || 'media/image1.png';
-  let targetPath = rel.startsWith('word/') ? rel : `word/${rel.replace(/^\//, '')}`;
-  const imgBytes = srcEng.mediaFiles?.get(targetPath);
-  if (!imgBytes) return false;
-
-  const ext = targetPath.split('.').pop() || 'png';
-  const relsText = tgtEng.relsText || '';
-  const rIdNums = [...relsText.matchAll(/Id=["']rId(\d+)["']/g)].map((m) => parseInt(m[1], 10));
-  const maxRId = Math.max(0, ...rIdNums);
-  const newRId = `rId${maxRId + 10}`;
-  const newMediaPath = `word/media/image_ghs_${Date.now()}.${ext}`;
-  const newRelTarget = `media/${newMediaPath.split('/').pop()}`;
-
-  if (!tgtEng.mediaFiles) tgtEng.mediaFiles = new Map();
-  tgtEng.mediaFiles.set(newMediaPath, imgBytes);
-  tgtEng.zip?.file(newMediaPath, imgBytes);
-  tgtEng.relationshipMap?.set(newRId, newRelTarget);
-
-  const newRelTag = `<Relationship Id="${newRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${newRelTarget}"/>`;
-  tgtEng.relsText = relsText.includes('</Relationships>')
-    ? relsText.replace('</Relationships>', `${newRelTag}</Relationships>`)
-    : `${relsText}\n${newRelTag}`;
-
-  const clonedDrawing = targetCell.node.ownerDocument.importNode(srcDrawingNode, true);
-  const clonedBlip = clonedDrawing.getElementsByTagNameNS('*', 'blip')[0];
-  if (clonedBlip) {
-    clonedBlip.setAttributeNS(R_NS, 'r:embed', newRId);
-  }
 
   let p = targetCell.node.getElementsByTagNameNS(W_NS, 'p')[0];
   if (!p) {
@@ -1499,13 +1495,64 @@ export function transferDrawingToCell(srcEngine, targetEngine, srcDrawingNode, t
   const existingRuns = [...p.getElementsByTagNameNS(W_NS, 'r')];
   existingRuns.forEach((r) => p.removeChild(r));
 
-  const run = targetCell.node.ownerDocument.createElementNS(W_NS, 'w:r');
-  run.appendChild(clonedDrawing);
-  p.appendChild(run);
+  targetCell.images = [];
+  targetCell.relationships = [];
 
-  targetCell.text = '[象形图]';
-  targetCell.valueText = '[象形图]';
-  return true;
+  let count = 0;
+  for (const srcDrawingNode of nodes) {
+    const blip = srcDrawingNode.getElementsByTagNameNS('*', 'blip')[0];
+    if (!blip) continue;
+    const embedId = blip.getAttribute('r:embed') || blip.getAttributeNS(R_NS, 'embed') || blip.getAttribute('ns1:embed');
+    if (!embedId) continue;
+
+    const rel = srcEng.relationshipMap?.get(embedId) || 'media/image1.png';
+    let targetPath = rel.startsWith('word/') ? rel : `word/${rel.replace(/^\//, '')}`;
+    const imgBytes = srcEng.mediaFiles?.get(targetPath);
+    if (!imgBytes) continue;
+
+    const ext = targetPath.split('.').pop() || 'png';
+    const relsText = tgtEng.relsText || '';
+    const rIdNums = [...relsText.matchAll(/Id=["']rId(\d+)["']/g)].map((m) => parseInt(m[1], 10));
+    const maxRId = Math.max(0, ...rIdNums);
+    const newRId = `rId${maxRId + 10 + count}`;
+    const newMediaPath = `word/media/image_ghs_${Date.now()}_${count}.${ext}`;
+    const newRelTarget = `media/${newMediaPath.split('/').pop()}`;
+
+    if (!tgtEng.mediaFiles) tgtEng.mediaFiles = new Map();
+    tgtEng.mediaFiles.set(newMediaPath, imgBytes);
+    tgtEng.zip?.file(newMediaPath, imgBytes);
+    tgtEng.relationshipMap?.set(newRId, newRelTarget);
+
+    const newRelTag = `<Relationship Id="${newRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${newRelTarget}"/>`;
+    tgtEng.relsText = relsText.includes('</Relationships>')
+      ? relsText.replace('</Relationships>', `${newRelTag}</Relationships>`)
+      : `${relsText}\r\n${newRelTag}`;
+
+    const clonedDrawing = targetCell.node.ownerDocument.importNode(srcDrawingNode, true);
+    const clonedBlip = clonedDrawing.getElementsByTagNameNS('*', 'blip')[0];
+    if (clonedBlip) {
+      clonedBlip.setAttributeNS(R_NS, 'r:embed', newRId);
+    }
+
+    const run = targetCell.node.ownerDocument.createElementNS(W_NS, 'w:r');
+    run.appendChild(clonedDrawing);
+    p.appendChild(run);
+
+    targetCell.images.push({
+      rid: newRId,
+      node: clonedDrawing,
+      extent: { cx: 1080135, cy: 1035050 }
+    });
+    targetCell.relationships.push({
+      rid: newRId,
+      target: newRelTarget
+    });
+    count++;
+  }
+
+  targetCell.text = '';
+  targetCell.valueText = '';
+  return count > 0;
 }
 
 export function setCellAlignment(cell, align = 'center') {
@@ -1562,13 +1609,13 @@ export function writeCellLabel(cell, value, allowLabelEdit = false, roleStyle = 
     const spaceCount = num === '11.10' ? 2 : Math.max(1, padLen - num.length);
     const prefix = `${num}${' '.repeat(spaceCount)}`;
     clean = prefix + core;
-  } else if (cell.row >= 1 && /^\s*(\d+\.\d+)/.test(cell.text)) {
+  } else if (cell.row >= 1 && /^\s*(\d+\.\d+)/.test(cell.text) && !/物质或混合物分类/.test(clean)) {
     const existingPrefixMatch = cell.text.match(/^\s*(\d+\.\d+)/);
     const num = existingPrefixMatch[1];
     const secNum = parseInt(num.split('.')[0], 10);
     const padLen = secNum === 11 ? 6 : (secNum === 9 ? 5 : 5);
     clean = clean.replace(/^\s*\d+\.\d+\s*/, '').trim();
-    if (!/[：:]$/.test(clean) && !core.includes('其他危害')) clean += '：';
+    if (!/[：:]$/.test(clean) && !clean.includes('其他危害') && !clean.includes('物质或混合物分类')) clean += '：';
     const spaceCount = num === '11.10' ? 2 : Math.max(1, padLen - num.length);
     const prefix = `${num}${' '.repeat(spaceCount)}`;
     clean = prefix + clean;
@@ -1891,7 +1938,7 @@ export function classifyLabelTier(cell, row, paragraph, record) {
   const seq = normalizedSequence(paragraph, cell);
   if (seq) return 'parent';
 
-  if (labelText || /^[^\n：:]{1,100}[：:]/.test(text)) {
+  if (labelText || /^[^\r\n：:]{1,100}[：:]/.test(text)) {
     return 'child';
   }
 
@@ -2186,15 +2233,113 @@ export function applySemanticOverrides(engine, fieldOverrides = {}) {
 
 export const SYSTEM_DEFAULT_PRESETS = [
   {
-    id: 'preset_custom_1',
-    name: '自定义预设 1',
-    targetTemplate: 'CN 冠志',
-    isBuiltin: false,
+    id: 'preset_guocai_cn',
+    name: '国彩中文标准预设',
+    entity: '国彩',
+    language: 'CN',
+    baselineId: 'baseline_cn_guanzhi',
+    targetTemplate: 'CN 国彩',
+    isBuiltin: true,
     enabledForExport: true,
-    headerFooterOverrides: {},
-    fieldOverrides: {},
+    headerFooterOverrides: {
+      company: '英德市国彩新材料有限公司',
+      title: '物料安全数据表',
+      version: 'V1.0',
+      customFileNamePattern: '{model} msds_CN 国彩.docx',
+    },
+    fieldOverrides: {
+      supplier_name: '英德市国彩精细化工有限公司',
+      supplier_address: '广东省英德市白沙镇太平村更古坑凯迪工业园区',
+      emergency_phone: '86-763-2811205',
+      phone: '86-763-2811205',
+      fax: '86-763-2811024',
+      postal_code: '513038',
+    },
+  },
+  {
+    id: 'preset_guocai_en',
+    name: '国彩英文标准预设',
+    entity: '国彩',
+    language: 'EN',
+    baselineId: 'baseline_en_guanzhi',
+    targetTemplate: 'EN 国彩',
+    isBuiltin: true,
+    enabledForExport: true,
+    headerFooterOverrides: {
+      company: 'Yingde Guocai New Material Co., Ltd.',
+      title: 'MATERIAL SAFETY DATA SHEET',
+      version: 'V1.0',
+      customFileNamePattern: '{model} msds_EN 国彩.docx',
+    },
+    fieldOverrides: {
+      supplier_name: 'Yingde Guocai Fine Chemical Co., Ltd.',
+      supplier_address: 'Kaidi Industrial Park, Genggukeng, Taiping Village, Baisha Town, Yingde, Guangdong, China',
+      emergency_phone: '86-763-2811205',
+      phone: '86-763-2811205',
+      fax: '86-763-2811024',
+      postal_code: '513038',
+    },
+  },
+  {
+    id: 'preset_guanzhi_cn',
+    name: '冠志中文基准预设',
+    entity: '冠志',
+    language: 'CN',
+    baselineId: 'baseline_cn_guanzhi',
+    targetTemplate: 'CN 冠志',
+    isBuiltin: true,
+    enabledForExport: true,
+    headerFooterOverrides: {
+      company: '广州冠志新材料科技有限公司',
+      title: '物料安全数据表',
+      version: 'V1.0',
+      customFileNamePattern: '{model} msds_CN 冠志.docx',
+    },
+    fieldOverrides: {
+      supplier_name: '广州冠志新材料科技有限公司',
+    },
+  },
+  {
+    id: 'preset_guanzhi_en',
+    name: '冠志英文基准预设',
+    entity: '冠志',
+    language: 'EN',
+    baselineId: 'baseline_en_guanzhi',
+    targetTemplate: 'EN 冠志',
+    isBuiltin: true,
+    enabledForExport: true,
+    headerFooterOverrides: {
+      company: 'Guangzhou Guanzhi New Materials Technology Co., Ltd.',
+      title: 'MATERIAL SAFETY DATA SHEET',
+      version: 'V1.0',
+      customFileNamePattern: '{model} msds_EN 冠志.docx',
+    },
+    fieldOverrides: {
+      supplier_name: 'Guangzhou Guanzhi New Materials Technology Co., Ltd.',
+    },
   },
 ];
+export const TEMPLATE_BASELINES = [
+  {
+    id: 'baseline_cn_guanzhi',
+    label: '中文基准 (CN 冠志)',
+    displayName: '正式模板 · CN 冠志 (国标 GHS)',
+    templateFile: '正式模板_MSDS_CN_冠志(1).docx',
+    language: 'CN',
+    entity: '冠志',
+    defaultFileNamePattern: '{model} msds_CN 冠志.docx',
+  },
+  {
+    id: 'baseline_en_guanzhi',
+    label: '英文基准 (EN 冠志)',
+    displayName: '正式模板 · EN 冠志 (OSHA GHS)',
+    templateFile: '正式模板_MSDS_EN_冠志(1).docx',
+    language: 'EN',
+    entity: '冠志',
+    defaultFileNamePattern: '{model} msds_EN 冠志.docx',
+  },
+];
+
 export const SYSTEM_BUILTIN_PRESETS = SYSTEM_DEFAULT_PRESETS;
 
 export class PresetStore {
@@ -2217,11 +2362,49 @@ export class PresetStore {
     return JSON.parse(JSON.stringify(SYSTEM_DEFAULT_PRESETS));
   }
 
-  static createPreset(name = '新建自定义预设', targetTemplate = 'CN 冠志') {
+  static async fetchPresetsFromApi() {
+    try {
+      if (typeof fetch !== 'undefined') {
+        const resp = await fetch('/api/msds/presets');
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data && data.success && Array.isArray(data.presets) && data.presets.length > 0) {
+            const list = data.presets.map((p) => ({
+              id: p.id,
+              name: p.name,
+              entity: p.entity,
+              language: p.language,
+              targetTemplate: p.target_template || (p.language === 'en' ? `EN ${p.entity === 'guocai' ? '国彩' : '冠志'}` : `CN ${p.entity === 'guocai' ? '国彩' : '冠志'}`),
+              isBuiltin: Boolean(p.is_builtin),
+              enabledForExport: Boolean(p.enabled),
+              headerFooterOverrides: {
+                company: p.footer_company || '',
+                title: p.header_title || '',
+                customFileNamePattern: p.file_name_template || '',
+              },
+              fieldOverrides: p.company_info || {},
+            }));
+            this.savePresets(list);
+            return list;
+          }
+        }
+      }
+    } catch (e) {
+      // offline or backend API inactive, gracefully keep local presets
+    }
+    return null;
+  }
+
+  static createPreset(name = '新建自定义预设', baselineIdOrTemplate = 'baseline_cn_guanzhi') {
+    const baseline = TEMPLATE_BASELINES.find((b) => b.id === baselineIdOrTemplate)
+      || (baselineIdOrTemplate.includes('EN') ? TEMPLATE_BASELINES[1] : TEMPLATE_BASELINES[0]);
     return {
       id: `preset_${Date.now()}`,
       name: (name || '新建自定义预设').trim(),
-      targetTemplate: targetTemplate || 'CN 冠志',
+      baselineId: baseline.id,
+      language: baseline.language,
+      entity: baseline.entity,
+      targetTemplate: `${baseline.language} ${baseline.entity}`,
       isBuiltin: false,
       enabledForExport: true,
       headerFooterOverrides: {},
@@ -2230,13 +2413,16 @@ export class PresetStore {
   }
 
   static savePresets(presets) {
+    let saved = false;
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.setItem(this.STORAGE_KEY, JSON.stringify(presets));
+        saved = true;
       }
     } catch (e) {
       console.warn('Failed to save presets to localStorage', e);
     }
+    return saved;
   }
 
   static _mergeWithBuiltins(userList) {
@@ -2244,6 +2430,11 @@ export class PresetStore {
     for (const b of SYSTEM_BUILTIN_PRESETS) {
       if (!result.some((p) => p.id === b.id)) {
         result.push(JSON.parse(JSON.stringify(b)));
+      }
+    }
+    for (const p of result) {
+      if (!p.baselineId) {
+        p.baselineId = (p.language === 'EN' || p.targetTemplate?.includes('EN')) ? 'baseline_en_guanzhi' : 'baseline_cn_guanzhi';
       }
     }
     return result;
@@ -2311,4 +2502,52 @@ export function applyPresetPriorityOverlay(baseEngine, preset, targetEngine) {
   updateHeaderFooterData(targetEngine, mergedHf);
 
   return appliedCount;
+}
+
+
+export class DraftStore {
+  static STORAGE_KEY = 'msds_editor_drafts_v1';
+
+  static loadAllDraftsMeta() {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const raw = window.localStorage.getItem(this.STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn('Failed to load drafts meta from localStorage', e);
+    }
+    return {};
+  }
+
+  static saveDraftMeta(baselineId, meta) {
+    if (!baselineId) return;
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const all = this.loadAllDraftsMeta();
+        all[baselineId] = {
+          ...all[baselineId],
+          ...meta,
+          baselineId,
+          updatedAt: Date.now(),
+        };
+        window.localStorage.setItem(this.STORAGE_KEY, JSON.stringify(all));
+      }
+    } catch (e) {
+      console.warn('Failed to save draft meta to localStorage', e);
+    }
+  }
+
+  static clearDraftMeta(baselineId) {
+    if (!baselineId) return;
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const all = this.loadAllDraftsMeta();
+        delete all[baselineId];
+        window.localStorage.setItem(this.STORAGE_KEY, JSON.stringify(all));
+      }
+    } catch (e) {
+      console.warn('Failed to clear draft meta', e);
+    }
+  }
 }

@@ -1,0 +1,458 @@
+[
+  {
+    "model": "EP-1702",
+    "sections": [
+      {
+        "section": 1,
+        "title": "1.物料及供应商标识",
+        "autoRows": 10,
+        "manRows": 10,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 2,
+        "title": "2.危险性概述",
+        "autoRows": 6,
+        "manRows": 6,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 3,
+        "title": "3. 成分/组成资料",
+        "autoRows": 7,
+        "manRows": 7,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 4,
+        "title": "4.急救措施",
+        "autoRows": 6,
+        "manRows": 6,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 5,
+        "title": "5.消防措施",
+        "autoRows": 5,
+        "manRows": 5,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 6,
+        "title": "6.意外泄漏措施",
+        "autoRows": 4,
+        "manRows": 4,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 7,
+        "title": "7.操作和储存",
+        "autoRows": 3,
+        "manRows": 3,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 8,
+        "title": "8.接触控制/个人防护",
+        "autoRows": 12,
+        "manRows": 12,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 9,
+        "title": "9. 物理和化学特性",
+        "autoRows": 20,
+        "manRows": 20,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 10,
+        "title": "10.稳定性和反应性",
+        "autoRows": 4,
+        "manRows": 4,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 11,
+        "title": "11.毒性资料",
+        "autoRows": 2,
+        "manRows": 2,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 12,
+        "title": "12.生态信息",
+        "autoRows": 4,
+        "manRows": 4,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 13,
+        "title": "13. 处理注意事项",
+        "autoRows": 4,
+        "manRows": 4,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 14,
+        "title": "14. 运输信息",
+        "autoRows": 5,
+        "manRows": 5,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 15,
+        "title": "15. 法规信息",
+        "autoRows": 9,
+        "manRows": 9,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 16,
+        "title": "16. 其他信息",
+        "autoRows": 2,
+        "manRows": 2,
+        "rowDelta": 0,
+        "cellDifferences": []
+      }
+    ],
+    "cantSplitCount": 0,
+    "drawingsCount": 0,
+    "mediaFilesCount": 0,
+    "differences": []
+  },
+  {
+    "model": "EP-1704",
+    "sections": [
+      {
+        "section": 1,
+        "title": "1.物料及供应商标识",
+        "autoRows": 10,
+        "manRows": 10,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 2,
+        "title": "2.危险性概述",
+        "autoRows": 6,
+        "manRows": 6,
+        "rowDelta": 0,
+        "cellDifferences": [
+          {
+            "row": 2,
+            "col": 0,
+            "autoText": "2.1  物质或混合物分类：",
+            "manText": "2.1  GHS危险性类别："
+          },
+          {
+            "row": 3,
+            "col": 1,
+            "autoText": "GHS-象形图 丙二醇甲醚\n危害性说明：\nH412 对水生生物有害并具有长期持续影响。",
+            "manText": "GHS-象形图 丙二醇甲醚\n危害性说明:\nH412 对水生生物有害并具有长期持续影响。"
+          }
+        ]
+      },
+      {
+        "section": 3,
+        "title": "3. 成分/组成资料",
+        "autoRows": 7,
+        "manRows": 7,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 4,
+        "title": "4.急救措施",
+        "autoRows": 6,
+        "manRows": 6,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 5,
+        "title": "5.消防措施",
+        "autoRows": 5,
+        "manRows": 5,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 6,
+        "title": "6.意外泄漏措施",
+        "autoRows": 4,
+        "manRows": 4,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 7,
+        "title": "7.操作和储存",
+        "autoRows": 3,
+        "manRows": 3,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 8,
+        "title": "8.接触控制/个人防护",
+        "autoRows": 12,
+        "manRows": 12,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 9,
+        "title": "9. 物理和化学特性",
+        "autoRows": 20,
+        "manRows": 20,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 10,
+        "title": "10.稳定性和反应性",
+        "autoRows": 4,
+        "manRows": 4,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 11,
+        "title": "11.毒性资料",
+        "autoRows": 2,
+        "manRows": 2,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 12,
+        "title": "12.生态信息",
+        "autoRows": 4,
+        "manRows": 4,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 13,
+        "title": "13. 处理注意事项",
+        "autoRows": 4,
+        "manRows": 4,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 14,
+        "title": "14. 运输信息",
+        "autoRows": 5,
+        "manRows": 5,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 15,
+        "title": "15. 法规信息",
+        "autoRows": 9,
+        "manRows": 9,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 16,
+        "title": "16. 其他信息",
+        "autoRows": 2,
+        "manRows": 2,
+        "rowDelta": 0,
+        "cellDifferences": []
+      }
+    ],
+    "cantSplitCount": 0,
+    "drawingsCount": 0,
+    "mediaFilesCount": 0,
+    "differences": []
+  },
+  {
+    "model": "PU-2702",
+    "sections": [
+      {
+        "section": 1,
+        "title": "1.物料及供应商标识",
+        "autoRows": 10,
+        "manRows": 10,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 2,
+        "title": "2.危险性概述",
+        "autoRows": 6,
+        "manRows": 2,
+        "rowDelta": 4,
+        "cellDifferences": [
+          {
+            "row": 1,
+            "col": 0,
+            "autoText": "物质或混合物分类",
+            "manText": "物质或混合物分类\n2.1 物质或混合物的分类\n    GHS危险性类别:\n    根据GHS不属于危害化学品\n2.2 标签要素\n    GHS-象形图 \n    根据GHS不属于危害化学品\n2.3 其他危险 无适用资料。"
+          }
+        ]
+      },
+      {
+        "section": 3,
+        "title": "3. 成分/组成资料",
+        "autoRows": 8,
+        "manRows": 8,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 4,
+        "title": "4.急救措施",
+        "autoRows": 6,
+        "manRows": 6,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 5,
+        "title": "5.消防措施",
+        "autoRows": 5,
+        "manRows": 5,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 6,
+        "title": "6.意外泄漏措施",
+        "autoRows": 4,
+        "manRows": 4,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 7,
+        "title": "7.操作和储存",
+        "autoRows": 3,
+        "manRows": 3,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 8,
+        "title": "8.接触控制/个人防护",
+        "autoRows": 12,
+        "manRows": 12,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 9,
+        "title": "9. 物理和化学特性",
+        "autoRows": 20,
+        "manRows": 20,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 10,
+        "title": "10.稳定性和反应性",
+        "autoRows": 4,
+        "manRows": 4,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 11,
+        "title": "11.毒性资料",
+        "autoRows": 17,
+        "manRows": 17,
+        "rowDelta": 0,
+        "cellDifferences": [
+          {
+            "row": 15,
+            "col": 0,
+            "autoText": "11.11 吸入危险：",
+            "manText": "11.11  吸入危险："
+          },
+          {
+            "row": 16,
+            "col": 0,
+            "autoText": "11.12 附加信息：",
+            "manText": "11.12  吸入危险："
+          },
+          {
+            "row": 16,
+            "col": 1,
+            "autoText": "CMR评估\n聚氨酯分散体\n致癌性：无数据资料。\n致突变性：基于现有数据，未满足分类标准。\n致畸性：无数据资料。\n生殖毒性/生育力：无数据资料。",
+            "manText": "聚氨酯分散体\n致癌性：无数据资料。\n致突变性：基于现有数据，未满足分类标准。\n致畸性：无数据资料。\n生殖毒性/生育力：无数据资料。"
+          }
+        ]
+      },
+      {
+        "section": 12,
+        "title": "12.生态信息",
+        "autoRows": 4,
+        "manRows": 4,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 13,
+        "title": "13. 处理注意事项",
+        "autoRows": 4,
+        "manRows": 4,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 14,
+        "title": "14. 运输信息",
+        "autoRows": 5,
+        "manRows": 5,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 15,
+        "title": "15. 法规信息",
+        "autoRows": 9,
+        "manRows": 9,
+        "rowDelta": 0,
+        "cellDifferences": []
+      },
+      {
+        "section": 16,
+        "title": "16. 其他信息",
+        "autoRows": 2,
+        "manRows": 2,
+        "rowDelta": 0,
+        "cellDifferences": []
+      }
+    ],
+    "cantSplitCount": 0,
+    "drawingsCount": 0,
+    "mediaFilesCount": 0,
+    "differences": []
+  },
+  {
+    "model": "PU-303C",
+    "cantSplitCount": 0,
+    "drawingsCount": 1,
+    "mediaFilesCount": 1
+  }
+]

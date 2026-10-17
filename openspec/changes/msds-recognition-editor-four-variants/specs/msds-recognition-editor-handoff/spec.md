@@ -22,7 +22,7 @@ The system SHALL let a user start template editing from the currently recognized
 
 ### Requirement: Review source-to-template mappings before generation
 
-The system MUST show which source records were mapped, merged, omitted, or remain unresolved. It MUST NOT guess a target from row position alone, silently drop meaningful text, or populate a template example as a product fact. Unresolved or conflicting facts MUST block the four-variant export until the user resolves them or explicitly records an allowed source-only/omission disposition.
+The system MUST show which source records were mapped, merged, omitted, or remain unresolved. It MUST NOT guess a target from row position alone, silently drop meaningful text, or populate a template example as a product fact. Unresolved or conflicting facts MUST block export of the affected target draft until the user resolves them or explicitly records an allowed source-only/omission disposition.
 
 #### Scenario: A unique source label maps to a template slot
 
@@ -32,7 +32,7 @@ The system MUST show which source records were mapped, merged, omitted, or remai
 #### Scenario: A source field is ambiguous or unmatched
 
 - **WHEN** a source field has no unique registered target or conflicts with another source value
-- **THEN** the review list identifies its source Section and content, leaves the target unmodified, and prevents batch export
+- **THEN** the review list identifies its source Section and content, leaves the target unmodified, and prevents export of that affected target draft
 
 #### Scenario: Suppress source-absent template examples
 
@@ -51,11 +51,11 @@ The handoff MUST preserve the source's logical value boundaries, meaningful line
 #### Scenario: A source image or structured endpoint cannot be mapped
 
 - **WHEN** a source image, merged cell, nested table, or structured endpoint has no safe target representation
-- **THEN** the system preserves the source evidence and marks the item unresolved so export is blocked until it is handled
+- **THEN** the system preserves the source evidence and marks the item unresolved so export of that affected target draft is blocked until it is handled
 
 ### Requirement: Require reviewed English values
 
-For an English output derived from a Chinese source, every populated factual value MUST be supplied as a reviewed translation of its mapped source fact. The system MUST NOT copy Chinese text into an English template or infer a translation from a template example.
+For an English output derived from a Chinese source, every populated factual value MUST be supplied as a reviewed translation of its mapped source fact in an independently saved target-baseline draft. The system MUST NOT copy Chinese text into an English template or infer a translation from a template example. This requirement applies to the selected target draft; unprepared unrelated baselines do not prevent export of independently completed drafts.
 
 #### Scenario: English translation is reviewed
 
@@ -65,4 +65,4 @@ For an English output derived from a Chinese source, every populated factual val
 #### Scenario: English translation is incomplete
 
 - **WHEN** one or more required English values are missing or unreviewed
-- **THEN** the system identifies those fields and blocks the four-variant export
+- **THEN** the system identifies those fields and blocks that unprepared target draft and its presets; other independently completed selected baselines remain eligible

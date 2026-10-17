@@ -1,0 +1,77 @@
+﻿=== pre-change state 2026-10-17T23:19:32.7273858+08:00 ===
+repo: F:\docker\projects\Msds-Engine
+staging source: MSDS-Engine-v1.5.0-Complete-20261017.zip (re-extracted, 2098 files)
+
+--- git ---
+978416620d2da677b4eb7baca95a3e43c0f22734
+9784166 chore(release): v1.5.0 - Configurable Cell Permissions & Multi-Template Alignment
+ M web/package-lock.json
+?? openspec/changes/docker-deployment-source-sync/
+?? scratch/check_2341_output.mjs
+?? scratch/check_annots.mjs
+?? scratch/deep_compare_live.mjs
+?? scratch/review_bundle_extracted/
+?? web/check_2341_output.mjs
+?? web/compare_truth.mjs
+?? web/deep_compare_live.mjs
+
+--- image ---
+sha256:308ba41d6d3c9f63c85ef667191e8f5738e8d723fc565c33f6930e6b1c6affc6
+2026-10-11T13:31:45.308546963Z
+
+--- container src (normalized md5) ---
+version.js                 a7e3763ea7a392c7b9c2ec4febe3e4ca
+main.js                    5840434e3a8cf9599ca0c59ad98e6e37
+smart-matching.js          7a0d604bbbb48d0e53760913a56b80b9
+styles.css                 93b5753aff86368f553426fcf63a20cd
+docx-engine.js             79f74daca77486d6f3abe73180783214
+msds-api-controller.js     be9936a5fc1cadb9dec344625a0f7af5
+render-utils.js            160499d7e1e2507d47b76240ba7b6633
+msds-db.js                 298800502ada70ba0af8750cbaabfd31
+
+--- host live db (container view) ---
+1ee04a91feacf93514bbcede219970ed  /app/web/data/msds_repo.db
+
+--- host top-level ---
+.agents
+.git
+openspec
+output
+scratch
+scripts
+web
+_rollback
+覆写模块
+识别模块
+识别结果
+问题研究报告
+.dockerignore
+.gitignore
+compare_msds.mjs
+docker-compose.yml
+docker-start.bat
+Dockerfile
+MSDS匹配规则体系_全局与局部深度辨析报告.md
+MSDS深度匹配规则_全局体系报告.md
+MSDS覆写全局约束体系与八格式规范报告.md
+package.json
+README.md
+test_cell_editability.mjs
+test_matching_gt.mjs
+启动Agent-API服务.bat
+启动Web工作台.bat
+
+--- output files ---
+annotations.ndjson
+compare_msds.mjs
+comparison_report.txt
+comparison_report_utf8.txt
+direct_zip_extracted_pea.docx
+manifest.json
+matching-slots.ndjson
+PEA-4139 msds_CN 冠志.docx
+review-summary.md
+review_bundle_pea.docx
+section-summary.json
+source-facts.ndjson
+user_correct_2341.docx

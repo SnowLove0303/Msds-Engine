@@ -330,7 +330,7 @@ export function renderEditorCell(record, row, cell, tableWidth, fallbackGrid = f
     }).join('');
 
     const placeholder = isPresetMode ? '留空则继承普通模式值…' : '点击输入值…';
-    const cellValue = cell.valueText || '';
+    const cellValue = ((cell.images?.length || 0) > 0 && cell.valueText === '[象形图]') ? '' : (cell.valueText || '');
     const hasValue = Boolean(cellValue.trim());
 
     // 值清空按钮：普通模式与预设模式均支持

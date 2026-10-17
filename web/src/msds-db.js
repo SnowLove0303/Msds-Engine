@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
+import { SYSTEM_DEFAULT_PRESETS } from './docx-engine.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,7 +61,37 @@ function initTables(db) {
     CREATE INDEX IF NOT EXISTS idx_records_status ON msds_records(status);
     CREATE INDEX IF NOT EXISTS idx_records_model ON msds_records(model);
     CREATE INDEX IF NOT EXISTS idx_records_updated_at ON msds_records(updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS presets (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      baseline_id TEXT DEFAULT 'baseline_cn_guanzhi',
+      entity TEXT DEFAULT '国彩',
+      language TEXT DEFAULT 'CN',
+      target_template TEXT DEFAULT 'CN 国彩',
+      is_builtin INTEGER DEFAULT 0,
+      enabled_for_export INTEGER DEFAULT 1,
+      header_footer_json TEXT DEFAULT '{}',
+      field_overrides_json TEXT DEFAULT '{}',
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_presets_entity ON presets(entity);
+    CREATE INDEX IF NOT EXISTS idx_presets_language ON presets(language);
   `);
+
+  try {
+    db.exec("ALTER TABLE presets ADD COLUMN baseline_id TEXT DEFAULT 'baseline_cn_guanzhi';");
+  } catch {
+    // column already exists
+  }
+  try {
+    db.exec("CREATE INDEX IF NOT EXISTS idx_presets_baseline_id ON presets(baseline_id);");
+    db.exec("UPDATE presets SET baseline_id = 'baseline_en_guanzhi' WHERE id IN ('preset_guocai_en', 'preset_guanzhi_en') OR language = 'EN';");
+  } catch {
+    // ignore
+  }
+  seedDefaultPresets(db);
 }
 
 export function serializeRawFacts(records) {
@@ -388,4 +419,155 @@ export function getRepoStats() {
     annotatedCount: annotatedStmt.get()?.count || 0,
     batchCount: batchStmt.get()?.count || 0,
   };
+}
+
+// ============================================================
+// 预设库持久化管理 (Presets Database Management)
+// ============================================================
+
+export function seedDefaultPresets(db = getDb()) {
+  try {
+    const countStmt = db.prepare('SELECT COUNT(*) AS count FROM presets');
+    const count = countStmt.get()?.count || 0;
+    if (count === 0) {
+      const insertStmt = db.prepare(`
+        INSERT INTO presets (
+          id, name, baseline_id, entity, language, target_template,
+          is_builtin, enabled_for_export,
+          header_footer_json, field_overrides_json, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      const now = Date.now();
+      for (const p of SYSTEM_DEFAULT_PRESETS) {
+        insertStmt.run(
+          p.id,
+          p.name,
+          p.baselineId || (p.language === 'EN' ? 'baseline_en_guanzhi' : 'baseline_cn_guanzhi'),
+          p.entity || '国彩',
+          p.language || 'CN',
+          p.targetTemplate || 'CN 国彩',
+          p.isBuiltin ? 1 : 0,
+          p.enabledForExport ? 1 : 0,
+          JSON.stringify(p.headerFooterOverrides || {}),
+          JSON.stringify(p.fieldOverrides || {}),
+          now
+        );
+      }
+    }
+  } catch (e) {
+    console.warn('seedDefaultPresets error:', e);
+  }
+}
+
+export function listPresets({ baselineId, entity, language, enabledOnly } = {}) {
+  const db = getDb();
+  let sql = 'SELECT * FROM presets WHERE 1=1';
+  const params = [];
+
+  if (baselineId && baselineId !== 'all') {
+    sql += ' AND baseline_id = ?';
+    params.push(baselineId);
+  }
+
+  if (entity && entity !== 'all') {
+    sql += ' AND entity = ?';
+    params.push(entity);
+  }
+  if (language && language !== 'all') {
+    sql += ' AND language = ?';
+    params.push(language.toUpperCase());
+  }
+  if (enabledOnly) {
+    sql += ' AND enabled_for_export = 1';
+  }
+  sql += ' ORDER BY is_builtin DESC, updated_at DESC';
+
+  const stmt = db.prepare(sql);
+  const rows = stmt.all(...params);
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    baselineId: r.baseline_id || (r.language === 'EN' ? 'baseline_en_guanzhi' : 'baseline_cn_guanzhi'),
+    entity: r.entity,
+    language: r.language,
+    targetTemplate: r.target_template,
+    isBuiltin: Boolean(r.is_builtin),
+    enabledForExport: Boolean(r.enabled_for_export),
+    headerFooterOverrides: JSON.parse(r.header_footer_json || '{}'),
+    fieldOverrides: JSON.parse(r.field_overrides_json || '{}'),
+    updatedAt: r.updated_at,
+  }));
+}
+
+export function getPresetById(id) {
+  const db = getDb();
+  const stmt = db.prepare('SELECT * FROM presets WHERE id = ?');
+  const r = stmt.get(id);
+  if (!r) return null;
+
+  return {
+    id: r.id,
+    name: r.name,
+    baselineId: r.baseline_id || (r.language === 'EN' ? 'baseline_en_guanzhi' : 'baseline_cn_guanzhi'),
+    entity: r.entity,
+    language: r.language,
+    targetTemplate: r.target_template,
+    isBuiltin: Boolean(r.is_builtin),
+    enabledForExport: Boolean(r.enabled_for_export),
+    headerFooterOverrides: JSON.parse(r.header_footer_json || '{}'),
+    fieldOverrides: JSON.parse(r.field_overrides_json || '{}'),
+    updatedAt: r.updated_at,
+  };
+}
+
+export function savePreset(data) {
+  const db = getDb();
+  const now = Date.now();
+  const id = data.id || `preset_custom_${now}`;
+  const name = data.name || '新建自定义预设';
+  const baselineId = data.baselineId || (data.language === 'EN' || data.targetTemplate?.includes('EN') ? 'baseline_en_guanzhi' : 'baseline_cn_guanzhi');
+  const entity = data.entity || '国彩';
+  const language = (data.language || 'CN').toUpperCase();
+  const targetTemplate = data.targetTemplate || `${language} ${entity}`;
+  const isBuiltin = data.isBuiltin ? 1 : 0;
+  const enabledForExport = data.enabledForExport !== false ? 1 : 0;
+  const hfJson = JSON.stringify(data.headerFooterOverrides || {});
+  const fieldsJson = JSON.stringify(data.fieldOverrides || {});
+
+  const stmt = db.prepare(`
+    INSERT INTO presets (
+      id, name, baseline_id, entity, language, target_template,
+      is_builtin, enabled_for_export,
+      header_footer_json, field_overrides_json, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      name = excluded.name,
+      baseline_id = excluded.baseline_id,
+      entity = excluded.entity,
+      language = excluded.language,
+      target_template = excluded.target_template,
+      enabled_for_export = excluded.enabled_for_export,
+      header_footer_json = excluded.header_footer_json,
+      field_overrides_json = excluded.field_overrides_json,
+      updated_at = excluded.updated_at
+  `);
+
+  stmt.run(id, name, baselineId, entity, language, targetTemplate, isBuiltin, enabledForExport, hfJson, fieldsJson, now);
+  return getPresetById(id);
+}
+
+export function deletePreset(id) {
+  const db = getDb();
+  const existing = getPresetById(id);
+  if (!existing) {
+    throw new Error(`未找到 ID 为 ${id} 的预设`);
+  }
+  if (existing.isBuiltin) {
+    throw new Error('系统内置官方标准预设受只读保护，禁止删除');
+  }
+
+  const stmt = db.prepare('DELETE FROM presets WHERE id = ?');
+  stmt.run(id);
+  return { id, deleted: true };
 }

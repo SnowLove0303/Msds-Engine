@@ -1,3 +1,134 @@
+
+let lastActiveTriggerSelector = null;
+let lastFocusedModalControlSelector = null;
+const savedInertState = new Map();
+
+function recordModalTrigger(triggerEl) {
+  const el = triggerEl || document.activeElement;
+  if (!el) {
+    lastActiveTriggerSelector = null;
+    return;
+  }
+  if (el.id) {
+    lastActiveTriggerSelector = `#${el.id}`;
+  } else if (el.dataset?.action) {
+    const action = el.dataset.action;
+    const extra = el.dataset.presetId ? `[data-preset-id="${el.dataset.presetId}"]` :
+                  el.dataset.baselineId ? `[data-baseline-id="${el.dataset.baselineId}"]` :
+                  el.dataset.targetKey ? `[data-target-key="${el.dataset.targetKey}"]` : '';
+    lastActiveTriggerSelector = `${el.tagName.toLowerCase()}[data-action="${action}"]${extra}`;
+  } else {
+    lastActiveTriggerSelector = null;
+  }
+}
+
+function restoreModalTrigger() {
+  if (lastActiveTriggerSelector) {
+    const el = document.querySelector(lastActiveTriggerSelector);
+    if (el) {
+      try { el.focus(); return; } catch (_) {}
+    }
+  }
+}
+
+function focusFirstInModal(selector) {
+  setTimeout(() => {
+    const modal = document.querySelector(selector);
+    if (!modal) return;
+    const focusable = modal.querySelector('input:not([disabled]), button:not([disabled]):not(.modal-close), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') || modal.querySelector('.modal-close') || modal;
+    if (focusable) {
+      try {
+        focusable.focus();
+      } catch (_) {}
+    }
+  }, 60);
+}
+
+function applyModalInert() {
+  const root = document.querySelector('#app');
+  if (!root) return;
+  const topbar = root.querySelector('header.topbar');
+  const main = root.querySelector('main.page-shell');
+  [topbar, main].forEach((el) => {
+    if (el) {
+      if (!savedInertState.has(el)) {
+        savedInertState.set(el, el.hasAttribute('inert'));
+      }
+      el.setAttribute('inert', '');
+    }
+  });
+}
+
+function restoreModalInert() {
+  if (state.editor.exportModalOpen || state.editor.managerModalOpen || state.editor.versionModalOpen) {
+    return;
+  }
+  const root = document.querySelector('#app');
+  if (!root) return;
+  const topbar = root.querySelector('header.topbar');
+  const main = root.querySelector('main.page-shell');
+  [topbar, main].forEach((el) => {
+    if (el && savedInertState.has(el)) {
+      const hadInert = savedInertState.get(el);
+      if (hadInert) {
+        el.setAttribute('inert', '');
+      } else {
+        el.removeAttribute('inert');
+      }
+      savedInertState.delete(el);
+    }
+  });
+}
+
+function openUnifiedExportModal(triggerEl) {
+  recordModalTrigger(triggerEl);
+  state.editor.exportModalOpen = true;
+  lastFocusedModalControlSelector = null;
+  applyModalInert();
+  renderApp();
+  focusFirstInModal('.unified-export-dialog');
+}
+
+function closeUnifiedExportModal() {
+  state.editor.exportModalOpen = false;
+  lastFocusedModalControlSelector = null;
+  restoreModalInert();
+  renderApp();
+  restoreModalTrigger();
+}
+
+function openPresetManagerModal(triggerEl) {
+  recordModalTrigger(triggerEl);
+  state.editor.managerModalOpen = true;
+  lastFocusedModalControlSelector = null;
+  applyModalInert();
+  renderApp();
+  focusFirstInModal('.preset-manager-dialog');
+}
+
+function closePresetManagerModal() {
+  state.editor.managerModalOpen = false;
+  lastFocusedModalControlSelector = null;
+  restoreModalInert();
+  renderApp();
+  restoreModalTrigger();
+}
+
+function openVersionModal(triggerEl) {
+  recordModalTrigger(triggerEl);
+  state.editor.versionModalOpen = true;
+  applyModalInert();
+  renderApp();
+  focusFirstInModal('.version-modal-card');
+}
+
+function closeVersionModal() {
+  state.editor.versionModalOpen = false;
+  restoreModalInert();
+  renderApp();
+  restoreModalTrigger();
+}
+
 import { renderAsync } from 'docx-preview';
 import {
   addNoteRowAfter,
@@ -24,11 +155,13 @@ import {
   clearSectionValues,
   applyPresetPriorityOverlay,
   PresetStore,
+  DraftStore,
   getCellSemanticKey,
   findCellBySemanticKey,
   extractSemanticSnapshot,
   applySemanticOverrides,
   SYSTEM_BUILTIN_PRESETS,
+  TEMPLATE_BASELINES,
 } from './docx-engine.js';
 import {
   escapeHtml,
@@ -107,6 +240,8 @@ const state = {
   editor: {
     engine: null,
     template: 'CN 冠志',
+    currentBaselineId: 'baseline_cn_guanzhi',
+    drafts: {},
     selectedRecordId: null,
     selectedCellId: null,
     allowLabelEdit: false,
@@ -120,9 +255,20 @@ const state = {
     normalEngine: null,
     presets: PresetStore.loadPresets(),
     exportModalOpen: false,
+    exportConfig: {
+      formatDocx: true,
+      formatPdf: true,
+      langCn: true,
+      langEn: true,
+      includeGuanzhi: true,
+      includeGuocai: true,
+      customPresetIds: {},
+      isExporting: false,
+      exportProgress: '',
+    },
     managerModalOpen: false,
     versionModalOpen: false,
-    previewMode: 'source', // 'source' (默认源文档原件) | 'template' (当前模板排版)
+    previewMode: 'template', // 默认展示当前模板排版，开箱即用无需依赖源文件
     zoomScale: 'fit',
     isWidePreview: false,
   },
@@ -279,7 +425,7 @@ function toastMarkup() {
 function emptyWorkspace(kind) {
   const isInspect = kind === 'inspect';
   return `
-    <section class="empty-workspace" ${isInspect ? 'data-dropzone="inspect"' : ''}>
+    <section class="empty-workspace ${isInspect ? 'empty-workspace-inspect' : ''}" ${isInspect ? 'data-empty-workspace="inspect" data-dropzone="inspect"' : ''}>
       <h1>${isInspect ? '导入 DOCX' : '选择模板'}</h1>
       <div class="empty-actions">
         ${isInspect ? '<button class="button button-primary" data-action="pick-inspect">选择 DOCX</button><button class="button button-quiet" data-action="load-sample">载入样例</button>' : '<button class="button button-primary" data-action="load-editor">CN 冠志</button><button class="button button-quiet" data-action="load-en-editor">EN 冠志</button>'}
@@ -455,110 +601,432 @@ function getPresetExportFileName(preset, model) {
   return `${m} msds_${lang}_${cleanPresetName}.docx`;
 }
 
-function renderEditorBanner() {
+
+function getCurrentBaseline() {
+  return TEMPLATE_BASELINES.find((b) => b.id === state.editor.currentBaselineId) || TEMPLATE_BASELINES[0];
+}
+
+function ensureCurrentDraft() {
+  const currentBaseId = state.editor.currentBaselineId || 'baseline_cn_guanzhi';
+  if (!state.editor.drafts) state.editor.drafts = {};
+  if (!state.editor.drafts[currentBaseId] && state.editor.engine) {
+    state.editor.drafts[currentBaseId] = {
+      baselineId: currentBaseId,
+      engine: state.editor.isPresetEditing ? (state.editor.normalEngine || state.editor.engine) : state.editor.engine,
+      status: 'editing',
+      dirty: Boolean(state.editor.dirty),
+      selectedRecordId: state.editor.selectedRecordId,
+      customFileName: state.editor.customFileName || '',
+      updatedAt: Date.now(),
+    };
+  }
+}
+
+async function switchBaselineDraft(targetBaselineId) {
+  if (!targetBaselineId) return;
+  if (targetBaselineId === state.editor.currentBaselineId && state.editor.engine) return;
+
+  // 1. 暂存当前基准草稿
+  if (state.editor.engine) {
+    const curId = state.editor.currentBaselineId || 'baseline_cn_guanzhi';
+    const prevDraft = state.editor.drafts[curId] || {};
+    state.editor.drafts[curId] = {
+      ...prevDraft,
+      baselineId: curId,
+      engine: state.editor.isPresetEditing ? (state.editor.normalEngine || state.editor.engine) : state.editor.engine,
+      status: prevDraft.status === 'completed' && !state.editor.dirty ? 'completed' : 'editing',
+      dirty: Boolean(state.editor.dirty),
+      selectedRecordId: state.editor.selectedRecordId,
+      customFileName: state.editor.customFileName || '',
+      updatedAt: Date.now(),
+    };
+  }
+
+  // 退出预设编辑模式
   if (state.editor.isPresetEditing) {
-    const activePreset = state.editor.presets.find((x) => x.id === state.editor.editingPresetId) || state.editor.presets[0] || { id: 'preset_custom_1', name: '自定义预设 1', fieldOverrides: {} };
+    state.editor.isPresetEditing = false;
+    state.editor.editingPresetId = null;
+    state.editor.normalEngine = null;
+  }
+
+  // 2. 切换当前基准
+  state.editor.currentBaselineId = targetBaselineId;
+  const targetBaseline = TEMPLATE_BASELINES.find((b) => b.id === targetBaselineId) || TEMPLATE_BASELINES[0];
+
+  // 3. 恢复目标草稿或载入新底模
+  const targetDraft = state.editor.drafts[targetBaselineId];
+  if (targetDraft && targetDraft.engine) {
+    state.editor.engine = targetDraft.engine;
+    state.editor.selectedRecordId = targetDraft.selectedRecordId || firstSectionRecord(targetDraft.engine)?.id;
+    state.editor.dirty = Boolean(targetDraft.dirty);
+    state.editor.customFileName = targetDraft.customFileName || '';
+    state.editor.template = targetBaseline.displayName;
+    showToast(`已恢复【${targetBaseline.displayName}】已保存草稿。已编辑内容完好无损。`, 'info');
+  } else {
+    try {
+      const engine = await fetchTemplate(targetBaseline.displayName);
+      tableRecords(engine).forEach((record) => renumberRecord(record));
+      state.editor.engine = engine;
+      state.editor.selectedRecordId = firstSectionRecord(engine)?.id || null;
+      state.editor.dirty = false;
+      state.editor.customFileName = '';
+      state.editor.template = targetBaseline.displayName;
+      state.editor.drafts[targetBaselineId] = {
+        baselineId: targetBaselineId,
+        engine: engine,
+        status: 'editing',
+        dirty: false,
+        updatedAt: Date.now(),
+      };
+      showToast(`已载入【${targetBaseline.displayName}】底模。可独立编辑该基准内容。`, 'info');
+    } catch (err) {
+      showToast(`载入模板基准底模失败：${err.message}`, 'error');
+    }
+  }
+
+  renderApp();
+}
+
+function toggleBaselineComplete() {
+  ensureCurrentDraft();
+  const draft = state.editor.drafts[state.editor.currentBaselineId];
+  if (!draft) return;
+  if (draft.status === 'completed') {
+    draft.status = 'editing';
+    DraftStore.saveDraftMeta(state.editor.currentBaselineId, draft);
+    showToast('当前模板基准已恢复标记为【编辑中】。', 'info');
+  } else {
+    draft.status = 'completed';
+    draft.dirty = false;
+    DraftStore.saveDraftMeta(state.editor.currentBaselineId, draft);
+    showToast('🎉 当前模板基准已确认标为【已完成】，具备导出资格！', 'success');
+  }
+  renderApp();
+}
+
+function renderBaselineSelectorMarkup() {
+  ensureCurrentDraft();
+  const currentDraft = state.editor.drafts[state.editor.currentBaselineId];
+  const isCompleted = currentDraft?.status === 'completed';
+  return `
+    <div class="baseline-switch-group" title="切换模板基准；各基准拥有独立编辑草稿，切换时自动保存与恢复">
+      <label for="baseline-select" class="baseline-label">模板基准：</label>
+      <select id="baseline-select" class="baseline-dropdown">
+        ${TEMPLATE_BASELINES.map((b) => {
+          const d = state.editor.drafts[b.id];
+          const sText = !d || d.status === 'unstarted' ? '未开始' : (d.status === 'completed' ? '✓ 已完成' : '编辑中');
+          return `<option value="${escapeHtml(b.id)}" ${b.id === state.editor.currentBaselineId ? 'selected' : ''}>
+            ${escapeHtml(b.displayName)} [${sText}]
+          </option>`;
+        }).join('')}
+      </select>
+      <button type="button" class="button button-xs btn-toggle-baseline-complete ${isCompleted ? 'is-completed' : ''}" data-action="toggle-baseline-complete" title="切换当前模板基准是否完成编辑（仅已编辑基准可导出）">
+        ${isCompleted ? '✓ 已完成' : '○ 标为已完成'}
+      </button>
+    </div>
+  `;
+}
+
+function renderEditorBanner() {
+  const curBaseId = state.editor.currentBaselineId || 'baseline_cn_guanzhi';
+  const basePresets = (state.editor.presets || []).filter((p) => {
+    const bId = p.baselineId || (p.language === 'EN' ? 'baseline_en_guanzhi' : 'baseline_cn_guanzhi');
+    return bId === curBaseId;
+  });
+
+  if (state.editor.isPresetEditing) {
+    const activePreset = basePresets.find((x) => x.id === state.editor.editingPresetId) || basePresets[0] || (state.editor.presets || []).find((x) => x.id === state.editor.editingPresetId) || { id: 'preset_custom_1', name: '自定义预设 1', baselineId: curBaseId, fieldOverrides: {} };
     return `
-      <div class="preset-mode-banner">
+      <div class="preset-mode-banner" data-toolbar-scope="editor-banner">
         <div class="preset-banner-title">
-          <span class="preset-banner-badge">⚙️ 预设局部覆写模式</span>
+          <span class="preset-banner-badge">预设模式</span>
           <div class="preset-name-edit-group">
-            <label for="editing-preset-name-input" class="preset-name-label">当前预设名称：</label>
+            <label for="editing-preset-name-input" class="preset-name-label">预设名称：</label>
             <input
               id="editing-preset-name-input"
               class="preset-name-input"
               value="${escapeHtml(activePreset.name)}"
               placeholder="输入预设名称"
-              title="可直接修改此预设名称，保存时自动生效"
+              title="直接修改当前预设名称，保存后生效"
             />
           </div>
           <div class="preset-switch-group">
             <label for="switch-editing-preset-select" class="preset-switch-label">切换：</label>
             <select id="switch-editing-preset-select" class="preset-selector-dropdown">
-              ${state.editor.presets.map((p) => `
+              ${basePresets.map((p) => `
                 <option value="${escapeHtml(p.id)}" ${p.id === activePreset.id ? 'selected' : ''}>
                   ${escapeHtml(p.name)} (${Object.keys(p.fieldOverrides || {}).length}项覆写)
                 </option>
               `).join('')}
             </select>
           </div>
+          <div class="preset-status-wrap">
+            ${state.editor.dirty
+              ? '<span class="preset-status-indicator status-dirty" title="检测到未保存的字段覆写修改"><span class="status-dot dot-warn"></span>未保存修改</span>'
+              : '<span class="preset-status-indicator status-clean" title="所有修改已保存至预设"><span class="status-dot dot-clean"></span>已保存</span>'
+            }
+          </div>
         </div>
         <div class="preset-banner-actions">
-          <button type="button" class="button button-quiet button-sm btn-preset-new" data-action="create-new-preset" title="新建一个全新的空白预设">➕ 新建预设</button>
-          <button type="button" class="button button-quiet button-sm btn-preset-clone" data-action="save-as-new-preset" title="将当前编辑的覆写另存为新预设">📋 另存为新预设</button>
-          <button type="button" class="button button-quiet button-sm btn-preset-clear" data-action="clear-all-preset-overrides" title="清空本预设所有覆写字段，恢复全部留空继承">🧹 清空所有覆写</button>
-          <button type="button" class="button button-quiet button-sm btn-preset-delete" data-action="delete-current-preset" title="删除当前正在编辑的预设">🗑️ 删除此预设</button>
-          <button type="button" class="button button-quiet button-sm btn-preset-manage" data-action="open-preset-manager-modal" title="查看并管理所有已存预设">📑 预设管理</button>
-          <button type="button" class="button button-primary button-sm btn-preset-save" data-action="save-current-preset" title="保存对当前预设的覆写修改与名称">💾 保存预设</button>
-          <button type="button" class="button button-quiet button-sm btn-preset-exit" data-action="exit-preset-editing" title="退出预设编辑，返回普通物料文档编辑">↩️ 退出预设 (返回普通模式)</button>
+          <button type="button" class="button button-primary button-sm btn-preset-save" data-action="save-current-preset" title="保存对当前预设的覆写修改与名称">保存预设</button>
+          <button type="button" class="button button-secondary button-sm" data-action="save-as-new-preset" title="将当前编辑的覆写另存为新预设">另存为</button>
+          <button type="button" class="button button-danger-subtle button-sm" data-action="clear-all-preset-overrides" title="清空本预设所有覆写字段，恢复全部留空继承">清空覆写</button>
+          <button type="button" class="button button-quiet button-sm btn-preset-exit" data-action="exit-preset-editing" title="退出预设编辑，返回主物料文档编辑">返回主稿</button>
         </div>
       </div>
     `;
   }
+
+  const curDraft = state.editor.drafts[curBaseId];
+  const isDone = curDraft && curDraft.status === 'completed' && !curDraft.dirty;
+
   return `
-    <div class="normal-mode-banner">
+    <div class="normal-mode-banner" data-toolbar-scope="editor-banner">
       <div class="normal-banner-info">
-        <span class="normal-mode-indicator">当前模式：<strong>普通文档编辑</strong>（编辑此物料的具体主稿内容）</span>
-        <span class="normal-preset-count">已存预设：${state.editor.presets.length} 个</span>
+        <span class="normal-mode-indicator">基准模式：<strong>${escapeHtml(getCurrentBaseline()?.displayName || '当前基准')}</strong></span>
+        <span class="pill ${isDone ? 'pill-green' : 'pill-blue'}">${isDone ? '✓ 已就绪' : '编辑中'}</span>
+        <span class="normal-preset-count">${basePresets.length} 个专属预设</span>
       </div>
       <div class="normal-banner-actions">
-        <button class="button button-quiet button-xs btn-normal-enter-preset" data-action="enter-preset-mode" title="进入预设编辑模式，对 MSDS 整个模板进行局部覆写预设">⚙️ 进入预设编辑模式</button>
-        <button class="button button-quiet button-xs btn-normal-manager-presets" data-action="open-preset-manager-modal" title="查看、管理、新建或删除已存预设">📑 预设配置管理</button>
-        <button class="button button-quiet button-xs btn-normal-export-presets" data-action="open-preset-export-modal" title="勾选预设，局部优先级覆盖同步导出多版本 DOCX">📦 预设同步导出</button>
+        <button type="button" class="button button-secondary button-sm" data-action="enter-preset-mode" title="进入当前基准专属预设编辑模式">进入预设编辑</button>
+        <button type="button" class="button button-quiet button-sm" data-action="open-preset-manager-modal" title="查看与管理所有模板基准预设">预设管理</button>
       </div>
     </div>
   `;
 }
 
-function renderPresetExportModal() {
+function computeExportTargets() {
+  ensureCurrentDraft();
+  const cfg = state.editor.exportConfig;
+  const targets = [];
+
+  for (const b of TEMPLATE_BASELINES) {
+    const draft = state.editor.drafts[b.id];
+    // 严格规范：只有 status === 'completed' 且无未确认脏数据(!draft.dirty)，才具备就绪导出资格
+    const isReady = draft && draft.status === 'completed' && !draft.dirty && draft.engine;
+    if (!isReady) continue;
+
+    const baseEngine = draft.engine;
+    const baseModel = baseEngine?.headerFooterData?.model || state.review.session?.productModel || 'MSDS';
+
+    // 1. 基础草稿勾选
+    const baseKey = `${b.id}:base`;
+    if (cfg.selectedTargets?.[baseKey]) {
+      const baseClean = `${baseModel} msds_${b.language} ${b.entity}`;
+      if (cfg.formatDocx) {
+        targets.push({
+          baselineId: b.id,
+          baselineName: b.displayName,
+          type: 'base',
+          title: '基础底稿 (主版本)',
+          format: 'docx',
+          fileName: `${baseClean}.docx`,
+          docxFileName: `${baseClean}.docx`,
+          engine: baseEngine,
+        });
+      }
+      if (cfg.formatPdf) {
+        targets.push({
+          baselineId: b.id,
+          baselineName: b.displayName,
+          type: 'base',
+          title: '基础底稿 (主版本)',
+          format: 'pdf',
+          fileName: `${baseClean}.pdf`,
+          docxFileName: `${baseClean}.docx`,
+          engine: baseEngine,
+        });
+      }
+    }
+
+    // 2. 属于该基准的预设勾选
+    const bPresets = state.editor.presets.filter((p) => {
+      const pBaseId = p.baselineId || (p.language === 'EN' ? 'baseline_en_guanzhi' : 'baseline_cn_guanzhi');
+      return pBaseId === b.id;
+    });
+
+    for (const p of bPresets) {
+      const pKey = `${b.id}:${p.id}`;
+      if (cfg.selectedTargets?.[pKey]) {
+        let presetDocxName = '';
+        if (p.headerFooterOverrides?.customFileNamePattern) {
+          presetDocxName = p.headerFooterOverrides.customFileNamePattern.replace('{model}', baseModel);
+        } else {
+          const cleanPresetName = (p.name || '预设').replace(/[\\/:*?"<>|]/g, '_');
+          presetDocxName = `${baseModel} msds_${b.language}_${cleanPresetName}.docx`;
+        }
+        const baseClean = presetDocxName.replace(/\.docx$/i, '');
+
+        if (cfg.formatDocx) {
+          targets.push({
+            baselineId: b.id,
+            baselineName: b.displayName,
+            type: 'preset',
+            preset: p,
+            title: p.name,
+            format: 'docx',
+            fileName: `${baseClean}.docx`,
+            docxFileName: `${baseClean}.docx`,
+            engine: baseEngine,
+          });
+        }
+        if (cfg.formatPdf) {
+          targets.push({
+            baselineId: b.id,
+            baselineName: b.displayName,
+            type: 'preset',
+            preset: p,
+            title: p.name,
+            format: 'pdf',
+            fileName: `${baseClean}.pdf`,
+            docxFileName: `${baseClean}.docx`,
+            engine: baseEngine,
+          });
+        }
+      }
+    }
+  }
+
+  return targets;
+}
+
+function renderUnifiedExportModal() {
   if (!state.editor.exportModalOpen) return '';
-  const baseModel = state.editor.engine?.headerFooterData?.model || '';
-  const baseExportName = buildExportDocxName(state.editor.engine, {
-    customFileName: state.editor.customFileName,
-    templateName: state.editor.template,
-    sourcePreviewName: state.sourcePreview?.name,
-    productModel: baseModel,
-  });
+  ensureCurrentDraft();
+  const cfg = state.editor.exportConfig;
+  const targets = computeExportTargets();
+  const docxCount = targets.filter((t) => t.format === 'docx').length;
+  const pdfCount = targets.filter((t) => t.format === 'pdf').length;
 
   return `
-    <div class="modal-backdrop" data-backdrop="true" style="position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:9999;">
-      <div class="modal-card preset-export-dialog" style="background:#0b192c;border:1px solid rgba(91,214,210,.3);border-radius:12px;width:540px;max-width:92vw;box-shadow:0 20px 40px rgba(0,0,0,.6);overflow:hidden;">
-        <div class="modal-header" style="padding:14px 20px;border-bottom:1px solid rgba(142,177,214,.2);display:flex;justify-content:space-between;align-items:center;">
-          <div class="modal-title" style="font-weight:700;font-size:15px;color:#e2e8f0;display:flex;align-items:center;gap:8px;">
-            <span>📦</span> 同步覆写多版本批量导出
+    <div class="modal-backdrop" data-backdrop="true">
+      <div class="modal-card unified-export-dialog" role="dialog" aria-modal="true" aria-labelledby="export-modal-title" tabindex="-1">
+        <div class="modal-header">
+          <div id="export-modal-title" class="modal-title">
+            导出
           </div>
-          <button class="modal-close" data-action="close-preset-modal" style="background:transparent;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">×</button>
+          <button class="modal-close" data-action="close-unified-export-modal" type="button" aria-label="关闭">×</button>
         </div>
-        <div class="modal-body" style="padding:20px;">
-          <p style="color:#94a3b8;font-size:13px;margin:0 0 14px 0;line-height:1.5;">勾选需要同时导出的文档版本。系统将基于当前基准底稿，自动注入各版本专属的页眉页脚与字段覆写差量：</p>
-          <div class="preset-export-list">
-            <label class="preset-export-item active" style="cursor:default;">
-              <input type="checkbox" id="export-check-base" checked disabled style="margin-right:10px;accent-color:#0ea5e9;" />
-              <div class="preset-item-info" style="flex:1;">
-                <span class="preset-item-title">🌱 基准文档 (${escapeHtml(state.editor.template)})</span>
-                <span class="preset-item-filename">${escapeHtml(baseExportName)}</span>
+        <div class="export-modal-body">
+          <!-- 1. 交付格式选择 -->
+          <div class="export-section">
+            <div class="export-section-header">
+              <span class="export-section-title">1. 选择交付格式</span>
+              <div class="export-quick-links">
+                <button type="button" class="export-quick-link" data-action="quick-export-both-formats">全部 (Word+PDF)</button>
+                <button type="button" class="export-quick-link" data-action="quick-export-docx-only">仅 Word</button>
+                <button type="button" class="export-quick-link" data-action="quick-export-pdf-only">仅 PDF</button>
               </div>
-              <span class="preset-tag tag-inherited">底稿主版本</span>
-            </label>
-            ${state.editor.presets.map((p) => `
-              <label class="preset-export-item ${p.enabledForExport ? 'active' : ''}" style="cursor:pointer;">
-                <input type="checkbox" class="export-preset-check" data-preset-id="${escapeHtml(p.id)}" ${p.enabledForExport ? 'checked' : ''} style="margin-right:10px;accent-color:#0ea5e9;" />
-                <div class="preset-item-info" style="flex:1;">
-                  <span class="preset-item-title">${p.isBuiltin ? '🏢' : '⚙️'} ${escapeHtml(p.name)} [底模: ${escapeHtml(p.targetTemplate)}]</span>
-                  <span class="preset-item-filename">${escapeHtml(getPresetExportFileName(p, baseModel))}</span>
-                  <span class="preset-item-overrides-count">${Object.keys(p.fieldOverrides || {}).length} 处专属覆写字段</span>
-                </div>
-                <span class="preset-tag tag-override">衍生版本</span>
+            </div>
+            <div class="export-chip-group">
+              <label class="export-chip ${cfg.formatDocx ? 'active' : ''}">
+                <input type="checkbox" data-action="toggle-export-format" data-format="docx" ${cfg.formatDocx ? 'checked' : ''} />
+                <span>Word (.docx)</span>
               </label>
-            `).join('')}
+              <label class="export-chip ${cfg.formatPdf ? 'active' : ''}">
+                <input type="checkbox" data-action="toggle-export-format" data-format="pdf" ${cfg.formatPdf ? 'checked' : ''} />
+                <span>PDF (.pdf)</span>
+              </label>
+            </div>
           </div>
-          <div style="margin-top:14px;padding:10px 12px;background:rgba(14,165,233,.08);border:1px solid rgba(14,165,233,.2);border-radius:6px;font-size:12px;color:#7dd3fc;display:flex;align-items:center;gap:8px;">
-            <span>💡</span> 选中多个版本时，系统将逐个触发下载并同步打包为 ZIP 格式！
+
+          <!-- 2. 已就绪基准与版本 -->
+          <div class="export-section">
+            <div class="export-section-header">
+              <span class="export-section-title">2. 勾选交付基准与版本</span>
+            </div>
+            <div class="export-baseline-list">
+              ${TEMPLATE_BASELINES.map((b) => {
+                const draft = state.editor.drafts[b.id];
+                const isReady = draft && draft.status === 'completed' && !draft.dirty && draft.engine;
+                const bPresets = state.editor.presets.filter((p) => {
+                  const pBaseId = p.baselineId || (p.language === 'EN' ? 'baseline_en_guanzhi' : 'baseline_cn_guanzhi');
+                  return pBaseId === b.id;
+                });
+                const baseKey = `${b.id}:base`;
+
+                if (!isReady) {
+                  return `
+                    <div class="export-baseline-card is-unstarted">
+                      <div class="export-baseline-header">
+                        <span class="export-baseline-name">
+                          <strong>${escapeHtml(b.displayName)}</strong>
+                          <span class="pill pill-warn">未就绪 (草稿编辑中)</span>
+                        </span>
+                      </div>
+                      <p class="export-baseline-empty-tip">
+                        该基准草稿尚未标记为完成或包含未保存修改，已自动阻断导出。
+                      </p>
+                    </div>
+                  `;
+                }
+
+                return `
+                  <div class="export-baseline-card">
+                    <div class="export-baseline-header">
+                      <span class="export-baseline-name">
+                        <strong>${escapeHtml(b.displayName)}</strong>
+                        <span class="pill pill-green">✓ 已就绪</span>
+                      </span>
+                      <span class="export-subtext">含基础底稿与 ${bPresets.length} 个专属预设</span>
+                    </div>
+                    <div class="export-baseline-items">
+                      <label class="export-chip ${cfg.selectedTargets?.[baseKey] ? 'active' : ''}">
+                        <input type="checkbox" data-action="toggle-export-target" data-target-key="${baseKey}" ${cfg.selectedTargets?.[baseKey] ? 'checked' : ''} />
+                        <span>基础底稿 (主版本)</span>
+                      </label>
+                      ${bPresets.map((p) => {
+                        const pKey = `${b.id}:${p.id}`;
+                        return `
+                          <label class="export-chip ${cfg.selectedTargets?.[pKey] ? 'active' : ''}">
+                            <input type="checkbox" data-action="toggle-export-target" data-target-key="${pKey}" ${cfg.selectedTargets?.[pKey] ? 'checked' : ''} />
+                            <span>${escapeHtml(p.name)}</span>
+                          </label>
+                        `;
+                      }).join('')}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
           </div>
+
+          <!-- 3. 实时交付清单预览 -->
+          <div class="export-section">
+            <div class="export-section-header">
+              <span class="export-section-title">3. 交付清单预览 (${targets.length} 份)</span>
+              <span class="export-subtext">${docxCount} 份 Word · ${pdfCount} 份 PDF</span>
+            </div>
+            <div class="export-preview-box">
+              ${targets.length === 0 ? '<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:12px;">未勾选任何导出项，请在上方已就绪基准中勾选版本。</div>' : targets.map((t) => `
+                <div class="export-preview-row">
+                  <div class="export-preview-tags">
+                    <span class="export-pill-tag tag-entity">${escapeHtml(t.baselineName.split('·')[1]?.trim() || t.baselineName)}</span>
+                    <span class="export-pill-tag tag-cn">${escapeHtml(t.title)}</span>
+                    <span class="export-pill-tag ${t.format === 'docx' ? 'tag-docx' : 'tag-pdf'}">${t.format.toUpperCase()}</span>
+                  </div>
+                  <span class="export-preview-filename">${escapeHtml(t.fileName)}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          ${cfg.isExporting ? `
+            <div class="export-progress-bar">
+              <div class="export-spinner"></div>
+              <span>${escapeHtml(cfg.exportProgress || '正在构建交付物…')}</span>
+            </div>
+          ` : `
+            <div class="export-summary-bar">
+              <span>共 <strong>${targets.length}</strong> 份交付物，将打包为单一 ZIP 压缩包下载。</span>
+            </div>
+          `}
         </div>
-        <div class="modal-actions" style="padding:12px 20px;background:#081322;border-top:1px solid rgba(142,177,214,.15);display:flex;justify-content:flex-end;gap:10px;">
-          <button class="button button-quiet" data-action="close-preset-modal">取消</button>
-          <button class="button button-dark" data-action="confirm-batch-preset-export" style="background:#0ea5e9;color:#fff;border-color:#0284c7;">🚀 立即开始同步导出</button>
+        <div class="modal-actions">
+          <button type="button" class="button button-quiet" data-action="close-unified-export-modal" ${cfg.isExporting ? 'disabled' : ''}>取消</button>
+          <button type="button" class="button button-primary" data-action="confirm-unified-export" ${targets.length === 0 || cfg.isExporting ? 'disabled' : ''}>
+            ${cfg.isExporting ? '正在导出…' : '导出 ZIP'}
+          </button>
         </div>
       </div>
     </div>
@@ -567,46 +1035,60 @@ function renderPresetExportModal() {
 
 function renderPresetManagerModal() {
   if (!state.editor.managerModalOpen) return '';
+
   return `
-    <div class="modal-backdrop" data-backdrop="true" style="position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:9999;">
-      <div class="modal-card" style="background:#0b192c;border:1px solid rgba(91,214,210,.3);border-radius:12px;width:620px;max-width:92vw;box-shadow:0 20px 40px rgba(0,0,0,.6);overflow:hidden;">
-        <div class="modal-header" style="padding:14px 20px;border-bottom:1px solid rgba(142,177,214,.2);display:flex;justify-content:space-between;align-items:center;">
-          <div class="modal-title" style="font-weight:700;font-size:15px;color:#e2e8f0;display:flex;align-items:center;gap:8px;">
-            <span>📑</span> 预设配置管理中心
+    <div class="modal-backdrop" data-backdrop="true">
+      <div class="modal-card preset-manager-dialog" role="dialog" aria-modal="true" aria-labelledby="preset-modal-title" tabindex="-1">
+        <div class="modal-header">
+          <div id="preset-modal-title" class="modal-title">
+            预设管理
           </div>
-          <button class="modal-close" data-action="close-preset-modal" type="button" style="background:transparent;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">×</button>
+          <button class="modal-close" data-action="close-preset-modal" type="button" aria-label="关闭">×</button>
         </div>
-        <div class="modal-body" style="padding:20px;max-height:65vh;overflow-y:auto;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-            <p style="color:#94a3b8;font-size:13px;margin:0;line-height:1.5;">在此查看、切换编辑或删除系统所有衍生预设。预设支持独立覆写与命名：</p>
-            <button class="button button-quiet button-xs" data-action="create-new-preset" type="button" style="color:#34d399;border-color:rgba(52,211,153,.4);font-size:12px;white-space:nowrap;margin-left:12px;">➕ 新建预设</button>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:12px;">
-            ${state.editor.presets.map((p) => `
-              <div style="padding:12px 14px;background:rgba(15,23,42,.7);border:1px solid rgba(148,163,184,.2);border-radius:8px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                  <div>
-                    <strong style="color:#f1f5f9;font-size:13px;">${escapeHtml(p.name)}</strong>
-                    <span style="font-size:11px;color:#38bdf8;margin-left:6px;background:rgba(56,189,248,.1);padding:1px 6px;border-radius:3px;">${escapeHtml(p.targetTemplate)}</span>
-                    ${p.isBuiltin ? '<span style="font-size:10px;color:#94a3b8;margin-left:4px;">(系统初始)</span>' : ''}
+        <div class="modal-body">
+          ${TEMPLATE_BASELINES.map((b) => {
+            const bPresets = state.editor.presets.filter((p) => {
+              const pBaseId = p.baselineId || (p.language === 'EN' ? 'baseline_en_guanzhi' : 'baseline_cn_guanzhi');
+              return pBaseId === b.id;
+            });
+            const isCur = b.id === state.editor.currentBaselineId;
+            return `
+              <div class="preset-baseline-group">
+                <div class="preset-baseline-header">
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <strong style="color:var(--text-main);font-size:13px;">${escapeHtml(b.displayName)}</strong>
+                    ${isCur ? '<span class="pill pill-green">当前基准</span>' : ''}
+                    <span class="pill pill-blue">${bPresets.length} 个专属预设</span>
                   </div>
-                  <div style="display:flex;gap:6px;">
-                    <button class="button button-quiet button-xs" data-action="edit-preset-from-manager" data-preset-id="${escapeHtml(p.id)}" type="button" style="color:#38bdf8;font-size:11px;border-color:rgba(56,189,248,.35);" title="切换并直接进入该预设编辑模式">✏️ 进入编辑</button>
-                    <button class="button button-quiet button-xs" data-action="delete-preset" data-preset-id="${escapeHtml(p.id)}" type="button" style="color:#ef4444;font-size:11px;border-color:rgba(239,68,68,.35);" title="${state.editor.presets.length <= 1 ? '至少需保留一个预设，无法删除' : '删除此预设'}">🗑️ 删除</button>
-                  </div>
+                  <button class="button button-secondary button-xs" data-action="create-new-preset" data-baseline-id="${b.id}" type="button">+ 新建预设</button>
                 </div>
-                <div style="font-size:12px;color:#94a3b8;display:flex;flex-direction:column;gap:3px;">
-                  <div>发布主体：<span style="color:#e2e8f0;">${escapeHtml(p.headerFooterOverrides?.company || '同基准 (继承)')}</span></div>
-                  <div>命名规则：<code style="color:#5bd6d2;font-size:11px;">${escapeHtml(p.headerFooterOverrides?.customFileNamePattern || '标准命名')}</code></div>
-                  <div>覆写字段：<span style="color:#38bdf8;font-weight:600;">${Object.keys(p.fieldOverrides || {}).length} 项专属覆写</span></div>
+                <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+                  ${bPresets.length === 0 ? '<div style="font-size:12px;color:var(--text-secondary);padding:6px 0;">该基准下暂无自定义预设。</div>' : bPresets.map((p) => `
+                    <div class="preset-item-card">
+                      <div>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                          <strong style="color:var(--text-main);font-size:13px;">${escapeHtml(p.name)}</strong>
+                          ${p.isBuiltin ? '<span style="font-size:11px;color:var(--text-secondary);">(系统标准)</span>' : ''}
+                        </div>
+                        <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;">
+                          发布主体: <span>${escapeHtml(p.headerFooterOverrides?.company || '继承基准')}</span> · 
+                          专属覆写: <span style="color:var(--btn-primary-bg);font-weight:600;">${Object.keys(p.fieldOverrides || {}).length} 项</span>
+                        </div>
+                      </div>
+                      <div style="display:flex;gap:8px;align-items:center;">
+                        <button class="button button-quiet button-sm" data-action="edit-preset-from-manager" data-preset-id="${escapeHtml(p.id)}" type="button" title="切换并进入该预设编辑">编辑</button>
+                        ${!p.isBuiltin ? `<button class="button button-danger-subtle button-sm" data-action="delete-preset" data-preset-id="${escapeHtml(p.id)}" type="button" title="删除此预设">删除</button>` : ''}
+                      </div>
+                    </div>
+                  `).join('')}
                 </div>
               </div>
-            `).join('')}
-          </div>
+            `;
+          }).join('')}
         </div>
-        <div class="modal-actions" style="padding:12px 20px;background:#081322;border-top:1px solid rgba(142,177,214,.15);display:flex;justify-content:space-between;align-items:center;">
-          <button class="button button-quiet button-sm" data-action="reset-presets-to-default" type="button" style="color:#f59e0b;">↺ 恢复系统初始预设</button>
-          <button class="button button-quiet" data-action="close-preset-modal" type="button">关闭</button>
+        <div class="modal-actions" style="display:flex;justify-content:space-between;align-items:center;">
+          <button class="button button-danger-subtle button-sm" data-action="reset-presets-to-default" type="button">恢复默认预设</button>
+          <button class="button button-secondary" data-action="close-preset-modal" type="button">关闭</button>
         </div>
       </div>
     </div>
@@ -616,61 +1098,61 @@ function renderPresetManagerModal() {
 function renderVersionModal() {
   if (!state.editor.versionModalOpen) return '';
   return `
-    <div class="modal-backdrop" data-backdrop="true" style="position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:99999;">
-      <div class="modal-card version-modal-card" style="background:#0b192c;border:1px solid rgba(56,189,248,.35);border-radius:14px;width:680px;max-width:94vw;box-shadow:0 24px 50px rgba(0,0,0,.75);overflow:hidden;color:#e2e8f0;">
-        <div class="modal-header" style="padding:16px 24px;border-bottom:1px solid rgba(148,163,184,.2);display:flex;justify-content:space-between;align-items:center;background:#0f2238;">
+    <div class="modal-backdrop" data-backdrop="true" style="position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:99999;">
+      <div class="modal-card version-modal-card" role="dialog" aria-modal="true" aria-labelledby="version-modal-title" tabindex="-1" style="background:var(--bg-panel);border:1px solid var(--border-base);border-radius:14px;width:680px;max-width:94vw;box-shadow:var(--shadow-modal);overflow:hidden;color:var(--text-main);">
+        <div class="modal-header" style="padding:16px 24px;border-bottom:1px solid var(--border-light);display:flex;justify-content:space-between;align-items:center;background:var(--bg-subtle);">
           <div style="display:flex;align-items:center;gap:12px;">
             <div style="width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#0284c7,#38bdf8);display:flex;align-items:center;justify-content:center;font-size:20px;">🚀</div>
             <div>
-              <div style="font-weight:700;font-size:16px;color:#f8fafc;display:flex;align-items:center;gap:8px;">
+              <div id="version-modal-title" style="font-weight:700;font-size:16px;color:var(--text-main);display:flex;align-items:center;gap:8px;">
                 <span>MSDS Engine</span>
-                <span style="font-size:12px;background:#0369a1;color:#bae6fd;padding:2px 8px;border-radius:999px;font-weight:600;">v${APP_VERSION}</span>
+                <span style="font-size:12px;background:#0284c7;color:#ffffff;padding:2px 8px;border-radius:999px;font-weight:600;">v${APP_VERSION}</span>
               </div>
-              <div style="font-size:12px;color:#94a3b8;margin-top:2px;">构建日期: ${APP_BUILD_DATE} · 生产/开发混合自适应环境</div>
+              <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">构建日期: ${APP_BUILD_DATE} · 生产/开发混合自适应环境</div>
             </div>
           </div>
-          <button class="modal-close" data-action="close-version-modal" type="button" style="background:transparent;border:none;color:#94a3b8;font-size:22px;cursor:pointer;">×</button>
+          <button class="modal-close" data-action="close-version-modal" type="button" style="background:transparent;border:none;color:var(--text-secondary);font-size:22px;cursor:pointer;">×</button>
         </div>
         <div class="modal-body" style="padding:22px 24px;max-height:70vh;overflow-y:auto;display:flex;flex-direction:column;gap:18px;">
           <!-- 核心特性 -->
-          <div style="background:rgba(15,23,42,.6);border:1px solid rgba(56,189,248,.2);border-radius:10px;padding:14px 16px;">
-            <div style="font-size:13px;font-weight:700;color:#38bdf8;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+          <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:14px 16px;">
+            <div style="font-size:13px;font-weight:700;color:#0369a1;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
               <span>✨</span> 本次版本核心特性 (v${APP_VERSION})
             </div>
-            <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7;color:#cbd5e1;">
+            <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7;color:var(--text-secondary);">
               ${RELEASE_NOTES.map((item) => `<li><strong>${escapeHtml(item.title)}</strong>：${escapeHtml(item.desc)}</li>`).join('')}
             </ul>
           </div>
 
           <!-- Docker 快速更新方案 -->
-          <div style="background:rgba(15,23,42,.8);border:1px solid rgba(148,163,184,.2);border-radius:10px;padding:16px;">
+          <div style="background:var(--bg-subtle);border:1px solid var(--border-light);border-radius:10px;padding:16px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-              <div style="font-size:13px;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:6px;">
+              <div style="font-size:13px;font-weight:700;color:var(--text-main);display:flex;align-items:center;gap:6px;">
                 <span>🐳</span> <strong>Docker 容器部署与一键更新</strong>
               </div>
-              <button class="button button-quiet button-xs" data-action="copy-docker-cmd" type="button" style="font-size:12px;color:#38bdf8;border-color:rgba(56,189,248,.4);">📋 复制命令</button>
+              <button class="button button-quiet button-xs" data-action="copy-docker-cmd" type="button" style="font-size:12px;color:var(--cyan);border-color:var(--border-base);">📋 复制命令</button>
             </div>
-            <p style="font-size:12px;color:#94a3b8;margin:0 0 8px 0;line-height:1.5;">如果在 Docker 环境运行，在宿主机项目根目录执行以下一行命令即可秒级拉取更新并重构启动：</p>
-            <pre id="docker-update-cmd" style="background:#030712;padding:10px 14px;border-radius:6px;border:1px solid #1e293b;font-family:Consolas, Monaco, monospace;font-size:12px;color:#a5f3fc;margin:0;overflow-x:auto;">${escapeHtml(UPDATE_COMMANDS.docker)}</pre>
+            <p style="font-size:12px;color:var(--text-secondary);margin:0 0 8px 0;line-height:1.5;">如果在 Docker 环境运行，在宿主机项目根目录执行以下一行命令即可秒级拉取更新并重构启动：</p>
+            <pre id="docker-update-cmd" style="background:#ffffff;padding:10px 14px;border-radius:6px;border:1px solid var(--border-base);font-family:Consolas, Monaco, monospace;font-size:12px;color:#0369a1;margin:0;overflow-x:auto;">${escapeHtml(UPDATE_COMMANDS.docker)}</pre>
           </div>
 
           <!-- 本地开发/运行快速更新方案 -->
-          <div style="background:rgba(15,23,42,.8);border:1px solid rgba(148,163,184,.2);border-radius:10px;padding:16px;">
+          <div style="background:var(--bg-subtle);border:1px solid var(--border-light);border-radius:10px;padding:16px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-              <div style="font-size:13px;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:6px;">
+              <div style="font-size:13px;font-weight:700;color:var(--text-main);display:flex;align-items:center;gap:6px;">
                 <span>⚡</span> <strong>本地一键更新脚本 (Windows / Linux)</strong>
               </div>
-              <button class="button button-quiet button-xs" data-action="copy-local-cmd" type="button" style="font-size:12px;color:#38bdf8;border-color:rgba(56,189,248,.4);">📋 复制命令</button>
+              <button class="button button-quiet button-xs" data-action="copy-local-cmd" type="button" style="font-size:12px;color:var(--cyan);border-color:var(--border-base);">📋 复制命令</button>
             </div>
-            <p style="font-size:12px;color:#94a3b8;margin:0 0 8px 0;line-height:1.5;">支持调用仓库内置的高可用更新脚本，自动检测依赖并重新构建：</p>
-            <pre id="local-update-cmd" style="background:#030712;padding:10px 14px;border-radius:6px;border:1px solid #1e293b;font-family:Consolas, Monaco, monospace;font-size:12px;color:#a5f3fc;margin:0;overflow-x:auto;"># Windows (PowerShell):
+            <p style="font-size:12px;color:var(--text-secondary);margin:0 0 8px 0;line-height:1.5;">支持调用仓库内置的高可用更新脚本，自动检测依赖并重新构建：</p>
+            <pre id="local-update-cmd" style="background:#ffffff;padding:10px 14px;border-radius:6px;border:1px solid var(--border-base);font-family:Consolas, Monaco, monospace;font-size:12px;color:#0369a1;margin:0;overflow-x:auto;"># Windows (PowerShell):
 ${escapeHtml(UPDATE_COMMANDS.windows)}
 
 # Linux / macOS:
 ${escapeHtml(UPDATE_COMMANDS.linux)}</pre>
           </div>
         </div>
-        <div class="modal-actions" style="padding:14px 24px;background:#081322;border-top:1px solid rgba(148,163,184,.15);display:flex;justify-content:space-between;align-items:center;">
+        <div class="modal-actions" style="padding:14px 24px;background:var(--bg-subtle);border-top:1px solid var(--border-light);display:flex;justify-content:space-between;align-items:center;">
           <span style="font-size:12px;color:#64748b;">✨ MSDS Engine 自动化与快速热更新支持</span>
           <button class="button button-quiet" type="button" data-action="close-version-modal">关闭窗口</button>
         </div>
@@ -958,12 +1440,33 @@ function renderApp() {
   });
 
   let content = '';
-  if (state.view === 'inspect') content = renderInspector();
-  else if (state.view === 'matching') content = renderMatching();
-  else content = renderEditor();
+  try {
+    if (state.view === 'inspect') content = renderInspector();
+    else if (state.view === 'matching') content = renderMatching();
+    else content = renderEditor();
+  } catch (renderError) {
+    console.error('renderApp failed:', renderError);
+    content = `
+      <div class="empty-workspace" style="padding:40px;text-align:center;">
+        <h1 style="color:#ef4444;">⚠️ 视图渲染异常</h1>
+        <p style="color:#64748b;margin:12px 0;">${escapeHtml(renderError.message || String(renderError))}</p>
+        <pre style="background:#0f172a;color:#f87171;padding:16px;border-radius:8px;max-width:800px;margin:16px auto;text-align:left;overflow:auto;font-size:12px;">${escapeHtml(renderError.stack || '')}</pre>
+        <button class="button button-primary" onclick="window.location.reload()">重新载入工作台</button>
+      </div>
+    `;
+  }
 
-  root.innerHTML = `${navMarkup()}<main class="page-shell ${state.view === 'matching' ? 'matching-shell' : ''}">${content}</main>${toastMarkup()}${renderAnnotationDrawer()}${renderAnnotationModal()}${renderPresetExportModal()}${renderPresetManagerModal()}${renderVersionModal()}${renderBatchImportModal()}`;
+  root.innerHTML = `${navMarkup()}<main class="page-shell ${state.view === 'matching' ? 'matching-shell' : ''}">${content}</main>${toastMarkup()}${renderAnnotationDrawer()}${renderAnnotationModal()}${renderUnifiedExportModal()}${renderPresetManagerModal()}${renderVersionModal()}${renderBatchImportModal()}`;
   bindEvents();
+  if (lastFocusedModalControlSelector) {
+    const selToRestore = lastFocusedModalControlSelector;
+    window.requestAnimationFrame(() => {
+      const el = root.querySelector(selToRestore);
+      if (el) {
+        try { el.focus(); } catch (_) {}
+      }
+    });
+  }
   window.requestAnimationFrame(renderPreviews);
 }
 
@@ -994,7 +1497,7 @@ function renderInspector() {
     </div>
     <div class="inspector-layout ${state.inspector.showPreview ? '' : 'inspector-hide-preview'}">
       <aside class="side-panel inspector-side">
-        <div class="side-heading"><h2>Section</h2><span class="side-count">${records.length}</span></div>
+        <div class="side-heading" data-toolbar-scope="editor-section-heading"><h2>Section</h2><span class="side-count">${records.length}</span></div>
         <label class="search-box"><span>⌕</span><input id="inspect-search" type="search" placeholder="搜索标签、GHS、产品名…" value="${escapeHtml(state.inspector.query)}" /><kbd>⌘ K</kbd></label>
         <div class="section-list">${sectionNav(records, state.inspector.selectedRecordId, query, 'inspect')}${visibleRecords.filter((record) => !record.sectionNumber).map((record) => recordNavItem(record, state.inspector.selectedRecordId, 'extra')).join('')}</div>
       </aside>
@@ -1614,6 +2117,24 @@ function renderMatching() {
     </div>
   `;
 }
+function renderEditorToolbarButtons() {
+  const openAnnotations = (state.review.session?.annotations || []).filter((a) => a.status === 'open').length;
+  if (state.editor.isPresetEditing) {
+    return `
+      <button class="button button-secondary button-sm" data-action="run-audit" title="运行模板规则合规审计">审计</button>
+      <button class="button button-secondary button-sm" data-action="toggle-review-drawer" title="查看或管理批注清单">批注 (${openAnnotations})</button>
+      <button class="button button-primary button-sm" data-action="open-unified-export-modal" title="导出已就绪基准与预设交付物">导出</button>
+    `;
+  }
+  return `
+    <button class="button button-secondary button-sm" data-action="run-audit" title="运行模板规则合规审计">审计</button>
+    <button class="button button-secondary button-sm" data-action="toggle-review-drawer" title="查看或管理批注清单">批注 (${openAnnotations})</button>
+    <button class="button button-primary button-sm" data-action="open-unified-export-modal" title="导出已就绪基准与预设交付物">导出</button>
+    <button class="button button-quiet button-sm" data-action="open-preset-manager-modal" title="打开预设配置管理中心">预设管理</button>
+    <button class="button button-quiet button-sm" data-action="reset-all-template" title="清空修改恢复至初始模板">恢复模板</button>
+  `;
+}
+
 function renderHeaderFooterEditor(engine, records, query) {
   const hf = engine?.headerFooterData || extractHeaderFooterData(engine) || {};
   const currentExportName = buildExportDocxName(engine, {
@@ -1624,19 +2145,9 @@ function renderHeaderFooterEditor(engine, records, query) {
   });
 
   return `
-    ${headerBand('模板编辑器', '', '', `
-      ${state.editor.isPresetEditing ? `
-        <button class="button button-quiet" data-action="save-current-preset" style="color:#000;background:#f59e0b;font-weight:700;"><span>💾</span> 保存预设</button>
-        <button class="button button-quiet" data-action="exit-preset-editing" style="color:#fff;background:rgba(255,255,255,0.15);"><span>↩️</span> 退出预设</button>
-      ` : ''}
-      <button class="button button-quiet" data-action="reset-all-template" title="清空全部修改并恢复至初始模板状态">↺ 恢复整份模板</button>
-      <button class="button button-quiet" data-action="run-audit">审计</button>
-      <button class="button button-quiet" data-action="toggle-review-drawer" title="查看或管理批注与问题清单"><span>💬</span> 批注 (${(state.review.session?.annotations || []).filter((a) => a.status === 'open').length})</button>
-      <button class="button button-dark" data-action="export-review-bundle" title="导出正式 DOCX 与 Agent 审阅包"><span>📦</span> 导出审阅包</button>
-      <button class="button button-dark" data-action="export-docx">导出 DOCX</button>
-    `)}
+    ${headerBand('模板编辑器', '', '', renderEditorToolbarButtons())}
     ${renderEditorBanner()}
-    <div class="file-ribbon" title="内嵌模板工作副本，源模板只读">
+    <div class="file-ribbon" data-toolbar-scope="editor-file-ribbon" title="内嵌模板工作副本，源模板只读">
       <div class="file-ribbon-icon">模板</div>
       <div class="file-ribbon-copy">
         <strong>${escapeHtml(state.editor.template)}</strong>
@@ -1646,14 +2157,14 @@ function renderHeaderFooterEditor(engine, records, query) {
           <button class="button button-quiet button-xs" data-action="reset-filename-to-standard" title="恢复标准命名规则" style="padding:1px 6px;height:20px;font-size:11px;">↺</button>
         </span>
       </div>
-      <div class="template-selector"><select id="template-select" aria-label="模板选择">${Object.keys(TEMPLATE_OPTIONS).map((name) => `<option ${state.editor.template === name ? 'selected' : ''}>${name}</option>`).join('')}</select></div>
+      ${renderBaselineSelectorMarkup()}
       <label class="toggle-control"><input id="allow-label-edit" type="checkbox" ${state.editor.allowLabelEdit ? 'checked' : ''}><span class="toggle-track"></span><span>特殊情况：允许修改标签文本</span></label>
       <label class="toggle-control"><input id="manage-cell-editability" type="checkbox" ${state.editor.manageCellEditability ? 'checked' : ''}><span class="toggle-track"></span><span>特殊情况：配置值格编辑权限</span></label>
       <div class="file-ribbon-coverage"><span class="pulse-dot"></span>${records.filter((record) => record.sectionNumber).length}/16</div>
     </div>
     <div class="inspector-layout editor-layout">
       <aside class="side-panel editor-side">
-        <div class="side-heading"><h2>Section</h2><span class="side-count">${records.filter((record) => record.sectionNumber).length}/16</span></div>
+        <div class="side-heading" data-toolbar-scope="editor-section-heading"><h2>Section</h2><span class="side-count">${records.filter((record) => record.sectionNumber).length}/16</span></div>
         <label class="search-box"><span>⌕</span><input id="editor-search" type="search" placeholder="搜索标签、序号…" value="${escapeHtml(state.editor.query)}" /><kbd>⌘ K</kbd></label>
         <div class="section-list">${sectionNav(records, state.editor.selectedRecordId, query, 'editor', engine)}</div>
         <div class="side-footer"><span class="file-signal"></span><span>${state.editor.dirty ? '有未导出修改' : '工作副本干净'}</span></div>
@@ -1806,19 +2317,9 @@ function renderEditor() {
   const selectedVisible = visibleRecords.find((record) => record.id === selected?.id) || visibleRecords[0] || selected;
   if (selectedVisible) state.editor.selectedRecordId = selectedVisible.id;
   return `
-    ${headerBand('模板编辑器', '', '', `
-      ${state.editor.isPresetEditing ? `
-        <button class="button button-quiet" data-action="save-current-preset" style="color:#000;background:#f59e0b;font-weight:700;"><span>💾</span> 保存预设</button>
-        <button class="button button-quiet" data-action="exit-preset-editing" style="color:#fff;background:rgba(255,255,255,0.15);"><span>↩️</span> 退出预设</button>
-      ` : ''}
-      <button class="button button-quiet" data-action="reset-all-template" title="清空全部修改并恢复至初始模板状态">↺ 恢复整份模板</button>
-      <button class="button button-quiet" data-action="run-audit">审计</button>
-      <button class="button button-quiet" data-action="toggle-review-drawer" title="查看或管理批注与问题清单"><span>💬</span> 批注 (${(state.review.session?.annotations || []).filter((a) => a.status === 'open').length})</button>
-      <button class="button button-dark" data-action="export-review-bundle" title="导出正式 DOCX 与 Agent 审阅包"><span>📦</span> 导出审阅包</button>
-      <button class="button button-dark" data-action="export-docx">导出 DOCX</button>
-    `)}
+    ${headerBand('模板编辑器', '', '', renderEditorToolbarButtons())}
     ${renderEditorBanner()}
-    <div class="file-ribbon" title="内嵌模板工作副本，源模板只读">
+    <div class="file-ribbon" data-toolbar-scope="editor-file-ribbon" title="内嵌模板工作副本，源模板只读">
       <div class="file-ribbon-icon">模板</div>
       <div class="file-ribbon-copy">
         <strong>${escapeHtml(state.editor.template)}</strong>
@@ -1828,7 +2329,7 @@ function renderEditor() {
           <button class="button button-quiet button-xs" data-action="reset-filename-to-standard" title="恢复标准命名规则" style="padding:1px 6px;height:20px;font-size:11px;">↺</button>
         </span>
       </div>
-      <div class="template-selector"><select id="template-select" aria-label="模板选择">${Object.keys(TEMPLATE_OPTIONS).map((name) => `<option ${state.editor.template === name ? 'selected' : ''}>${name}</option>`).join('')}</select></div>
+      ${renderBaselineSelectorMarkup()}
       <label class="toggle-control"><input id="allow-label-edit" type="checkbox" ${state.editor.allowLabelEdit ? 'checked' : ''}><span class="toggle-track"></span><span>特殊情况：允许修改标签文本</span></label>
       <label class="toggle-control"><input id="manage-cell-editability" type="checkbox" ${state.editor.manageCellEditability ? 'checked' : ''}><span class="toggle-track"></span><span>特殊情况：配置值格编辑权限</span></label>
       <div class="file-ribbon-coverage"><span class="pulse-dot"></span>${records.filter((record) => record.sectionNumber).length}/16</div>
@@ -1841,15 +2342,15 @@ function renderEditor() {
         <div class="side-footer"><span class="file-signal"></span><span>${state.editor.dirty ? '有未导出修改' : '工作副本干净'}</span></div>
       </aside>
       <section class="content-panel editor-content structured-panel">
-        <div class="panel-heading">
+        <div class="panel-heading" data-toolbar-scope="editor-table-heading">
           <h2>${escapeHtml(selectedVisible?.title || '未找到章节')}</h2>
           <div class="heading-pills">
             <span class="pill pill-blue">${selectedVisible ? sectionLabel(selectedVisible.sectionNumber) : '—'}</span>
             <span class="pill">${selectedVisible?.rows?.length || 0} 行</span>
-            <button class="button button-quiet button-sm" data-action="reset-current-section" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="仅将当前 Section 恢复至初始模板状态（保留其他 Section 修改）" style="height:22px;padding:0 8px;font-size:10px;line-height:20px;color:#d97706;">↺ 恢复本节</button>
-            <button class="button button-quiet button-sm" data-table-action="add-note-row" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="在当前节顶部插入单列说明行" style="height:22px;padding:0 8px;font-size:10px;line-height:20px;color:#0284c7;">＋ 说明行</button>
-            <button class="button button-quiet button-sm" data-table-action="add-row" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="在表格末尾追加一行" style="height:22px;padding:0 8px;font-size:10px;line-height:20px;">＋ 追加行</button>
-            <button class="button button-quiet button-sm btn-clear-section" data-action="clear-current-section-values" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="一键清空当前章节所有单元格内容（支持普通与预设模式）" style="height:22px;padding:0 8px;font-size:10px;line-height:20px;color:#ef4444;border-color:rgba(239,68,68,0.3);">🗑️ 清空本节填写值</button>
+            <button class="button button-quiet button-xs" data-action="reset-current-section" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="仅将当前 Section 恢复至初始模板状态（保留其他 Section 修改）">↺ 恢复本节</button>
+            <button class="button button-quiet button-xs" data-table-action="add-note-row" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="在当前节顶部插入单列说明行">＋ 说明行</button>
+            <button class="button button-quiet button-xs" data-table-action="add-row" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="在表格末尾追加一行">＋ 追加行</button>
+            <button class="button button-danger button-xs btn-clear-section" data-action="clear-current-section-values" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="一键清空当前章节所有单元格内容（支持普通与预设模式）">🗑️ 清空本节填写值</button>
             <span class="pill pill-green">${errors.length ? `${errors.length} 个问题` : '通过'}</span>
           </div>
         </div>
@@ -1857,7 +2358,7 @@ function renderEditor() {
       </section>
       <aside class="right-stack ${state.editor.isWidePreview ? 'wide-preview-mode' : ''}">
         <section class="preview-panel">
-          <div class="panel-heading compact preview-heading-flex" style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;">
+          <div class="panel-heading compact preview-heading-flex" data-toolbar-scope="editor-preview-heading" style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;">
             <div class="preview-tab-group" style="display:inline-flex;background:rgba(255,255,255,0.06);border-radius:6px;padding:2px;gap:2px;">
               <button type="button" class="mode-pill ${state.editor.previewMode !== 'template' ? 'active' : ''}" data-editor-preview-mode="source" title="查看真实源文档原件 (如 PU-2341E)" style="border:none;background:${state.editor.previewMode !== 'template' ? '#0284c7' : 'transparent'};color:${state.editor.previewMode !== 'template' ? '#fff' : '#94a3b8'};padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;">▤ 源文件原版式</button>
               <button type="button" class="mode-pill ${state.editor.previewMode === 'template' ? 'active' : ''}" data-editor-preview-mode="template" title="查看当前编辑后的模板排版效果" style="border:none;background:${state.editor.previewMode === 'template' ? '#059669' : 'transparent'};color:${state.editor.previewMode === 'template' ? '#fff' : '#94a3b8'};padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;">📑 模板效果</button>
@@ -1890,15 +2391,32 @@ function renderEditorTable(record) {
 
 function bindEvents() {
   root.querySelectorAll('[data-view]').forEach((button) => button.addEventListener('click', async () => {
-    state.view = button.dataset.view;
-    if (state.view === 'matching') {
-      if (!state.inspector.engine) {
-        showToast('请先在识别工作区导入或选择 DOCX 文件。', 'info');
-      } else if (!state.matching.templateEngine) {
-        await syncMatchingEngine(state.matching.template || 'CN 冠志');
+    const prevView = state.view;
+    try {
+      state.view = button.dataset.view;
+      if (state.view === 'matching') {
+        if (!state.inspector.engine) {
+          if (state.repo.records && state.repo.records.length > 0 && !state.repo.activeRecordId) {
+            const firstRec = state.repo.records[0];
+            await loadRepoRecordToInspectAndMatching(firstRec.id);
+          }
+        } else if (!state.matching.templateEngine) {
+          await syncMatchingEngine(state.matching.template || 'CN 冠志');
+        }
+      } else if (state.view === 'editor') {
+        ensureCurrentDraft();
+        if (!state.editor.engine) {
+          await switchBaselineDraft(state.editor.currentBaselineId || 'baseline_cn_guanzhi');
+          return; // switchBaselineDraft 内部已调用 renderApp
+        }
       }
+      renderApp();
+    } catch (err) {
+      console.error('View switch failed:', err);
+      showToast(`切换视图失败: ${err.message}`, 'error');
+      state.view = prevView;
+      renderApp();
     }
-    renderApp();
   }));
   root.querySelectorAll('.section-nav-row[data-record-id]').forEach((button) => button.addEventListener('click', () => {
     if (state.view === 'inspect') {
@@ -2168,8 +2686,8 @@ function bindEvents() {
   });
   root.querySelector('[data-action="pick-inspect"]')?.addEventListener('click', () => pickFile('inspect'));
   root.querySelector('[data-action="load-sample"]')?.addEventListener('click', () => loadInspectorTemplate('CN 冠志'));
-  root.querySelector('[data-action="load-editor"]')?.addEventListener('click', () => loadEditorTemplate('CN 冠志'));
-  root.querySelector('[data-action="load-en-editor"]')?.addEventListener('click', () => loadEditorTemplate('EN 冠志'));
+  root.querySelector('[data-action="load-editor"]')?.addEventListener('click', () => switchBaselineDraft('baseline_cn_guanzhi'));
+  root.querySelector('[data-action="load-en-editor"]')?.addEventListener('click', () => switchBaselineDraft('baseline_en_guanzhi'));
   root.querySelector('[data-action="export-json"]')?.addEventListener('click', exportJson);
   root.querySelector('[data-action="run-audit"]')?.addEventListener('click', () => {
     const errors = auditEngine(state.editor.engine);
@@ -2356,6 +2874,10 @@ function bindEvents() {
     state.editor.manageCellEditability = event.target.checked;
     renderApp();
   }));
+  root.querySelectorAll('#baseline-select, .baseline-dropdown').forEach((el) => el.addEventListener('change', async (event) => {
+    const targetBaselineId = event.target.value;
+    await switchBaselineDraft(targetBaselineId);
+  }));
   root.querySelectorAll('#template-select').forEach((el) => el.addEventListener('change', (event) => {
     loadEditorTemplate(event.target.value);
   }));
@@ -2363,8 +2885,13 @@ function bindEvents() {
   // 智能匹配核心流转事件
   root.querySelectorAll('[data-action="start-matching"]').forEach((btn) => btn.addEventListener('click', async () => {
     if (!state.inspector.engine) {
-      showToast('请先在识别工作区导入或选择 DOCX 文件。', 'error');
-      return;
+      if (state.repo.records && state.repo.records.length > 0) {
+        const recId = state.repo.activeRecordId || state.repo.records[0].id;
+        await loadRepoRecordToInspectAndMatching(recId);
+      } else {
+        showToast('请先选择样本或导入 DOCX 文件。', 'info');
+        return;
+      }
     }
     try {
       state.matching.selectedSectionNumber = 1;
@@ -2500,21 +3027,70 @@ function bindEvents() {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && state.view === 'inspect') {
       event.preventDefault();
       root.querySelector('#inspect-search')?.focus();
+      return;
     }
-  }, { once: true });
+    // 无障碍：Escape 关闭活动弹窗并恢复触发焦点
+    if (event.key === 'Escape') {
+      if (state.editor.exportModalOpen) {
+        event.preventDefault();
+        state.editor.exportModalOpen = false;
+        renderApp();
+        restoreModalTrigger();
+        return;
+      }
+      if (state.editor.managerModalOpen) {
+        event.preventDefault();
+        state.editor.managerModalOpen = false;
+        renderApp();
+        restoreModalTrigger();
+        return;
+      }
+    }
+    // 无障碍：Tab 在活动弹窗内环闭循环 (Focus Trap)
+    const activeModal = root.querySelector('.modal-card[role="dialog"]');
+    if (activeModal && event.key === 'Tab') {
+      const focusables = Array.from(activeModal.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+      if (focusables.length > 0) {
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (event.shiftKey && (document.activeElement === first || !activeModal.contains(document.activeElement))) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && (document.activeElement === last || !activeModal.contains(document.activeElement))) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    }
+  });
 
   // ============================================================
   // 全局事件委托：预设模式/清空/导出动作 (确保任何重绘与子元素点击100%响应)
   // ============================================================
   if (!root._presetDelegationBound) {
     root._presetDelegationBound = true;
+
+    // 全局委托基准下拉切换 (change 事件)
+    root.addEventListener('change', async (e) => {
+      const select = e.target.closest('#baseline-select, .baseline-dropdown');
+      if (select) {
+        await switchBaselineDraft(select.value);
+      }
+    });
+
     root.addEventListener('click', (e) => {
       // 1. 进入预设编辑模式
       const enterBtn = e.target.closest('[data-action="enter-preset-mode"]');
       if (enterBtn) {
         e.preventDefault();
         e.stopPropagation();
-        enterPresetEditing(state.editor.editingPresetId || state.editor.presets[0]?.id);
+        const curBaseId = state.editor.currentBaselineId || 'baseline_cn_guanzhi';
+        const basePresets = (state.editor.presets || []).filter((p) => {
+          const bId = p.baselineId || (p.language === 'EN' ? 'baseline_en_guanzhi' : 'baseline_cn_guanzhi');
+          return bId === curBaseId;
+        });
+        const targetPreset = basePresets.find((x) => x.id === state.editor.editingPresetId) || basePresets[0] || state.editor.presets[0];
+        enterPresetEditing(targetPreset?.id);
         return;
       }
 
@@ -2577,8 +3153,7 @@ function bindEvents() {
       if (openMgrModalBtn) {
         e.preventDefault();
         e.stopPropagation();
-        state.editor.managerModalOpen = true;
-        renderApp();
+        openPresetManagerModal(openMgrModalBtn);
         return;
       }
 
@@ -2625,8 +3200,7 @@ function bindEvents() {
       if (openExportModalBtn) {
         e.preventDefault();
         e.stopPropagation();
-        state.editor.exportModalOpen = true;
-        renderApp();
+        openUnifiedExportModal(openExportModalBtn);
         return;
       }
 
@@ -2693,6 +3267,124 @@ function bindEvents() {
         e.stopPropagation();
         state.editor.versionModalOpen = false;
         renderApp();
+        return;
+      }
+
+      // 9.5 统一导出中心与基准切换
+      const openUnifiedExportBtn = e.target.closest('[data-action="open-unified-export-modal"]');
+      if (openUnifiedExportBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        openUnifiedExportModal(openExportModalBtn);
+        return;
+      }
+
+      const closeUnifiedExportBtn = e.target.closest('[data-action="close-unified-export-modal"]');
+      if (closeUnifiedExportBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeUnifiedExportModal();
+        return;
+      }
+
+      // 切换基准完成状态
+      const toggleCompleteBtn = e.target.closest('[data-action="toggle-baseline-complete"]');
+      if (toggleCompleteBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleBaselineComplete();
+        return;
+      }
+
+      // 前往指定基准编辑
+      const jumpBaseBtn = e.target.closest('[data-action="jump-to-baseline"]');
+      if (jumpBaseBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const bId = jumpBaseBtn.dataset.baselineId;
+        state.editor.exportModalOpen = false;
+        state.editor.managerModalOpen = false;
+        state.view = 'editor';
+        switchBaselineDraft(bId);
+        return;
+      }
+
+      // 导出中心目标勾选切换
+      const toggleTargetEl = e.target.closest('[data-action="toggle-export-target"]');
+      if (toggleTargetEl) {
+        const k = toggleTargetEl.dataset.targetKey;
+        if (!state.editor.exportConfig.selectedTargets) state.editor.exportConfig.selectedTargets = {};
+        state.editor.exportConfig.selectedTargets[k] = !state.editor.exportConfig.selectedTargets[k];
+        renderApp();
+        return;
+      }
+
+      // 导出中心格式切换
+      const toggleExportFmt = e.target.closest('[data-action="toggle-export-format"]');
+      if (toggleExportFmt) {
+        const fmt = toggleExportFmt.dataset.format;
+        lastFocusedModalControlSelector = `[data-action="toggle-export-format"][data-format="${fmt}"]`;
+        if (fmt === 'docx') state.editor.exportConfig.formatDocx = !state.editor.exportConfig.formatDocx;
+        if (fmt === 'pdf') state.editor.exportConfig.formatPdf = !state.editor.exportConfig.formatPdf;
+        renderApp();
+        return;
+      }
+
+      // 快速切换
+      if (e.target.closest('[data-action="quick-export-both-formats"]')) {
+        lastFocusedModalControlSelector = '[data-action="quick-export-both-formats"]';
+        state.editor.exportConfig.formatDocx = true;
+        state.editor.exportConfig.formatPdf = true;
+        renderApp();
+        return;
+      }
+      if (e.target.closest('[data-action="quick-export-docx-only"]')) {
+        lastFocusedModalControlSelector = '[data-action="quick-export-docx-only"]';
+        state.editor.exportConfig.formatDocx = true;
+        state.editor.exportConfig.formatPdf = false;
+        renderApp();
+        return;
+      }
+      if (e.target.closest('[data-action="quick-export-pdf-only"]')) {
+        lastFocusedModalControlSelector = '[data-action="quick-export-pdf-only"]';
+        state.editor.exportConfig.formatDocx = false;
+        state.editor.exportConfig.formatPdf = true;
+        renderApp();
+        return;
+      }
+      if (e.target.closest('[data-action="quick-export-select-all-ready"]')) {
+        state.editor.exportConfig.selectedTargets = {};
+        for (const b of TEMPLATE_BASELINES) {
+          const d = state.editor.drafts[b.id];
+          if (d && (d.status === 'completed' || d.status === 'editing') && d.engine) {
+            state.editor.exportConfig.selectedTargets[`${b.id}:base`] = true;
+            for (const p of state.editor.presets || []) {
+              const pBaseId = p.baselineId || (p.language === 'EN' ? 'baseline_en_guanzhi' : 'baseline_cn_guanzhi');
+              if (pBaseId === b.id) {
+                state.editor.exportConfig.selectedTargets[`${b.id}:${p.id}`] = true;
+              }
+            }
+          }
+        }
+        renderApp();
+        return;
+      }
+      if (e.target.closest('[data-action="quick-export-select-base-only"]')) {
+        state.editor.exportConfig.selectedTargets = {};
+        for (const b of TEMPLATE_BASELINES) {
+          const d = state.editor.drafts[b.id];
+          if (d && (d.status === 'completed' || d.status === 'editing') && d.engine) {
+            state.editor.exportConfig.selectedTargets[`${b.id}:base`] = true;
+          }
+        }
+        renderApp();
+        return;
+      }
+
+      if (e.target.closest('[data-action="confirm-unified-export"]')) {
+        e.preventDefault();
+        e.stopPropagation();
+        executeUnifiedExport();
         return;
       }
 
@@ -3375,9 +4067,18 @@ async function loadEditorTemplate(name) {
 }
 
 async function fetchTemplate(name) {
-  const fileName = TEMPLATE_OPTIONS[name];
-  if (!fileName) throw new DocxEngineError(`未知模板配置：${name}`, 'TEMPLATE_FETCH');
-  if (!templateBufferCache.has(name)) {
+  let fileName = TEMPLATE_OPTIONS[name];
+  if (!fileName) {
+    const b = TEMPLATE_BASELINES.find((x) => x.id === name || x.displayName === name || x.label === name || x.templateFile === name);
+    if (b) fileName = b.templateFile;
+    else if (name && (name.includes('EN') || name.toLowerCase().includes('english') || name.includes('OSHA'))) fileName = TEMPLATE_OPTIONS['EN 冠志'];
+    else if (name && (name.includes('CN') || name.includes('中文') || name.includes('国标'))) fileName = TEMPLATE_OPTIONS['CN 冠志'];
+    else if (name && name.endsWith('.docx')) fileName = name;
+  }
+  if (!fileName) fileName = TEMPLATE_OPTIONS['CN 冠志']; // 兜底官方标准底模，绝不抛错阻断用户直接编辑
+
+  const cacheKey = fileName;
+  if (!templateBufferCache.has(cacheKey)) {
     const response = await fetch(`/templates/${encodeURIComponent(fileName)}`);
     if (!response.ok) throw new DocxEngineError(`无法读取内嵌模板：${response.status}`, 'TEMPLATE_FETCH');
     const contentType = response.headers.get('content-type') || '';
@@ -3385,14 +4086,13 @@ async function fetchTemplate(name) {
       throw new DocxEngineError(`模板文件未能正确返回 (服务端返回了 HTML 页面，而非 docx 资源)`, 'TEMPLATE_FETCH');
     }
     const buf = await response.arrayBuffer();
-    // 校验 ZIP 魔数 'PK' (0x50, 0x4B)
     const header = new Uint8Array(buf.slice(0, 4));
     if (header[0] !== 0x50 || header[1] !== 0x4B) {
       throw new DocxEngineError(`模板文件格式损坏或非合法 DOCX/ZIP 文件`, 'TEMPLATE_FETCH');
     }
-    templateBufferCache.set(name, buf);
+    templateBufferCache.set(cacheKey, buf);
   }
-  const buf = templateBufferCache.get(name);
+  const buf = templateBufferCache.get(cacheKey);
   return loadDocx(buf.slice(0), fileName);
 }
 
@@ -3404,19 +4104,26 @@ function handleEditorInput(event) {
   if (!record || !cell) return;
   const text = (input.isContentEditable ? (input.innerText || '') : (input.value || '')).replace(/^\n$/, '');
 
-  // 局部同步覆写预设分支
-  if (state.editor.presetModeEnabled && state.editor.activePresetId && input.dataset.editKind === 'value') {
-    const activePreset = state.editor.presets.find((p) => p.id === state.editor.activePresetId);
+  // 预设编辑模式分支：直接写入当前预设的 fieldOverrides 并同步引擎单元格
+  if (state.editor.isPresetEditing && state.editor.editingPresetId && input.dataset.editKind === 'value') {
+    const activePreset = state.editor.presets.find((p) => p.id === state.editor.editingPresetId);
     const semKey = input.dataset.semanticKey || getCellSemanticKey(cell);
     if (activePreset && semKey) {
       if (!activePreset.fieldOverrides) activePreset.fieldOverrides = {};
       activePreset.fieldOverrides[semKey] = text;
-      PresetStore.savePresets(state.editor.presets);
+      writeCellValue(cell, text, state.editor.engine?.roleStyles?.value);
       state.editor.dirty = true;
       refreshEditorDirty();
       return;
     }
   }
+  // 内容发生任何修改时，立即撤销之前的 completed 完成资格（失效保护）
+  const activeDraft = state.editor.drafts[state.editor.currentBaselineId];
+  if (activeDraft && activeDraft.status === 'completed') {
+    activeDraft.status = 'editing';
+    DraftStore.saveDraftMeta(state.editor.currentBaselineId, activeDraft);
+  }
+
   try {
     if (input.dataset.editKind === 'label') {
       writeCellLabel(cell, text, state.editor.allowLabelEdit, state.editor.engine?.roleStyles?.label);
@@ -3653,65 +4360,41 @@ function handleClearAllPresetOverrides() {
   renderApp();
 }
 
-async function exportDocx() {
-  if (!state.editor.engine) return;
-  if (state.editor.isPresetEditing) {
-    if (window.confirm('您当前处于预设编辑模式。\n\n点击【确定】打开【多版本同步导出】窗口以勾选预设同步导出；\n点击【取消】导出当前单份预设预览文档。')) {
-      state.editor.exportModalOpen = true;
-      renderApp();
-      return;
-    }
-  } else if (state.editor.presets && state.editor.presets.length > 0 && state.editor.presetModeEnabled) {
-    state.editor.exportModalOpen = true;
-    renderApp();
-    return;
+
+function arrayBufferToBase64(buffer) {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
   }
-  if (state.review.session) {
-    const gate = checkExportGate(state.review.session);
-    if (!gate.allowed) {
-      const confirmExport = window.confirm(
-        `【审阅门禁提示】\n当前存在 ${gate.blockers.length} 个阻断项与 ${gate.errors.length} 个错误批注尚未标记解决。\n\n是否确认忽略门禁并继续强行导出 DOCX？`
-      );
-      if (!confirmExport) {
-        state.review.drawerOpen = true;
-        renderApp();
-        return;
-      }
-    }
-  }
-  const errors = auditEngine(state.editor.engine);
-  if (errors.length) {
-    showToast(`导出已阻止：请先处理 ${errors.length} 个审计问题。`, 'error');
-    return;
-  }
-  try {
-    const buffer = await state.editor.engine.exportArrayBuffer();
-    const exportName = buildExportDocxName(state.editor.engine, {
-      customFileName: state.editor.customFileName,
-      templateName: state.editor.template,
-      sourcePreviewName: state.sourcePreview?.name,
-      productModel: state.editor.engine?.headerFooterData?.model || state.review.session?.productModel,
-    });
-    downloadBlob(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }), exportName);
-    state.editor.dirty = false;
-    renderApp();
-    showToast(`已导出 ${exportName}，源模板保持不变。`, 'success');
-  } catch (error) {
-    showToast(`导出失败：${error.message}`, 'error');
-  }
+  return btoa(binary);
 }
 
-async function executeBatchPresetExport() {
-  const baseEngine = state.editor.isPresetEditing ? state.editor.normalEngine : state.editor.engine;
-  if (!baseEngine) {
-    showToast('缺少主文档实例，无法导出。', 'error');
+function base64ToArrayBuffer(base64) {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+async function executeUnifiedExport() {
+  ensureCurrentDraft();
+  const targets = computeExportTargets();
+  if (targets.length === 0) {
+    showToast('未选择任何导出组合，请至少勾选一项已就绪版本与导出格式。', 'warning');
     return;
   }
+
+  // 审阅门禁检查
   if (state.review.session) {
     const gate = checkExportGate(state.review.session);
     if (!gate.allowed) {
       const confirmExport = window.confirm(
-        `【审阅门禁提示】\n当前存在 ${gate.blockers.length} 个阻断项与 ${gate.errors.length} 个错误批注尚未标记解决。\n\n是否确认忽略门禁并继续强行导出 DOCX？`
+        `【审阅门禁提示】\n当前存在 ${gate.blockers.length} 个阻断项与 ${gate.errors.length} 个错误批注尚未标记解决。\n\n是否确认忽略门禁并继续强行导出？`
       );
       if (!confirmExport) {
         state.review.drawerOpen = true;
@@ -3720,73 +4403,131 @@ async function executeBatchPresetExport() {
       }
     }
   }
-  tableRecords(baseEngine).forEach((r) => renumberRecord(r));
-  const errors = auditEngine(baseEngine);
-  if (errors.length) {
-    showToast(`导出已阻止：请先处理 ${errors.length} 个审计问题。`, 'error');
-    return;
-  }
 
-  const exportBase = root.querySelector('#export-check-base')?.checked ?? true;
-  const checkedPresetIds = Array.from(root.querySelectorAll('.export-preset-check:checked')).map((el) => el.dataset.presetId);
-  const selectedPresets = state.editor.presets.filter((p) => checkedPresetIds.includes(p.id));
-
-  showToast('正在生成普通与预设文档，请稍候…', 'info');
+  state.editor.exportConfig.isExporting = true;
+  state.editor.exportConfig.exportProgress = '正在从各基准独立草稿并发生成 Word 文档…';
+  renderApp();
 
   try {
-    const outputs = [];
-    const baseModel = baseEngine.headerFooterData?.model || '';
+    const curDraft = state.editor.drafts[state.editor.currentBaselineId];
+    const baseModel = curDraft?.engine?.headerFooterData?.model || state.review.session?.productModel || 'MSDS';
 
-    // 1. 导出普通版本 (主文档)
-    if (exportBase) {
-      const baseBuffer = await baseEngine.exportArrayBuffer();
-      const baseName = buildExportDocxName(baseEngine, {
-        customFileName: state.editor.customFileName,
-        templateName: state.editor.template,
-        sourcePreviewName: state.sourcePreview?.name,
-        productModel: baseModel,
-      });
-      outputs.push({ name: baseName, buffer: baseBuffer });
+    // 1. 并发生成全部需要的 DOCX
+    const uniqueDocxMap = new Map();
+    for (const t of targets) {
+      if (!uniqueDocxMap.has(t.docxFileName)) {
+        uniqueDocxMap.set(t.docxFileName, t);
+      }
     }
 
-    // 2. 逐个生成勾选的预设版本 (优先级覆盖：预设填了的优先覆盖，未填继承主文档)
-    for (const preset of selectedPresets) {
-      const rawBuf = engineBuffer(baseEngine);
-      const presetEngine = await loadDocx(rawBuf, preset.targetTemplate || state.editor.template);
+    const docxTasks = Array.from(uniqueDocxMap.values()).map(async (t) => {
+      let doc;
+      if (t.type === 'base') {
+        doc = t.engine;
+      } else if (t.type === 'preset' && t.preset) {
+        const editedBuf = await t.engine.exportArrayBuffer();
+        doc = await loadDocx(editedBuf, t.docxFileName);
+        applyPresetPriorityOverlay(t.engine, t.preset, doc);
+      } else {
+        doc = t.engine;
+      }
 
-      // 核心：调用 applyPresetPriorityOverlay
-      applyPresetPriorityOverlay(baseEngine, preset, presetEngine);
-      tableRecords(presetEngine).forEach((r) => renumberRecord(r));
+      tableRecords(doc).forEach((r) => renumberRecord(r));
+      const buf = await doc.exportArrayBuffer();
+      return {
+        docxFileName: t.docxFileName,
+        buffer: buf,
+        target: t,
+      };
+    });
 
-      const presetFileName = getPresetExportFileName(preset, baseModel);
-      const presetBuffer = await presetEngine.exportArrayBuffer();
-      outputs.push({ name: presetFileName, buffer: presetBuffer });
+    const generatedDocxList = await Promise.all(docxTasks);
+    const docxMap = new Map();
+    for (const g of generatedDocxList) {
+      docxMap.set(g.docxFileName, g.buffer);
     }
 
-    if (outputs.length === 0) {
-      showToast('未选择任何导出项。', 'warning');
+    // 2. 批量并发转译 PDF (如果勾选了 PDF)
+    const pdfMap = new Map();
+    const needsPdf = targets.some((t) => t.format === 'pdf');
+
+    if (needsPdf) {
+      state.editor.exportConfig.exportProgress = '正在通过批处理管道极速渲染高清 PDF…';
+      renderApp();
+
+      const pdfRequests = [];
+      for (const t of targets) {
+        if (t.format === 'pdf' && docxMap.has(t.docxFileName)) {
+          if (!pdfRequests.some((p) => p.name === t.docxFileName)) {
+            const buf = docxMap.get(t.docxFileName);
+            pdfRequests.push({
+              name: t.docxFileName,
+              bufferBase64: arrayBufferToBase64(buf),
+            });
+          }
+        }
+      }
+
+      try {
+        const resp = await fetch('/api/msds/convert-pdf-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ files: pdfRequests }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.success && Array.isArray(data.pdfs)) {
+            for (const p of data.pdfs) {
+              pdfMap.set(p.pdfName, base64ToArrayBuffer(p.pdfBase64));
+            }
+          }
+        } else {
+          console.warn('PDF 转换服务端接口返回状态非 200，继续交付 DOCX');
+        }
+      } catch (pdfErr) {
+        console.warn('PDF 批量转换请求失败:', pdfErr);
+      }
+    }
+
+    // 3. 组装最终交付清单
+    const finalFiles = [];
+    for (const t of targets) {
+      if (t.format === 'docx') {
+        const buf = docxMap.get(t.docxFileName);
+        if (buf) {
+          finalFiles.push({ name: t.fileName, buffer: buf });
+        }
+      } else if (t.format === 'pdf') {
+        const buf = pdfMap.get(t.fileName);
+        if (buf) {
+          finalFiles.push({ name: t.fileName, buffer: buf });
+        }
+      }
+    }
+
+    if (finalFiles.length === 0) {
+      showToast('未生成任何有效交付物，请检查选择。', 'error');
       return;
     }
 
-    if (outputs.length === 1) {
-      downloadBlob(new Blob([outputs[0].buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }), outputs[0].name);
-      showToast(`已成功导出：${outputs[0].name}`, 'success');
-    } else {
-      const zip = new JSZip();
-      for (const item of outputs) {
-        zip.file(item.name, item.buffer);
-        downloadBlob(new Blob([item.buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }), item.name);
-      }
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const zipName = `${baseModel || 'MSDS'}_多版本同步包.zip`;
-      downloadBlob(zipBlob, zipName);
-      showToast(`🎉 成功按预设优先级覆盖同步导出 ${outputs.length} 份标准文档！`, 'success');
+    // 4. 打包并触发下载（严守单一 ZIP 导出交付物契约）
+    const zip = new JSZip();
+    for (const f of finalFiles) {
+      zip.file(f.name, f.buffer);
     }
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const zipName = `${baseModel}_MSDS_交付物.zip`;
+    downloadBlob(zipBlob, zipName);
+    showToast(`成功打包导出全部 ${finalFiles.length} 份交付物 (ZIP)。`, 'success');
 
     state.editor.exportModalOpen = false;
+  } catch (err) {
+    console.error('Unified export failed:', err);
+    showToast(`导出失败：${err.message}`, 'error');
+  } finally {
+    state.editor.exportConfig.isExporting = false;
+    state.editor.exportConfig.exportProgress = '';
     renderApp();
-  } catch (error) {
-    showToast(`同步导出失败：${error.message}`, 'error');
   }
 }
 
@@ -3832,11 +4573,71 @@ async function handleExportReviewBundle() {
 async function bootstrap() {
   renderApp();
   fetchRepoData();
+  PresetStore.fetchPresetsFromApi().then((apiPresets) => {
+    if (apiPresets && apiPresets.length > 0) {
+      state.editor.presets = apiPresets;
+      renderApp();
+    }
+  }).catch(() => {});
   try {
-    await loadEditorTemplate('CN 冠志');
+    await switchBaselineDraft('baseline_cn_guanzhi');
   } catch (error) {
-    showToast('内嵌模板暂时无法加载，请确认开发服务器已启动。', 'error');
+    console.warn('Initial draft load fallback:', error);
+    try {
+      await loadEditorTemplate('CN 冠志');
+    } catch {}
   }
 }
 
 bootstrap();
+
+
+// 保证单次注册全局弹窗生命周期键盘监听器 (Escape 关闭与 Tab 焦点限制)
+if (!window._msdsGlobalKeydownAttached) {
+  window._msdsGlobalKeydownAttached = true;
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (state.editor.versionModalOpen) {
+        e.preventDefault();
+        closeVersionModal();
+        return;
+      }
+      if (state.editor.managerModalOpen) {
+        e.preventDefault();
+        closePresetManagerModal();
+        return;
+      }
+      if (state.editor.exportModalOpen) {
+        e.preventDefault();
+        closeUnifiedExportModal();
+        return;
+      }
+      if (state.review?.drawerOpen) {
+        e.preventDefault();
+        state.review.drawerOpen = false;
+        renderApp();
+        return;
+      }
+    }
+
+    if (e.key === 'Tab') {
+      const activeModal = document.querySelector('.modal-card[role="dialog"]');
+      if (activeModal) {
+        const focusables = Array.from(activeModal.querySelectorAll(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        ));
+        if (focusables.length > 0) {
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    }
+  });
+}

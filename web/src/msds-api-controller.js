@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
 import { loadDocx } from './docx-engine.js';
 import { runSmartMatching, applyMatchResultToEditor } from './smart-matching.js';
+import JSZip from 'jszip';
 import {
   createBatch,
   listBatches,
@@ -17,7 +18,25 @@ import {
   updateRecordAnnotations,
   getRepoStats,
   serializeMatchResult,
+  listPresets,
+  getPresetById,
+  savePreset,
+  deletePreset,
 } from './msds-db.js';
+import {
+  applyPresetPriorityOverlay,
+  buildExportDocxName,
+  renumberRecord,
+} from './docx-engine.js';
+
+function tableRecords(engine) {
+  return (engine?.records || []).filter((r) => r.kind === 'table');
+}
+import {
+  convertDocxToPdf,
+  convertBatchDocxToPdf,
+  isPdfConverterAvailable,
+} from './pdf-converter.js';
 
 if (!globalThis.DOMParser || !globalThis.XMLSerializer) {
   const dom = new JSDOM('<!doctype html><html><body></body></html>');
@@ -413,6 +432,124 @@ export async function handleApiRequest(req, res) {
     }
 
     // ==========================================
+    // 0.5 预设库管理与优先级应用 (Presets API)
+    // ==========================================
+
+    // 0.5.1 GET /api/msds/presets - 获取全部预设（支持 entity/language/enabled 过滤）
+    if (pathname === '/api/msds/presets' && req.method === 'GET') {
+      const entity = searchParams.get('entity') || 'all';
+      const language = searchParams.get('language') || 'all';
+      const enabledOnly = searchParams.get('enabledOnly') === 'true';
+
+      const presets = listPresets({ entity, language, enabledOnly });
+      sendJson(res, 200, {
+        success: true,
+        total: presets.length,
+        data: presets,
+      });
+      return true;
+    }
+
+    // 0.5.2 GET /api/msds/presets/:id - 获取指定预设详情
+    const presetDetailMatch = pathname.match(/^\/api\/msds\/presets\/([^\/]+)$/);
+    if (presetDetailMatch && req.method === 'GET') {
+      const presetId = decodeURIComponent(presetDetailMatch[1]);
+      const p = getPresetById(presetId);
+      if (!p) {
+        sendJson(res, 404, { success: false, error: { message: `未找到 ID 为 ${presetId} 的预设` } });
+        return true;
+      }
+      sendJson(res, 200, { success: true, data: p });
+      return true;
+    }
+
+    // 0.5.3 POST /api/msds/presets - 新建或保存预设
+    if (pathname === '/api/msds/presets' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      if (!body.name) {
+        sendJson(res, 400, { success: false, error: { message: '预设名称（name）为必填字段' } });
+        return true;
+      }
+      const saved = savePreset(body);
+      sendJson(res, 200, { success: true, data: saved, message: '预设已成功保存' });
+      return true;
+    }
+
+    // 0.5.4 PUT /api/msds/presets/:id - 更新指定预设
+    if (presetDetailMatch && req.method === 'PUT') {
+      const presetId = decodeURIComponent(presetDetailMatch[1]);
+      const body = await parseJsonBody(req);
+      body.id = presetId;
+      const updated = savePreset(body);
+      sendJson(res, 200, { success: true, data: updated, message: '预设已成功更新' });
+      return true;
+    }
+
+    // 0.5.5 DELETE /api/msds/presets/:id - 删除指定自定义预设
+    if (presetDetailMatch && req.method === 'DELETE') {
+      const presetId = decodeURIComponent(presetDetailMatch[1]);
+      try {
+        const delRes = deletePreset(presetId);
+        sendJson(res, 200, { success: true, id: presetId, message: '预设已成功删除' });
+      } catch (err) {
+        sendJson(res, 400, { success: false, error: { message: err.message } });
+      }
+      return true;
+    }
+
+    // 0.5.6 POST /api/msds/presets/apply - 将指定预设应用至会话（优先级覆盖）
+    if (pathname === '/api/msds/presets/apply' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const sessionId = body.sessionId || 'default';
+      const presetId = body.presetId;
+
+      const session = sessions.get(sessionId);
+      if (!session || !session.editorEngine) {
+        sendJson(res, 404, { success: false, error: { message: `未找到会话或模板编辑器未就绪: ${sessionId}` } });
+        return true;
+      }
+
+      let presetObj = body.preset;
+      if (!presetObj && presetId) {
+        presetObj = getPresetById(presetId);
+      }
+      if (!presetObj) {
+        sendJson(res, 400, { success: false, error: { message: '请提供有效的 presetId 或 preset 对象' } });
+        return true;
+      }
+
+      // 如果有即时传入的临时覆盖
+      if (body.customFieldOverrides) {
+        presetObj = {
+          ...presetObj,
+          fieldOverrides: { ...presetObj.fieldOverrides, ...body.customFieldOverrides },
+        };
+      }
+      if (body.customHeaderFooterOverrides) {
+        presetObj = {
+          ...presetObj,
+          headerFooterOverrides: { ...presetObj.headerFooterOverrides, ...body.customHeaderFooterOverrides },
+        };
+      }
+
+      // 执行局部优先级覆盖合并
+      const appliedCount = applyPresetPriorityOverlay(session.sourceEngine || session.editorEngine, presetObj, session.editorEngine);
+      tableRecords(session.editorEngine).forEach((r) => renumberRecord(r));
+      session.updatedAt = Date.now();
+      session.activePresetId = presetObj.id;
+
+      sendJson(res, 200, {
+        success: true,
+        sessionId,
+        presetId: presetObj.id,
+        presetName: presetObj.name,
+        appliedFieldsCount: appliedCount,
+        message: `预设【${presetObj.name}】已成功覆盖应用`,
+      });
+      return true;
+    }
+
+    // ==========================================
     // 现有单次会话 API 保留 (Backward Compatibility)
     // ==========================================
 
@@ -423,6 +560,7 @@ export async function handleApiRequest(req, res) {
         status: 'UP',
         engineVersion: APP_VERSION,
         activeSessions: sessions.size,
+        pdfConverterAvailable: isPdfConverterAvailable(),
         timestamp: new Date().toISOString(),
       });
       return true;
@@ -639,6 +777,414 @@ export async function handleApiRequest(req, res) {
         sessionId,
         templateVariant: session.templateVariant,
         data: { sections: structuredSections },
+      });
+      return true;
+    }
+
+
+    // ==========================================
+    // 6. 统一导出接口 (Export DOCX & PDF)
+    // ==========================================
+    // POST /api/msds/convert-pdf-batch
+    // 支持接收前端传来的多份 DOCX 文件并发批处理转译为高清 PDF
+    if (pathname === '/api/msds/convert-pdf-batch' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      if (!isPdfConverterAvailable()) {
+        sendJson(res, 503, { success: false, error: { message: '服务器未配置或未找到可用的 LibreOffice 环境，无法转译 PDF' } });
+        return true;
+      }
+      const files = (body.files || []).map((f) => ({
+        name: f.name,
+        buffer: Buffer.from(f.bufferBase64, 'base64'),
+      }));
+      const pdfs = await convertBatchDocxToPdf(files);
+      sendJson(res, 200, {
+        success: true,
+        pdfs: pdfs.map((p) => ({
+          pdfName: p.pdfName,
+          pdfBase64: p.pdfBuffer.toString('base64'),
+          size: p.size,
+          durationMs: p.durationMs,
+        })),
+      });
+      return true;
+    }
+
+    // POST /api/msds/export
+    // 支持按预设优先级同步导出 DOCX 与高清 PDF (可打包为 ZIP 或返回 base64 清单)
+    if (pathname === '/api/msds/export' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const sessionId = body.sessionId || 'default';
+      const session = sessions.get(sessionId);
+
+      let baseEngine = session?.editorEngine;
+      let baseModel = session?.matchResult?.summary?.productName || '';
+
+      if (!baseEngine && body.baseDocxBase64) {
+        const buf = Buffer.from(body.baseDocxBase64, 'base64');
+        baseEngine = await loadDocx(buf, body.templateName || 'base.docx');
+        baseModel = body.productModel || baseEngine.headerFooterData?.model || '';
+      }
+
+      if (!baseEngine && body.recordId) {
+        const rec = getRecordById(body.recordId);
+        if (rec) {
+          const buf = getDocxBuffer(body.recordId);
+          if (buf) {
+            baseEngine = await loadDocx(buf, rec.file_name);
+            baseModel = rec.model || '';
+          }
+        }
+      }
+
+      if (!baseEngine) {
+        sendJson(res, 404, { success: false, error: { message: `未找到可导出的引擎实例。请提供有效 sessionId 或 recordId` } });
+        return true;
+      }
+
+      const format = String(body.format || 'docx').toLowerCase(); // 'docx' | 'pdf' | 'both'
+      const returnType = String(body.returnType || 'json').toLowerCase(); // 'json' | 'binary'
+      const includeBase = body.includeBase !== false;
+      const requestedPresetIds = Array.isArray(body.presetIds) ? body.presetIds : null;
+
+      // 提取预设清单
+      let exportPresets = [];
+      if (requestedPresetIds && requestedPresetIds.length > 0) {
+        for (const pid of requestedPresetIds) {
+          const p = getPresetById(pid);
+          if (p) exportPresets.push(p);
+        }
+      } else if (body.presetIds === 'all') {
+        exportPresets = listPresets({ enabledOnly: true });
+      }
+
+      const outputs = [];
+
+      // 1. 并发准备全部 DOCX 目标文件 (Promise.all 并行装配)
+      const docxGenerationTasks = [];
+
+      if (includeBase) {
+        docxGenerationTasks.push(
+          (async () => {
+            const baseDocxBuf = await baseEngine.exportArrayBuffer();
+            const baseName = buildExportDocxName(baseEngine, {
+              customFileName: body.customFileName,
+              templateName: session?.templateVariant,
+              sourcePreviewName: session?.sourceFileName,
+              productModel: baseModel,
+            });
+            return {
+              name: baseName,
+              format: 'docx',
+              buffer: Buffer.from(baseDocxBuf),
+              size: baseDocxBuf.byteLength,
+              isBase: true,
+            };
+          })()
+        );
+      }
+
+      for (const preset of exportPresets) {
+        docxGenerationTasks.push(
+          (async () => {
+            const rawBuf = await baseEngine.exportArrayBuffer();
+            const presetEngine = await loadDocx(rawBuf, preset.targetTemplate || 'template.docx');
+
+            applyPresetPriorityOverlay(baseEngine, preset, presetEngine);
+            tableRecords(presetEngine).forEach((r) => renumberRecord(r));
+
+            let presetDocxName = '';
+            if (preset.headerFooterOverrides?.customFileNamePattern) {
+              presetDocxName = preset.headerFooterOverrides.customFileNamePattern.replace('{model}', baseModel || 'MSDS');
+            } else {
+              const cleanPresetName = (preset.name || '预设').replace(/[\/:*?"<>|]/g, '_');
+              const lang = preset.language || 'CN';
+              presetDocxName = `${baseModel || 'MSDS'} msds_${lang}_${cleanPresetName}.docx`;
+            }
+
+            const presetDocxBuf = await presetEngine.exportArrayBuffer();
+            return {
+              name: presetDocxName,
+              presetId: preset.id,
+              presetName: preset.name,
+              format: 'docx',
+              buffer: Buffer.from(presetDocxBuf),
+              size: presetDocxBuf.byteLength,
+              isBase: false,
+            };
+          })()
+        );
+      }
+
+      // 并行执行所有 DOCX 生成
+      const docxResults = await Promise.all(docxGenerationTasks);
+
+      if (format === 'docx' || format === 'both') {
+        for (const item of docxResults) {
+          outputs.push(item);
+        }
+      }
+
+      // 2. 批量极速并发转译 PDF (利用 LibreOffice 原生批处理管道)
+      if (format === 'pdf' || format === 'both') {
+        if (!isPdfConverterAvailable()) {
+          throw new Error('本机未检测到可用的 LibreOffice PDF 转换工具');
+        }
+        const pdfItemsToConvert = docxResults.map((item) => ({
+          buffer: item.buffer,
+          name: item.name,
+        }));
+
+        const pdfResults = await convertBatchDocxToPdf(pdfItemsToConvert);
+        for (let i = 0; i < pdfResults.length; i++) {
+          const pRes = pdfResults[i];
+          const matchedDocx = docxResults[i];
+          outputs.push({
+            name: pRes.pdfName,
+            presetId: matchedDocx?.presetId,
+            presetName: matchedDocx?.presetName,
+            format: 'pdf',
+            buffer: pRes.pdfBuffer,
+            size: pRes.size,
+            durationMs: pRes.durationMs,
+          });
+        }
+      }
+
+      if (outputs.length === 0) {
+        sendJson(res, 400, { success: false, error: { message: '没有生成任何导出文件' } });
+        return true;
+      }
+
+      // 二进制下载流模式
+      if (returnType === 'binary') {
+        if (outputs.length === 1) {
+          const single = outputs[0];
+          const contentType = single.format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          res.writeHead(200, {
+            'Content-Type': contentType,
+            'Content-Length': single.buffer.length,
+            'Content-Disposition': `attachment; filename="${encodeURIComponent(single.name)}"`,
+            'Access-Control-Allow-Origin': '*',
+          });
+          res.end(single.buffer);
+          return true;
+        } else {
+          const zip = new JSZip();
+          for (const item of outputs) {
+            zip.file(item.name, item.buffer);
+          }
+          const zipBuf = await zip.generateAsync({ type: 'nodebuffer' });
+          const zipName = `${baseModel || 'MSDS'}_多版本同步包.zip`;
+          res.writeHead(200, {
+            'Content-Type': 'application/zip',
+            'Content-Length': zipBuf.length,
+            'Content-Disposition': `attachment; filename="${encodeURIComponent(zipName)}"`,
+            'Access-Control-Allow-Origin': '*',
+          });
+          res.end(zipBuf);
+          return true;
+        }
+      }
+
+      // 默认 JSON 模式 (携带 Base64 内容及统计元数据)
+      sendJson(res, 200, {
+        success: true,
+        sessionId,
+        model: baseModel,
+        format,
+        totalFiles: outputs.length,
+        files: outputs.map((f) => ({
+          name: f.name,
+          format: f.format,
+          size: f.size,
+          presetId: f.presetId,
+          presetName: f.presetName,
+          durationMs: f.durationMs,
+          contentBase64: f.buffer.toString('base64'),
+        })),
+      });
+      return true;
+    }
+
+    // ==========================================
+    // 6. 统一导出接口 (Export DOCX & PDF)
+    // ==========================================
+    // POST /api/msds/export
+    // 支持按预设优先级同步导出 DOCX 与高清 PDF (可打包为 ZIP 或返回 base64 清单)
+    if (pathname === '/api/msds/export' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const sessionId = body.sessionId || 'default';
+      const session = sessions.get(sessionId);
+
+      let baseEngine = session?.editorEngine;
+      let baseModel = session?.matchResult?.summary?.productName || '';
+
+      if (!baseEngine && body.recordId) {
+        const rec = getRecordById(body.recordId);
+        if (rec) {
+          const buf = getDocxBuffer(body.recordId);
+          if (buf) {
+            baseEngine = await loadDocx(buf, rec.file_name);
+            baseModel = rec.model || '';
+          }
+        }
+      }
+
+      if (!baseEngine) {
+        sendJson(res, 404, { success: false, error: { message: `未找到可导出的引擎实例。请提供有效 sessionId 或 recordId` } });
+        return true;
+      }
+
+      const format = String(body.format || 'docx').toLowerCase(); // 'docx' | 'pdf' | 'both'
+      const returnType = String(body.returnType || 'json').toLowerCase(); // 'json' | 'binary'
+      const includeBase = body.includeBase !== false;
+      const requestedPresetIds = Array.isArray(body.presetIds) ? body.presetIds : null;
+
+      // 提取预设清单
+      let exportPresets = [];
+      if (requestedPresetIds && requestedPresetIds.length > 0) {
+        for (const pid of requestedPresetIds) {
+          const p = getPresetById(pid);
+          if (p) exportPresets.push(p);
+        }
+      } else if (body.presetIds === 'all') {
+        exportPresets = listPresets({ enabledOnly: true });
+      }
+
+      const outputs = [];
+
+      // 1. 普通基准主文档导出
+      if (includeBase) {
+        const baseDocxBuf = await baseEngine.exportArrayBuffer();
+        const baseName = buildExportDocxName(baseEngine, {
+          customFileName: body.customFileName,
+          templateName: session?.templateVariant,
+          sourcePreviewName: session?.sourceFileName,
+          productModel: baseModel,
+        });
+
+        if (format === 'docx' || format === 'both') {
+          outputs.push({
+            name: baseName,
+            format: 'docx',
+            buffer: Buffer.from(baseDocxBuf),
+            size: baseDocxBuf.byteLength,
+          });
+        }
+        if (format === 'pdf' || format === 'both') {
+          if (!isPdfConverterAvailable()) {
+            throw new Error('本机未检测到可用的 LibreOffice PDF 转换工具');
+          }
+          const pdfRes = await convertDocxToPdf(baseDocxBuf, baseName);
+          outputs.push({
+            name: pdfRes.pdfName,
+            format: 'pdf',
+            buffer: pdfRes.pdfBuffer,
+            size: pdfRes.size,
+            durationMs: pdfRes.durationMs,
+          });
+        }
+      }
+
+      // 2. 逐个生成勾选的预设版本
+      for (const preset of exportPresets) {
+        const rawBuf = await baseEngine.exportArrayBuffer();
+        const presetEngine = await loadDocx(rawBuf, preset.targetTemplate || 'template.docx');
+
+        applyPresetPriorityOverlay(baseEngine, preset, presetEngine);
+        tableRecords(presetEngine).forEach((r) => renumberRecord(r));
+
+        let presetDocxName = '';
+        if (preset.headerFooterOverrides?.customFileNamePattern) {
+          presetDocxName = preset.headerFooterOverrides.customFileNamePattern.replace('{model}', baseModel || 'MSDS');
+        } else {
+          const cleanPresetName = (preset.name || '预设').replace(/[\\/:*?"<>|]/g, '_');
+          const lang = preset.language || 'CN';
+          presetDocxName = `${baseModel || 'MSDS'} msds_${lang}_${cleanPresetName}.docx`;
+        }
+
+        const presetDocxBuf = await presetEngine.exportArrayBuffer();
+
+        if (format === 'docx' || format === 'both') {
+          outputs.push({
+            name: presetDocxName,
+            presetId: preset.id,
+            presetName: preset.name,
+            format: 'docx',
+            buffer: Buffer.from(presetDocxBuf),
+            size: presetDocxBuf.byteLength,
+          });
+        }
+        if (format === 'pdf' || format === 'both') {
+          if (!isPdfConverterAvailable()) {
+            throw new Error('本机未检测到可用的 LibreOffice PDF 转换工具');
+          }
+          const pdfRes = await convertDocxToPdf(presetDocxBuf, presetDocxName);
+          outputs.push({
+            name: pdfRes.pdfName,
+            presetId: preset.id,
+            presetName: preset.name,
+            format: 'pdf',
+            buffer: pdfRes.pdfBuffer,
+            size: pdfRes.size,
+            durationMs: pdfRes.durationMs,
+          });
+        }
+      }
+
+      if (outputs.length === 0) {
+        sendJson(res, 400, { success: false, error: { message: '没有生成任何导出文件' } });
+        return true;
+      }
+
+      // 二进制下载流模式
+      if (returnType === 'binary') {
+        if (outputs.length === 1) {
+          const single = outputs[0];
+          const contentType = single.format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          res.writeHead(200, {
+            'Content-Type': contentType,
+            'Content-Length': single.buffer.length,
+            'Content-Disposition': `attachment; filename="${encodeURIComponent(single.name)}"`,
+            'Access-Control-Allow-Origin': '*',
+          });
+          res.end(single.buffer);
+          return true;
+        } else {
+          const zip = new JSZip();
+          for (const item of outputs) {
+            zip.file(item.name, item.buffer);
+          }
+          const zipBuf = await zip.generateAsync({ type: 'nodebuffer' });
+          const zipName = `${baseModel || 'MSDS'}_多版本同步包.zip`;
+          res.writeHead(200, {
+            'Content-Type': 'application/zip',
+            'Content-Length': zipBuf.length,
+            'Content-Disposition': `attachment; filename="${encodeURIComponent(zipName)}"`,
+            'Access-Control-Allow-Origin': '*',
+          });
+          res.end(zipBuf);
+          return true;
+        }
+      }
+
+      // 默认 JSON 模式 (携带 Base64 内容及统计元数据)
+      sendJson(res, 200, {
+        success: true,
+        sessionId,
+        model: baseModel,
+        format,
+        totalFiles: outputs.length,
+        files: outputs.map((f) => ({
+          name: f.name,
+          format: f.format,
+          size: f.size,
+          presetId: f.presetId,
+          presetName: f.presetName,
+          durationMs: f.durationMs,
+          contentBase64: f.buffer.toString('base64'),
+        })),
       });
       return true;
     }
