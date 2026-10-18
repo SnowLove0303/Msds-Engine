@@ -122,7 +122,7 @@ export function serializeMatchResult(matchRes) {
   if (!matchRes || typeof matchRes !== 'object') return {};
   return {
     success: matchRes.success,
-    engineVersion: matchRes.engineVersion || '1.3.0',
+    engineVersion: matchRes.engineVersion || '1.6.0',
     summary: matchRes.summary || {},
     fileNaming: matchRes.fileNaming || {},
     headerFooter: matchRes.headerFooter || {},
@@ -232,7 +232,7 @@ export function saveRecord(record) {
     Number(record.conflictFields || 0),
     Number(record.unmatchedFields || 0),
     Number(record.annotationsCount || 0),
-    record.engineVersion || '1.3.0',
+    record.engineVersion || '1.6.0',
     rawFactsStr,
     matchResultStr,
     typeof record.annotationsJson === 'string' ? record.annotationsJson : JSON.stringify(record.annotationsJson || []),
@@ -359,7 +359,7 @@ export function deleteRecord(id) {
   return { success: true, id };
 }
 
-export function updateRecordMatch(id, matchResult, engineVersion = '1.3.0') {
+export function updateRecordMatch(id, matchResult, engineVersion = '1.6.0') {
   const db = getDb();
   const now = Date.now();
   const summary = matchResult.summary || {};

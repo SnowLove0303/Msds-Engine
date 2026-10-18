@@ -30,9 +30,18 @@ rollback/*.zip
 _rollback/
 *.zip
 
+
 # Operating system & Editor files
 .DS_Store
 Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+
+
+# 镜像构建用的原中文字体（微软专有字体，不进版本库；仅本机构建镜像时使用）
+# 同步方式：scripts/sync-build-fonts.ps1
+docker/fonts/*
+!docker/fonts/.gitkeep
+!docker/fonts/README.md

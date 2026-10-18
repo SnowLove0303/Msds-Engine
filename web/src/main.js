@@ -272,6 +272,7 @@ const state = {
     zoomScale: 'fit',
     isWidePreview: false,
   },
+  pdfCapability: null, // 服务端 PDF 转换能力描述（来自 GET /api/msds/health），用于导出前呈现
   pendingScrollSection: { inspect: null, matching: null, editor: null },
   previewScrollPositions: { inspect: 0, matching: 0, editor: 0 },
   review: {
@@ -897,6 +898,9 @@ function renderUnifiedExportModal() {
   const targets = computeExportTargets();
   const docxCount = targets.filter((t) => t.format === 'docx').length;
   const pdfCount = targets.filter((t) => t.format === 'pdf').length;
+  // PDF 能力呈现：能力缺失时禁用"仅 PDF"，并对"全部 (Word+PDF)"标注 PDF 将缺失
+  const pdfCap = state.pdfCapability;
+  const pdfUnavailable = Boolean(pdfCap && pdfCap.available === false);
 
   return `
     <div class="modal-backdrop" data-backdrop="true">
@@ -913,9 +917,9 @@ function renderUnifiedExportModal() {
             <div class="export-section-header">
               <span class="export-section-title">1. 选择交付格式</span>
               <div class="export-quick-links">
-                <button type="button" class="export-quick-link" data-action="quick-export-both-formats">全部 (Word+PDF)</button>
+                <button type="button" class="export-quick-link" data-action="quick-export-both-formats" ${pdfUnavailable ? 'title="PDF 转换当前不可用，选择后将只交付 Word"' : ''}>全部 (Word+PDF)</button>
                 <button type="button" class="export-quick-link" data-action="quick-export-docx-only">仅 Word</button>
-                <button type="button" class="export-quick-link" data-action="quick-export-pdf-only">仅 PDF</button>
+                <button type="button" class="export-quick-link" data-action="quick-export-pdf-only" ${pdfUnavailable ? 'disabled title="PDF 转换当前不可用"' : ''}>仅 PDF</button>
               </div>
             </div>
             <div class="export-chip-group">
@@ -923,11 +927,19 @@ function renderUnifiedExportModal() {
                 <input type="checkbox" data-action="toggle-export-format" data-format="docx" ${cfg.formatDocx ? 'checked' : ''} />
                 <span>Word (.docx)</span>
               </label>
-              <label class="export-chip ${cfg.formatPdf ? 'active' : ''}">
-                <input type="checkbox" data-action="toggle-export-format" data-format="pdf" ${cfg.formatPdf ? 'checked' : ''} />
+              <label class="export-chip ${cfg.formatPdf && !pdfUnavailable ? 'active' : ''}">
+                <input type="checkbox" data-action="toggle-export-format" data-format="pdf" ${cfg.formatPdf && !pdfUnavailable ? 'checked' : ''} ${pdfUnavailable ? 'disabled' : ''} />
                 <span>PDF (.pdf)</span>
               </label>
             </div>
+            ${pdfUnavailable ? `
+              <div class="export-capability-warning" role="status">
+                <strong>PDF 转换当前不可用，本次导出将只交付 Word。</strong>
+                <div class="export-capability-reason">${escapeHtml(pdfCap.reason || '未找到可用的 PDF 转换运行时')}</div>
+                ${pdfCap.remedy ? `<div class="export-capability-remedy">补救方式：${escapeHtml(pdfCap.remedy)}</div>` : ''}
+                ${pdfCap.backendLabel ? `<div class="export-capability-backend">当前后端：${escapeHtml(pdfCap.backendLabel)}｜字体：${escapeHtml(pdfCap.fontsStatus || '未知')}</div>` : ''}
+              </div>
+            ` : ''}
           </div>
 
           <!-- 2. 已就绪基准与版本 -->
@@ -3325,7 +3337,13 @@ function bindEvents() {
         const fmt = toggleExportFmt.dataset.format;
         lastFocusedModalControlSelector = `[data-action="toggle-export-format"][data-format="${fmt}"]`;
         if (fmt === 'docx') state.editor.exportConfig.formatDocx = !state.editor.exportConfig.formatDocx;
-        if (fmt === 'pdf') state.editor.exportConfig.formatPdf = !state.editor.exportConfig.formatPdf;
+        if (fmt === 'pdf') {
+          if (state.pdfCapability && state.pdfCapability.available === false) {
+            showToast(`PDF 转换当前不可用，无法选择 PDF。${state.pdfCapability.reason || ''}`, 'error');
+            return;
+          }
+          state.editor.exportConfig.formatPdf = !state.editor.exportConfig.formatPdf;
+        }
         renderApp();
         return;
       }
@@ -3334,7 +3352,12 @@ function bindEvents() {
       if (e.target.closest('[data-action="quick-export-both-formats"]')) {
         lastFocusedModalControlSelector = '[data-action="quick-export-both-formats"]';
         state.editor.exportConfig.formatDocx = true;
-        state.editor.exportConfig.formatPdf = true;
+        if (state.pdfCapability && state.pdfCapability.available === false) {
+          state.editor.exportConfig.formatPdf = false;
+          showToast(`PDF 转换当前不可用，已切换为仅交付 Word。原因：${state.pdfCapability.reason || ''}`, 'info');
+        } else {
+          state.editor.exportConfig.formatPdf = true;
+        }
         renderApp();
         return;
       }
@@ -3346,6 +3369,10 @@ function bindEvents() {
         return;
       }
       if (e.target.closest('[data-action="quick-export-pdf-only"]')) {
+        if (state.pdfCapability && state.pdfCapability.available === false) {
+          showToast(`PDF 转换当前不可用，已阻止仅 PDF 导出。${state.pdfCapability.reason || ''}`, 'error');
+          return;
+        }
         lastFocusedModalControlSelector = '[data-action="quick-export-pdf-only"]';
         state.editor.exportConfig.formatDocx = false;
         state.editor.exportConfig.formatPdf = true;
@@ -3741,8 +3768,8 @@ function renderZoomBar(targetId, currentZoom = 'fit') {
 
 function applyDocxFitToWidth(target, scaleMode = 'fit') {
   if (!target) return;
-  const wrapper = target.querySelector('.docx-wrapper');
-  const section = target.querySelector('section.docx');
+  const wrapper = target.querySelector('.docx-wrapper, .docx-preview-wrapper');
+  const section = target.querySelector('section.docx, section.docx-preview');
   if (!wrapper || !section) return;
 
   const containerWidth = target.clientWidth;
@@ -4451,7 +4478,21 @@ async function executeUnifiedExport() {
     const pdfMap = new Map();
     const needsPdf = targets.some((t) => t.format === 'pdf');
 
-    if (needsPdf) {
+    // PDF 能力预检：能力缺失时不留半成品；同时勾选 Word 的场景降级为仅交付 Word
+    const pdfUnavailable = Boolean(state.pdfCapability && state.pdfCapability.available === false);
+    if (needsPdf && pdfUnavailable) {
+      const hasDocxTargets = targets.some((t) => t.format === 'docx');
+      if (!hasDocxTargets) {
+        state.editor.exportConfig.isExporting = false;
+        state.editor.exportConfig.exportProgress = '';
+        showToast(`PDF 转换不可用，已取消导出以避免产生半成品。${state.pdfCapability.reason || ''}`, 'error');
+        renderApp();
+        return;
+      }
+      showToast(`PDF 转换不可用，本次将只交付 Word。原因：${state.pdfCapability.reason || ''}`, 'info');
+    }
+
+    if (needsPdf && !pdfUnavailable) {
       state.editor.exportConfig.exportProgress = '正在通过批处理管道极速渲染高清 PDF…';
       renderApp();
 
@@ -4482,7 +4523,13 @@ async function executeUnifiedExport() {
             }
           }
         } else {
-          console.warn('PDF 转换服务端接口返回状态非 200，继续交付 DOCX');
+          let reason = '';
+          try {
+            const errJson = await resp.json();
+            reason = errJson?.error?.message || '';
+          } catch {}
+          console.warn('PDF 转换服务端接口返回状态非 200，继续交付 DOCX', reason);
+          if (reason) showToast(`PDF 未生成，已交付 Word。${reason}`, 'error');
         }
       } catch (pdfErr) {
         console.warn('PDF 批量转换请求失败:', pdfErr);
@@ -4570,8 +4617,27 @@ async function handleExportReviewBundle() {
   }
 }
 
+/**
+ * 读取服务端 PDF 转换能力，用于导出弹窗的能力呈现与导出前预检。
+ * 能力缺失时在用户点击导出之前就明确告知，而不是事后才失败。
+ */
+async function loadPdfCapability() {
+  try {
+    const resp = await fetch('/api/msds/health');
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (data && data.pdfCapability) {
+      state.pdfCapability = data.pdfCapability;
+      renderApp();
+    }
+  } catch {
+    // 能力探测失败不阻断界面
+  }
+}
+
 async function bootstrap() {
   renderApp();
+  loadPdfCapability();
   fetchRepoData();
   PresetStore.fetchPresetsFromApi().then((apiPresets) => {
     if (apiPresets && apiPresets.length > 0) {

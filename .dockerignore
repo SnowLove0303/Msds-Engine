@@ -9,5 +9,7 @@ web/dist
 __pycache__
 *.pyc
 _work
+# 本地回滚归档
+_rollback
 .DS_Store
 Thumbs.db

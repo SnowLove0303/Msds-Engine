@@ -126,9 +126,37 @@ node tests/test_full_problem_inventory.mjs
 # 4. 逐标签/值/位置批注与 Agent 审阅包 (NDJSON) 测试
 node tests/test_annotation_anchor_system.mjs
 
-# 5. 生产打包构建验证
+# 5. DOCX→PDF 高保真导出回归（验证 7 页黄金无漂移基线）
+node tests/test_pdf_export_fidelity.mjs
+
+# 6. PDF 运行时分层解析与优雅降级回归
+node tests/test_pdf_runtime_resolution.mjs
+node tests/test_pdf_preflight_and_degradation.mjs
+
+# 7. 生产打包构建验证
 npm run build
 ```
+
+---
+
+## 🐳 Docker 生产部署与高保真 PDF 导出
+
+MSDS-Engine 支持完整的 Docker 生产级开箱即用交付：
+
+```powershell
+# 1. (首次或换机) 从 Windows 本地同步微软核心字体到构建目录
+powershell -ExecutionPolicy Bypass -File scripts/sync-build-fonts.ps1
+
+# 2. 构建生产容器镜像 (集成 Node 22 + LibreOffice + 核心中文字体)
+docker compose build
+
+# 3. 启动后台容器
+docker compose up -d
+```
+
+- **访问服务**：`http://127.0.0.1:5173/`
+- **原字体映射**：容器构建时装入宋体/黑体/楷体/仿宋/雅黑（`docker/fonts/`），通过 `docker/fontconfig-local.conf` 映射，确保金标 DOCX 转换 PDF 保持与 WPS 严格一致的 **7 页排版与 0 缺字**。
+- **健康状态**：`GET /api/msds/health` 实时报告 PDF 运行时可用性与后端详情。
 
 ---
 

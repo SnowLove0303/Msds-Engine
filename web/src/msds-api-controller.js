@@ -35,7 +35,7 @@ function tableRecords(engine) {
 import {
   convertDocxToPdf,
   convertBatchDocxToPdf,
-  isPdfConverterAvailable,
+  getPdfCapability,
 } from './pdf-converter.js';
 
 if (!globalThis.DOMParser || !globalThis.XMLSerializer) {
@@ -44,10 +44,49 @@ if (!globalThis.DOMParser || !globalThis.XMLSerializer) {
   globalThis.XMLSerializer = dom.window.XMLSerializer;
 }
 
+/**
+ * PDF 导出预检：在生成任何文件之前判定转换能力，并决定"快速失败"或"降级为仅 Word"。
+ * - format='pdf'  且能力不可用 → blocked（不产生任何半成品）
+ * - format='both' 且能力不可用 → pdfOmitted（继续交付 Word，并在响应中标注缺失原因）
+ * @param {string} format 'docx' | 'pdf' | 'both'
+ */
+function evaluatePdfPreflight(format) {
+  const needsPdf = format === 'pdf' || format === 'both';
+  if (!needsPdf) return { needsPdf: false, capability: null, pdfOmitted: null, blocked: null };
+
+  const capability = getPdfCapability();
+  if (capability.available) return { needsPdf: true, capability, pdfOmitted: null, blocked: null };
+
+  const remedy = capability.remedy || '请先准备可用的 PDF 转换运行环境';
+  if (format === 'pdf') {
+    return {
+      needsPdf: true,
+      capability,
+      pdfOmitted: null,
+      blocked: {
+        status: 503,
+        message: `PDF 转换能力不可用，已取消本次导出以避免产生半成品。原因：${capability.reason} 补救方式：${remedy}`,
+      },
+    };
+  }
+  return {
+    needsPdf: true,
+    capability,
+    pdfOmitted: {
+      reason: capability.reason,
+      remedy,
+      backend: capability.backend,
+      fontsStatus: capability.fontsStatus,
+      attempts: capability.attempts,
+    },
+    blocked: null,
+  };
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const TEMPLATES_DIR = path.resolve(__dirname, '../public/templates');
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.6.0';
 
 // 内存会话存储池
 const sessions = new Map();
@@ -555,12 +594,31 @@ export async function handleApiRequest(req, res) {
 
     // 1. GET /api/msds/health
     if (pathname === '/api/msds/health' && req.method === 'GET') {
+      const pdfCapability = getPdfCapability();
       sendJson(res, 200, {
         success: true,
         status: 'UP',
         engineVersion: APP_VERSION,
         activeSessions: sessions.size,
-        pdfConverterAvailable: isPdfConverterAvailable(),
+        // 保留既有布尔字段（取值来源改为能力描述，语义不变）
+        pdfConverterAvailable: pdfCapability.available,
+        // 新增：完整能力详情，用于导出前诊断与后端溯源
+        pdfCapability: {
+          available: pdfCapability.available,
+          backend: pdfCapability.backend,
+          backendLabel: pdfCapability.backendLabel,
+          version: pdfCapability.version,
+          exportFilter: pdfCapability.exportFilter,
+          fontsReady: pdfCapability.fontsReady,
+          fontsStatus: pdfCapability.fontsStatus,
+          fontsDetail: pdfCapability.fontsDetail,
+          reason: pdfCapability.reason,
+          remedy: pdfCapability.remedy,
+          warnings: pdfCapability.warnings,
+          attempts: pdfCapability.attempts,
+          platform: pdfCapability.platform,
+          probedAt: pdfCapability.probedAt,
+        },
         timestamp: new Date().toISOString(),
       });
       return true;
@@ -789,8 +847,15 @@ export async function handleApiRequest(req, res) {
     // 支持接收前端传来的多份 DOCX 文件并发批处理转译为高清 PDF
     if (pathname === '/api/msds/convert-pdf-batch' && req.method === 'POST') {
       const body = await parseJsonBody(req);
-      if (!isPdfConverterAvailable()) {
-        sendJson(res, 503, { success: false, error: { message: '服务器未配置或未找到可用的 LibreOffice 环境，无法转译 PDF' } });
+      const capability = getPdfCapability();
+      if (!capability.available) {
+        sendJson(res, 503, {
+          success: false,
+          error: {
+            message: `PDF 转换能力不可用，无法转译 PDF。原因：${capability.reason} 补救方式：${capability.remedy}`,
+          },
+          pdfCapability: capability,
+        });
         return true;
       }
       const files = (body.files || []).map((f) => ({
@@ -860,6 +925,17 @@ export async function handleApiRequest(req, res) {
 
       const outputs = [];
 
+      // PDF 能力预检：必须在生成任何文件之前完成，避免"已完成大量工作才报能力缺失"
+      const pdfPreflight = evaluatePdfPreflight(format);
+      if (pdfPreflight.blocked) {
+        sendJson(res, pdfPreflight.blocked.status, {
+          success: false,
+          error: { message: pdfPreflight.blocked.message },
+          pdfCapability: pdfPreflight.capability,
+        });
+        return true;
+      }
+
       // 1. 并发准备全部 DOCX 目标文件 (Promise.all 并行装配)
       const docxGenerationTasks = [];
 
@@ -926,10 +1002,8 @@ export async function handleApiRequest(req, res) {
       }
 
       // 2. 批量极速并发转译 PDF (利用 LibreOffice 原生批处理管道)
-      if (format === 'pdf' || format === 'both') {
-        if (!isPdfConverterAvailable()) {
-          throw new Error('本机未检测到可用的 LibreOffice PDF 转换工具');
-        }
+      //    both 模式下能力缺失时跳过 PDF，保留已生成的 DOCX（优雅降级）
+      if (pdfPreflight.needsPdf && !pdfPreflight.pdfOmitted) {
         const pdfItemsToConvert = docxResults.map((item) => ({
           buffer: item.buffer,
           name: item.name,
@@ -966,6 +1040,9 @@ export async function handleApiRequest(req, res) {
             'Content-Length': single.buffer.length,
             'Content-Disposition': `attachment; filename="${encodeURIComponent(single.name)}"`,
             'Access-Control-Allow-Origin': '*',
+            ...(pdfPreflight.pdfOmitted
+              ? { 'X-PDF-Omitted': encodeURIComponent(pdfPreflight.pdfOmitted.reason || 'pdf-unavailable') }
+              : {}),
           });
           res.end(single.buffer);
           return true;
@@ -981,6 +1058,9 @@ export async function handleApiRequest(req, res) {
             'Content-Length': zipBuf.length,
             'Content-Disposition': `attachment; filename="${encodeURIComponent(zipName)}"`,
             'Access-Control-Allow-Origin': '*',
+            ...(pdfPreflight.pdfOmitted
+              ? { 'X-PDF-Omitted': encodeURIComponent(pdfPreflight.pdfOmitted.reason || 'pdf-unavailable') }
+              : {}),
           });
           res.end(zipBuf);
           return true;
@@ -994,6 +1074,16 @@ export async function handleApiRequest(req, res) {
         model: baseModel,
         format,
         totalFiles: outputs.length,
+        pdfOmitted: pdfPreflight.pdfOmitted || null,
+        pdfCapability: pdfPreflight.capability
+          ? {
+              available: pdfPreflight.capability.available,
+              backend: pdfPreflight.capability.backend,
+              backendLabel: pdfPreflight.capability.backendLabel,
+              reason: pdfPreflight.capability.reason,
+              remedy: pdfPreflight.capability.remedy,
+            }
+          : null,
         files: outputs.map((f) => ({
           name: f.name,
           format: f.format,
@@ -1054,6 +1144,17 @@ export async function handleApiRequest(req, res) {
 
       const outputs = [];
 
+      // PDF 能力预检：必须在生成任何文件之前完成
+      const pdfPreflight = evaluatePdfPreflight(format);
+      if (pdfPreflight.blocked) {
+        sendJson(res, pdfPreflight.blocked.status, {
+          success: false,
+          error: { message: pdfPreflight.blocked.message },
+          pdfCapability: pdfPreflight.capability,
+        });
+        return true;
+      }
+
       // 1. 普通基准主文档导出
       if (includeBase) {
         const baseDocxBuf = await baseEngine.exportArrayBuffer();
@@ -1072,10 +1173,7 @@ export async function handleApiRequest(req, res) {
             size: baseDocxBuf.byteLength,
           });
         }
-        if (format === 'pdf' || format === 'both') {
-          if (!isPdfConverterAvailable()) {
-            throw new Error('本机未检测到可用的 LibreOffice PDF 转换工具');
-          }
+        if (pdfPreflight.needsPdf && !pdfPreflight.pdfOmitted) {
           const pdfRes = await convertDocxToPdf(baseDocxBuf, baseName);
           outputs.push({
             name: pdfRes.pdfName,
@@ -1116,10 +1214,7 @@ export async function handleApiRequest(req, res) {
             size: presetDocxBuf.byteLength,
           });
         }
-        if (format === 'pdf' || format === 'both') {
-          if (!isPdfConverterAvailable()) {
-            throw new Error('本机未检测到可用的 LibreOffice PDF 转换工具');
-          }
+        if (pdfPreflight.needsPdf && !pdfPreflight.pdfOmitted) {
           const pdfRes = await convertDocxToPdf(presetDocxBuf, presetDocxName);
           outputs.push({
             name: pdfRes.pdfName,
@@ -1148,6 +1243,9 @@ export async function handleApiRequest(req, res) {
             'Content-Length': single.buffer.length,
             'Content-Disposition': `attachment; filename="${encodeURIComponent(single.name)}"`,
             'Access-Control-Allow-Origin': '*',
+            ...(pdfPreflight.pdfOmitted
+              ? { 'X-PDF-Omitted': encodeURIComponent(pdfPreflight.pdfOmitted.reason || 'pdf-unavailable') }
+              : {}),
           });
           res.end(single.buffer);
           return true;
@@ -1163,6 +1261,9 @@ export async function handleApiRequest(req, res) {
             'Content-Length': zipBuf.length,
             'Content-Disposition': `attachment; filename="${encodeURIComponent(zipName)}"`,
             'Access-Control-Allow-Origin': '*',
+            ...(pdfPreflight.pdfOmitted
+              ? { 'X-PDF-Omitted': encodeURIComponent(pdfPreflight.pdfOmitted.reason || 'pdf-unavailable') }
+              : {}),
           });
           res.end(zipBuf);
           return true;
@@ -1176,6 +1277,16 @@ export async function handleApiRequest(req, res) {
         model: baseModel,
         format,
         totalFiles: outputs.length,
+        pdfOmitted: pdfPreflight.pdfOmitted || null,
+        pdfCapability: pdfPreflight.capability
+          ? {
+              available: pdfPreflight.capability.available,
+              backend: pdfPreflight.capability.backend,
+              backendLabel: pdfPreflight.capability.backendLabel,
+              reason: pdfPreflight.capability.reason,
+              remedy: pdfPreflight.capability.remedy,
+            }
+          : null,
         files: outputs.map((f) => ({
           name: f.name,
           format: f.format,

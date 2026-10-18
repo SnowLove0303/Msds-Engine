@@ -1,0 +1,71 @@
+{
+  "fixture": {
+    "docx": "PU-303C msds_CN 冠志 （手动）.docx",
+    "goldenPdf": "PU-303C msds_CN 冠志 （手动）.pdf",
+    "sourceDir": "算法训练材料/PU-303C",
+    "note": "金标 PDF 由 WPS 产出；DOCX 为对应手动产出件，二者构成 DOCX→PDF 保真度基准样本对"
+  },
+  "measuredAt": "2026-10-18T00:40:00+08:00",
+  "measuredBy": "openspec change portable-pdf-export-pipeline / task 6.1",
+  "measurementMethod": {
+    "pages": "pdfinfo 报告页数",
+    "cjkChars": "pdftotext -layout 抽取后按 Unicode Script=Han 计数",
+    "cjkCoverage": "金标汉字多重集在候选文本中的命中比例（对换行重排鲁棒）",
+    "labelCount": "归一化文本中匹配 /^\\d+\\.\\d+/ 的标签行数（表格/条款结构代理指标）",
+    "replacementChars": "抽取文本中 U+FFFD 缺字替代字符计数"
+  },
+  "measurements": {
+    "goldenWps": { "pages": 7, "cjkChars": 2228, "labelCount": 69, "replacementChars": 0 },
+    "windowsCom": {
+      "backend": "com",
+      "runtime": "WPS/Word COM (Windows)",
+      "pages": 7,
+      "cjkChars": 2228,
+      "cjkDeltaPct": 0,
+      "cjkCoverage": 1,
+      "labelCount": 69,
+      "replacementChars": 0,
+      "normalizedDiffLines": 0,
+      "probeLabelsPresent": ["物料安全数据表", "产品名称", "广州冠志新材料科技有限公司", "急救措施"],
+      "verdict": "与金标 PDF 抽取文本完全一致（归一化后 0 差异）"
+    },
+    "bundledLibreOfficeWindows": {
+      "backend": "bundled",
+      "runtime": "LibreOffice 26.8.1.1 (Windows 便携版)",
+      "pages": 7,
+      "cjkChars": 2242,
+      "cjkDeltaPct": 0.63,
+      "cjkCoverage": 0.9982,
+      "labelCount": 69,
+      "replacementChars": 0,
+      "normalizedDiffLines": 231,
+      "probeLabelsPresent": ["物料安全数据表", "产品名称", "广州冠志新材料科技有限公司", "急救措施"],
+      "verdict": "页数与结构一致；差异集中于换行点重排（如『使用限制：』与『切勿操作』的断行位置），非内容缺失"
+    },
+    "bundledLibreOfficeContainer": {
+      "backend": "bundled",
+      "runtime": "LibreOffice 7.4.7.2 (Debian bookworm, 镜像内 + 核心原字体)",
+      "pages": 7,
+      "cjkChars": 2242,
+      "cjkDeltaPct": 0.63,
+      "cjkCoverage": 0.9982,
+      "labelCount": 69,
+      "replacementChars": 0,
+      "normalizedDiffLines": 151,
+      "probeLabelsPresent": ["物料安全数据表", "产品名称", "广州冠志新材料科技有限公司", "急救措施"],
+      "verdict": "容器内装入核心原中文字体后，页数与金标严格一致（7 页 vs 7 页，告别 Noto 的 12 页漂移），结构完整且 0 缺字替代字符"
+    }
+  },
+  "tolerance": {
+    "_comment": "先测量后固化：以下阈值由上述实测结果放宽留白后冻结，回归测试以此为唯一判据",
+    "pageCountDeltaMax": 0,
+    "cjkCoverageMin": 0.98,
+    "cjkCharDeltaPctMax": 2.0,
+    "labelCountDeltaMax": 0,
+    "replacementCharsMax": 0
+  },
+  "knownLimitations": [
+    "容器内运行时为 Debian 提供的 LibreOffice 7.4.7，与 Windows 便携版 26.8.1 不同版本；两者页数均与金标一致，但跨版本归一化行差异未逐版本记录",
+    "normalizedDiffLines 对换行重排高度敏感（实测 231/240），故仅作信息输出，不作为判据"
+  ]
+}
