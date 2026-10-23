@@ -1,79 +1,71 @@
-# 规范契约：全 16 Section 标签序号对齐与表头样式规约 (Specification)
+# table-header-and-label-alignment Specification
 
-## 1. Section 3 表头三列格式与角色一致性契约
+## Purpose
+Standardize table header typography and label sequence alignment across all 16 sections in MSDS documents and web workbench views. Enforces consistent font roles, fixed double-slot sequence containers, hanging indent for multi-line labels, vertical cell centering, and semantic decoupling of value-only text rows.
+
+## Requirements
 
 ### Requirement: Section 3 Table Header Style Uniformity
-Section 3 的表头行（`化学品名称 | CAS编号 | 含量%（w/w）`）在 Web 界面渲染与 DOCX 导出中，必须具备完全一致的字体角色、加粗属性与下划线。
-- **Scenario**: 渲染 Section 3 表头行
-  - **Given** 处于识别表格、标准匹配表格或模板编辑器工作区
-  - **When** 渲染包含 `化学品名称`、`CAS编号`、`含量%（w/w）` 的表头行
-  - **Then** 所有三列单元格的内部文本均必须呈现为加粗（`font-weight: 700`）
-  - **And** 所有三列单元格均保留下划线（`text-decoration: underline`）
-  - **And** 消除第 0 列的 `label-child-row`（2.2rem 缩进），三列垂直内边距与基线完全对齐
-  - **And** 导出的 DOCX 底层 OpenXML 中三列表头 run 均显式包含 `<w:b/>` 节点。
+The table header row in Section 3 (`化学品名称 | CAS编号 | 含量%（w/w）` or English counterpart) SHALL possess consistent typography roles, font weight, and border underlines in both web rendering and DOCX generation:
+- All three header cells MUST render text with bold weight (`font-weight: 700`);
+- All header cells SHALL retain bottom border underline styling;
+- The sequence indent (`label-child-row`) MUST be suppressed in column 0 so vertical baseline aligns across all three columns;
+- Exported DOCX OOXML runs MUST explicitly include `<w:b/>` tags.
 
----
-
-## 2. 序号与标签文本固定双槽位网格契约 (全三大视图统一)
+#### Scenario: Rendering Section 3 table header row
+- **WHEN** rendering Section 3 header row in recognition, matching, or template editor views
+- **THEN** all three column cells render with bold font weight and horizontal baseline alignment
+- **AND** exported Word documents contain explicit bold markup on all header runs
 
 ### Requirement: Fixed Double-Slot Baseline Alignment
-所有数据行标签单元格（包括带前缀序号与无前缀序号），在 `DOCX 识别`、`智能匹配`（原始表与标准表）、`模板编辑器` 三大视图中，必须统一采用固定宽度的双槽位 Grid 渲染，确保 16 个章节的所有标签中文首字（如“产”、“中”、“化”、“供”等）共用完全相同的水平起始线。
-- **Scenario**: 渲染带序号（如 `1.1 产品名称`、`10.1 化学稳定性`）或无序号（如 `中文名称：`、`供应商名称：`）标签行
-  - **Given** 处于 DOCX 识别、智能匹配或模板编辑器工作区
-  - **When** 输出第一列标签段落或单元格 HTML
-  - **Then** 必须输出具备 `.label-line-grid` 容器的双槽位结构
-  - **And** 第一槽位固定为统一宽度 `--sequence-width`（默认 2.8rem）的 `.sequence-run` / `.sequence-slot`
-  - **And** 存在序号时渲染序号文本，无序号时渲染不可见的 `.empty-slot` 占位槽
-  - **And** 标签正文位于第二槽位 `.label-text-slot` 中，中文首字 X 坐标在全 16 个章节中保持严格垂直共线（误差 0px）
-  - **And** 废除任何对无序号行的硬编码 `padding-left: 2.2rem` 偏位缩进
-  - **And** 模板编辑器中双击允许编辑标签时，编辑输入框约束在 `.label-text-slot` 内，保持基线绝对一致。
+All data row label cells (with or without sequence number prefixes) across DOCX recognition, smart matching, and template editor views SHALL adopt a fixed-width double-slot grid layout:
+- The container MUST utilize the `.label-line-grid` layout container;
+- The first slot SHALL be fixed at `--sequence-width` (default 2.8rem) as `.sequence-run` / `.sequence-slot`;
+- For unnumbered labels, the slot MUST render an invisible `.empty-slot` placeholder;
+- The label text MUST reside in `.label-text-slot`, ensuring first Chinese character X coordinates share a vertical collinear alignment across all 16 sections;
+- Hardcoded `padding-left: 2.2rem` offsets MUST NOT be applied to unnumbered rows.
 
----
-
-## 3. 多行长标签悬挂缩进契约
+#### Scenario: Aligning labeled and unnumbered rows
+- **WHEN** displaying rows with sequence numbers like `1.1` alongside unnumbered rows like `中文名称：`
+- **THEN** both row types share the identical horizontal start coordinate for the primary label text
+- **AND** double-click editing boundaries in the editor are confined within the text slot
 
 ### Requirement: Multi-Line Label Hanging Indent
-当标签文本超出单行宽度发生折行时，续行必须保持在标签正文槽内换行，严禁跌回序号下方或单元格左边缘。
-- **Scenario**: 渲染 Section 11.8 特异性靶器官毒性等长标签
-  - **Given** 标签正文在当前容器宽度下发生折行
-  - **When** 浏览器进行文本排版
-  - **Then** 第二行及后续换行文本的左边缘必须与第一行标签首字精确垂向对齐
-  - **And** 换行文本不得回弹至单元格最左侧（保留由 `--sequence-width` 形成的悬挂空白）。
+When label text wraps across multiple lines, wrapped text lines SHALL maintain hanging indentation within the label text slot:
+- Second and subsequent lines MUST align with the first character of line one;
+- Wrapped text MUST NOT spill back into the sequence slot or cell left boundary.
 
----
-
-## 4. 标签格垂直居中契约
+#### Scenario: Wrapping long labels in Section 11
+- **WHEN** long text such as `特异性靶器官系统毒性——一次接触` wraps in a narrow column
+- **THEN** line two aligns vertically with line one
+- **AND** the sequence margin remains reserved as hanging whitespace
 
 ### Requirement: Label Cell Vertical Centering
-结构化表格的标签单元格必须恢复垂直居中对齐，禁止全局强制置顶。
-- **Scenario**: 渲染包含多行值的复杂表格行
-  - **Given** 右侧值单元格因多行文本导致整行高度增加
-  - **When** 渲染左侧标签单元格
-  - **Then** 标签单元格的 computed `vertical-align` 必须为 `middle`（章节 Row 0 大标题除外）
-  - **And** 严禁任何 CSS `!important` 将其强行覆盖为 `top`。
+Label cells in structured tables SHALL render with vertical middle alignment by default:
+- Computed `vertical-align` of label cells MUST be `middle` (excluding Section Row 0 title banners);
+- Global CSS MUST NOT override label cell vertical alignment to `top` with `!important`.
 
----
-
-## 5. 窄标签列防伪竖排与横向可读性契约
+#### Scenario: Rendering label cells next to multi-line values
+- **WHEN** a right-side value cell expands vertically due to multi-line text
+- **THEN** the left-side label cell vertically centers relative to the expanded row height
 
 ### Requirement: Horizontal Text Flow in Narrow Columns
-Section 8 与 Section 11 等窄标签列必须保障横向可读性，杜绝单字纵向竖排。
-- **Scenario**: 渲染 Section 8 或 Section 11 的窄标签列
-  - **Given** 标签列列宽较窄（如 <= 160px）
-  - **When** 计算单元格样式与文本折行
-  - **Then** 标签列设置不低于 110px 的最小安全宽度
-  - **And** 汉字按语义词组换行，严禁逐字单字向下断裂
-  - **And** 英文单词、浓度单位及成对括号（如 `（w/w）`）保持横向完整，不得被暴力横向劈开。
+Narrow label columns such as Section 8 and Section 11 SHALL maintain horizontal readability:
+- Label columns SHALL maintain a minimum safe width of at least 110px;
+- Chinese text MUST wrap by semantic phrase boundaries without single-character vertical fragmentation;
+- English words, concentration units, and parenthetical groups (e.g. `(w/w)`) MUST stay horizontally intact.
 
----
-
-## 6. 单列说明行语义解耦契约
+#### Scenario: Viewing narrow label columns in editor
+- **WHEN** column width drops below 160px
+- **THEN** the layout maintains horizontal word grouping
+- **AND** suppresses isolated single-character vertical text splitting
 
 ### Requirement: Value-Only Row Semantics
-Section 13 废弃处置法规、Section 15 法规清单、Section 16 免责声明等单列大文本行，必须作为独立值容器呈现。
-- **Scenario**: 渲染无冒号标签的单列独立大文本
-  - **Given** 单元格跨全列且文本长度较大无标签前缀
-  - **When** 渲染该行
-  - **Then** 赋予 `role = 'value-only'` 与 `fontRole = 'value'`
-  - **And** 渲染为 `.value-only-row`，采用正文字体与常规字重（`font-weight: normal`）
-  - **And** 禁止包裹为 `label-parent-row` 或强行注入标签加粗与缩进。
+Single-column standalone full-width text rows (Section 13 waste disposal, Section 15 regulations, Section 16 disclaimers) SHALL be treated as pure value containers:
+- Cells spanning the entire width without colon prefixes SHALL receive `role = 'value-only'` and `fontRole = 'value'`;
+- Rendered markup MUST use `.value-only-row` with normal font weight (`font-weight: normal`);
+- The renderer MUST NOT wrap such rows into `label-parent-row` or inject synthetic bold/indent styling.
+
+#### Scenario: Rendering full-width regulatory text
+- **WHEN** Section 13 or Section 15 outputs large multi-paragraph regulatory text
+- **THEN** the row renders as regular body text without artificial bolding or label indentation

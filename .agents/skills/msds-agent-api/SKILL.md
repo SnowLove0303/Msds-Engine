@@ -1,11 +1,62 @@
 ---
 name: msds-agent-api
-description: "通过 HTTP REST API 驱动 MSDS Studio 自动化工作流：支持源文件导入、16个Section结构化识别抽取、指定模板智能匹配注入以及获取清晰明了的结构化匹配结果。"
+description: "通过 HTTP REST API 驱动 MSDS Studio 自动化工作流：支持源文件导入、16个Section结构化识别抽取、前置模板值清空防污染、指定模板智能匹配注入以及获取清晰明了的结构化匹配结果与标准八格式。"
 ---
 
 # MSDS Studio Agent API 调用工作流技能 (MSDS Agent API)
 
-本技能为各类 AI Agent 提供通过标准化 HTTP REST API 调度 MSDS Studio 核心引擎的能力，实现 MSDS 文档从源文件导入、识别抽取、智能匹配到生成结构化标签-值结果的端到端自动化。
+本技能为各类 AI Agent 提供通过标准化 HTTP REST API 调度 MSDS Studio 核心引擎的能力，实现 MSDS 文档从源文件导入、识别抽取、**前置模板值清空防污染**、智能匹配到生成结构化标签-值结果与标准 8 格式（4 DOCX + 4 PDF）的端到端自动化。
+
+---
+
+## 🛑 唯一法定作业路径：严禁绕开 MSDS Studio 直改文档 (Exclusive Route Guardrail)
+
+> [!CAUTION]
+> **绝对禁令：严禁任何 Agent 绕开 MSDS Studio 引擎直接编写 ad-hoc 脚本（如调用 python-docx、原生 XML 修改或文件写入）直接操作 DOCX/PDF 文件！**  
+> 一切 MSDS 的识别、装配、修改、翻译、预设覆盖与 8 格式导出，**必须且仅能通过 MSDS Studio API（如 `POST /api/msds/pipeline/generate-eight`）或官方流水线脚本（`node run_pipeline.mjs`）执行**。脱离 Studio 引擎私自修改的文档无法触发 5 大质量门禁，底层 XML 几何必定损坏，一律视为非法产物并一票否决！
+
+---
+
+## 🚨 核心操作铁律：前置模板值清空防污染 (Pre-Clear Value Guardrail)
+
+> [!IMPORTANT]
+> **Agent 开始使用编辑器编辑或发起装配前，必须优先使用编辑器的模板值清空功能（Clear Template Values Only），绝对禁止在残留旧模板数据的底模上直接编辑！**
+
+### 1. 为什么必须“先清空再编辑”？
+官方基准底模（`web/public/templates/`）中为了展示排版样式，预置了部分示范性文本（例如旧环氧乳液/异氰酸酯示范参数、示例物种信息、示例理化常数等）。
+如果 Agent 在未清空模板值的情况下直接执行装配或编辑，一旦源文件某字段未提供数据或匹配缺漏，**底模的历史旧值将悄悄“幽灵残留”在产出文档中**，引发灾难性业务合规事故（如非危化学品被串入致癌物/水生危害分类、水性产品固含被错写为 53% 等）。
+
+### 2. 清空原则（容器归母版，事实归源文）
+- **保留标签骨架**：清空操作仅清空所有单元格的**内容值（Value）**，严格保留所有官方标准的加粗标签（Label）与表格多列拓扑结构；
+- **化为纯净白纸**：清空后，所有待填写的插槽呈现为空白状态，确保后续注入的每一个字符均来自于源文件提取事实（Ground Truth）或规范化英译；
+- **双模联动执行**：
+  - **API / 代码调用**：在装配前调用 `cleanSlateTemplate(engine)` 或 `clearSectionValues(record)`；
+  - **Web 工作台交互**：优先点击顶部工具栏的【清空本节填写值】或全域清空按钮，确认画板为白纸后再进行字段填充。
+
+---
+
+## ⚖️ 关键辨析准则：区分“系统既定规范”与“实际写错/翻译问题”
+
+在对照审查报告（如《`问题研究报告/bl_8129a_msds.md`》）时，**必须清醒区分哪些是系统要求的法定基准，哪些是真正的内容与翻译错误**。报告中的部分“不一致”说明实际上是系统既定规范，切勿混淆：
+
+### 1. 🛡️ 系统既定规范（法定准则，绝对不是错误，严禁乱改）
+| 章节 | 表现现象 | 规范说明与系统契约 |
+| :--- | :--- | :--- |
+| **Section 3** | 英文标签包含 `3.1 Product type：`、`3.2 Ingredients` | **系统硬性规范**：官方英文底模已固化该二级编号，与中文版标准对齐，严禁误报为“多了序号错误”。 |
+| **Section 7** | 英文标签包含 `7.1 Precautions for safe handling：`、`7.2 Conditions for safe storage：` | **系统硬性规范**：官方底模标准层级，统一带 `7.1`、`7.2` 前缀。 |
+| **Section 15** | 英文版保留《危险化学品安全管理条例，国务院令591号》、GB/T 16483、GB 30000.2-29 等中文法规全称 | **法定合规准则**：面向中国境内化学品登记与监管备案，国家法规及国标名称具有法定专有性，底模统一保留中文法规名，绝非“未翻译”错误。 |
+| **Section 2** | 统一注入悬挂缩进 `457 dxa` 与显式制表位 `459 dxa` | **几何排版不变量**：保障序号与序号对齐、标签首字垂直水平齐平，严禁改动段落属性。 |
+| **全章节标签** | 标签文字与白名单保护机制 | **受管契约**：仅允许第 2、9、10、11、12 部分根据源文件进行子项适配，其余章节标签完全锁定只读。 |
+
+### 2. ❌ 真正的内容错误与翻译问题（必须通过前置清空与精细英译坚决根除）
+| 章节 | 典型错误表现（源自旧模板未清空残留） | 根因与正确处理标准 |
+| :--- | :--- | :--- |
+| **Section 2** | 非危品被写入 GHS 水生环境慢性危害类别3（H412）、出现“丙二醇甲醚”、多出 P273/P501 防范说明 | **旧模板串入污染**：底模残留了旧水性环氧乳液的危害信息。**正确做法**：前置清空值，非危品严格写入“根据GHS不属于危害化学品”，物理剪枝防范说明行。 |
+| **Section 5.2** | 不合适灭火剂直接复制了 5.1 合适灭火剂的内容（误写为二氧化碳、泡沫等） | **粗暴复制错误**：源文是“高流量的水喷射”。**正确做法**：精准翻译为 `High-volume water jet`，严禁照抄 5.1。 |
+| **Section 9** | 固含量错写为 `53±2%`（源文为 `40±2%`）；密度错写为 `Approx. 1.06 g/cm³`（源文为 `1.0-1.1 g/cm³`）；粘度错写为 `200--5000 mPa.s`（源文为 `<1000 mPa.s`） | **严重数值错乱**：旧产品指标残留。**正确做法**：前置清空物化数值，100% 遵从源文件实测数值。 |
+| **Section 9** | 离子性将“阳离子”写成 `Non-ionic`（非离子） | **物理属性完全颠倒**：**正确做法**：阳离子必须准确英译为 `Cationic`。 |
+| **Section 10.2** | 危险分解产物写死为通用的环氧树脂/溶剂分解套话 | **产品特征缺失**：如 BL-8129A 源文明确有二甲基吡唑，必须译为 `Releases 3,5-dimethylpyrazole under baking conditions`。 |
+| **Section 11** | 未测吸入毒性却残留“半数致死浓度（LC50）/4 h/大鼠：＞1.5 mg/L（气溶胶）”及物种描述 | **未测项未剪枝**：源文件未测的端点必须物理剪枝删除，绝不能留模板死重中文。 |
 
 ---
 
@@ -15,145 +66,24 @@ MSDS Studio 提供双模服务支持：
 1. **默认开发服务器（推荐）**：`http://127.0.0.1:5173/api/msds`（当 Web 端运行 `npm run dev` 时原生提供）
 2. **独立无头服务（后台/批处理）**：`http://127.0.0.1:5174/api/msds`（在 `web/` 目录下执行 `npm run api` 启动）
 
-> 💡 **提示**：Agent 在开始工作流前，可先探测 `GET /api/msds/health`，若未启动，可在后台启动 `npm run api` 或 `npm run dev`。
-
 ---
 
-## 🎯 核心 API 规格与调用说明
+## 🛠️ 典型 Agent 调度工作流
 
-统一响应采用 JSON Envelope 规范：`{ success: true, sessionId, data: ... }`。
-
-### 1. 导入 MSDS 源文档 (`POST /api/msds/import`)
-- **端点**：`POST /api/msds/import`
-- **请求头**：`Content-Type: application/json`
-- **请求体**：
-  ```json
-  {
-    "filePath": "F:/MSDS覆写/.../PU-2341E msds_CN 冠志.docx",
-    "sessionId": "default"
-  }
-  ```
-- **核心响应**：
-  - `fileName`：文档名称
-  - `sectionCount`：成功识别的 Section 数量（通常为 16）
-  - `sections`：各章节概要列表
-
-### 2. 获取识别结果 (`GET /api/msds/recognition`)
-- **端点**：`GET /api/msds/recognition?sessionId=default`
-- **核心响应**：
-  - `sections`：包含全部 16 个章节的结构化抽取事实：
-    - `sectionNumber`：章节号（1 ~ 16）
-    - `title`：章节原始标题
-    - `candidates`：识别出的标签-值候选列表 `[{ label, value }]`
-    - `components`（Section 3 专有）：化学组分列表 `[{ name, cas, concentration }]`
-
-### 3. 发起智能匹配 (`POST /api/msds/match`)
-- **端点**：`POST /api/msds/match`
-- **请求头**：`Content-Type: application/json`
-- **请求体**：
-  ```json
-  {
-    "sessionId": "default",
-    "templateVariant": "CN_GUANZHI"
-  }
-  ```
-  > 可选模板：`CN_GUANZHI`（中文冠志）、`EN_GUANZHI`（英文冠志）、`CN_GUOCAI`（中文国彩）、`EN_GUOCAI`（英文国彩）
-- **核心响应**：
-  - `injectedCount`：成功注入目标模板的字段项数
-  - `prunedCount`：按无值删行规则物理删除的行数
-  - `matchedFields`：命中标准插槽的字段总数
-
-### 4. 获取结构化匹配结果 (`GET /api/msds/match-result`)
-- **端点**：`GET /api/msds/match-result?sessionId=default&format=summary|markdown|detailed`
-- **参数说明**：
-  - `format=summary`（默认）：**结构化标签-值数据**。输出各 Section 最终呈现的有效行列表（已执行删行与重新编号）：
-    ```json
-    {
-      "sectionNumber": 2,
-      "title": "2. 危险性概述",
-      "rows": [
-        { "label": "2.1 GHS危险性类别：", "value": "根据GHS不属于危害化学品", "status": "MATCHED" },
-        { "label": "2.2 标签要素：", "value": "根据GHS不属于危害化学品", "status": "MATCHED" },
-        { "label": "2.3 其他危险：", "value": "无适用资料。", "status": "MATCHED" }
-      ]
-    }
-    ```
-  - `format=markdown`：**Agent 一键汇报模式**。后端直接拼接美观的 Markdown 表格报告，Agent 可直接返回给用户展示！
-  - `format=detailed`：全量模型数据。
-
----
-
-## 🛠️ 标准 Agent 四步工作流 (SOP)
-
-当用户要求 Agent 处理某份 MSDS 文件时，Agent 按照以下四步顺序执行：
-
-```mermaid
-sequenceDiagram
-    participant Agent as AI Agent
-    participant API as MSDS Studio API
-    Agent->>API: 1. POST /api/msds/import (传入 filePath)
-    API-->>Agent: 返回 16 个章节识别概况
-    Agent->>API: 2. GET /api/msds/recognition (获取源文档抽取事实)
-    API-->>Agent: 返回结构化事实与 Section 3 组分列表
-    Agent->>API: 3. POST /api/msds/match (指定 templateVariant)
-    API-->>Agent: 匹配完成 (injectedCount, prunedCount)
-    Agent->>API: 4. GET /api/msds/match-result?format=markdown
-    API-->>Agent: 返回标准化 Markdown 表格报告
-    Agent->>Agent: 向用户呈现最终 16 个 Section 标签-值核查报告
+### 场景：执行特定产品 8 格式批量自动化交付
+在工作目录 `web/` 下直接执行已封装的官方流水线入口：
+```bash
+node run_pipeline.mjs --model <产品型号> --input "<源文件路径>" --outDir "<目标输出目录>"
 ```
-
----
-
-## 💻 快速调用范例代码
-
-### 范例 1：PowerShell 一键工作流脚本
-```powershell
-$baseUrl = "http://127.0.0.1:5173/api/msds"
-$filePath = "F:\MSDS覆写\MSDS\TDS MSDS (2)\TDS MSDS\产品 TDS MSDS -- WORD版本\1-1 单组份水性聚氨酯树脂 PU\PU-2341E\中文版\PU-2341E msds_CN 冠志.docx"
-$session = "agent-" + (Get-Random)
-
-# 1. 导入
-$importRes = Invoke-RestMethod -Uri "$baseUrl/import" -Method Post -ContentType "application/json" -Body (@{ filePath = $filePath; sessionId = $session } | ConvertTo-Json)
-Write-Host "✓ 导入成功: $($importRes.data.fileName)，章节数: $($importRes.data.sectionCount)"
-
-# 2. 匹配
-$matchRes = Invoke-RestMethod -Uri "$baseUrl/match" -Method Post -ContentType "application/json" -Body (@{ sessionId = $session; templateVariant = "CN_GUANZHI" } | ConvertTo-Json)
-Write-Host "✓ 匹配成功: 注入 $($matchRes.data.injectedCount) 项，删行 $($matchRes.data.prunedCount) 项"
-
-# 3. 获取 Markdown 报告
-$reportRes = Invoke-RestMethod -Uri "$baseUrl/match-result?sessionId=$session&format=markdown"
-Write-Output $reportRes.data.markdown
+或者通过 REST API：
+```bash
+curl -X POST http://127.0.0.1:5173/api/msds/pipeline/generate-eight \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "PU-202C",
+    "cnGroundTruthPath": "E:\\冠志\\...\\PU-202C msds_CN 冠志.docx",
+    "targetDir": "E:\\冠志\\...\\PU-202C",
+    "revisionDate": "2026/10/22"
+  }'
 ```
-
-### 范例 2：Node.js 自动化调用脚本
-```javascript
-const baseUrl = 'http://127.0.0.1:5173/api/msds';
-const filePath = 'F:/MSDS覆写/.../PU-2341E msds_CN 冠志.docx';
-const sessionId = 'node-agent-task';
-
-// 1. 导入
-await fetch(`${baseUrl}/import`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ filePath, sessionId }),
-});
-
-// 2. 匹配
-await fetch(`${baseUrl}/match`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ sessionId, templateVariant: 'CN_GUANZHI' }),
-});
-
-// 3. 获取结构化标签-值数据
-const res = await fetch(`${baseUrl}/match-result?sessionId=${sessionId}&format=summary`);
-const json = await res.json();
-for (const sec of json.data.sections) {
-  console.log(`\n=== Section ${sec.sectionNumber}: ${sec.title} ===`);
-  if (sec.components) {
-    console.table(sec.components);
-  } else {
-    for (const r of sec.rows) console.log(`${r.label} => ${r.value}`);
-  }
-}
-```
+严禁直接使用外部第三方库（如 `python-docx`）操作上述目标输出目录下的 Word 文件！

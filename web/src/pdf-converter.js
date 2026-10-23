@@ -484,7 +484,10 @@ try {
     }
 } finally {
     if ($null -ne $app) {
-        $app.Quit()
+        try { $app.Quit() } catch {}
+        try { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($app) | Out-Null } catch {}
+        [System.GC]::Collect()
+        [System.GC]::WaitForPendingFinalizers()
     }
 }
 `;

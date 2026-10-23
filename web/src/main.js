@@ -82,6 +82,12 @@ function restoreModalInert() {
 
 function openUnifiedExportModal(triggerEl) {
   recordModalTrigger(triggerEl);
+  ensureCurrentDraft(true);
+  const curBaseId = state.editor.currentBaselineId || 'baseline_cn_guanzhi';
+  if (!state.editor.exportConfig.selectedTargets) state.editor.exportConfig.selectedTargets = {};
+  if (Object.keys(state.editor.exportConfig.selectedTargets).length === 0) {
+    state.editor.exportConfig.selectedTargets[`${curBaseId}:base`] = true;
+  }
   state.editor.exportModalOpen = true;
   lastFocusedModalControlSelector = null;
   applyModalInert();
@@ -435,11 +441,11 @@ function emptyWorkspace(kind) {
   `;
 }
 
-function headerBand(title, kicker, description, actions = '') {
+function headerBand(title, kicker, description, actions = '', scope = '') {
   return `
     <div class="page-band">
       <h1>${title}</h1>
-      ${actions ? `<div class="band-actions">${actions}</div>` : ''}
+      ${actions ? `<div class="band-actions"${scope ? ` data-toolbar-scope="${scope}"` : ''}>${actions}</div>` : ''}
     </div>
   `;
 }
@@ -603,68 +609,96 @@ function getPresetExportFileName(preset, model) {
 }
 
 
+let isSwitchingBaseline = false;
+
+function resolveBaseline(idOrName) {
+  if (!idOrName) return TEMPLATE_BASELINES[0];
+  const exact = TEMPLATE_BASELINES.find((b) =>
+    b.id === idOrName ||
+    b.displayName === idOrName ||
+    b.label === idOrName ||
+    b.templateFile === idOrName ||
+    b.language === idOrName
+  );
+  if (exact) return exact;
+  const s = String(idOrName).toLowerCase();
+  if (s.includes('en') || s.includes('english') || s.includes('osha')) {
+    return TEMPLATE_BASELINES.find((b) => b.language === 'EN') || TEMPLATE_BASELINES[1];
+  }
+  return TEMPLATE_BASELINES[0];
+}
+
 function getCurrentBaseline() {
   return TEMPLATE_BASELINES.find((b) => b.id === state.editor.currentBaselineId) || TEMPLATE_BASELINES[0];
 }
 
-function ensureCurrentDraft() {
+function ensureCurrentDraft(forceSync = false) {
   const currentBaseId = state.editor.currentBaselineId || 'baseline_cn_guanzhi';
   if (!state.editor.drafts) state.editor.drafts = {};
-  if (!state.editor.drafts[currentBaseId] && state.editor.engine) {
+  const prevDraft = state.editor.drafts[currentBaseId];
+  if (!prevDraft || forceSync || state.editor.engine) {
+    const targetEngine = state.editor.isPresetEditing ? (state.editor.normalEngine || state.editor.engine) : state.editor.engine;
     state.editor.drafts[currentBaseId] = {
+      ...prevDraft,
       baselineId: currentBaseId,
-      engine: state.editor.isPresetEditing ? (state.editor.normalEngine || state.editor.engine) : state.editor.engine,
-      status: 'editing',
+      engine: targetEngine || prevDraft?.engine,
+      status: prevDraft?.status || 'editing',
       dirty: Boolean(state.editor.dirty),
       selectedRecordId: state.editor.selectedRecordId,
-      customFileName: state.editor.customFileName || '',
+      customFileName: (state.editor.customFileName !== undefined && state.editor.customFileName !== '') ? state.editor.customFileName : (prevDraft?.customFileName || ''),
       updatedAt: Date.now(),
     };
   }
 }
 
-async function switchBaselineDraft(targetBaselineId) {
-  if (!targetBaselineId) return;
+async function switchBaselineDraft(targetBaselineIdOrName) {
+  if (!targetBaselineIdOrName || isSwitchingBaseline) return;
+  const targetBaseline = resolveBaseline(targetBaselineIdOrName);
+  const targetBaselineId = targetBaseline.id;
+
   if (targetBaselineId === state.editor.currentBaselineId && state.editor.engine) return;
 
-  // 1. 暂存当前基准草稿
-  if (state.editor.engine) {
-    const curId = state.editor.currentBaselineId || 'baseline_cn_guanzhi';
-    const prevDraft = state.editor.drafts[curId] || {};
-    state.editor.drafts[curId] = {
-      ...prevDraft,
-      baselineId: curId,
-      engine: state.editor.isPresetEditing ? (state.editor.normalEngine || state.editor.engine) : state.editor.engine,
-      status: prevDraft.status === 'completed' && !state.editor.dirty ? 'completed' : 'editing',
-      dirty: Boolean(state.editor.dirty),
-      selectedRecordId: state.editor.selectedRecordId,
-      customFileName: state.editor.customFileName || '',
-      updatedAt: Date.now(),
-    };
-  }
+  isSwitchingBaseline = true;
+  try {
+    // 1. 暂存当前基准草稿
+    if (state.editor.engine) {
+      const curId = state.editor.currentBaselineId || 'baseline_cn_guanzhi';
+      const prevDraft = state.editor.drafts[curId] || {};
+      state.editor.drafts[curId] = {
+        ...prevDraft,
+        baselineId: curId,
+        engine: state.editor.isPresetEditing ? (state.editor.normalEngine || state.editor.engine) : state.editor.engine,
+        status: prevDraft.status === 'completed' && !state.editor.dirty ? 'completed' : 'editing',
+        dirty: Boolean(state.editor.dirty),
+        selectedRecordId: state.editor.selectedRecordId,
+        customFileName: state.editor.customFileName || '',
+        updatedAt: Date.now(),
+      };
+    }
 
-  // 退出预设编辑模式
-  if (state.editor.isPresetEditing) {
-    state.editor.isPresetEditing = false;
-    state.editor.editingPresetId = null;
-    state.editor.normalEngine = null;
-  }
+    // 退出预设编辑模式
+    if (state.editor.isPresetEditing) {
+      state.editor.isPresetEditing = false;
+      state.editor.editingPresetId = null;
+      state.editor.normalEngine = null;
+    }
 
-  // 2. 切换当前基准
-  state.editor.currentBaselineId = targetBaselineId;
-  const targetBaseline = TEMPLATE_BASELINES.find((b) => b.id === targetBaselineId) || TEMPLATE_BASELINES[0];
+    // 2. 切换当前基准
+    state.editor.currentBaselineId = targetBaselineId;
 
-  // 3. 恢复目标草稿或载入新底模
-  const targetDraft = state.editor.drafts[targetBaselineId];
-  if (targetDraft && targetDraft.engine) {
-    state.editor.engine = targetDraft.engine;
-    state.editor.selectedRecordId = targetDraft.selectedRecordId || firstSectionRecord(targetDraft.engine)?.id;
-    state.editor.dirty = Boolean(targetDraft.dirty);
-    state.editor.customFileName = targetDraft.customFileName || '';
-    state.editor.template = targetBaseline.displayName;
-    showToast(`已恢复【${targetBaseline.displayName}】已保存草稿。已编辑内容完好无损。`, 'info');
-  } else {
-    try {
+    // 3. 恢复目标草稿或载入新底模
+    const targetDraft = state.editor.drafts[targetBaselineId];
+    if (targetDraft && targetDraft.engine) {
+      state.editor.engine = targetDraft.engine;
+      state.editor.selectedRecordId = targetDraft.selectedRecordId || firstSectionRecord(targetDraft.engine)?.id;
+      state.editor.dirty = Boolean(targetDraft.dirty);
+      state.editor.customFileName = targetDraft.customFileName || '';
+      state.editor.template = targetBaseline.displayName;
+      if (targetBaseline.language === 'EN') {
+        state.editor.previewMode = 'template';
+      }
+      showToast(`已恢复【${targetBaseline.displayName}】已保存草稿。已编辑内容完好无损。`, 'info');
+    } else {
       const engine = await fetchTemplate(targetBaseline.displayName);
       tableRecords(engine).forEach((record) => renumberRecord(record));
       state.editor.engine = engine;
@@ -672,6 +706,9 @@ async function switchBaselineDraft(targetBaselineId) {
       state.editor.dirty = false;
       state.editor.customFileName = '';
       state.editor.template = targetBaseline.displayName;
+      if (targetBaseline.language === 'EN') {
+        state.editor.previewMode = 'template';
+      }
       state.editor.drafts[targetBaselineId] = {
         baselineId: targetBaselineId,
         engine: engine,
@@ -680,12 +717,14 @@ async function switchBaselineDraft(targetBaselineId) {
         updatedAt: Date.now(),
       };
       showToast(`已载入【${targetBaseline.displayName}】底模。可独立编辑该基准内容。`, 'info');
-    } catch (err) {
-      showToast(`载入模板基准底模失败：${err.message}`, 'error');
     }
-  }
 
-  renderApp();
+    renderApp();
+  } catch (err) {
+    showToast(`载入模板基准底模失败：${err.message}`, 'error');
+  } finally {
+    isSwitchingBaseline = false;
+  }
 }
 
 function toggleBaselineComplete() {
@@ -769,10 +808,10 @@ function renderEditorBanner() {
           </div>
         </div>
         <div class="preset-banner-actions">
-          <button type="button" class="button button-primary button-sm btn-preset-save" data-action="save-current-preset" title="保存对当前预设的覆写修改与名称">保存预设</button>
+          <button type="button" class="button button-secondary button-sm btn-preset-save" data-action="save-current-preset" title="保存对当前预设的覆写修改与名称">保存预设</button>
           <button type="button" class="button button-secondary button-sm" data-action="save-as-new-preset" title="将当前编辑的覆写另存为新预设">另存为</button>
-          <button type="button" class="button button-danger-subtle button-sm" data-action="clear-all-preset-overrides" title="清空本预设所有覆写字段，恢复全部留空继承">清空覆写</button>
-          <button type="button" class="button button-quiet button-sm btn-preset-exit" data-action="exit-preset-editing" title="退出预设编辑，返回主物料文档编辑">返回主稿</button>
+          <button type="button" class="button button-secondary button-sm" data-action="clear-all-preset-overrides" title="清空本预设所有覆写字段，恢复全部留空继承">清空覆写</button>
+          <button type="button" class="button button-secondary button-sm btn-preset-exit" data-action="exit-preset-editing" title="退出预设编辑，返回主物料文档编辑">返回主稿</button>
         </div>
       </div>
     `;
@@ -790,30 +829,83 @@ function renderEditorBanner() {
       </div>
       <div class="normal-banner-actions">
         <button type="button" class="button button-secondary button-sm" data-action="enter-preset-mode" title="进入当前基准专属预设编辑模式">进入预设编辑</button>
-        <button type="button" class="button button-quiet button-sm" data-action="open-preset-manager-modal" title="查看与管理所有模板基准预设">预设管理</button>
       </div>
     </div>
   `;
 }
 
+function getBaselineReadiness(baselineId) {
+  const draft = state.editor.drafts[baselineId];
+  if (!draft || !draft.engine) {
+    return {
+      state: 'unstarted',
+      isReady: false,
+      badgeClass: 'pill-muted',
+      badgeText: '未初始化',
+      tipText: '该基准草稿尚未载入或初始化底模。',
+      actionLabel: '载入此基准',
+      action: 'jump-to-baseline',
+      cardClass: 'is-unstarted',
+    };
+  }
+  if (draft.status === 'completed' && !draft.dirty) {
+    return {
+      state: 'ready',
+      isReady: true,
+      badgeClass: 'pill-green',
+      badgeText: '✓ 已就绪',
+      tipText: '该基准已标记为完成，随时可交付导出。',
+      actionLabel: '',
+      action: '',
+      cardClass: 'is-ready',
+    };
+  }
+  // 处于 editing 或 dirty 状态的草稿：已具备导出能力，向用户明确说明这是编辑中的最新版本
+  return {
+    state: draft.dirty ? 'dirty' : 'editing',
+    isReady: true,
+    badgeClass: 'pill-blue',
+    badgeText: draft.dirty ? '草稿 (含编辑修改)' : '草稿 (编辑中)',
+    tipText: '当前草稿包含最新编辑内容，勾选后将导出该编辑版本。',
+    actionLabel: '标记完成',
+    action: 'quick-complete-baseline',
+    cardClass: 'is-ready',
+  };
+}
+
 function computeExportTargets() {
-  ensureCurrentDraft();
+  ensureCurrentDraft(true);
   const cfg = state.editor.exportConfig;
   const targets = [];
+  const activeCustomName = (state.editor.customFileName || '').trim();
 
   for (const b of TEMPLATE_BASELINES) {
+    const readiness = getBaselineReadiness(b.id);
+    if (!readiness.isReady) continue;
     const draft = state.editor.drafts[b.id];
-    // 严格规范：只有 status === 'completed' 且无未确认脏数据(!draft.dirty)，才具备就绪导出资格
-    const isReady = draft && draft.status === 'completed' && !draft.dirty && draft.engine;
-    if (!isReady) continue;
 
-    const baseEngine = draft.engine;
+    const baseEngine = (b.id === state.editor.currentBaselineId && state.editor.engine) ? state.editor.engine : draft.engine;
     const baseModel = baseEngine?.headerFooterData?.model || state.review.session?.productModel || 'MSDS';
+
+    // 计算基础草稿的文件名 (支持自定义文件名)
+    let baseClean = '';
+    const draftCustomName = (draft.customFileName || '').trim();
+    const effectiveCustom = (b.id === state.editor.currentBaselineId ? activeCustomName : draftCustomName) || activeCustomName;
+
+    if (effectiveCustom) {
+      const cleanCustom = effectiveCustom.replace(/\.docx$/i, '').replace(/\.pdf$/i, '').trim();
+      if (b.id === state.editor.currentBaselineId) {
+        baseClean = cleanCustom;
+      } else {
+        baseClean = `${cleanCustom}_${b.language}_${b.entity}`;
+      }
+    } else {
+      baseClean = `${baseModel} msds_${b.language} ${b.entity}`;
+    }
 
     // 1. 基础草稿勾选
     const baseKey = `${b.id}:base`;
     if (cfg.selectedTargets?.[baseKey]) {
-      const baseClean = `${baseModel} msds_${b.language} ${b.entity}`;
       if (cfg.formatDocx) {
         targets.push({
           baselineId: b.id,
@@ -854,7 +946,12 @@ function computeExportTargets() {
           presetDocxName = p.headerFooterOverrides.customFileNamePattern.replace('{model}', baseModel);
         } else {
           const cleanPresetName = (p.name || '预设').replace(/[\\/:*?"<>|]/g, '_');
-          presetDocxName = `${baseModel} msds_${b.language}_${cleanPresetName}.docx`;
+          if (effectiveCustom) {
+            const cleanCustom = effectiveCustom.replace(/\.docx$/i, '').replace(/\.pdf$/i, '').trim();
+            presetDocxName = `${cleanCustom}_${cleanPresetName}.docx`;
+          } else {
+            presetDocxName = `${baseModel} msds_${b.language}_${cleanPresetName}.docx`;
+          }
         }
         const baseClean = presetDocxName.replace(/\.docx$/i, '');
 
@@ -898,16 +995,24 @@ function renderUnifiedExportModal() {
   const targets = computeExportTargets();
   const docxCount = targets.filter((t) => t.format === 'docx').length;
   const pdfCount = targets.filter((t) => t.format === 'pdf').length;
-  // PDF 能力呈现：能力缺失时禁用"仅 PDF"，并对"全部 (Word+PDF)"标注 PDF 将缺失
+
   const pdfCap = state.pdfCapability;
   const pdfUnavailable = Boolean(pdfCap && pdfCap.available === false);
 
+  const baselineReadinessList = TEMPLATE_BASELINES.map((b) => ({
+    baseline: b,
+    readiness: getBaselineReadiness(b.id),
+  }));
+
+  const readyBaselinesCount = baselineReadinessList.filter((item) => item.readiness.isReady).length;
+  const hasReadyTargetsSelected = targets.length > 0;
+
   return `
-    <div class="modal-backdrop" data-backdrop="true">
+    <div class="modal-backdrop unified-export-backdrop" data-backdrop="true">
       <div class="modal-card unified-export-dialog" role="dialog" aria-modal="true" aria-labelledby="export-modal-title" tabindex="-1">
         <div class="modal-header">
           <div id="export-modal-title" class="modal-title">
-            导出
+            统一交付物导出中心
           </div>
           <button class="modal-close" data-action="close-unified-export-modal" type="button" aria-label="关闭">×</button>
         </div>
@@ -937,48 +1042,55 @@ function renderUnifiedExportModal() {
                 <strong>PDF 转换当前不可用，本次导出将只交付 Word。</strong>
                 <div class="export-capability-reason">${escapeHtml(pdfCap.reason || '未找到可用的 PDF 转换运行时')}</div>
                 ${pdfCap.remedy ? `<div class="export-capability-remedy">补救方式：${escapeHtml(pdfCap.remedy)}</div>` : ''}
-                ${pdfCap.backendLabel ? `<div class="export-capability-backend">当前后端：${escapeHtml(pdfCap.backendLabel)}｜字体：${escapeHtml(pdfCap.fontsStatus || '未知')}</div>` : ''}
               </div>
             ` : ''}
           </div>
 
-          <!-- 2. 已就绪基准与版本 -->
+          <!-- 2. 勾选交付基准与版本 -->
           <div class="export-section">
             <div class="export-section-header">
               <span class="export-section-title">2. 勾选交付基准与版本</span>
+              <div class="export-quick-links">
+                <button type="button" class="export-quick-link" data-action="quick-export-select-all-ready">全选已就绪项</button>
+                <button type="button" class="export-quick-link" data-action="quick-export-select-base-only">仅选基础底稿</button>
+              </div>
             </div>
             <div class="export-baseline-list">
-              ${TEMPLATE_BASELINES.map((b) => {
-                const draft = state.editor.drafts[b.id];
-                const isReady = draft && draft.status === 'completed' && !draft.dirty && draft.engine;
+              ${baselineReadinessList.map(({ baseline: b, readiness }) => {
                 const bPresets = state.editor.presets.filter((p) => {
                   const pBaseId = p.baselineId || (p.language === 'EN' ? 'baseline_en_guanzhi' : 'baseline_cn_guanzhi');
                   return pBaseId === b.id;
                 });
                 const baseKey = `${b.id}:base`;
 
-                if (!isReady) {
+                if (!readiness.isReady) {
                   return `
-                    <div class="export-baseline-card is-unstarted">
+                    <div class="export-baseline-card ${readiness.cardClass}">
                       <div class="export-baseline-header">
                         <span class="export-baseline-name">
                           <strong>${escapeHtml(b.displayName)}</strong>
-                          <span class="pill pill-warn">未就绪 (草稿编辑中)</span>
+                          <span class="pill ${readiness.badgeClass}">${readiness.badgeText}</span>
                         </span>
+                        <div class="export-baseline-actions">
+                          <button type="button" class="button button-secondary button-xs" data-action="${readiness.action}" data-baseline-id="${b.id}">${readiness.actionLabel}</button>
+                          <button type="button" class="button button-quiet button-xs" data-action="jump-to-baseline" data-baseline-id="${b.id}">进入编辑</button>
+                        </div>
                       </div>
-                      <p class="export-baseline-empty-tip">
-                        该基准草稿尚未标记为完成或包含未保存修改，已自动阻断导出。
+                      <p class="export-baseline-empty-tip ${readiness.state === 'dirty' ? 'tip-dirty' : 'tip-warn'}">
+                        ${readiness.tipText}
                       </p>
                     </div>
                   `;
                 }
 
+                const hasCheckedAny = Boolean(cfg.selectedTargets?.[baseKey] || bPresets.some((p) => cfg.selectedTargets?.[b.id + ':' + p.id]));
+
                 return `
-                  <div class="export-baseline-card">
+                  <div class="export-baseline-card is-ready">
                     <div class="export-baseline-header">
                       <span class="export-baseline-name">
                         <strong>${escapeHtml(b.displayName)}</strong>
-                        <span class="pill pill-green">✓ 已就绪</span>
+                        <span class="pill ${hasCheckedAny ? 'pill-green' : 'pill-muted'}">${hasCheckedAny ? '✓ 已就绪' : '已就绪 (未勾选)'}</span>
                       </span>
                       <span class="export-subtext">含基础底稿与 ${bPresets.length} 个专属预设</span>
                     </div>
@@ -1010,7 +1122,13 @@ function renderUnifiedExportModal() {
               <span class="export-subtext">${docxCount} 份 Word · ${pdfCount} 份 PDF</span>
             </div>
             <div class="export-preview-box">
-              ${targets.length === 0 ? '<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:12px;">未勾选任何导出项，请在上方已就绪基准中勾选版本。</div>' : targets.map((t) => `
+              ${targets.length === 0 ? `
+                <div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:12px;line-height:1.6;">
+                  ${readyBaselinesCount === 0 ?
+                    '【无法导出提示】当前所有基准草稿均处于编辑中或包含未保存修改。请在上方卡片点击【一键标记就绪】或【保存修改】后即可导出。' :
+                    '【选择提示】已有已就绪基准，但尚未勾选任何版本。请在上方卡片中勾选基础底稿或专属预设。'}
+                </div>
+              ` : targets.map((t) => `
                 <div class="export-preview-row">
                   <div class="export-preview-tags">
                     <span class="export-pill-tag tag-entity">${escapeHtml(t.baselineName.split('·')[1]?.trim() || t.baselineName)}</span>
@@ -1036,7 +1154,7 @@ function renderUnifiedExportModal() {
         </div>
         <div class="modal-actions">
           <button type="button" class="button button-quiet" data-action="close-unified-export-modal" ${cfg.isExporting ? 'disabled' : ''}>取消</button>
-          <button type="button" class="button button-primary" data-action="confirm-unified-export" ${targets.length === 0 || cfg.isExporting ? 'disabled' : ''}>
+          <button type="button" class="button button-primary" data-action="confirm-unified-export" ${targets.length === 0 || cfg.isExporting ? 'disabled' : ''} title="${targets.length === 0 ? '请先勾选至少一项已就绪版本' : '导出 ZIP 包'}">
             ${cfg.isExporting ? '正在导出…' : '导出 ZIP'}
           </button>
         </div>
@@ -1049,15 +1167,15 @@ function renderPresetManagerModal() {
   if (!state.editor.managerModalOpen) return '';
 
   return `
-    <div class="modal-backdrop" data-backdrop="true">
-      <div class="modal-card preset-manager-dialog" role="dialog" aria-modal="true" aria-labelledby="preset-modal-title" tabindex="-1">
-        <div class="modal-header">
-          <div id="preset-modal-title" class="modal-title">
+    <div class="preset-manager-backdrop" data-backdrop="true">
+      <div class="preset-manager-dialog" role="dialog" aria-modal="true" aria-labelledby="preset-modal-title" tabindex="-1">
+        <div class="preset-manager-header">
+          <div id="preset-modal-title" class="preset-manager-title">
             预设管理
           </div>
-          <button class="modal-close" data-action="close-preset-modal" type="button" aria-label="关闭">×</button>
+          <button class="preset-manager-close" data-action="close-preset-modal" type="button" aria-label="关闭">×</button>
         </div>
-        <div class="modal-body">
+        <div class="preset-manager-body">
           ${TEMPLATE_BASELINES.map((b) => {
             const bPresets = state.editor.presets.filter((p) => {
               const pBaseId = p.baselineId || (p.language === 'EN' ? 'baseline_en_guanzhi' : 'baseline_cn_guanzhi');
@@ -1067,27 +1185,27 @@ function renderPresetManagerModal() {
             return `
               <div class="preset-baseline-group">
                 <div class="preset-baseline-header">
-                  <div style="display:flex;align-items:center;gap:8px;">
-                    <strong style="color:var(--text-main);font-size:13px;">${escapeHtml(b.displayName)}</strong>
+                  <div class="preset-baseline-info">
+                    <strong class="preset-baseline-title">${escapeHtml(b.displayName)}</strong>
                     ${isCur ? '<span class="pill pill-green">当前基准</span>' : ''}
                     <span class="pill pill-blue">${bPresets.length} 个专属预设</span>
                   </div>
                   <button class="button button-secondary button-xs" data-action="create-new-preset" data-baseline-id="${b.id}" type="button">+ 新建预设</button>
                 </div>
-                <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
-                  ${bPresets.length === 0 ? '<div style="font-size:12px;color:var(--text-secondary);padding:6px 0;">该基准下暂无自定义预设。</div>' : bPresets.map((p) => `
+                <div class="preset-items-list">
+                  ${bPresets.length === 0 ? '<div class="preset-empty-hint">该基准下暂无自定义预设。</div>' : bPresets.map((p) => `
                     <div class="preset-item-card">
-                      <div>
-                        <div style="display:flex;align-items:center;gap:6px;">
-                          <strong style="color:var(--text-main);font-size:13px;">${escapeHtml(p.name)}</strong>
-                          ${p.isBuiltin ? '<span style="font-size:11px;color:var(--text-secondary);">(系统标准)</span>' : ''}
+                      <div class="preset-item-meta">
+                        <div class="preset-item-name-row">
+                          <strong class="preset-item-name">${escapeHtml(p.name)}</strong>
+                          ${p.isBuiltin ? '<span class="preset-item-system-tag">(系统标准)</span>' : ''}
                         </div>
-                        <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;">
+                        <div class="preset-item-desc">
                           发布主体: <span>${escapeHtml(p.headerFooterOverrides?.company || '继承基准')}</span> · 
-                          专属覆写: <span style="color:var(--btn-primary-bg);font-weight:600;">${Object.keys(p.fieldOverrides || {}).length} 项</span>
+                          专属覆写: <span class="preset-override-count">${Object.keys(p.fieldOverrides || {}).length} 项</span>
                         </div>
                       </div>
-                      <div style="display:flex;gap:8px;align-items:center;">
+                      <div class="preset-item-actions">
                         <button class="button button-quiet button-sm" data-action="edit-preset-from-manager" data-preset-id="${escapeHtml(p.id)}" type="button" title="切换并进入该预设编辑">编辑</button>
                         ${!p.isBuiltin ? `<button class="button button-danger-subtle button-sm" data-action="delete-preset" data-preset-id="${escapeHtml(p.id)}" type="button" title="删除此预设">删除</button>` : ''}
                       </div>
@@ -1098,7 +1216,7 @@ function renderPresetManagerModal() {
             `;
           }).join('')}
         </div>
-        <div class="modal-actions" style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="preset-manager-footer">
           <button class="button button-danger-subtle button-sm" data-action="reset-presets-to-default" type="button">恢复默认预设</button>
           <button class="button button-secondary" data-action="close-preset-modal" type="button">关闭</button>
         </div>
@@ -2135,15 +2253,18 @@ function renderEditorToolbarButtons() {
     return `
       <button class="button button-secondary button-sm" data-action="run-audit" title="运行模板规则合规审计">审计</button>
       <button class="button button-secondary button-sm" data-action="toggle-review-drawer" title="查看或管理批注清单">批注 (${openAnnotations})</button>
-      <button class="button button-primary button-sm" data-action="open-unified-export-modal" title="导出已就绪基准与预设交付物">导出</button>
+      <button class="button button-primary button-sm" data-action="quick-export-current-docx" title="直接导出当前正在编辑的 DOCX 文件（所见即所得）">导出当前文档</button>
+      <button class="button button-secondary button-sm" data-action="open-unified-export-modal" title="交付全基准与预设多格式">批量导出...</button>
+      <button class="button button-secondary button-sm" data-action="open-preset-manager-modal" title="打开预设配置管理中心">预设管理</button>
     `;
   }
   return `
     <button class="button button-secondary button-sm" data-action="run-audit" title="运行模板规则合规审计">审计</button>
     <button class="button button-secondary button-sm" data-action="toggle-review-drawer" title="查看或管理批注清单">批注 (${openAnnotations})</button>
-    <button class="button button-primary button-sm" data-action="open-unified-export-modal" title="导出已就绪基准与预设交付物">导出</button>
-    <button class="button button-quiet button-sm" data-action="open-preset-manager-modal" title="打开预设配置管理中心">预设管理</button>
-    <button class="button button-quiet button-sm" data-action="reset-all-template" title="清空修改恢复至初始模板">恢复模板</button>
+    <button class="button button-primary button-sm" data-action="quick-export-current-docx" title="直接导出当前正在编辑的 DOCX 文件（所见即所得）">导出当前文档</button>
+    <button class="button button-secondary button-sm" data-action="open-unified-export-modal" title="交付全基准与预设多格式">批量导出...</button>
+    <button class="button button-secondary button-sm" data-action="open-preset-manager-modal" title="打开预设配置管理中心">预设管理</button>
+    <button class="button button-secondary button-sm" data-action="reset-all-template" title="清空修改恢复至初始模板">恢复模板</button>
   `;
 }
 
@@ -2157,7 +2278,7 @@ function renderHeaderFooterEditor(engine, records, query) {
   });
 
   return `
-    ${headerBand('模板编辑器', '', '', renderEditorToolbarButtons())}
+    ${headerBand('模板编辑器', '', '', renderEditorToolbarButtons(), 'editor-top-actions')}
     ${renderEditorBanner()}
     <div class="file-ribbon" data-toolbar-scope="editor-file-ribbon" title="内嵌模板工作副本，源模板只读">
       <div class="file-ribbon-icon">模板</div>
@@ -2166,7 +2287,7 @@ function renderHeaderFooterEditor(engine, records, query) {
         <span class="file-ribbon-name-wrap">
           <span>导出文件名：</span>
           <input id="quick-export-name-input" class="quick-export-name-input" value="${escapeHtml(currentExportName)}" title="直接修改导出文件名，回车或失焦生效" />
-          <button class="button button-quiet button-xs" data-action="reset-filename-to-standard" title="恢复标准命名规则" style="padding:1px 6px;height:20px;font-size:11px;">↺</button>
+          <button class="button button-secondary button-sm" data-action="reset-filename-to-standard" title="恢复标准命名规则">↺</button>
         </span>
       </div>
       ${renderBaselineSelectorMarkup()}
@@ -2329,7 +2450,7 @@ function renderEditor() {
   const selectedVisible = visibleRecords.find((record) => record.id === selected?.id) || visibleRecords[0] || selected;
   if (selectedVisible) state.editor.selectedRecordId = selectedVisible.id;
   return `
-    ${headerBand('模板编辑器', '', '', renderEditorToolbarButtons())}
+    ${headerBand('模板编辑器', '', '', renderEditorToolbarButtons(), 'editor-top-actions')}
     ${renderEditorBanner()}
     <div class="file-ribbon" data-toolbar-scope="editor-file-ribbon" title="内嵌模板工作副本，源模板只读">
       <div class="file-ribbon-icon">模板</div>
@@ -2338,7 +2459,7 @@ function renderEditor() {
         <span class="file-ribbon-name-wrap">
           <span>导出文件名：</span>
           <input id="quick-export-name-input" class="quick-export-name-input" value="${escapeHtml(buildExportDocxName(engine, { customFileName: state.editor.customFileName, templateName: state.editor.template, sourcePreviewName: state.sourcePreview?.name, productModel: engine.headerFooterData?.model }))}" title="直接修改导出文件名，回车或失焦生效" />
-          <button class="button button-quiet button-xs" data-action="reset-filename-to-standard" title="恢复标准命名规则" style="padding:1px 6px;height:20px;font-size:11px;">↺</button>
+          <button class="button button-secondary button-sm" data-action="reset-filename-to-standard" title="恢复标准命名规则">↺</button>
         </span>
       </div>
       ${renderBaselineSelectorMarkup()}
@@ -2359,10 +2480,10 @@ function renderEditor() {
           <div class="heading-pills">
             <span class="pill pill-blue">${selectedVisible ? sectionLabel(selectedVisible.sectionNumber) : '—'}</span>
             <span class="pill">${selectedVisible?.rows?.length || 0} 行</span>
-            <button class="button button-quiet button-xs" data-action="reset-current-section" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="仅将当前 Section 恢复至初始模板状态（保留其他 Section 修改）">↺ 恢复本节</button>
-            <button class="button button-quiet button-xs" data-table-action="add-note-row" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="在当前节顶部插入单列说明行">＋ 说明行</button>
-            <button class="button button-quiet button-xs" data-table-action="add-row" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="在表格末尾追加一行">＋ 追加行</button>
-            <button class="button button-danger button-xs btn-clear-section" data-action="clear-current-section-values" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="一键清空当前章节所有单元格内容（支持普通与预设模式）">🗑️ 清空本节填写值</button>
+            <button class="button button-secondary button-sm" data-action="reset-current-section" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="仅将当前 Section 恢复至初始模板状态（保留其他 Section 修改）">↺ 恢复本节</button>
+            <button class="button button-secondary button-sm" data-table-action="add-note-row" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="在当前节顶部插入单列说明行">＋ 说明行</button>
+            <button class="button button-secondary button-sm" data-table-action="add-row" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="在表格末尾追加一行">＋ 追加行</button>
+            <button class="button button-secondary button-sm btn-clear-section" data-action="clear-current-section-values" data-record-id="${escapeHtml(selectedVisible?.id || '')}" title="一键清空当前章节所有单元格内容（支持普通与预设模式）">清空本节填写值</button>
             <span class="pill pill-green">${errors.length ? `${errors.length} 个问题` : '通过'}</span>
           </div>
         </div>
@@ -2370,10 +2491,10 @@ function renderEditor() {
       </section>
       <aside class="right-stack ${state.editor.isWidePreview ? 'wide-preview-mode' : ''}">
         <section class="preview-panel">
-          <div class="panel-heading compact preview-heading-flex" data-toolbar-scope="editor-preview-heading" style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;">
-            <div class="preview-tab-group" style="display:inline-flex;background:rgba(255,255,255,0.06);border-radius:6px;padding:2px;gap:2px;">
-              <button type="button" class="mode-pill ${state.editor.previewMode !== 'template' ? 'active' : ''}" data-editor-preview-mode="source" title="查看真实源文档原件 (如 PU-2341E)" style="border:none;background:${state.editor.previewMode !== 'template' ? '#0284c7' : 'transparent'};color:${state.editor.previewMode !== 'template' ? '#fff' : '#94a3b8'};padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;">▤ 源文件原版式</button>
-              <button type="button" class="mode-pill ${state.editor.previewMode === 'template' ? 'active' : ''}" data-editor-preview-mode="template" title="查看当前编辑后的模板排版效果" style="border:none;background:${state.editor.previewMode === 'template' ? '#059669' : 'transparent'};color:${state.editor.previewMode === 'template' ? '#fff' : '#94a3b8'};padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;">📑 模板效果</button>
+          <div class="panel-heading compact preview-heading-flex" data-toolbar-scope="editor-preview-heading">
+            <div class="preview-tab-group">
+              <button type="button" class="mode-pill ${state.editor.previewMode !== 'template' ? 'active' : ''}" data-editor-preview-mode="source" title="查看真实源文档原件 (如 PU-2341E)">▤ 源文件原版式</button>
+              <button type="button" class="mode-pill ${state.editor.previewMode === 'template' ? 'active' : ''}" data-editor-preview-mode="template" title="查看当前编辑后的模板排版效果">📑 模板效果</button>
             </div>
             ${renderZoomBar('editor', state.editor.zoomScale || 'fit')}
             <span class="preview-lock">只读</span>
@@ -2410,7 +2531,8 @@ function bindEvents() {
         if (!state.inspector.engine) {
           if (state.repo.records && state.repo.records.length > 0 && !state.repo.activeRecordId) {
             const firstRec = state.repo.records[0];
-            await loadRepoRecordToInspectAndMatching(firstRec.id);
+            await loadRecordToThreePane(firstRec.id);
+            return;
           }
         } else if (!state.matching.templateEngine) {
           await syncMatchingEngine(state.matching.template || 'CN 冠志');
@@ -2566,6 +2688,8 @@ function bindEvents() {
 
   root.querySelectorAll('#hf-export-filename, #quick-export-name-input').forEach((input) => input.addEventListener('input', (e) => {
     state.editor.customFileName = e.target.value.trim();
+    const curDraft = state.editor.drafts?.[state.editor.currentBaselineId];
+    if (curDraft) curDraft.customFileName = state.editor.customFileName;
   }));
 
   root.querySelectorAll('[data-action="reset-filename-to-standard"]').forEach((btn) => btn.addEventListener('click', () => {
@@ -2899,7 +3023,7 @@ function bindEvents() {
     if (!state.inspector.engine) {
       if (state.repo.records && state.repo.records.length > 0) {
         const recId = state.repo.activeRecordId || state.repo.records[0].id;
-        await loadRepoRecordToInspectAndMatching(recId);
+        await loadRecordToThreePane(recId);
       } else {
         showToast('请先选择样本或导入 DOCX 文件。', 'info');
         return;
@@ -2970,6 +3094,9 @@ function bindEvents() {
     state.editor.selectedRecordId = firstSectionRecord(state.editor.engine)?.id || null;
     state.editor.selectedCellId = null;
     state.editor.dirty = true;
+    const curBase = resolveBaseline(state.editor.template || state.editor.currentBaselineId);
+    state.editor.currentBaselineId = curBase.id;
+    ensureCurrentDraft(true);
     state.view = 'editor';
     renderApp();
     showToast(`✓ 智能匹配结果已安全导入模板编辑器（${state.editor.template}）。`, 'success');
@@ -3052,9 +3179,7 @@ function bindEvents() {
       }
       if (state.editor.managerModalOpen) {
         event.preventDefault();
-        state.editor.managerModalOpen = false;
-        renderApp();
-        restoreModalTrigger();
+        closePresetManagerModal();
         return;
       }
     }
@@ -3175,7 +3300,7 @@ function bindEvents() {
         e.preventDefault();
         e.stopPropagation();
         const pId = editFromMgrBtn.dataset.presetId;
-        state.editor.managerModalOpen = false;
+        closePresetManagerModal();
         enterPresetEditing(pId);
         return;
       }
@@ -3253,8 +3378,20 @@ function bindEvents() {
       }
 
       // 8.5 点击遮罩背景空白区域关闭弹窗 (点击弹窗卡片内容区域不会触发)
-      if (e.target.dataset.backdrop === 'true' || e.target.classList.contains('modal-backdrop')) {
+      if (e.target.dataset.backdrop === 'true' || e.target.classList.contains('modal-backdrop') || e.target.classList.contains('preset-manager-backdrop')) {
         e.preventDefault();
+        if (state.editor.managerModalOpen) {
+          closePresetManagerModal();
+          return;
+        }
+        if (state.editor.exportModalOpen) {
+          closeUnifiedExportModal();
+          return;
+        }
+        if (state.editor.versionModalOpen) {
+          closeVersionModal();
+          return;
+        }
         state.editor.exportModalOpen = false;
         state.editor.managerModalOpen = false;
         state.editor.versionModalOpen = false;
@@ -3267,6 +3404,14 @@ function bindEvents() {
       if (closeModalBtn) {
         e.preventDefault();
         e.stopPropagation();
+        if (state.editor.managerModalOpen) {
+          closePresetManagerModal();
+          return;
+        }
+        if (state.editor.exportModalOpen) {
+          closeUnifiedExportModal();
+          return;
+        }
         state.editor.exportModalOpen = false;
         state.editor.managerModalOpen = false;
         renderApp();
@@ -3283,11 +3428,18 @@ function bindEvents() {
       }
 
       // 9.5 统一导出中心与基准切换
+      if (e.target.closest('[data-action="quick-export-current-docx"]')) {
+        e.preventDefault();
+        e.stopPropagation();
+        exportCurrentDocumentDocx();
+        return;
+      }
+
       const openUnifiedExportBtn = e.target.closest('[data-action="open-unified-export-modal"]');
       if (openUnifiedExportBtn) {
         e.preventDefault();
         e.stopPropagation();
-        openUnifiedExportModal(openExportModalBtn);
+        openUnifiedExportModal(openUnifiedExportBtn);
         return;
       }
 
@@ -3300,6 +3452,40 @@ function bindEvents() {
       }
 
       // 切换基准完成状态
+      // 快捷一键标记基准就绪 (来自导出中心)
+      const quickCompleteBtn = e.target.closest('[data-action="quick-complete-baseline"]');
+      if (quickCompleteBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const bId = quickCompleteBtn.dataset.baselineId;
+        if (bId && state.editor.drafts[bId]) {
+          state.editor.drafts[bId].status = 'completed';
+          state.editor.drafts[bId].dirty = false;
+          if (!state.editor.exportConfig.selectedTargets) state.editor.exportConfig.selectedTargets = {};
+          state.editor.exportConfig.selectedTargets[`${bId}:base`] = true;
+          showToast(`基准 [${bId}] 已标记为完成并就绪，已自动加入导出清单`, 'success');
+          renderApp();
+        }
+        return;
+      }
+
+      // 快捷保存基准草稿 (来自导出中心)
+      const saveBaselineBtn = e.target.closest('[data-action="save-baseline-draft"]');
+      if (saveBaselineBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const bId = saveBaselineBtn.dataset.baselineId;
+        if (bId && state.editor.drafts[bId]) {
+          state.editor.drafts[bId].dirty = false;
+          state.editor.drafts[bId].status = 'completed';
+          if (!state.editor.exportConfig.selectedTargets) state.editor.exportConfig.selectedTargets = {};
+          state.editor.exportConfig.selectedTargets[`${bId}:base`] = true;
+          showToast(`基准 [${bId}] 草稿已保存并就绪`, 'success');
+          renderApp();
+        }
+        return;
+      }
+
       const toggleCompleteBtn = e.target.closest('[data-action="toggle-baseline-complete"]');
       if (toggleCompleteBtn) {
         e.preventDefault();
@@ -3557,9 +3743,9 @@ function bindEvents() {
   });
 
   root.querySelectorAll('[data-action="open-preset-manager-modal"]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      state.editor.managerModalOpen = true;
-      renderApp();
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openPresetManagerModal(btn);
     });
   });
 
@@ -4408,6 +4594,33 @@ function base64ToArrayBuffer(base64) {
   return bytes.buffer;
 }
 
+
+async function exportCurrentDocumentDocx() {
+  ensureCurrentDraft(true);
+  const engine = state.editor.engine;
+  if (!engine) {
+    showToast('当前无可用文档可导出', 'warning');
+    return;
+  }
+  const curBase = getCurrentBaseline();
+  const baseModel = engine?.headerFooterData?.model || state.review.session?.productModel || 'MSDS';
+  let fileName = (state.editor.customFileName || '').trim();
+  if (fileName) {
+    if (!fileName.toLowerCase().endsWith('.docx')) fileName += '.docx';
+  } else {
+    fileName = `${baseModel} msds_${curBase.language} ${curBase.entity}.docx`;
+  }
+
+  try {
+    tableRecords(engine).forEach((r) => renumberRecord(r));
+    const buf = await engine.exportArrayBuffer();
+    downloadBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }), fileName);
+    showToast(`✓ 已成功导出当前编辑文档：${fileName}`, 'success');
+  } catch (err) {
+    showToast(`导出失败：${err.message}`, 'error');
+  }
+}
+
 async function executeUnifiedExport() {
   ensureCurrentDraft();
   const targets = computeExportTargets();
@@ -4477,6 +4690,7 @@ async function executeUnifiedExport() {
     // 2. 批量并发转译 PDF (如果勾选了 PDF)
     const pdfMap = new Map();
     const needsPdf = targets.some((t) => t.format === 'pdf');
+    const requestedPdfTargets = targets.filter((t) => t.format === 'pdf');
 
     // PDF 能力预检：能力缺失时不留半成品；同时勾选 Word 的场景降级为仅交付 Word
     const pdfUnavailable = Boolean(state.pdfCapability && state.pdfCapability.available === false);
@@ -4485,7 +4699,7 @@ async function executeUnifiedExport() {
       if (!hasDocxTargets) {
         state.editor.exportConfig.isExporting = false;
         state.editor.exportConfig.exportProgress = '';
-        showToast(`PDF 转换不可用，已取消导出以避免产生半成品。${state.pdfCapability.reason || ''}`, 'error');
+        showToast(`PDF 转换不可用，已取消导出以避免产生空文件。${state.pdfCapability.reason || ''}`, 'error');
         renderApp();
         return;
       }
@@ -4528,15 +4742,24 @@ async function executeUnifiedExport() {
             const errJson = await resp.json();
             reason = errJson?.error?.message || '';
           } catch {}
-          console.warn('PDF 转换服务端接口返回状态非 200，继续交付 DOCX', reason);
-          if (reason) showToast(`PDF 未生成，已交付 Word。${reason}`, 'error');
+          console.warn('PDF 转换服务端接口返回状态非 200:', reason);
         }
       } catch (pdfErr) {
         console.warn('PDF 批量转换请求失败:', pdfErr);
       }
     }
 
-    // 3. 组装最终交付清单
+    // 3. 统计交付物完整性并查验 PDF 失败项
+    const failedPdfFiles = [];
+    if (needsPdf && !pdfUnavailable) {
+      for (const pt of requestedPdfTargets) {
+        if (!pdfMap.has(pt.fileName)) {
+          failedPdfFiles.push(pt.fileName);
+        }
+      }
+    }
+
+    // 4. 组装最终交付清单与文件名消重
     const finalFiles = [];
     for (const t of targets) {
       if (t.format === 'docx') {
@@ -4553,19 +4776,46 @@ async function executeUnifiedExport() {
     }
 
     if (finalFiles.length === 0) {
-      showToast('未生成任何有效交付物，请检查选择。', 'error');
+      if (needsPdf && !targets.some((t) => t.format === 'docx')) {
+        showToast(`所请求的 ${requestedPdfTargets.length} 份 PDF 转换均失败，已终止下载以避免产生空压缩包。`, 'error');
+      } else {
+        showToast('未生成任何有效交付物，请检查选择。', 'error');
+      }
       return;
     }
 
-    // 4. 打包并触发下载（严守单一 ZIP 导出交付物契约）
+    // 5. 打包并触发下载（单一 ZIP 交付物契约 + 文件名查重防御）
     const zip = new JSZip();
+    const usedZipNames = new Set();
     for (const f of finalFiles) {
-      zip.file(f.name, f.buffer);
+      let uniqueName = f.name;
+      let counter = 1;
+      while (usedZipNames.has(uniqueName)) {
+        const dotIdx = f.name.lastIndexOf('.');
+        if (dotIdx !== -1) {
+          uniqueName = `${f.name.slice(0, dotIdx)}_${counter}${f.name.slice(dotIdx)}`;
+        } else {
+          uniqueName = `${f.name}_${counter}`;
+        }
+        counter++;
+      }
+      usedZipNames.add(uniqueName);
+      zip.file(uniqueName, f.buffer);
     }
+
     const zipBlob = await zip.generateAsync({ type: 'blob' });
-    const zipName = `${baseModel}_MSDS_交付物.zip`;
+    const isPartialSuccess = failedPdfFiles.length > 0;
+    const zipName = isPartialSuccess ? `${baseModel}_MSDS_部分交付物.zip` : `${baseModel}_MSDS_交付物.zip`;
     downloadBlob(zipBlob, zipName);
-    showToast(`成功打包导出全部 ${finalFiles.length} 份交付物 (ZIP)。`, 'success');
+
+    if (isPartialSuccess) {
+      showToast(
+        `导出完成 (部分成功)：已打包 ${finalFiles.length} 份交付物。有 ${failedPdfFiles.length} 份 PDF 转换未成功（${failedPdfFiles.slice(0, 2).join(', ')}${failedPdfFiles.length > 2 ? ' 等' : ''}）。`,
+        'warning'
+      );
+    } else {
+      showToast(`成功打包导出全部 ${finalFiles.length} 份交付物 (ZIP)。`, 'success');
+    }
 
     state.editor.exportModalOpen = false;
   } catch (err) {

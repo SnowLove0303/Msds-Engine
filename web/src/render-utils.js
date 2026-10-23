@@ -143,7 +143,7 @@ export function renderParagraph(paragraph, cell, record, roleStyles = null, isFi
   // Value-only single column identification
   const isValueOnly = cell?.role === 'value-only' || cell?.role === 'source-note' || cell?.fontRole === 'value' ||
     Boolean(row && row.cells.length === 1 && (
-      (record?.sectionNumber === 13 && /必需遵守适用的国标|处理方法|废弃/i.test(cell.text || '')) ||
+      (record?.sectionNumber === 13 && /必须遵守适用的国标|必需遵守适用的国标|在欧盟领域内废弃|处理方法|废弃/i.test(cell.text || '')) ||
       (record?.sectionNumber === 15 && !paragraph.text?.trim()?.endsWith('：')) ||
       (record?.sectionNumber === 16 && /就我们所掌握的知识/i.test(cell.text || ''))
     ));

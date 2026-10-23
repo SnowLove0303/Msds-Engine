@@ -1,0 +1,45 @@
+{
+  "timestamp": "2026-10-19T07:30:14.812Z",
+  "viewport1920": {
+    "backdrop": {
+      "position": "fixed",
+      "inset": "0px",
+      "zIndex": "99999",
+      "display": "flex",
+      "justifyContent": "center",
+      "alignItems": "center"
+    },
+    "dialog": {
+      "width": 880,
+      "height": 564,
+      "top": 258,
+      "left": 512.5,
+      "maxHeight": "907.2px",
+      "borderRadius": "10px",
+      "overflow": "hidden"
+    },
+    "body": {
+      "overflowY": "auto",
+      "height": 454,
+      "scrollHeight": 454
+    },
+    "buttonReference": {
+      "height": "28px",
+      "borderRadius": "7px",
+      "fontSize": "11.5px",
+      "backgroundColor": "rgb(255, 255, 255)",
+      "border": "1px solid rgb(203, 213, 225)"
+    }
+  },
+  "viewport320": {
+    "clientWidth": 320,
+    "dialogWidth": 296,
+    "dialogHeight": 776,
+    "hasHorizontalOverflow": true,
+    "bodyScrollable": true
+  },
+  "screenshots": [
+    "openspec/changes/restore-preset-manager-modal-window/evidence/preset_manager_1920x1080.png",
+    "openspec/changes/restore-preset-manager-modal-window/evidence/preset_manager_320x800.png"
+  ]
+}

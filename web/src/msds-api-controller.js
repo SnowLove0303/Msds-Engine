@@ -37,6 +37,15 @@ import {
   convertBatchDocxToPdf,
   getPdfCapability,
 } from './pdf-converter.js';
+import {
+  ENTITY_MATRIX,
+  buildEnglishFacts,
+  buildBaseChineseEngine,
+  buildBaseEnglishEngine,
+  derivePresetEngines,
+  batchExportDeliverables,
+  executeEightDeliverablesPipeline
+} from './pipeline-engine.js';
 
 if (!globalThis.DOMParser || !globalThis.XMLSerializer) {
   const dom = new JSDOM('<!doctype html><html><body></body></html>');
@@ -99,6 +108,9 @@ function getOrCreateSession(sessionId = 'default') {
       matchResult: null,
       editorEngine: null,
       templateVariant: 'CN_GUANZHI',
+      baseCnEngine: null,
+      baseEnEngine: null,
+      presetEngines: null,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -136,13 +148,30 @@ async function parseJsonBody(req) {
 }
 
 function sendJson(res, statusCode, data) {
+  if (res.headersSent) {
+    try { res.end(); } catch {}
+    return;
+  }
+  let jsonStr;
+  try {
+    jsonStr = JSON.stringify(data);
+  } catch (err) {
+    if (!res.headersSent) {
+      res.writeHead(500, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+      });
+      res.end(JSON.stringify({ success: false, error: { message: `JSON 序列化失败: ${err.message}` } }));
+    }
+    return;
+  }
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
   });
-  res.end(JSON.stringify(data));
+  res.end(jsonStr);
 }
 
 // 递归扫描目录中的 DOCX 文件
@@ -840,6 +869,188 @@ export async function handleApiRequest(req, res) {
     }
 
 
+    // ========================================================
+    // 5.5 四阶生产流水线 API 端点 (Pipeline API)
+    // ========================================================
+    // 阶段一：建立中文基准 (Base-CN)
+    if (pathname === '/api/msds/pipeline/base-cn' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const sessionId = body.sessionId || 'default';
+      const session = getOrCreateSession(sessionId);
+
+      const model = body.model || 'MSDS';
+      let cnBuf = null;
+      if (body.cnGroundTruthBase64) {
+        cnBuf = Buffer.from(body.cnGroundTruthBase64, 'base64');
+      } else if (body.recordId) {
+        cnBuf = await getDocxBuffer(body.recordId);
+      }
+
+      const engine = await buildBaseChineseEngine({
+        modelCode: model,
+        cnGroundTruthBuffer: cnBuf,
+        cnGroundTruthPath: body.cnGroundTruthPath,
+        revisionDate: body.revisionDate || null
+      });
+
+      session.baseCnEngine = engine;
+      session.model = model;
+
+      sendJson(res, 200, {
+        success: true,
+        stage: 1,
+        stageName: 'Base-CN Established',
+        sessionId,
+        model,
+        tableCount: tableRecords(engine).length,
+        headerFooter: engine.headerFooterData
+      });
+      return true;
+    }
+
+    // 阶段二：建立英文基准 (Base-EN)
+    if (pathname === '/api/msds/pipeline/base-en' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const sessionId = body.sessionId || 'default';
+      const session = getOrCreateSession(sessionId);
+
+      const model = body.model || session.model || 'MSDS';
+      const facts = body.facts || {};
+
+      const engine = await buildBaseEnglishEngine({
+        modelCode: model,
+        facts,
+        revisionDate: body.revisionDate || null
+      });
+
+      session.baseEnEngine = engine;
+
+      sendJson(res, 200, {
+        success: true,
+        stage: 2,
+        stageName: 'Base-EN Derived',
+        sessionId,
+        model,
+        tableCount: tableRecords(engine).length,
+        headerFooter: engine.headerFooterData
+      });
+      return true;
+    }
+
+    // 阶段三：应用预设派生变体 (Apply Presets)
+    if (pathname === '/api/msds/pipeline/apply-presets' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const sessionId = body.sessionId || 'default';
+      const session = getOrCreateSession(sessionId);
+
+      if (!session.baseCnEngine || !session.baseEnEngine) {
+        sendJson(res, 400, {
+          success: false,
+          error: { message: '请先完成阶段一 (base-cn) 与阶段二 (base-en) 基准建立' }
+        });
+        return true;
+      }
+
+      const model = session.model || body.model || 'MSDS';
+      const entityId = body.entityId || 'GUOCAI';
+
+      const { cnPresetEngine, enPresetEngine } = await derivePresetEngines({
+        modelCode: model,
+        baseCnEngine: session.baseCnEngine,
+        baseEnEngine: session.baseEnEngine,
+        entityId,
+        revisionDate: body.revisionDate || null
+      });
+
+      session.presetEngines = {
+        cn: cnPresetEngine,
+        en: enPresetEngine,
+        entityId
+      };
+
+      sendJson(res, 200, {
+        success: true,
+        stage: 3,
+        stageName: 'Presets Applied',
+        sessionId,
+        model,
+        derivedVariants: [
+          `${model} msds_CN ${ENTITY_MATRIX[entityId]?.cn?.shortName || entityId}`,
+          `${model} msds_EN ${ENTITY_MATRIX[entityId]?.en?.shortName || entityId}`
+        ]
+      });
+      return true;
+    }
+
+    // 阶段四：批量并行导出 (Export All)
+    if (pathname === '/api/msds/pipeline/export-all' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const sessionId = body.sessionId || 'default';
+      const session = getOrCreateSession(sessionId);
+
+      if (!session.baseCnEngine || !session.baseEnEngine || !session.presetEngines) {
+        sendJson(res, 400, {
+          success: false,
+          error: { message: '缺少完整的基准或预设引擎实例，无法导出' }
+        });
+        return true;
+      }
+
+      const model = session.model || body.model || 'MSDS';
+      const targetDir = body.targetDir || null;
+
+      const deliverables = await batchExportDeliverables({
+        modelCode: model,
+        targetDir,
+        engines: {
+          cnGuanzhi: session.baseCnEngine,
+          cnGuocai: session.presetEngines.cn,
+          enGuanzhi: session.baseEnEngine,
+          enGuocai: session.presetEngines.en
+        }
+      });
+
+      sendJson(res, 200, {
+        success: true,
+        stage: 4,
+        stageName: 'Export Complete',
+        sessionId,
+        model,
+        targetDir,
+        deliverables
+      });
+      return true;
+    }
+
+    // 统一门面接口：四阶流水线一步原子完成 (One-Click Atomic Pipeline)
+    if (pathname === '/api/msds/pipeline/generate-eight' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const model = body.model;
+      if (!model) {
+        sendJson(res, 400, { success: false, error: { message: '必须指定产品型号 (model)' } });
+        return true;
+      }
+
+      let cnBuf = null;
+      if (body.cnGroundTruthBase64) {
+        cnBuf = Buffer.from(body.cnGroundTruthBase64, 'base64');
+      } else if (body.recordId) {
+        cnBuf = await getDocxBuffer(body.recordId);
+      }
+
+      const result = await executeEightDeliverablesPipeline({
+        modelCode: model,
+        cnGroundTruthPath: body.cnGroundTruthPath,
+        cnGroundTruthBuffer: cnBuf,
+        targetDir: body.targetDir,
+        facts: body.facts || {},
+        revisionDate: body.revisionDate || null
+      });
+
+      sendJson(res, 200, result);
+      return true;
+    }
+
     // ==========================================
     // 6. 统一导出接口 (Export DOCX & PDF)
     // ==========================================
@@ -1303,7 +1514,9 @@ export async function handleApiRequest(req, res) {
     sendJson(res, 404, { success: false, error: { message: `未知的 API 端点: ${pathname}` } });
     return true;
   } catch (err) {
-    sendJson(res, 500, { success: false, error: { message: `服务器内部错误: ${err.message}`, stack: err.stack } });
+    if (!res.headersSent) {
+      sendJson(res, 500, { success: false, error: { message: `服务器内部错误: ${err.message}`, stack: err.stack } });
+    }
     return true;
   }
 }

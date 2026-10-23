@@ -1,23 +1,38 @@
 # section2-layout-pruning Specification
 
 ## Purpose
-TBD - created by archiving change section2-pruning-and-table-layout. Update Purpose after archive.
+Define strict invariants and operational procedures for Section 2 (Hazard Identification) layout pruning in MSDS documents. Ensures that empty rows are physically removed from OOXML tables without leaving dangling blanks or broken row-spanning merges, sequence numbers remain strictly consecutive, and web table rendering maintains a clean two-column layout without column spillover.
 
 ## Requirements
 
-### Requirement: S2-PRUNE-001 - Section 2 无值行必须物理安全删除
-当执行智能匹配将结果写入目标模板时（`applyMatchResultToEditor`），Section 2 必须遵从“无值即删行”的原则：
-- 若 Section 2 中某行对应的插槽在源文件中未匹配到有效值（或状态不为 `MATCHED` / `NOT_APPLICABLE`、或值为空白），该行必须自底向上通过 `deleteRow` 进行物理删除；
-- 严禁在模板中保留大段空白无值行；
-- 删行后，剩余行必须自动调用 `renumberRecord` 重新按序递增编号（如 `2.1`、`2.2`、`2.3` 等无断号）。
+### Requirement: S2-PRUNE-001 - Section 2 无值行物理安全删除
+The matching engine SHALL enforce zero-residual pruning for Section 2 when applying match results to template tables:
+- When a slot in Section 2 lacks a valid matched fact in source data (or status is not `MATCHED`/`NOT_APPLICABLE`, or value is whitespace), the engine SHALL physically delete the corresponding row via bottom-up row deletion;
+- The engine MUST NOT leave blank or unpopulated rows in target tables;
+- After row deletion, remaining rows SHALL be automatically renumbered sequentially (e.g. `2.1`, `2.2`, `2.3` with zero sequence gaps).
 
-### Requirement: S2-MERGE-002 - Section 2 复合跨行合并块的动态几何联动
-针对 Section 2 中的 `2.8 健康危害` 复合跨行块：
-- 若所有健康途径（吸入、食入、皮肤、眼睛、症状体征）均无匹配值，该合并块的所有行（包含父标题行）必须完整安全删除；
-- 若仅部分途径有值，必须物理删除无值的途径行，且首行父级标题单元格（`2.8 健康危害`）的 `rowspan` 属性与底层 Word XML `<w:vMerge>` 必须同步更新为实际剩余子行数，严禁悬空溢出。
+#### Scenario: Pruning unmatched Section 2 rows
+- **WHEN** smart matching runs on Section 2 slots and finds unmatched or empty items
+- **THEN** the engine deletes all empty row nodes from bottom to top
+- **AND** renumbers the remaining valid rows with consecutive numbering prefixes
+
+### Requirement: S2-MERGE-002 - Section 2 复合跨行合并块动态联动
+The layout engine MUST dynamically synchronize vertical merges (`<w:vMerge>`) for compound multi-row blocks like `2.8 健康危害`:
+- When all health hazard routes (inhalation, ingestion, skin, eyes, symptoms) have no matched values, the engine SHALL safely remove all rows of the compound block including the parent header row;
+- When only a subset of routes has valid values, the engine SHALL physically delete empty route rows and update the parent cell's `rowspan` and `<w:vMerge>` count to match the actual remaining child rows, preventing dangling spillover.
+
+#### Scenario: Synchronizing rowspan on partial health routes
+- **WHEN** only inhalation and skin routes have values while eyes and ingestion are empty
+- **THEN** the engine deletes the empty child rows
+- **AND** updates the parent header row cell rowspan and vertical merge tags to match the surviving rows
 
 ### Requirement: S2-LAYOUT-003 - Web 渲染层列数与跨行边界防御
-Web 渲染层（`renderStructuredTable`、`renderEditorTable`）在呈现 Section 2 时：
-- 表格列数必须严格维持为 2 列（`colgroup` 宽度比例 `35.926%` : `64.074%`）；
-- 严禁产生因跨行溢出覆盖后续行造成的第 3 列列挤出（Column Spillover）；
-- 章节内加粗子标签（如 `2.9`、`2.10` 等）在渲染出的 HTML 中必须位于第一列（`col: 0`），严禁被推至第二列。
+The web rendering layer (`renderStructuredTable`, `renderEditorTable`) SHALL strictly protect column boundaries when rendering Section 2:
+- The table MUST maintain exactly 2 columns with a fixed width ratio (`35.926%` : `64.074%`);
+- The renderer MUST NOT produce a third column spillover caused by row-span overflow;
+- Sub-labels in Section 2 (such as `2.9`, `2.10`) MUST stay positioned in the first column (`col: 0`) in rendered HTML.
+
+#### Scenario: Rendering Section 2 in editor without column spillover
+- **WHEN** the web client renders Section 2 table view
+- **THEN** the table layout enforces exactly two columns without width collapse
+- **AND** all sequence sub-labels stay pinned in column 0
