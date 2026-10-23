@@ -27,6 +27,12 @@ import {
   applyPresetPriorityOverlay,
   buildExportDocxName,
   renumberRecord,
+  applySemanticOverrides,
+  findCellBySemanticKey,
+  writeCellValue,
+  updateHeaderFooterData,
+  harmonizeTableLabels,
+  suppressOversizedRowHeights,
 } from './docx-engine.js';
 
 function tableRecords(engine) {
@@ -99,6 +105,80 @@ const APP_VERSION = '1.6.0';
 
 // 内存会话存储池
 const sessions = new Map();
+
+// ==========================================
+// 协同草稿内存存储池与辅助函数
+// ==========================================
+const editorDrafts = new Map();
+
+export function getEditorDraft(id) {
+  return editorDrafts.get(id) || null;
+}
+
+export function listEditorDrafts() {
+  return Array.from(editorDrafts.values()).map((d) => ({
+    draftId: d.draftId,
+    model: d.model,
+    baselineId: d.baselineId,
+    fieldsCount: d.fieldsCount,
+    createdAt: d.createdAt,
+    updatedAt: d.updatedAt,
+  }));
+}
+
+function resolveTemplateByBaseline(baselineId = 'baseline_cn_guanzhi') {
+  const norm = String(baselineId || '').toLowerCase();
+  if (norm.includes('en_guocai') || norm.includes('guocai_en')) {
+    return path.join(TEMPLATES_DIR, '正式模板_MSDS_EN_国彩(1).docx');
+  }
+  if (norm.includes('en')) {
+    return path.join(TEMPLATES_DIR, '正式模板_MSDS_EN_冠志(1).docx');
+  }
+  if (norm.includes('cn_guocai') || norm.includes('guocai_cn') || norm.includes('guocai')) {
+    return path.join(TEMPLATES_DIR, '正式模板_MSDS_CN_国彩(1).docx');
+  }
+  return path.join(TEMPLATES_DIR, '正式模板_MSDS_CN_冠志(1).docx');
+}
+
+function findCellInEngine(engine, key) {
+  if (!engine?.records || !key) return null;
+  const k = String(key).trim();
+  let cell = findCellBySemanticKey(engine, k);
+  if (cell) return cell;
+  if (!k.startsWith('sec')) {
+    cell = findCellBySemanticKey(engine, `sec${k}`);
+    if (cell) return cell;
+  }
+  const numMatch = k.match(/^(d+).(d+)$/);
+  if (numMatch) {
+    const secNum = parseInt(numMatch[1], 10);
+    const itemNum = numMatch[2];
+    const prefixRegex = new RegExp(`^\\s*${secNum}\\.${itemNum}\\b`);
+    const records = engine.records.filter((r) => r.sectionNumber === secNum && Array.isArray(r.rows));
+    for (const record of records) {
+      for (const row of record.rows) {
+        const labelCell = row.cells.find((c) => c.role === 'label' || c.isLabel) || row.cells[0];
+        const labelText = (labelCell?.labelText || labelCell?.text || '').trim();
+        if (prefixRegex.test(labelText)) {
+          const valCell = row.cells.find((c) => c.editable);
+          if (valCell) return valCell;
+        }
+      }
+    }
+  }
+  for (const record of engine.records) {
+    if (!Array.isArray(record.rows)) continue;
+    for (const row of record.rows) {
+      const labelCell = row.cells.find((c) => c.role === 'label' || c.isLabel) || row.cells[0];
+      const labelText = (labelCell?.labelText || labelCell?.text || '').trim();
+      if (labelText && labelText.includes(k)) {
+        const valCell = row.cells.find((c) => c.editable);
+        if (valCell) return valCell;
+      }
+    }
+  }
+  return null;
+}
 
 function getOrCreateSession(sessionId = 'default') {
   if (!sessions.has(sessionId)) {
@@ -613,6 +693,129 @@ export async function handleApiRequest(req, res) {
         presetName: presetObj.name,
         appliedFieldsCount: appliedCount,
         message: `预设【${presetObj.name}】已成功覆盖应用`,
+      });
+      return true;
+    }
+
+    // ==========================================
+    // 0.6 Agent 与 Web 编辑器协同草稿流 API
+    // ==========================================
+
+    // 0.6.1 POST /api/msds/editor/draft - 创建或追加协同草稿
+    if (pathname === '/api/msds/editor/draft' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const { model, baselineId, fields, facts } = body;
+
+      const tplPath = resolveTemplateByBaseline(baselineId);
+      if (!fsSync.existsSync(tplPath)) {
+        sendJson(res, 404, { success: false, error: { message: `模板基准文件不存在: ${tplPath}` } });
+        return true;
+      }
+
+      const tplBuf = await fs.readFile(tplPath);
+      const engine = await loadDocx(tplBuf, path.basename(tplPath));
+
+      let modifiedCount = 0;
+      if (fields && typeof fields === 'object') {
+        for (const [k, v] of Object.entries(fields)) {
+          if (v === undefined || v === null) continue;
+          const cell = findCellInEngine(engine, k);
+          if (cell && cell.editable) {
+            writeCellValue(cell, v);
+            modifiedCount++;
+          }
+        }
+      }
+
+      // 保持 G-11 字体/字重分离与排版规整
+      harmonizeTableLabels(engine);
+      suppressOversizedRowHeights(engine);
+      if (model) {
+        updateHeaderFooterData(engine, { model: String(model).trim() });
+      }
+
+      const docxArrayBuffer = await engine.exportArrayBuffer();
+      const docxBuffer = Buffer.from(docxArrayBuffer);
+      const draftId = `draft_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+      editorDrafts.set(draftId, {
+        draftId,
+        model: model || 'PU-Standard',
+        baselineId: baselineId || 'baseline_cn_guanzhi',
+        engine,
+        docxBuffer,
+        fieldsCount: modifiedCount,
+        facts: facts || null,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+
+      sendJson(res, 200, {
+        success: true,
+        data: {
+          draftId,
+          model: model || 'PU-Standard',
+          baselineId: baselineId || 'baseline_cn_guanzhi',
+          modifiedFields: modifiedCount,
+          createdAt: Date.now(),
+        },
+      });
+      return true;
+    }
+
+    // 0.6.2 GET /api/msds/editor/drafts - 获取全部活跃协同草稿摘要
+    if (pathname === '/api/msds/editor/drafts' && req.method === 'GET') {
+      const list = Array.from(editorDrafts.values()).map((d) => ({
+        draftId: d.draftId,
+        model: d.model,
+        baselineId: d.baselineId,
+        fieldsCount: d.fieldsCount,
+        createdAt: d.createdAt,
+        updatedAt: d.updatedAt,
+      }));
+      sendJson(res, 200, { success: true, data: list });
+      return true;
+    }
+
+    // 0.6.3 GET /api/msds/editor/draft/:id/docx - 获取协同草稿 DOCX 二进制
+    const draftDocxMatch = pathname.match(/^\/api\/msds\/editor\/draft\/([^\/]+)\/docx$/);
+    if (draftDocxMatch && req.method === 'GET') {
+      const draftId = decodeURIComponent(draftDocxMatch[1]);
+      const draft = editorDrafts.get(draftId);
+      if (!draft || !draft.docxBuffer) {
+        sendJson(res, 404, { success: false, error: { message: `未找到 ID 为 ${draftId} 的协同草稿` } });
+        return true;
+      }
+      res.writeHead(200, {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'Content-Length': draft.docxBuffer.length,
+        'Content-Disposition': `inline; filename="${encodeURIComponent(draft.draftId + '.docx')}"`,
+        'Access-Control-Allow-Origin': '*',
+      });
+      res.end(draft.docxBuffer);
+      return true;
+    }
+
+    // 0.6.4 GET /api/msds/editor/draft/:id - 获取指定草稿元数据
+    const draftMetaMatch = pathname.match(/^\/api\/msds\/editor\/draft\/([^\/]+)$/);
+    if (draftMetaMatch && req.method === 'GET') {
+      const draftId = decodeURIComponent(draftMetaMatch[1]);
+      const draft = editorDrafts.get(draftId);
+      if (!draft) {
+        sendJson(res, 404, { success: false, error: { message: `未找到 ID 为 ${draftId} 的协同草稿` } });
+        return true;
+      }
+      sendJson(res, 200, {
+        success: true,
+        data: {
+          draftId: draft.draftId,
+          model: draft.model,
+          baselineId: draft.baselineId,
+          fieldsCount: draft.fieldsCount,
+          facts: draft.facts,
+          createdAt: draft.createdAt,
+          updatedAt: draft.updatedAt,
+        },
       });
       return true;
     }

@@ -4895,6 +4895,33 @@ async function bootstrap() {
       renderApp();
     }
   }).catch(() => {});
+
+  // Agent 与 Web 编辑器协同草稿流（零 UI 侵入）：支持通过 ?draftId=xxx 静默数据水合
+  if (typeof window !== 'undefined' && window.location) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const draftId = urlParams.get('draftId');
+    if (draftId) {
+      try {
+        const resp = await fetch(`/api/msds/editor/draft/${encodeURIComponent(draftId)}/docx`);
+        if (resp.ok) {
+          const arrayBuffer = await resp.arrayBuffer();
+          const engine = await loadDocx(arrayBuffer, `draft_${draftId}.docx`);
+          state.editor.engine = engine;
+          state.editor.selectedRecordId = firstSectionRecord(engine)?.id || null;
+          state.editor.dirty = true;
+          state.editor.customFileName = `draft_${draftId}.docx`;
+          state.view = 'editor';
+          ensureCurrentDraft(true);
+          renderApp();
+          showToast(`已成功载入协同草稿: ${draftId}`, 'success');
+          return;
+        }
+      } catch (e) {
+        console.warn('Failed to hydrate collaborative draft:', e);
+      }
+    }
+  }
+
   try {
     await switchBaselineDraft('baseline_cn_guanzhi');
   } catch (error) {
