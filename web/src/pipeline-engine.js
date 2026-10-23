@@ -2621,4 +2621,90 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
   if (isEnglish) {
     assertZeroChinese(engine, docName);
   }
+
+  // Gate 5: Section 2 危险性分类与引导行纯净度门禁
+  const s2 = engine.records.find(r => r.sectionNumber === 2);
+  if (s2) {
+    const row22 = s2.rows.find(r => /2\.2|GHS标签要素|GHS label elements/i.test(r.cells[0]?.text || ''));
+    if (row22 && row22.cells.length >= 2) {
+      const valText = (row22.cells[1].text || '').trim();
+      if (valText && valText !== '') {
+        throw new Error(`【质量门禁拦截 (Gate 5)】${docName} Section 2 引导行 2.2 右侧值格含有非法注入字符: "${valText}"！必须保持为空占位。`);
+      }
+    }
+  }
+
+  // Gate 6: 全篇值格 100% 纯左对齐与自然词距断言
+  const xmlDoc = engine.documentXml;
+  const allTbls = Array.from(xmlDoc.getElementsByTagNameNS(W_NS, 'tbl'));
+  for (let t = 0; t < allTbls.length; t++) {
+    const tbl = allTbls[t];
+    const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
+    for (let r = 0; r < rows.length; r++) {
+      const cells = Array.from(rows[r].getElementsByTagNameNS(W_NS, 'tc'));
+      if (cells.length < 2) continue;
+      for (let c = 1; c < cells.length; c++) {
+        const cell = cells[c];
+        const cellText = (cell.textContent || '').trim();
+        if (cellText === 'CAS编号' || cellText === 'CAS NO.' || /^\d{2,7}-\d{2}-\d$/.test(cellText)) continue;
+        const pList = Array.from(cell.getElementsByTagNameNS(W_NS, 'p'));
+        for (const p of pList) {
+          const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+          const jc = pPr?.getElementsByTagNameNS(W_NS, 'jc')[0]?.getAttributeNS(W_NS, 'val');
+          if (jc === 'both' || jc === 'distribute') {
+            throw new Error(`【质量门禁拦截 (Gate 6)】${docName} 表格 ${t + 1} 行 ${r + 1} 列 ${c + 1} 值格出现非法 "${jc}" 对齐！严禁两端对齐/分散对齐造成词间拉大。`);
+          }
+          const ind = pPr?.getElementsByTagNameNS(W_NS, 'ind')[0];
+          const firstLine = ind?.getAttributeNS(W_NS, 'firstLine');
+          if (firstLine && firstLine !== '0') {
+            throw new Error(`【质量门禁拦截 (Gate 6)】${docName} 表格 ${t + 1} 行 ${r + 1} 列 ${c + 1} 值格出现非法首行缩进: firstLine=${firstLine}！值格文字严禁公文式首行缩进。`);
+          }
+        }
+      }
+    }
+  }
+
+  // Gate 7: Section 13 四行独立结构门禁
+  const s13 = engine.records.find(r => r.sectionNumber === 13);
+  if (s13 && s13.rows.length !== 4) {
+    throw new Error(`【质量门禁拦截 (Gate 7)】${docName} Section 13 行数异常: 当前 ${s13.rows.length} 行 (必须严格保持 4 行独立结构)!`);
+  }
+
+  // Gate 8: 值格数值常规体与字体纯净度断言 (G-11 字体分离法定不变量)
+  for (let t = 0; t < allTbls.length; t++) {
+    const tbl = allTbls[t];
+    const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
+    for (let r = 0; r < rows.length; r++) {
+      const cells = Array.from(rows[r].getElementsByTagNameNS(W_NS, 'tc'));
+      if (cells.length < 2) continue;
+      for (let c = 1; c < cells.length; c++) {
+        const cell = cells[c];
+        const cellText = (cell.textContent || '').trim();
+        if (cellText === 'CAS编号' || cellText === '含量%（w/w）' || cellText === 'CAS NO.' || cellText === 'Concentration % (w/w)') continue;
+        const runs = Array.from(cell.getElementsByTagNameNS(W_NS, 'r'));
+        for (const run of runs) {
+          const runText = (run.textContent || '').trim();
+          if (!runText) continue;
+          const bEl = run.getElementsByTagNameNS(W_NS, 'b')[0];
+          const isBold = bEl && bEl.getAttributeNS(W_NS, 'val') !== '0';
+          if (isBold) {
+            const isSubLabel = /^(预防措施|事故响应|安全储存|废弃处置|经口|吸入|经皮|物种|分类|结果|Oral|Inhalation|Dermal|Species|Classification|Result)[：:]?$/i.test(runText);
+            if (!isSubLabel) {
+              throw new Error(`【质量门禁拦截 (Gate 8)】${docName} 表格 ${t + 1} 行 ${r + 1} 列 ${c + 1} 发现非法加粗数值: "${runText}"！违反 G-11 字体分离法定不变量。`);
+            }
+          }
+          if (!isEnglish) {
+            const rFonts = run.getElementsByTagNameNS(W_NS, 'rFonts')[0];
+            if (rFonts) {
+              const ascii = rFonts.getAttributeNS(W_NS, 'ascii');
+              const eastAsia = rFonts.getAttributeNS(W_NS, 'eastAsia');
+              if (ascii === 'Calibri' || eastAsia === 'Calibri') {
+                throw new Error(`【质量门禁拦截 (Gate 8)】${docName} 表格 ${t + 1} 行 ${r + 1} 列 ${c + 1} 发现非法 Calibri 字体污染: "${runText}"！中文版必须保持受控宋体。`);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }

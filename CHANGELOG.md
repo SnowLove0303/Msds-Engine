@@ -1,5 +1,19 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-10-23 傍晚] - Pstack 防线下沉自迭代：新增 Gate 8 门禁与 5 维无死角审计基座
+
+### 根因与复盘 (Root Cause & Retro)
+- **踩坑现象**：在针对 `PU-608 msds_CN 冠志.docx` 的人为破坏排查考核中，初版审计脚本漏检了 Section 9 外观值格内部“数值文字内容不变但被非法加粗（`bold=1`）且字体被污染为 Calibri”的破坏行为；
+- **深层根因**：
+  1. 初版差分脚本在 `bText === pText` 时错误采用了短路逻辑，跳过了 Run 级（`<w:rPr>`）属性的扫描；
+  2. 既有 Gate 1~7 仅校验了段落级左对齐，未将《ARCHITECTURE.md》第 5 条“G-11 字体分离（数值严禁加粗、中文严禁 Calibri）”下沉为机械化断言代码，导致规则停留在散文层；
+- **防线下沉闭环 (Defense Escalation)**：
+  1. **正式确立 Gate 8（值格数值常规体与字体纯净度断言门禁）**：在 `web/src/pipeline-engine.js` 的 `assertDeliverableQuality` 中正式落地 Gate 8 机械断言代码，一旦检测到非子标签数值异常加粗或出现 Calibri 字体污染，立即一票否决阻断交付；
+  2. **升级规范与宪法文档**：在《MSDS 中英文覆写排版规范 (v5.0.0)》第五章、`ARCHITECTURE.md` 与 `AGENTS.md` 中同步锁定 8 大门禁；
+  3. **固化机械化测试用例**：编写 `web/tests/test_gate8_assertion.mjs`，已实测验证对破坏文件的 100% 敏锐拦截与对正品文件的 100% 绿灯通行。
+
+---
+
 ## [2026-10-23 下午追加] - 中英文覆写全景大一统规范落地、Section 2.1 分类修复与 Recommendation 对齐
 
 ### 核心交付 (Delivered)
