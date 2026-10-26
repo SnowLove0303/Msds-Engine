@@ -1,5 +1,23 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-10-26 早晨] - PA 系列丙烯酸酯与特异指标英译适配、中文值格首行缩进清理与 Section 13 四行门禁闭环
+
+### 核心交付 (Delivered)
+1. **PA 系列（丙烯酸酯类）8 格式端到端一键生产**：
+   - 针对 `PA-3223` 标准型号，通过官方受控流水线（`POST /api/msds/pipeline/generate-eight`）成功生成标准 8 格式（4 DOCX + 4 PDF）；
+   - 源文件安全留存为 `PA-3223 msds_CN 冠志_源文件留存.docx`，严禁绕开官方流水线私自修改产出物。
+2. **PA 系列特殊组分与毒理指标英译完善 (Gate 4 零中文门禁 100% 绿灯)**：
+   - Section 3 新增组分英译映射：`羟基丙烯酸酯聚合物` -> `Hydroxy acrylic polymer`、`丙二醇丁醚` -> `Propylene glycol butyl ether`、`N,N二甲基乙醇胺` -> `2-Dimethylaminoethanol`；
+   - Section 11 毒理学指标新增动物急性毒性正则识别：适配 `（鼠）LD50：＞2000 mg/kg` 转为西文标准 `(Rat) LD50: > 2000 mg/kg`；
+   - Section 11 空缺端点动态精简：对于源文未测的皮肤刺激、眼睛刺激、致敏性、致突变性空行进行动态剪枝，消除英文底模自带的历史残留参考数据；
+   - Section 12 生态毒理与持久性英译防踩坑：增加无可利用毒理研究免责声明识别；调整正则优先级，解决 `不易生物降解` 被 `易生物降解` 截胡导致的文字半英半中污染。
+3. **中文母版值格公文首行缩进与两端对齐清理 (Gate 6 断言防护)**：
+   - 在 `buildBaseChineseEngine` 阶段新增全表值格清洗逻辑，自动拔除底模残留的 `w:firstLine` 首行缩进与 `w:jc val="both"`，确保所有值格 100% 纯左对齐与自然词距。
+4. **Section 13 中文母版四行独立结构对齐 (Gate 7 门禁保障)**：
+   - 将 `buildBaseChineseEngine` 中的 Section 13 逻辑由历史的 3 行收敛改为与英文版及 Gate 7 严格对齐的标准 4 行独立结构（标题行 + 两行独立说明行 + 处置方法行）。
+
+---
+
 ## [2026-10-23 傍晚] - Pstack 防线下沉自迭代：新增 Gate 8 门禁与 5 维无死角审计基座
 
 ### 根因与复盘 (Root Cause & Retro)
