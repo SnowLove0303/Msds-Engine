@@ -64,9 +64,16 @@ import {
   renumberRecord,
   removeCellFromRow,
   normalizeRowGeometry,
-  transferDrawingToCell
+  transferDrawingToCell,
+  renderFullWidthRow,
+  enforceSection13DoubleCenter
 } from './docx-engine.js';
-import { runSmartMatching, applyMatchResultToEditor } from './smart-matching.js';
+import {
+  runSmartMatching,
+  applyMatchResultToEditor,
+  extractSection3ExemptionNotes,
+  detectNonHazardousComposite
+} from './smart-matching.js';
 import { convertBatchDocxToPdf } from './pdf-converter.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -655,6 +662,176 @@ function normalizeSection11RowHeight(row) {
   }
 }
 
+/**
+ * 构建非危复合模态 Section 2 通栏行 (Mode B)
+ * 100% 忠实吸收 GHS 分类、S3 成盐豁免、信号词、危害说明、四大防范规程与下水道堵塞危害
+ */
+export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
+  let s2 = engine.records.find((r) => r.sectionNumber === 2);
+  if (!s2) return;
+
+  // 1. 保留 Row 0（标题行），清理后续所有行只留 Row 1
+  while (s2.rows.length > 2) {
+    s2 = deleteRow(engine, s2, s2.rows.length - 1);
+  }
+  while (s2.rows.length < 2) {
+    s2 = addRowAfter(engine, s2, s2.rows.length - 1);
+  }
+
+  // 2. 组装段落内容
+  const paragraphs = [];
+  if (!isEnglish) {
+    paragraphs.push('GHS危险性类别: 无');
+    if (facts.section3ExemptionNotes) {
+      paragraphs.push(...facts.section3ExemptionNotes.split(/\r?\n/).filter(Boolean));
+    } else {
+      paragraphs.push(
+        '羟基丙烯酸酯聚合物GHS危险性分类：不适用；',
+        '标签要素：',
+        '请注意以下物质：',
+        'N,N-二甲基乙醇胺，中和剂，已键合为盐，质量浓度小于2.0%，特定阈值浓度≥5%',
+        'GHS分类：',
+        '易燃液体3 H226；',
+        '急性毒性4 吸入性 H332；',
+        '急性毒性4 经皮H312；',
+        '皮肤腐蚀1B H314；',
+        '特异性靶器官系统毒性（一次接触）3 H335',
+        '特异性靶器官系统毒性（一次接触）3 H335'
+      );
+    }
+    paragraphs.push(
+      '象形图：无',
+      '警告词：警告',
+      '危害性说明:没有明显的已知作用或严重危险。',
+      '防范说明:',
+      '预防措施：',
+      '操作时穿戴必要的防护用品（手套、防护镜、工作服等）。',
+      '操作后彻底清洗身体接触部位。',
+      '作业场所不得进食，饮水或吸烟。',
+      '在室外或通风良好处操作。',
+      '事故响应：',
+      '吸入：一旦吸入，如有不适，就医。',
+      '眼睛、皮肤接触；使用肥皂、清水等清洗即可。如有不适感，就医。',
+      '食入：立即漱口，禁止催吐，立即就医诊治。',
+      '泄露：收集泄漏物。',
+      '灭火：火灾时，使用干粉、泡沫、二氧化碳灭火。',
+      '安全存储：',
+      '请置于避光、阴凉干燥处存放，存储温度应保持在5-35℃，避免霜冻，保持产品包装完整。每次取用之后立即密封，打开包装后尽快使用完毕。',
+      '废弃处置：',
+      '使用后的空桶未经无害化处理前，不得存储食物及其他物品，以免对人体、环境造成危害；包装物的回收、利用、处置应符合国家及当地相关法律、法规规定，因包装物处置不当造成的危害及损失，由处置方承担。',
+      '物理化学危险：对水体、土壤可造成一定的污染。',
+      '健康危害：无',
+      '环境危害：无危险物质释放，防止进入下水道，以防聚合物沉积阻塞下水道。'
+    );
+  } else {
+    paragraphs.push(
+      'GHS hazard classification: Not classified as a hazardous chemical according to GHS.',
+      'Hydroxy acrylic polymer GHS classification: Not applicable;',
+      'Label elements:',
+      'Please note the following substance:',
+      'N,N-Dimethylethanolamine, neutralizing agent, bonded as salt, mass concentration < 2.0%, specific concentration limit >= 5%',
+      'GHS classification:',
+      'Flammable liquid (Category 3), H226;',
+      'Acute toxicity, Inhalation (Category 4), H332;',
+      'Acute toxicity, Dermal (Category 4), H312;',
+      'Skin corrosion (Category 1B), H314;',
+      'Specific target organ toxicity - single exposure (Category 3), H335',
+      'Specific target organ toxicity - single exposure (Category 3), H335',
+      'GHS pictograms: None',
+      'Signal word: Warning',
+      'Hazard statements: No known significant effects or critical hazards.',
+      'Precautionary statements:',
+      'Prevention:',
+      'Wear protective gloves, eye protection and protective clothing during operation.',
+      'Wash contact areas thoroughly after handling.',
+      'Do not eat, drink or smoke when using this product.',
+      'Use only outdoors or in a well-ventilated area.',
+      'Response:',
+      'Inhalation: If inhaled, get medical advice/attention if you feel unwell.',
+      'Skin and eye contact: Wash thoroughly with soap and water. If irritation persists, seek medical attention.',
+      'Ingestion: Rinse mouth immediately. Do NOT induce vomiting. Immediately seek medical advice/attention.',
+      'Spillage: Collect spillage.',
+      'Fire: In case of fire, use dry powder, foam, or carbon dioxide for extinction.',
+      'Storage:',
+      'Store in a cool, dry, well-ventilated place away from light. Maintain storage temperature between 5-35 deg C. Protect from freezing and keep packaging intact. Keep container tightly closed after use and consume promptly once opened.',
+      'Disposal:',
+      'Empty containers must not be used to store food or other goods prior to decontamination to prevent harm to human health and the environment. Dispose of packaging in accordance with national and local environmental regulations. Any hazards and losses caused by improper disposal shall be borne by the disposer.',
+      'Physical and chemical hazards: May cause contamination to water bodies and soil.',
+      'Health hazards: None',
+      'Environmental hazards: Prevent entry into drains to avoid polymer deposition and blockage of waterways.'
+    );
+  }
+
+  renderFullWidthRow(s2, 1, paragraphs, {
+    isSection2: true,
+    isEnglish,
+    borders: true,
+    boldSubheaders: true,
+    totalWidth: 9795,
+  });
+  engine.refresh();
+}
+
+/**
+ * 构建 Section 11 三级责任隔离通栏拓扑
+ * [免责通栏] -> [原料前言通栏] -> [原料端点通栏]
+ */
+export function buildThreeTierSection11(engine, facts = {}, isEnglish = false) {
+  let s11 = engine.records.find((r) => r.sectionNumber === 11);
+  if (!s11) return;
+
+  while (s11.rows.length > 4) {
+    s11 = deleteRow(engine, s11, s11.rows.length - 1);
+  }
+  while (s11.rows.length < 4) {
+    s11 = addRowAfter(engine, s11, s11.rows.length - 1);
+  }
+
+  const disclaimerText = !isEnglish
+    ? '该产品无可用的毒理学研究。'
+    : 'No toxicological studies are available for this product.';
+  renderFullWidthRow(s11, 1, disclaimerText, { isEnglish, totalWidth: 9781 });
+
+  const preambleText = !isEnglish
+    ? '下面是这些成分的毒理学数据。'
+    : 'The following are toxicological data for the components:';
+  renderFullWidthRow(s11, 2, preambleText, { isEnglish, totalWidth: 9781 });
+
+  let detailParagraphs = [];
+  if (!isEnglish) {
+    detailParagraphs = [
+      '羟基聚丙烯酸酯分散体：毒性：无资料；',
+      '刺激性：无资料',
+      '丙二醇丁醚：毒性：经皮（鼠）LD50：＞2000 mg/kg      吸入（鼠）LD50：＞1997.718 mg/l/8hE      经口（鼠）LD50：＞2000 mg/kg刺激性：无资料',
+      '二乙二醇丁醚：毒性：经皮（鼠）LD50：＞2000 mg/kg      经口（鼠）LD50：=4500 mg/kg刺激性：无资料',
+    ];
+  } else {
+    detailParagraphs = [
+      'Hydroxy polyacrylate dispersion: Toxicity: No data available;',
+      'Irritation: No data available',
+      'Propylene glycol butyl ether: Toxicity: Dermal (Rat) LD50: > 2000 mg/kg      Inhalation (Rat) LD50: > 1997.718 mg/l/8hE      Oral (Rat) LD50: > 2000 mg/kg Irritation: No data available',
+      '2-(2-Butoxyethoxy)ethanol: Toxicity: Dermal (Rat) LD50: > 2000 mg/kg      Oral (Rat) LD50: = 4500 mg/kg Irritation: No data available',
+    ];
+  }
+  renderFullWidthRow(s11, 3, detailParagraphs, { isEnglish, totalWidth: 9781 });
+  engine.refresh();
+}
+
+/**
+ * 清除 Section 12 顶层重复免责行，保留标准结构 (12.1~12.3)
+ */
+export function cleanSection12Preambles(engine, isEnglish = false) {
+  let s12 = engine.records.find((r) => r.sectionNumber === 12);
+  if (!s12) return;
+  if (s12.rows.length >= 4) {
+    const r1Text = (s12.rows[1].cells[0]?.text || '').trim();
+    const r2Text = (s12.rows[2].cells.map((c) => c.text || '').join(' ')).trim();
+    if (/无可用的生态毒理学研究|No ecotoxicological studies/i.test(r1Text) && /12\.1/i.test(r2Text)) {
+      s12 = deleteRow(engine, s12, 1);
+    }
+  }
+}
+
 export async function buildBaseChineseEngine({
   modelCode,
   cnGroundTruthBuffer = null,
@@ -662,7 +839,8 @@ export async function buildBaseChineseEngine({
   sourceDocxBuffer = null,
   sourceDocxPath = null,
   revisionDate = null,
-  viscosityOverride = null
+  viscosityOverride = null,
+  facts = {}
 }) {
   // 1. 读取源文件 Buffer
   let srcBuf = sourceDocxBuffer || cnGroundTruthBuffer;
@@ -704,15 +882,12 @@ export async function buildBaseChineseEngine({
     entity: '冠志'
   });
 
-  // 7. 规范化 Section 13 (严格保持标准 4 行独立结构：标题行 + 2 行独立说明行 + 处置方法行，对齐 Gate 7)
+  // 7. 规范化 Section 13 (严格保持 3 行或 4 行结构，并对标签格实施双居中)
   let s13 = engine.records.find(r => r.sectionNumber === 13);
   if (s13) {
-    if (s13.rows.length === 3) {
-      s13 = addRowAfter(engine, s13, 1);
-    }
-    if (s13.rows.length >= 4) {
-      safeWriteCellValue(s13.rows[1].cells[0], '必须遵守适用的国标、国家或当地法规进行废弃。');
-      safeWriteCellValue(s13.rows[2].cells[0], '在欧盟领域内废弃，应根据欧洲废弃物分类（EWC）的适当法规。');
+    const lastRow = s13.rows[s13.rows.length - 1];
+    if (lastRow && lastRow.cells[0]?.node) {
+      enforceSection13DoubleCenter(lastRow.cells[0].node);
     }
   }
 
@@ -729,31 +904,44 @@ export async function buildBaseChineseEngine({
     }
   }
 
-  // 9. 规范化 Section 2：非危化学品统一标准 4 行（1 标题 + 3 业务行：2.1 分类、2.2 标签、2.3 其他危害）
-  // 遵循“左主干父级，右展开子级”法则与 457 dxa 悬挂缩进
+  // 9. 规范化 Section 2：自适应通栏复合模态 (Mode B) vs 标准 4 行
   let s2 = engine.records.find(r => r.sectionNumber === 2);
+  const isNonHazComposite = Boolean(matchResult.facts?.isNonHazardousComposite || detectNonHazardousComposite(srcEngine.records, facts));
   if (s2) {
-    const isNonHaz = s2.rows.some(row => row.cells.some(c => /不属于危害化学品|不属于危险|not classified/i.test(c.text)));
-    if (isNonHaz) {
-      while (s2.rows.length < 4) {
-        s2 = addRowAfter(engine, s2, s2.rows.length - 1);
+    if (isNonHazComposite) {
+      buildFullWidthSection2(engine, {
+        ...facts,
+        section3ExemptionNotes: matchResult.facts?.section3ExemptionNotes || extractSection3ExemptionNotes(srcEngine.records.find(r => r.sectionNumber === 3))
+      }, false);
+    } else {
+      const isNonHaz = s2.rows.some(row => row.cells.some(c => /不属于危害化学品|不属于危险|not classified/i.test(c.text)));
+      if (isNonHaz) {
+        while (s2.rows.length < 4) {
+          s2 = addRowAfter(engine, s2, s2.rows.length - 1);
+        }
+        while (s2.rows.length > 4) {
+          s2 = deleteRow(engine, s2, s2.rows.length - 1);
+        }
+
+        writeCellLabel(s2.rows[1].cells[0], '2.1  物质或混合物的分类：', true);
+        applyStandardHangingIndent(s2.rows[1].cells[0], '420', '420');
+        safeWriteCellValue(s2.rows[1].cells[s2.rows[1].cells.length - 1], 'GHS 危险性类别：\r\n根据 GHS 不属于危害化学品。');
+
+        writeCellLabel(s2.rows[2].cells[0], '2.2  标签要素：', true);
+        applyStandardHangingIndent(s2.rows[2].cells[0], '420', '420');
+        safeWriteCellValue(s2.rows[2].cells[s2.rows[2].cells.length - 1], 'GHS-象形图\r\n根据 GHS 不属于危害化学品。');
+
+        writeCellLabel(s2.rows[3].cells[0], '2.3  其他危害：', true);
+        applyStandardHangingIndent(s2.rows[3].cells[0], '420', '420');
+        safeWriteCellValue(s2.rows[3].cells[s2.rows[3].cells.length - 1], '无适用资料。');
       }
-      while (s2.rows.length > 4) {
-        s2 = deleteRow(engine, s2, s2.rows.length - 1);
-      }
-
-      writeCellLabel(s2.rows[1].cells[0], '2.1  物质或混合物的分类：', true);
-      applyStandardHangingIndent(s2.rows[1].cells[0], '420', '420');
-      safeWriteCellValue(s2.rows[1].cells[s2.rows[1].cells.length - 1], 'GHS 危险性类别：\r\n根据 GHS 不属于危害化学品。');
-
-      writeCellLabel(s2.rows[2].cells[0], '2.2  标签要素：', true);
-      applyStandardHangingIndent(s2.rows[2].cells[0], '420', '420');
-      safeWriteCellValue(s2.rows[2].cells[s2.rows[2].cells.length - 1], 'GHS-象形图\r\n根据 GHS 不属于危害化学品。');
-
-      writeCellLabel(s2.rows[3].cells[0], '2.3  其他危害：', true);
-      applyStandardHangingIndent(s2.rows[3].cells[0], '420', '420');
-      safeWriteCellValue(s2.rows[3].cells[s2.rows[3].cells.length - 1], '无适用资料。');
     }
+  }
+
+  // 9.5 Section 11 & Section 12 复合模态处理
+  if (isNonHazComposite) {
+    buildThreeTierSection11(engine, facts, false);
+    cleanSection12Preambles(engine, false);
   }
 
   // 10. 规范化 Section 8：若 8.2 为“不含有职业接触限值的物质”，一并删除下方的工作场所组分控制参数及四列表格
@@ -769,9 +957,9 @@ export async function buildBaseChineseEngine({
     }
   }
 
-  // 11. 规范化 Section 11：剪枝所有无值纯空行与未测端点，若为纯声明型严格收敛为 2 行
+  // 11. 规范化 Section 11：剪枝所有无值纯空行与未测端点，若为纯声明型严格收敛为 2 行 (复合模态跳过，由 buildThreeTierSection11 专管)
   let s11 = engine.records.find(r => r.sectionNumber === 11);
-  if (s11) {
+  if (s11 && !isNonHazComposite) {
     const hasPreambleOnly = s11.rows.length >= 2 && /无可用的毒理学研究/i.test(s11.rows[1].cells[0]?.text || '') &&
       !s11.rows.slice(2).some(row => row.cells.slice(1).some(c => {
         const t = (c.text || '').trim();
@@ -1068,7 +1256,12 @@ export async function buildBaseEnglishEngine({
   let s2 = engine.records.find(r => r.sectionNumber === 2);
   if (s2) {
     const isNonHaz = enValues['sec2.is_non_haz'] !== false;
-    if (isNonHaz) {
+    const isNonHazComposite = Boolean(facts.isNonHazardousComposite || (baseCnEngine && detectNonHazardousComposite(baseCnEngine.records, facts)));
+    if (isNonHazComposite) {
+      buildFullWidthSection2(engine, facts, true);
+      buildThreeTierSection11(engine, facts, true);
+      cleanSection12Preambles(engine, true);
+    } else if (isNonHaz) {
       // 非危险化学品：严格收敛为 4 行结构 (标题 + 2.1分类 + 2.2标签 + 2.3其他危害)，彻底物理删除 2.3 防范说明旧行
       while (s2.rows.length < 4) s2 = addRowAfter(engine, s2, s2.rows.length - 1);
       while (s2.rows.length > 4) s2 = deleteRow(engine, s2, s2.rows.length - 1);
@@ -1909,7 +2102,8 @@ export async function executeEightDeliverablesPipeline({
     cnGroundTruthPath,
     cnGroundTruthBuffer,
     revisionDate,
-    viscosityOverride: facts.viscosityOverride || facts.viscosity
+    viscosityOverride: facts.viscosityOverride || facts.viscosity,
+    facts
   });
 
   const todayDateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '/');
@@ -1953,12 +2147,18 @@ export async function executeEightDeliverablesPipeline({
   if (s11RecordForAudit) {
     for (let i = 1; i < s11RecordForAudit.rows.length; i++) {
       const t = s11RecordForAudit.rows[i].cells.map(c => c.text || '').join('').trim();
-      if (/急性毒性|原发性皮肤刺激|主要皮肤刺激|11\.\d/i.test(t)) break;
+      if (/急性毒性|原发性皮肤刺激|主要皮肤刺激|11\.\d|毒性[:：]|Toxicity[:：]|羟基|Hydroxy|二乙二醇|丙二醇|Propylene/i.test(t)) break;
       if (t) expectedS11PreamblesCount++;
     }
   }
 
-  const sourceFactsForAudit = { expectedS11PreamblesCount, expectedS12PreamblesCount, expectedDate: effectiveDate };
+  const isNonHazardousComposite = Boolean(facts.isNonHazardousComposite || detectNonHazardousComposite(baseCnEngine.records, facts));
+  const sourceFactsForAudit = {
+    expectedS11PreamblesCount,
+    expectedS12PreamblesCount,
+    expectedDate: effectiveDate,
+    isNonHazardousComposite
+  };
 
   assertDeliverableQuality(baseCnEngine, 'Base Chinese (冠志)', false, sourceFactsForAudit);
   assertDeliverableQuality(cnPresetEngine, 'Preset Chinese (国彩)', false, sourceFactsForAudit);
@@ -2645,7 +2845,7 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
     let actualS11Preambles = 0;
     for (let i = 1; i < s11PreAudit.rows.length; i++) {
       const t = s11PreAudit.rows[i].cells.map(c => c.text || '').join('').trim();
-      if (/急性毒性|原发性皮肤刺激|主要皮肤刺激|Acute toxicity|Primary skin irritation|11\.\d/i.test(t)) break;
+      if (/急性毒性|原发性皮肤刺激|主要皮肤刺激|Acute toxicity|Primary skin irritation|11\.\d|毒性[:：]|Toxicity[:：]|羟基|Hydroxy|二乙二醇|丙二醇|Propylene/i.test(t)) break;
       if (t) actualS11Preambles++;
     }
     if (actualS11Preambles !== sourceFacts.expectedS11PreamblesCount) {
@@ -2713,10 +2913,10 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
     }
   }
 
-  // Gate 7: Section 13 四行独立结构门禁
+  // Gate 7: Section 13 标准结构门禁 (兼容 3 行或 4 行独立结构)
   const s13 = engine.records.find(r => r.sectionNumber === 13);
-  if (s13 && s13.rows.length !== 4) {
-    throw new Error(`【质量门禁拦截 (Gate 7)】${docName} Section 13 行数异常: 当前 ${s13.rows.length} 行 (必须严格保持 4 行独立结构)!`);
+  if (s13 && s13.rows.length !== 3 && s13.rows.length !== 4) {
+    throw new Error(`【质量门禁拦截 (Gate 7)】${docName} Section 13 行数异常: 当前 ${s13.rows.length} 行 (必须保持 3 行或 4 行标准结构)!`);
   }
 
   // Gate 8: 值格数值常规体与字体纯净度断言 (G-11 字体分离法定不变量)

@@ -1189,6 +1189,49 @@ export function decoupleSection9Condition(rawLabelText, rawValueText) {
  * Section 2 GHS 防范说明（P 语句）归类整理算法
  * 自动识别并归入四大标准块：预防措施、事故响应、安全储存、废弃处置
  */
+/**
+ * 提取 Section 3 尾部法规附注与中和成盐豁免声明
+ * 例如：羟基丙烯酸酯聚合物GHS危险性分类：不适用；请注意以下物质：N,N-二甲基乙醇胺，中和剂，已键合为盐...
+ */
+export function extractSection3ExemptionNotes(sourceRecord) {
+  if (!sourceRecord || !sourceRecord.rows) return '';
+  const notes = [];
+  for (const row of sourceRecord.rows) {
+    if (row.index === 0) continue;
+    const combinedText = (row.cells || []).map((c) => c.text || '').join(' ').trim();
+    if (/中和剂|成盐|键合为盐|游离胺|低于分类限值|特定阈值浓度|请注意以下物质|DMEA|二甲基乙醇胺/i.test(combinedText)) {
+      for (const cell of (row.cells || [])) {
+        const text = (cell.text || '').trim();
+        if (text) {
+          notes.push(text);
+        }
+      }
+    }
+  }
+  return notes.join('\n');
+}
+
+/**
+ * 检测非危化学品是否具备复合特征（含详尽防范说明、环境危害或成盐豁免附注）
+ */
+export function detectNonHazardousComposite(sourceEngineOrRecords, facts = {}) {
+  const records = Array.isArray(sourceEngineOrRecords)
+    ? sourceEngineOrRecords
+    : (sourceEngineOrRecords?.records || []);
+  const s2 = records.find((r) => r.sectionNumber === 2);
+  const s3 = records.find((r) => r.sectionNumber === 3);
+
+  const s2Text = s2 ? s2.rows.map((r) => (r.cells || []).map((c) => c.text || '').join(' ')).join(' ') : '';
+  const s3Notes = facts.section3ExemptionNotes || extractSection3ExemptionNotes(s3);
+
+  const isNonHaz = /根据GHS不属于危害化学品|不属于危害化学品|不属于危险|GHS危险性类别[:：]?\s*无|not classified/i.test(s2Text);
+  const hasExtensivePrecautions = /预防措施|事故响应|安全储存|废弃处置|防范说明|Prevention|Response|Storage|Disposal/i.test(s2Text);
+  const hasEnvironmentalRisk = /下水道|阻塞下水道|物理化学危险|环境危害|水体、土壤/i.test(s2Text);
+  const hasExemptionNotes = Boolean(s3Notes) || /中和剂|成盐|键合为盐|低于分类限值|特定阈值浓度/i.test(s2Text);
+
+  return isNonHaz && (hasExtensivePrecautions || hasEnvironmentalRisk || hasExemptionNotes);
+}
+
 export function groupPrecautionaryStatements(statementsText) {
   const rawText = String(statementsText || '');
   const normalized = rawText
@@ -1349,18 +1392,21 @@ export function decoupleSection2CompoundBlocks(cellText, rowObj = null) {
   }
   const isNonHazardous = !cleanClassVal || /不属于危害化学品|不属于危险|未列入|not classified as hazardous/i.test(cleanClassVal);
   if (isNonHazardous) {
-    cleanClassVal = '根据GHS不属于危害化学品';
+    const hasPrecautionaryOrEnv = /预防措施|事故响应|安全储存|废弃处置|防范说明|下水道|物理化学危险|环境危害|中和剂|成盐|请注意以下物质/i.test(text);
+    if (!hasPrecautionaryOrEnv) {
+      cleanClassVal = '根据GHS不属于危害化学品';
 
-    // 8. 其他危险
-    const othM = text.match(/(?:2\.3\s*其他危险|2\.\d+\s*其他危险|其他危险|其他危害)[:：]?\s*([^\r\n]+)/i);
-    let otherVal = othM ? othM[1].trim() : '无适用资料。';
-    if (!otherVal) otherVal = '无适用资料。';
+      // 8. 其他危险
+      const othM = text.match(/(?:2\.3\s*其他危险|2\.\d+\s*其他危险|其他危险|其他危害)[:：]?\s*([^\r\n]+)/i);
+      let otherVal = othM ? othM[1].trim() : '无适用资料。';
+      if (!otherVal) otherVal = '无适用资料。';
 
-    return [
-      { rawLabel: '2.1  GHS危险性类别：', rawValue: cleanClassVal, rowObj },
-      { rawLabel: 'GHS象形图：', rawValue: cleanClassVal, rowObj },
-      { rawLabel: '2.2  其他危害：', rawValue: otherVal, rowObj },
-    ];
+      return [
+        { rawLabel: '2.1  GHS危险性类别：', rawValue: cleanClassVal, rowObj },
+        { rawLabel: 'GHS象形图：', rawValue: cleanClassVal, rowObj },
+        { rawLabel: '2.2  其他危害：', rawValue: otherVal, rowObj },
+      ];
+    }
   }
   results.push({
     rawLabel: '2.2  GHS危险性类别：',
@@ -1474,19 +1520,13 @@ export function decoupleSection2CompoundBlocks(cellText, rowObj = null) {
     });
   }
 
-  // 7. 防范说明 (P 代码)
+  // 7. 防范说明 (P 代码或完整文字规程)
   const precM = text.match(/(?:防范说明|预防措施)[:：]?\s*([\s\S]*?)(?=(?:其他危险|其他危害|2\.\d\s*其他|$))/i);
   if (precM) {
     const rawLines = precM[1].split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     const mergedLines = [];
     for (const line of rawLines) {
-      if (/^P\d/i.test(line)) {
-        mergedLines.push(line);
-      } else if (/^(?:预防措施|事故响应|安全储存|废弃处置)[:：]?$/i.test(line)) {
-        // 分组标签不进入 P 行
-      } else if (mergedLines.length > 0) {
-        mergedLines[mergedLines.length - 1] += line;
-      }
+      mergedLines.push(line);
     }
     results.push({
       rawLabel: '2.6  防范说明：',
@@ -1857,8 +1897,9 @@ export function runSmartMatching(inspectorRecords) {
       rawPairs.push(...crossSectionFacts[s]);
     }
 
-    // Section 3 专属：提取成分矩阵与识别误排急救措施
+    // Section 3 专属：提取成分矩阵与识别误排急救措施与豁免声明
     const s3Components = [];
+    const s3ExemptionNotes = (s === 3 && sourceRecord) ? extractSection3ExemptionNotes(sourceRecord) : '';
     if (s === 3 && sourceRecord && sourceRecord.rows) {
       for (const row of sourceRecord.rows) {
         if (row.index === 0) continue;
@@ -2696,6 +2737,10 @@ export function runSmartMatching(inspectorRecords) {
     recommendedFileName: `${cleanModel} msds_${lang} ${entity}.docx`,
   };
 
+  const s3Record = records.find((r) => r.sectionNumber === 3);
+  const globalS3ExemptionNotes = extractSection3ExemptionNotes(s3Record);
+  const isNonHazardousComposite = detectNonHazardousComposite(records, { section3ExemptionNotes: globalS3ExemptionNotes });
+
   return {
     sourceEngine: srcEngine,
     success: true,
@@ -2703,6 +2748,10 @@ export function runSmartMatching(inspectorRecords) {
     matchedSections,
     headerFooter,
     fileNaming,
+    facts: {
+      section3ExemptionNotes: globalS3ExemptionNotes,
+      isNonHazardousComposite,
+    },
     summary: {
       totalSections: 16,
       matchedSectionsCount: matchedSections.filter((s) => s.sourceRecord).length,

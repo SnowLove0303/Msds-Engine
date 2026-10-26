@@ -2347,6 +2347,204 @@ export function deleteRow(engine, record, rowIndex) {
   return updated;
 }
 
+/**
+ * 将表格的某一行渲染或转换为单单元格通栏行 (Full-Width Row)
+ * @param {Object} record - 表格 record
+ * @param {number} rowIndex - 行索引
+ * @param {string|Array<string>} content - 填入的文本（支持换行符或多段落数组）
+ * @param {Object} options - 配置项，如 totalWidth (默认 9781 或 9795), isEnglish, boldSubheaders, borders
+ */
+export function renderFullWidthRow(record, rowIndex, content, options = {}) {
+  if (!record || record.kind !== 'table') return;
+  const row = record.rows[rowIndex];
+  if (!row?.node) return;
+
+  const doc = row.node.ownerDocument;
+  const totalCols = (record.structure?.gridWidthsTwips?.length) || record.columns || 2;
+  const totalWidth = options.totalWidth || (record.structure?.gridWidthsTwips || []).reduce((sum, w) => sum + (Number(w) || 0), 0) || (options.isSection2 ? 9795 : 9781);
+
+  // 1. 移除 row.node 中多余的 tc，只保留第一个 tc，并彻底剥除 vMerge
+  const tcs = Array.from(row.node.getElementsByTagNameNS(W_NS, 'tc'));
+  for (let i = 1; i < tcs.length; i++) {
+    row.node.removeChild(tcs[i]);
+  }
+  const tcNode = tcs[0];
+  if (!tcNode) return;
+
+  const vMerges = Array.from(tcNode.getElementsByTagNameNS(W_NS, 'vMerge'));
+  vMerges.forEach((vm) => vm.parentNode?.removeChild(vm));
+  const localVm = Array.from(tcNode.getElementsByTagName('vMerge'));
+  localVm.forEach((vm) => vm.parentNode?.removeChild(vm));
+
+  let cell = row.cells?.[0];
+  if (!cell || !cell.node) {
+    cell = {
+      node: tcNode,
+      text: '',
+      editable: true,
+      kind: 'value',
+      rowIndex,
+      cellIndex: 0,
+    };
+    row.cells = [cell];
+  } else if (row.cells.length > 1) {
+    row.cells = [row.cells[0]];
+  }
+
+  // 2. 设置 tcPr
+  let tcPr = cell.node.getElementsByTagNameNS(W_NS, 'tcPr')[0];
+  if (!tcPr) {
+    tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+    cell.node.insertBefore(tcPr, cell.node.firstChild);
+  }
+
+  // tcW
+  let tcW = tcPr.getElementsByTagNameNS(W_NS, 'tcW')[0];
+  if (!tcW) {
+    tcW = doc.createElementNS(W_NS, 'w:tcW');
+    tcPr.appendChild(tcW);
+  }
+  tcW.setAttributeNS(W_NS, 'w:w', String(totalWidth));
+  tcW.setAttributeNS(W_NS, 'w:type', 'dxa');
+
+  // gridSpan
+  if (totalCols > 1) {
+    let gridSpan = tcPr.getElementsByTagNameNS(W_NS, 'gridSpan')[0];
+    if (!gridSpan) {
+      gridSpan = doc.createElementNS(W_NS, 'w:gridSpan');
+      tcPr.appendChild(gridSpan);
+    }
+    gridSpan.setAttributeNS(W_NS, 'w:val', String(totalCols));
+  }
+
+  // vAlign
+  let vAlign = tcPr.getElementsByTagNameNS(W_NS, 'vAlign')[0];
+  if (!vAlign) {
+    vAlign = doc.createElementNS(W_NS, 'w:vAlign');
+    tcPr.appendChild(vAlign);
+  }
+  vAlign.setAttributeNS(W_NS, 'w:val', 'center');
+
+  // 边框注入
+  if (options.borders !== false) {
+    let tcBorders = tcPr.getElementsByTagNameNS(W_NS, 'tcBorders')[0];
+    if (!tcBorders) {
+      tcBorders = doc.createElementNS(W_NS, 'w:tcBorders');
+      tcPr.appendChild(tcBorders);
+    }
+    const topVal = options.topBorder || 'dotted';
+    const bottomVal = options.bottomBorder || 'dotted';
+
+    let top = tcBorders.getElementsByTagNameNS(W_NS, 'top')[0];
+    if (!top) { top = doc.createElementNS(W_NS, 'w:top'); tcBorders.appendChild(top); }
+    top.setAttributeNS(W_NS, 'w:val', topVal);
+    top.setAttributeNS(W_NS, 'w:color', 'auto');
+    top.setAttributeNS(W_NS, 'w:sz', '4');
+    top.setAttributeNS(W_NS, 'w:space', '0');
+
+    let bottom = tcBorders.getElementsByTagNameNS(W_NS, 'bottom')[0];
+    if (!bottom) { bottom = doc.createElementNS(W_NS, 'w:bottom'); tcBorders.appendChild(bottom); }
+    bottom.setAttributeNS(W_NS, 'w:val', bottomVal);
+    bottom.setAttributeNS(W_NS, 'w:color', 'auto');
+    bottom.setAttributeNS(W_NS, 'w:sz', '4');
+    bottom.setAttributeNS(W_NS, 'w:space', '0');
+  }
+
+  // 3. 填充段落内容
+  if (content !== undefined && content !== null) {
+    const existingPs = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
+    existingPs.forEach((p) => cell.node.removeChild(p));
+
+    const paragraphs = Array.isArray(content) ? content : String(content).split(/\r?\n/);
+    for (const pText of paragraphs) {
+      const pNode = doc.createElementNS(W_NS, 'w:p');
+      const pPr = doc.createElementNS(W_NS, 'w:pPr');
+      const jc = doc.createElementNS(W_NS, 'w:jc');
+      jc.setAttributeNS(W_NS, 'w:val', 'left');
+      pPr.appendChild(jc);
+
+      const spacing = doc.createElementNS(W_NS, 'w:spacing');
+      spacing.setAttributeNS(W_NS, 'w:line', '300');
+      spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
+      pPr.appendChild(spacing);
+
+      pNode.appendChild(pPr);
+
+      const rNode = doc.createElementNS(W_NS, 'w:r');
+      const rPr = doc.createElementNS(W_NS, 'w:rPr');
+      const rFonts = doc.createElementNS(W_NS, 'w:rFonts');
+      if (options.isEnglish) {
+        rFonts.setAttributeNS(W_NS, 'w:ascii', 'Arial');
+        rFonts.setAttributeNS(W_NS, 'w:hAnsi', 'Arial');
+      } else {
+        rFonts.setAttributeNS(W_NS, 'w:ascii', 'SimSun');
+        rFonts.setAttributeNS(W_NS, 'w:eastAsia', 'SimSun');
+        rFonts.setAttributeNS(W_NS, 'w:hAnsi', 'SimSun');
+      }
+      rPr.appendChild(rFonts);
+
+      const sz = doc.createElementNS(W_NS, 'w:sz');
+      sz.setAttributeNS(W_NS, 'w:val', options.fontSizeTwips ? String(options.fontSizeTwips) : '18'); // 9pt
+      rPr.appendChild(sz);
+
+      if (options.boldSubheaders && /^(?:预防措施|事故响应|安全储存|安全存储|废弃处置|Prevention|Response|Storage|Disposal|物理化学危险|健康危害|环境危害|Physical and chemical hazards|Health hazards|Environmental hazards)[:：]/i.test(pText.trim())) {
+        const b = doc.createElementNS(W_NS, 'w:b');
+        rPr.appendChild(b);
+      }
+
+      rNode.appendChild(rPr);
+      const t = doc.createElementNS(W_NS, 'w:t');
+      t.setAttribute('xml:space', 'preserve');
+      t.textContent = pText;
+      rNode.appendChild(t);
+      pNode.appendChild(rNode);
+
+      cell.node.appendChild(pNode);
+    }
+    cell.text = Array.isArray(content) ? content.join('\n') : content;
+  }
+}
+
+/**
+ * 针对 Section 13 标签格实施双居中对齐（垂直居中 + 水平居中）
+ * 彻底消除多余制表位与悬挂缩进
+ */
+export function enforceSection13DoubleCenter(cellNode) {
+  if (!cellNode) return;
+  let tcPr = cellNode.getElementsByTagNameNS(W_NS, 'tcPr')[0];
+  if (!tcPr) {
+    tcPr = cellNode.ownerDocument.createElementNS(W_NS, 'w:tcPr');
+    cellNode.insertBefore(tcPr, cellNode.firstChild);
+  }
+  let vAlign = tcPr.getElementsByTagNameNS(W_NS, 'vAlign')[0];
+  if (!vAlign) {
+    vAlign = cellNode.ownerDocument.createElementNS(W_NS, 'w:vAlign');
+    tcPr.appendChild(vAlign);
+  }
+  vAlign.setAttributeNS(W_NS, 'w:val', 'center');
+
+  const ps = cellNode.getElementsByTagNameNS(W_NS, 'p');
+  for (let i = 0; i < ps.length; i++) {
+    const p = ps[i];
+    let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+    if (!pPr) {
+      pPr = cellNode.ownerDocument.createElementNS(W_NS, 'w:pPr');
+      p.insertBefore(pPr, p.firstChild);
+    }
+    let jc = pPr.getElementsByTagNameNS(W_NS, 'jc')[0];
+    if (!jc) {
+      jc = cellNode.ownerDocument.createElementNS(W_NS, 'w:jc');
+      pPr.appendChild(jc);
+    }
+    jc.setAttributeNS(W_NS, 'w:val', 'center');
+
+    const tabs = pPr.getElementsByTagNameNS(W_NS, 'tabs')[0];
+    if (tabs) pPr.removeChild(tabs);
+    const ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
+    if (ind) pPr.removeChild(ind);
+  }
+}
+
 export function addNoteRowAfter(engine, record, rowIndex, initialText = '说明：') {
   if (!record || record.kind !== 'table') throw new DocxEngineError('当前记录不是表格', 'NOT_TABLE');
   const targetRow = record.rows[rowIndex];

@@ -1,5 +1,56 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-10-26 下午] - OpenSpec: 自适应通栏复合豁免工作流 (Mode B) 与四维深度审计体系正式合入 (PA-3223 标杆落地)
+
+### 一、 核心复盘与系统定位重大转型 (Paradigm Shift & Retro)
+1. **系统定位重归理性**：
+   - 深刻纠偏“过度依赖系统内置黑盒死算法”的致命误区，确立系统为 **Agent 的专业编辑与底模排版承重墙**（提供底模拓扑、几何自愈、样式渲染与防篡改门禁）；
+   - **Agent 恪守事实第一责任人**：由 Agent 依据全局规范对源文内容进行语义理解、事实提取、归类调整后输入编辑器与流水线进行标准化装配产出。
+2. **四大宪政公理全面回归**：
+   - **内容守恒公理**：源文内容 100% 继承，严禁以“非危”为由黑盒裁剪防范说明与法规豁免；
+   - **格式继承公理**：模板几何与 OOXML 样式 100% 继承，严禁破坏底模样式与字号行距；
+   - **覆写桥梁公理**：编辑器作为桥梁，确保装配不走样、输出可审查；
+   - **辅助定位公理**：内置算法作为提效辅助工具，最终由 Agent 与门禁进行真理终审。
+
+### 二、 核心交付与架构攻坚 (Delivered & Architecture)
+1. **Section 2 模态 B 自适应通栏 (Mode B Full-Width Assembly)**：
+   - 彻底废除旧版针对非危险品执行 `while (s2.rows.length > 4) deleteRow` 的机械化删行逻辑；
+   - 引入模态 B 通栏机制：当检测到源文为“非危复合模态”（GHS危险性类别: 无，但包含详尽防范说明、环境危害或成盐豁免附注）时，自动装配为 2 行拓扑（Row 0 章节标题，Row 1 单单元格通栏 `tcW=9795`，双虚线边框，左对齐，自然词距）；
+   - 完整吸收源文：GHS分类、上浮的 S3 尾部成盐豁免、信号词（警告/Warning）、危害性说明免责语、四大防范规程（预防、响应、储存、处置）及下水道防聚合物沉积阻塞环境危害。
+2. **Section 3 法规成盐豁免声明上浮机制 (Section 3 Exemption Elevation)**：
+   - 新增 `extractSection3ExemptionNotes(record)`：精准捕获源文成分表下方的 N,N-二甲基乙醇胺（DMEA）中和剂成盐、浓度 <2.0%、特定阈值浓度 ≥5% 的关键法律事实；
+   - 按照黄金基准将其优雅上浮至 Section 2 紧挨 GHS 分类呈现，使 Section 3 保持纯净规整的标准 3 列成分数据网格。
+3. **Section 11 三级责任隔离通栏拓扑 (Three-Tier Liability Isolation Topology)**：
+   - 废除将原料端点生搬硬套至 11.1~11.3 槽位的旧逻辑，重构为 4 行独立通栏拓扑：
+     - Row 0: 章节标题；
+     - Row 1: 混合物整体验免免责声明（`该产品无可用的毒理学研究。`）；
+     - Row 2: 原料参考引言行（`下面是这些成分的毒理学数据。`）；
+     - Row 3: 纯原料经皮/经口/吸入端点详细罗列通栏。
+4. **Section 12 消除重复免责与 Section 13 双居中收敛**：
+   - Section 12 自动清除顶层冗余免责行，清爽呈现 12.1~12.3；
+   - Section 13 落地 `enforceSection13DoubleCenter`（垂直居中 + 水平居中，清除制表位与缩进），标准化收敛为 3 行结构，Gate 7 门禁完成弹性兼容（兼容 3 行或 4 行）。
+5. **Gate 9 语义事实保真度门禁 (Gate 9 Semantic Fact Conservation Gate)**：
+   - 在 `pipeline-engine.js` 的 `assertDeliverableQuality` 增加 Gate 9 硬性断言：若源文包含预防、响应、存储、处置、下水道风险或成盐豁免事实，产出物必须 100% 穿透留存，杜绝“门禁全绿但内容被删光”的盲目审核悲剧。
+6. **四维深度审计工具与自动化回归测试**：
+   - 新建 `web/scripts/run_four_dimensional_audit.mjs`：覆盖维度 1（事实保真）、维度 2（OOXML几何）、维度 3（法律拓扑）、维度 4（交付留存与跨预设差分）；
+   - 新建 `web/tests/test_adaptive_fullwidth_pa3223.mjs`：全流程实测跑通 Gate 1~9 与四维审计，真实退出码 0。
+7. **Web UI 与 CSS 零字节改动铁壁**：
+   - `web/src/styles.css` 与 `web/index.html` 严格保持 **0 字节、0 行改动**。
+
+### 三、 遇到问题与解法 (Problems & Solutions)
+1. **问题 1：非危硬编码删行导致 20 余行防范规程丢失**
+   - *根因*：历史代码在判定 `isNonHaz` 后粗暴执行 `while (s2.rows.length > 4) deleteRow` 并硬写入“无适用资料。”；
+   - *解法*：引入 `detectNonHazardousComposite`，分流至 `buildFullWidthSection2` 模态 B 通栏，彻底废除暴力删行。
+2. **问题 2：Section 3 组分后半部分成盐豁免被丢弃**
+   - *根因*：匹配引擎仅把表格识别为成分网格，尾部通栏法规说明行因不符合 3 列而被忽略；
+   - *解法*：实现 `extractSection3ExemptionNotes` 跨章节提取，并在流水线中将其上浮至 Section 2 标签要素下属，保留完整证据链。
+3. **问题 3：Gate 3 将原料端点行误判为说明行导致行数断言拦截**
+   - *根因*：Gate 3 说明行判定正则仅包含 `急性毒性|原发性皮肤刺激|11\.\d`，未涵盖三级隔离模式下以原料名称（`羟基聚丙烯酸酯|Hydroxy`）开头的端点详情行；
+   - *解法*：扩展 Gate 3 正则，并在 `renderFullWidthRow` 中主动剥除克隆行残留的 `vMerge="continue"`，彻底自愈行几何。
+
+---
+
+
 ## [2026-10-26 早晨] - PA 系列丙烯酸酯与特异指标英译适配、中文值格首行缩进清理与 Section 13 四行门禁闭环
 
 ### 核心交付 (Delivered)
