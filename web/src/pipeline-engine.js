@@ -704,11 +704,16 @@ export async function buildBaseChineseEngine({
     entity: '冠志'
   });
 
-  // 7. 规范化 Section 13 (消除拆行残余，确保标准 3 行结构)
+  // 7. 规范化 Section 13 (严格保持标准 4 行独立结构：标题行 + 2 行独立说明行 + 处置方法行，对齐 Gate 7)
   let s13 = engine.records.find(r => r.sectionNumber === 13);
-  if (s13 && s13.rows.length === 4) {
-    safeWriteCellValue(s13.rows[1].cells[0], '必须遵守适用的国标、国家或当地法规进行废弃。\n在欧盟领域内废弃，应根据欧洲废弃物分类（EWC）的适当法规。');
-    s13 = deleteRow(engine, s13, 2);
+  if (s13) {
+    if (s13.rows.length === 3) {
+      s13 = addRowAfter(engine, s13, 1);
+    }
+    if (s13.rows.length >= 4) {
+      safeWriteCellValue(s13.rows[1].cells[0], '必须遵守适用的国标、国家或当地法规进行废弃。');
+      safeWriteCellValue(s13.rows[2].cells[0], '在欧盟领域内废弃，应根据欧洲废弃物分类（EWC）的适当法规。');
+    }
   }
 
   // 8. 若传入 viscosityOverride，原子级确保 Section 9 粘度值
@@ -821,6 +826,40 @@ export async function buildBaseChineseEngine({
     }
   }
 
+  // 12. 统一值格左对齐与清除首行公文缩进 (根除底模残留的 jc="both" 与 firstLine="26")
+  const allTbls = Array.from(engine.documentXml.getElementsByTagNameNS(W_NS, 'tbl'));
+  for (const tbl of allTbls) {
+    const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
+    for (const row of rows) {
+      const cells = Array.from(row.getElementsByTagNameNS(W_NS, 'tc'));
+      if (cells.length < 2) continue;
+      for (let c = 1; c < cells.length; c++) {
+        const cell = cells[c];
+        const pList = Array.from(cell.getElementsByTagNameNS(W_NS, 'p'));
+        for (const p of pList) {
+          const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+          if (pPr) {
+            const jcNode = pPr.getElementsByTagNameNS(W_NS, 'jc')[0];
+            const jcVal = jcNode?.getAttributeNS(W_NS, 'val');
+            if (jcVal === 'both' || jcVal === 'distribute') {
+              jcNode.setAttributeNS(W_NS, 'w:val', 'left');
+            }
+            const indNode = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
+            if (indNode) {
+              const fl = indNode.getAttributeNS(W_NS, 'firstLine');
+              if (fl && fl !== '0') {
+                indNode.removeAttributeNS(W_NS, 'firstLine');
+                indNode.removeAttribute('w:firstLine');
+                indNode.removeAttributeNS(W_NS, 'firstLineChars');
+                indNode.removeAttribute('w:firstLineChars');
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   // 严格保留模板原装序号与格式，严禁全局重排序号
   engine._adaptiveRevisionDate = finalRevisionDate;
   return engine;
@@ -849,6 +888,8 @@ function translateToxicologyValueToEnglish(cnText) {
   t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*[/／]\s*豚鼠\s*[:：]\s*/g, 'LD50 / Dermal / Guinea pig: ');
   t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*[/／]\s*兔\s*[:：]\s*/g, 'LD50 / Dermal / Rabbit: ');
   t = t.replace(/（此值仅用于有可吸入的颗粒形成的情况。?）/g, '(applicable only where respirable aerosols are formed)');
+  t = t.replace(/[（(]\s*鼠\s*[）)]\s*LD50\s*[:：]\s*/g, '(Rat) LD50: ');
+  t = t.replace(/＞/g, '> ');
 
   // 皮肤与眼睛刺激
   t = t.replace(/物种\s*[:：]\s*兔子?/g, 'Species: Rabbit');
@@ -921,7 +962,7 @@ export function translateSection12PreambleToEnglish(cnText) {
  * Section 12 生态毒理实测指标专业英译 (鱼类、藻类、水蚤等)
  */
 export function translateEcotoxicityValueToEnglish(cnText) {
-  if (!cnText) return 'No ecotoxicological studies are available for this product.\nDo not allow to enter drains, water courses or soil.';
+  if (!cnText || /无可用的生态毒理学研究|禁止排入下水道/i.test(cnText)) return 'No ecotoxicological studies are available for this product.\nDo not allow to enter drains, water courses or soil.';
   let en = cnText;
   en = en.replace(/对鱼类的毒性[：:]/g, 'Toxicity to fish:\n');
   en = en.replace(/半数致死浓度[（(]LC50[）)]\/(\d+)\s*h\/虹鳟[：:]/gi, 'LC50 / $1 h / Oncorhynchus mykiss (rainbow trout): ');
@@ -939,6 +980,7 @@ export function translateEcotoxicityValueToEnglish(cnText) {
 export function translatePersistenceValueToEnglish(cnText) {
   if (!cnText) return 'The product is not readily biodegradable.';
   if (/无数据/i.test(cnText)) return 'No data available.';
+  if (/不易生物降解|难生物降解|难降解|不属于易降解/i.test(cnText)) return 'The product is not readily biodegradable.';
   if (/易生物降解/i.test(cnText)) {
     let t = cnText;
     t = t.replace(/生物降解性[：:]/g, 'Biodegradability: ');
@@ -1139,6 +1181,9 @@ export async function buildBaseEnglishEngine({
           else if (/聚氨酯.*分散体|水性聚氨酯/i.test(cnName)) enName = 'Polyurethane dispersion';
           else if (/聚氨酯/i.test(cnName)) enName = 'Polyurethane';
           else if (/水$/i.test(cnName)) enName = 'Water';
+          else if (/羟基丙烯酸酯.*聚合物|丙烯酸酯.*聚合物/i.test(cnName)) enName = 'Hydroxy acrylic polymer';
+          else if (/丙二醇.*丁醚|丙二醇单丁醚/i.test(cnName)) enName = 'Propylene glycol butyl ether';
+          else if (/N,N[－\-—\s]*二甲基乙醇胺|二甲基乙醇胺|DMEA/i.test(cnName)) enName = '2-Dimethylaminoethanol';
           if (/商业机密|商业秘密/i.test(cas)) cas = 'Trade secret';
 
           comps.push({
@@ -1448,6 +1493,10 @@ export async function buildBaseEnglishEngine({
         let shouldPrune = false;
         if (/Inhalation:/i.test(rText) && !inhalCn) shouldPrune = true;
         else if (/Dermal:/i.test(rText) && !dermCn) shouldPrune = true;
+        else if (/Primary skin irritation/i.test(rText) && !skinIrrCn) shouldPrune = true;
+        else if (/Primary eye irritation/i.test(rText) && !eyeIrrCn) shouldPrune = true;
+        else if (/Sensitization/i.test(rText) && !sensCn) shouldPrune = true;
+        else if (/Mutagenicity/i.test(rText) && !mutCn) shouldPrune = true;
         else if (/Carcinogenicity/i.test(rText) && !carcCn) shouldPrune = true;
         else if (/Teratogenicity/i.test(rText) && !findCnVal(/致畸/i)) shouldPrune = true;
         else if (/In vitro genotoxicity/i.test(rText) && !findCnVal(/体外遗传毒性|体外基因毒性/i)) shouldPrune = true;
