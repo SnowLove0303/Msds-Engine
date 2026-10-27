@@ -1,3 +1,4 @@
+import path from 'node:path';
 import fs from 'node:fs';
 import JSZip from 'jszip';
 import { DOMParser } from '@xmldom/xmldom';
@@ -12,8 +13,22 @@ import { DOMParser } from '@xmldom/xmldom';
  */
 
 export async function loadDocXml(filePath) {
-  const updatedPath = filePath.replace(/\.docx$/i, ' (更新).docx');
-  const actualPath = fs.existsSync(updatedPath) ? updatedPath : filePath;
+  const ext = path.extname(filePath);
+  const base = path.basename(filePath, ext);
+  const dir = path.dirname(filePath);
+  const candidates = [
+    path.join(dir, `${base} (最新)${ext}`),
+    path.join(dir, `${base} (更新)${ext}`),
+    path.join(dir, `${base} (临时更新)${ext}`),
+    filePath
+  ];
+  let actualPath = filePath;
+  for (const c of candidates) {
+    if (fs.existsSync(c)) {
+      actualPath = c;
+      break;
+    }
+  }
   const zip = await JSZip.loadAsync(fs.readFileSync(actualPath));
   const xml = await zip.file('word/document.xml').async('text');
   return new DOMParser().parseFromString(xml, 'text/xml');
@@ -60,8 +75,13 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
   // G-01: 8 格式交付物完整性断言
   for (const file of DELIVERABLES) {
     const fullPath = `${targetDir}/${file}`;
-    const updatedPath = fullPath.replace(/(\.docx|\.pdf)$/i, ' (更新)$1');
-    const exists = fs.existsSync(fullPath) || fs.existsSync(updatedPath);
+    const ext = path.extname(fullPath);
+    const base = path.basename(fullPath, ext);
+    const dir = path.dirname(fullPath);
+    const exists = fs.existsSync(fullPath) ||
+      fs.existsSync(path.join(dir, `${base} (最新)${ext}`)) ||
+      fs.existsSync(path.join(dir, `${base} (更新)${ext}`)) ||
+      fs.existsSync(path.join(dir, `${base} (临时更新)${ext}`));
     assert(exists, `交付物存在性 (G-01): ${file}`);
   }
 
@@ -217,7 +237,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
   s11EnPs.forEach((p, idx) => {
     const t = getPText(p);
     const badNoSpace = t.match(/[a-zA-Z0-9\)]:(?![ \s\n])/g);
-    const badMultiSpace = t.replace(/ {14}| {10}/g, '').match(/[a-zA-Z0-9\)]:[ ]{2,}/g);
+    const badMultiSpace = t.replace(/ {8}| {6}| {5}| {3}/g, '').match(/[a-zA-Z0-9\)]:[ ]{2,}/g);
     if (badNoSpace) {
       badColonSpacingEnCount += badNoSpace.length;
       console.error(`     ↳ 英文冒号后无空格: P[${idx}]`);
@@ -246,7 +266,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
   let multiSpaceEnCount = 0;
   s11EnPs.forEach((p, idx) => {
     const t = getPText(p);
-    const sanitized = t.replace(/ {14}| {10}/g, '');
+    const sanitized = t.replace(/ {8}| {6}| {5}| {3}/g, '');
     const m = sanitized.match(/[ ]{2,}/g);
     if (m) {
       multiSpaceEnCount += m.length;
@@ -371,6 +391,33 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
   assert(titleIndentEnCount === 4, `Section 2 英文版防范说明四大标题 left="480" 相互对齐断言 (实测命中: ${titleIndentEnCount}/4)`);
   assert(contentIndentEnCount >= 10, `Section 2 英文版防范说明内容项 left="960" 相互对齐断言 (实测命中: ${contentIndentEnCount}/11)`);
   assert(s2EnHangingCount === 0, `Section 2 英文版换行首字对齐公理 (零悬挂缩进，续行与首行严格对齐) (实测悬挂数: ${s2EnHangingCount})`);
+  // L-S11 英文版双列垂直对齐公理 (Endpoints & LD50: Dual-Column Vertical Alignment)
+  const s11EnRow3Target = tblsEn[10].getElementsByTagName('w:tr')[3];
+  const s11EnRow3Ps = Array.from(s11EnRow3Target.getElementsByTagName('w:p'));
+  let s11ColAlignPassCount = 0;
+  for (const p of s11EnRow3Ps) {
+    const t = getPText(p);
+    if (t.includes('Propylene glycol butyl ether:')) {
+      const hasDermalAlign = /Toxicity: Dermal \(Rat\) {3}LD50:/.test(t);
+      const hasInhalAlign = / {8}Inhalation \(Rat\) LD50:/.test(t);
+      const hasOralAlign = / {8}Oral \(Rat\) {5}LD50:/.test(t);
+      if (hasDermalAlign && hasInhalAlign && hasOralAlign) {
+        s11ColAlignPassCount++;
+      } else {
+        console.error('     ↳ 丙二醇丁醚列对齐断言失败: ' + JSON.stringify(t));
+      }
+    } else if (t.includes('2-(2-Butoxyethoxy)ethanol:')) {
+      const hasDermalAlign = /Toxicity: Dermal \(Rat\) {3}LD50:/.test(t);
+      const hasOralAlign = / {8}Oral \(Rat\) {5}LD50:/.test(t);
+      if (hasDermalAlign && hasOralAlign) {
+        s11ColAlignPassCount++;
+      } else {
+        console.error('     ↳ 二乙二醇丁醚列对齐断言失败: ' + JSON.stringify(t));
+      }
+    }
+  }
+  assert(s11ColAlignPassCount === 2, `Section 11 英文版测试端点与 LD50: 双列绝对垂直列对齐断言 (实测命中: ${s11ColAlignPassCount}/2)`);
+
 
   // L-S3: 成分/组成信息 (居中对齐与 CAS 规范)
   const s3 = tblsCn[2];

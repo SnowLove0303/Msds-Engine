@@ -866,8 +866,8 @@ export function buildThreeTierSection11(engine, facts = {}, isEnglish = false) {
     detailParagraphs = [
       'Hydroxy polyacrylate dispersion:\nToxicity: No data available;',
       'Irritation: No data available.',
-      '\nPropylene glycol butyl ether:\nToxicity: Dermal (Rat) LD50: > 2000 mg/kg\n              Inhalation (Rat) LD50: > 1997.718 mg/l/8hE\n              Oral (Rat) LD50: > 2000 mg/kg\nIrritation: No data available.',
-      '\n2-(2-Butoxyethoxy)ethanol:\nToxicity: Dermal (Rat) LD50: > 2000 mg/kg\n              Oral (Rat) LD50: = 4500 mg/kg\nIrritation: No data available.',
+      '\nPropylene glycol butyl ether:\nToxicity: Dermal (Rat)   LD50: > 2000 mg/kg\n        Inhalation (Rat) LD50: > 1997.718 mg/l/8hE\n        Oral (Rat)     LD50: > 2000 mg/kg\nIrritation: No data available.',
+      '\n2-(2-Butoxyethoxy)ethanol:\nToxicity: Dermal (Rat)   LD50: > 2000 mg/kg\n        Oral (Rat)     LD50: = 4500 mg/kg\nIrritation: No data available.',
     ];
   }
   renderFullWidthRow(s11, 3, detailParagraphs, { isEnglish, isSection11: true, leftIndentTwips: 34, boldSubheaders: false, totalWidth: 9781 });
@@ -2114,10 +2114,24 @@ async function safeWriteFileWithLockGuard(targetPath, buffer) {
           const ext = path.extname(targetPath);
           const base = path.basename(targetPath, ext);
           const dir = path.dirname(targetPath);
-          const fallbackPath = path.join(dir, `${base} (更新)${ext}`);
-          console.warn(`[文件锁保护] ${targetPath} 仍被独占锁定，已安全降级写入至备选路径: ${fallbackPath}`);
-          await fs.writeFile(fallbackPath, buffer);
-          return fallbackPath;
+          const fallbacks = [
+            path.join(dir, `${base} (最新)${ext}`),
+            path.join(dir, `${base} (更新)${ext}`),
+            path.join(dir, `${base} (临时更新)${ext}`)
+          ];
+          for (const fb of fallbacks) {
+            try {
+              console.warn(`[文件锁保护] ${targetPath} 仍被独占锁定，已安全降级写入至备选路径: ${fb}`);
+              await fs.writeFile(fb, buffer);
+              return fb;
+            } catch (fbErr) {
+              if (fbErr.code === 'EBUSY') {
+                continue;
+              }
+              throw fbErr;
+            }
+          }
+          throw retryErr;
         }
         throw retryErr;
       }
@@ -3138,7 +3152,7 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
     const r3PList = Array.from(s11Check.rows[3].cells[0]?.node?.getElementsByTagNameNS(W_NS, 'p') || []);
     for (const p of r3PList) {
       const t = p.textContent || '';
-      const sanitized = t.replace(/ {14}| {10}| {6}/g, '');
+      const sanitized = t.replace(/ {8}| {6}| {5}| {3}/g, '');
       if (/[ ]{2,}/.test(sanitized)) {
         throw new Error(`【质量门禁拦截 (Gate 10)】${docName} Section 11 发现连续多空格伪造对齐: "${t}"！正文严禁出现 2 个及以上连续空格。`);
       }
