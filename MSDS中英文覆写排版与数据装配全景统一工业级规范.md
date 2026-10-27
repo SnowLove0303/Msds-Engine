@@ -61,7 +61,7 @@
 
 ### 5.10 Gate 10: 反多空格排版与法定列对齐缩进公理 (G-28 排版工具公理)
 - **规则**：
-  1. **法定首列对齐缩进白名单**：在 Section 11 等多行通栏复合单元格中，为垂直对齐首行 3 个中文字符宽度的前置标签（如 `毒性：`），后续换行指标行（`吸入...` / `经口...`）行首必须且允许使用**严格 6 个半角空格**（中文版）或 **10 个半角空格**（英文版对齐 `Toxicity: `），使测试端点形成严整的垂直列对齐；
+  1. **法定首列对齐缩进白名单**：在 Section 11 等多行通栏复合单元格中，为垂直对齐首行 3 个中文字符宽度的前置标签（如 `毒性：`），后续换行指标行（`吸入...` / `经口...`）行首必须且允许使用**严格 6 个半角空格**（中文版）或 **14 个半角空格**（英文版在 Arial 9.5pt 下精准对齐 `Toxicity: ` 的 3945 em 几何宽度），使测试端点形成严整的垂直列对齐；
   2. **正文严禁非授权连续多空格**：除上述经过手做母版认证的法定列对齐空格外，正文文本严禁出现任意连续 2 个及以上的连续空格（`"  "`）或制表位用于随意排版；
   3. **OOXML 显式常规体识别**：严格识别 `<w:b w:val="0"/>` 为常规体，Section 11 顶部免责说明行（Row 1）与成分引言行（Row 2）严格保持常规体，仅组分标题加粗。
 - **一票否决**：检测到未授权的连续多空格或粗细层级混乱，立即抛出异常熔断阻断交付。
@@ -74,6 +74,13 @@
 - **规则**：在生成 8 项交付物后，系统必须自动触发 `audit_bipolar_bilayer.mjs`，执行涵盖全局 5 大公理与 16 章节专属局部规范的全量 AST 断言。
 - **一票否决**：必须获得实测真实退出码 0。存在任何 1 项失败（Failures > 0），流水线严禁放行。
 
+### 5.13 Gate 13: Section 2 英文版换行首字对齐与层级对齐公理 (G-30 首字换行对齐与层级公理)
+- **规则**：
+  1. **标题与标题对齐 (Titles Align with Each Other)**：防范说明四大子标题（`Prevention:`、`Response:`、`Storage:`、`Disposal:`）统一左缩进 `<w:ind w:left="480"/>`，实现同级标题垂直完全对齐；
+  2. **内容与内容对齐 (Content Items Align with Each Other)**：四大防范说明下的具体规程与条目（如 `Wear protective...`、`Inhalation...`、`Store in a cool...`、`Empty containers...` 等），统一左缩进 `<w:ind w:left="960"/>`，实现同级内容条目垂直完全对齐；
+  3. **换行首字对齐 (First-Letter Alignment on Line Wrap)**：严禁使用 `hanging` 悬挂缩进；段落整体使用 `left="480"` 或 `left="960"`。当条目内部自然换行时（例如成盐声明第 2 行 `concentration limit >= 5%`），续行起始坐标与首行首字（`N,N-...` 的首字母 `N`）完全垂直对齐，彻底消除左侧悬挂突出或参差不齐现象。
+- **一票否决**：检测到子标题未对齐（非 480）、内容条目未对齐（非 960）或存在悬挂缩进导致换行首字错位，立即阻断交付。
+
 ---
 
 ## 第六章 附录：核心引擎实现对应索引
@@ -84,6 +91,7 @@
 | **文字垂线对齐与标签几何** | `web/src/pipeline-engine.js` | `formatEnglishLabelCell()` / `applyLeftIndentToP()` |
 | **值格纯左对齐与词距消除** | `web/src/pipeline-engine.js` | `formatValueCell()` |
 | **Section 2.5 紧凑重排** | `web/src/pipeline-engine.js` | `formatPrecautionaryValueCell()` |
+| **Section 2 英文层级对齐与换行首字对齐** | `web/src/docx-engine.js` | `renderFullWidthRow()` |
 | **页脚公司左对齐/日期右对齐** | `web/src/docx-engine.js` | `standardizeEnglishTypographyAndLabels()` |
 | **全量 12 大质量门禁断言** | `web/src/pipeline-engine.js` | `assertDeliverableQuality()` |
 | **双极双层机械终审套件** | `web/scripts/audit_bipolar_bilayer.mjs` | `runBipolarBilayerAudit()` |

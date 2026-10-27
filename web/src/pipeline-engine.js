@@ -866,8 +866,8 @@ export function buildThreeTierSection11(engine, facts = {}, isEnglish = false) {
     detailParagraphs = [
       'Hydroxy polyacrylate dispersion:\nToxicity: No data available;',
       'Irritation: No data available.',
-      '\nPropylene glycol butyl ether:\nToxicity: Dermal (Rat) LD50: > 2000 mg/kg\n          Inhalation (Rat) LD50: > 1997.718 mg/l/8hE\n          Oral (Rat) LD50: > 2000 mg/kg\nIrritation: No data available.',
-      '\n2-(2-Butoxyethoxy)ethanol:\nToxicity: Dermal (Rat) LD50: > 2000 mg/kg\n          Oral (Rat) LD50: = 4500 mg/kg\nIrritation: No data available.',
+      '\nPropylene glycol butyl ether:\nToxicity: Dermal (Rat) LD50: > 2000 mg/kg\n              Inhalation (Rat) LD50: > 1997.718 mg/l/8hE\n              Oral (Rat) LD50: > 2000 mg/kg\nIrritation: No data available.',
+      '\n2-(2-Butoxyethoxy)ethanol:\nToxicity: Dermal (Rat) LD50: > 2000 mg/kg\n              Oral (Rat) LD50: = 4500 mg/kg\nIrritation: No data available.',
     ];
   }
   renderFullWidthRow(s11, 3, detailParagraphs, { isEnglish, isSection11: true, leftIndentTwips: 34, boldSubheaders: false, totalWidth: 9781 });
@@ -2402,12 +2402,15 @@ export function standardizeEnglishTypographyAndLabels(engine) {
         }
       }
 
-      // 3. Section 11 专属：二级标签 (Oral:, Inhalation:, Dermal:, Fertility:) 加粗，续行标签空首列
+      // 3. Section 11 专属：通栏单单元格行全量豁免，严禁压平 4 段或破坏行缩进
+      if (sectionNumber === 11 && (cells.length === 1 || isSingleCellRow)) {
+        continue;
+      }
+      if (sectionNumber === 2 && isSingleCellRow) {
+        // Section 2 通栏复合模态：已由 buildFullWidthSection2 与 renderFullWidthRow 精准排版，严格豁免避免被 formatSingleCellRow 压平
+        continue;
+      }
       if (sectionNumber === 11 && rIdx >= 3) {
-        // 通栏单元格 (cells.length === 1，如 Mode B 通栏复合豁免模态) 严格豁免，严禁压平 4 段或强加尾部冒号
-        if (cells.length === 1) {
-          continue;
-        }
         const c0 = cells[0];
         if (c0) {
           cleanTabsInNode(c0, W_NS);
@@ -3129,13 +3132,13 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
     }
   }
 
-  // Gate 10: 反多空格排版公理 (G-28: 正文中严禁无序连续空格；但在 Section 11 软换行垂直列对齐中，允许法定 6 空格(CN)与 10 空格(EN)缩进)
+  // Gate 10: 反多空格排版公理 (G-28: 正文中严禁无序连续空格；但在 Section 11 软换行垂直列对齐中，允许法定 6 空格(CN)与 10/14 空格(EN)缩进)
   const s11Check = engine.records.find(r => r.sectionNumber === 11);
   if (s11Check && s11Check.rows.length >= 4) {
     const r3PList = Array.from(s11Check.rows[3].cells[0]?.node?.getElementsByTagNameNS(W_NS, 'p') || []);
     for (const p of r3PList) {
       const t = p.textContent || '';
-      const sanitized = t.replace(/ {10}| {6}/g, '');
+      const sanitized = t.replace(/ {14}| {10}| {6}/g, '');
       if (/[ ]{2,}/.test(sanitized)) {
         throw new Error(`【质量门禁拦截 (Gate 10)】${docName} Section 11 发现连续多空格伪造对齐: "${t}"！正文严禁出现 2 个及以上连续空格。`);
       }

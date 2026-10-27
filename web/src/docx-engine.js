@@ -2448,36 +2448,55 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
 
       // Section 2 专属 5 级缩进几何状态机 (完全对齐 PA-3223 手做版 AST 事实)
       if (options.isSection2) {
-        if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃液体3|急性毒性4|皮肤腐蚀1B|特异性靶器官系统毒性)/i.test(trimmed) ||
-            /^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable liquid|Acute toxicity|Skin corrosion|Specific target organ toxicity)/i.test(trimmed)) {
-          const ind = doc.createElementNS(W_NS, 'w:ind');
-          ind.setAttributeNS(W_NS, 'w:firstLine', '480');
-          ind.setAttributeNS(W_NS, 'w:right', '480');
-          pPr.appendChild(ind);
-        } else if (/^(?:预防措施|事故响应|安全存储|安全储存|废弃处置)[：:]/i.test(trimmed) ||
-                   /^(?:Prevention|Response|Storage|Disposal)[：:]/i.test(trimmed)) {
-          const ind = doc.createElementNS(W_NS, 'w:ind');
-          ind.setAttributeNS(W_NS, 'w:firstLine', '482');
-          pPr.appendChild(ind);
-        } else if (/^在室外或通风良好处操作/i.test(trimmed) || /^Use only outdoors or in a well-ventilated area/i.test(trimmed)) {
-          const ind = doc.createElementNS(W_NS, 'w:ind');
-          ind.setAttributeNS(W_NS, 'w:firstLine', '960');
-          pPr.appendChild(ind);
-        } else if (/^(?:请置于避光|装完整|Store in a cool)/i.test(trimmed)) {
-          const ind = doc.createElementNS(W_NS, 'w:ind');
-          if (/^装完整/i.test(trimmed)) {
-            ind.setAttributeNS(W_NS, 'w:left', '1198');
-            ind.setAttributeNS(W_NS, 'w:hanging', '240');
-          } else {
-            ind.setAttributeNS(W_NS, 'w:left', '1199');
-            ind.setAttributeNS(W_NS, 'w:hanging', '720');
+        if (options.isEnglish) {
+          // 英文版 Section 2 专属：标题与标题对齐 (left="480")，内容与内容对齐 (left="960")，换行首字对齐 (无 hanging)
+          if (/^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable liquid|Acute toxicity|Skin corrosion|Specific target organ toxicity)/i.test(trimmed)) {
+            // 成盐声明与 GHS 分类块：整段统一 left="480"，换行时第 2 行 (concentration limit >= 5%) 依旧首字对齐！
+            const ind = doc.createElementNS(W_NS, 'w:ind');
+            ind.setAttributeNS(W_NS, 'w:left', '480');
+            pPr.appendChild(ind);
+          } else if (/^(?:Prevention|Response|Storage|Disposal)[：:]/i.test(trimmed)) {
+            // 防范说明四大子标题：统一 left="480"，标题与标题对齐！
+            const ind = doc.createElementNS(W_NS, 'w:ind');
+            ind.setAttributeNS(W_NS, 'w:left', '480');
+            pPr.appendChild(ind);
+          } else if (/^(?:Wear protective|Wash contact|Do not eat|Use only outdoors|Inhalation|Skin and eye|Ingestion|Spillage|Fire|Store in a cool|Empty containers)/i.test(trimmed)) {
+            // 防范说明各项具体内容：统一 left="960"，内容与内容对齐；换行时各续行依旧首字对齐！
+            const ind = doc.createElementNS(W_NS, 'w:ind');
+            ind.setAttributeNS(W_NS, 'w:left', '960');
+            pPr.appendChild(ind);
           }
-          pPr.appendChild(ind);
-        } else if (/^(?:使用后的空桶|Empty containers)/i.test(trimmed)) {
-          const ind = doc.createElementNS(W_NS, 'w:ind');
-          ind.setAttributeNS(W_NS, 'w:left', '959');
-          ind.setAttributeNS(W_NS, 'w:hanging', '480');
-          pPr.appendChild(ind);
+        } else {
+          // 中文版 Section 2 专属 5 级缩进几何状态机 (完全对齐 PA-3223 手做版 AST 事实)
+          if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃液体3|急性毒性4|皮肤腐蚀1B|特异性靶器官系统毒性)/i.test(trimmed)) {
+            const ind = doc.createElementNS(W_NS, 'w:ind');
+            ind.setAttributeNS(W_NS, 'w:firstLine', '480');
+            ind.setAttributeNS(W_NS, 'w:right', '480');
+            pPr.appendChild(ind);
+          } else if (/^(?:预防措施|事故响应|安全存储|安全储存|废弃处置)[：:]/i.test(trimmed)) {
+            const ind = doc.createElementNS(W_NS, 'w:ind');
+            ind.setAttributeNS(W_NS, 'w:firstLine', '482');
+            pPr.appendChild(ind);
+          } else if (/^在室外或通风良好处操作/i.test(trimmed)) {
+            const ind = doc.createElementNS(W_NS, 'w:ind');
+            ind.setAttributeNS(W_NS, 'w:firstLine', '960');
+            pPr.appendChild(ind);
+          } else if (/^(?:请置于避光|装完整)/i.test(trimmed)) {
+            const ind = doc.createElementNS(W_NS, 'w:ind');
+            if (/^装完整/i.test(trimmed)) {
+              ind.setAttributeNS(W_NS, 'w:left', '1198');
+              ind.setAttributeNS(W_NS, 'w:hanging', '240');
+            } else {
+              ind.setAttributeNS(W_NS, 'w:left', '1199');
+              ind.setAttributeNS(W_NS, 'w:hanging', '720');
+            }
+            pPr.appendChild(ind);
+          } else if (/^(?:使用后的空桶)/i.test(trimmed)) {
+            const ind = doc.createElementNS(W_NS, 'w:ind');
+            ind.setAttributeNS(W_NS, 'w:left', '959');
+            ind.setAttributeNS(W_NS, 'w:hanging', '480');
+            pPr.appendChild(ind);
+          }
         }
       } else if (options.isSection11 && options.leftIndentTwips) {
         const ind = doc.createElementNS(W_NS, 'w:ind');

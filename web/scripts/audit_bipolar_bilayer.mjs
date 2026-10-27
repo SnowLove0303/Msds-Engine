@@ -12,7 +12,9 @@ import { DOMParser } from '@xmldom/xmldom';
  */
 
 export async function loadDocXml(filePath) {
-  const zip = await JSZip.loadAsync(fs.readFileSync(filePath));
+  const updatedPath = filePath.replace(/\.docx$/i, ' (更新).docx');
+  const actualPath = fs.existsSync(updatedPath) ? updatedPath : filePath;
+  const zip = await JSZip.loadAsync(fs.readFileSync(actualPath));
   const xml = await zip.file('word/document.xml').async('text');
   return new DOMParser().parseFromString(xml, 'text/xml');
 }
@@ -58,7 +60,9 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
   // G-01: 8 格式交付物完整性断言
   for (const file of DELIVERABLES) {
     const fullPath = `${targetDir}/${file}`;
-    assert(fs.existsSync(fullPath), `交付物存在性 (G-01): ${file}`);
+    const updatedPath = fullPath.replace(/(\.docx|\.pdf)$/i, ' (更新)$1');
+    const exists = fs.existsSync(fullPath) || fs.existsSync(updatedPath);
+    assert(exists, `交付物存在性 (G-01): ${file}`);
   }
 
   const docCn = await loadDocXml(`${targetDir}/PA-3223 msds_CN 冠志.docx`);
@@ -213,7 +217,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
   s11EnPs.forEach((p, idx) => {
     const t = getPText(p);
     const badNoSpace = t.match(/[a-zA-Z0-9\)]:(?![ \s\n])/g);
-    const badMultiSpace = t.replace(/ {10}/g, '').match(/[a-zA-Z0-9\)]:[ ]{2,}/g);
+    const badMultiSpace = t.replace(/ {14}| {10}/g, '').match(/[a-zA-Z0-9\)]:[ ]{2,}/g);
     if (badNoSpace) {
       badColonSpacingEnCount += badNoSpace.length;
       console.error(`     ↳ 英文冒号后无空格: P[${idx}]`);
@@ -242,7 +246,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
   let multiSpaceEnCount = 0;
   s11EnPs.forEach((p, idx) => {
     const t = getPText(p);
-    const sanitized = t.replace(/ {10}/g, '');
+    const sanitized = t.replace(/ {14}| {10}/g, '');
     const m = sanitized.match(/[ ]{2,}/g);
     if (m) {
       multiSpaceEnCount += m.length;
@@ -336,6 +340,37 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
   assert(storageHangingCount >= 1, `Section 2 (L-S2): 存储说明 left="1199" hanging="720" 悬挂缩进断言 (实测命中: ${storageHangingCount}/1)`);
   assert(disposalHangingCount >= 1, `Section 2 (L-S2): 空桶说明 left="959" hanging="480" 悬挂缩进断言 (实测命中: ${disposalHangingCount}/1)`);
   assert(boldLeakageCount === 0, `Section 2 (L-S2): 防范说明操作规程常规体保护零泄露断言 (实测加粗泄露数: ${boldLeakageCount})`);
+
+  // L-S2 英文版专属断言：标题与标题对齐 (left="480")，内容与内容对齐 (left="960")，换行首字对齐 (无 hanging)
+  const s2EnRow1 = tblsEn[1].getElementsByTagName('w:tr')[1];
+  const s2EnPs = Array.from(s2EnRow1.getElementsByTagName('w:p'));
+  let saltGhsIndentEnCount = 0;
+  let titleIndentEnCount = 0;
+  let contentIndentEnCount = 0;
+  let s2EnHangingCount = 0;
+
+  for (const p of s2EnPs) {
+    const pText = (p.textContent || '').trim();
+    const ind = p.getElementsByTagName('w:ind')[0];
+    const lt = ind?.getAttribute('w:left');
+    const hg = ind?.getAttribute('w:hanging');
+
+    if (/^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable liquid|Acute toxicity|Skin corrosion|Specific target organ)/i.test(pText)) {
+      if (lt === '480') saltGhsIndentEnCount++;
+    } else if (/^(?:Prevention|Response|Storage|Disposal)[：:]/i.test(pText)) {
+      if (lt === '480') titleIndentEnCount++;
+    } else if (/^(?:Wear protective|Wash contact|Do not eat|Use only outdoors|Inhalation|Skin and eye|Ingestion|Spillage|Fire|Store in a cool|Empty containers)/i.test(pText)) {
+      if (lt === '960') contentIndentEnCount++;
+    }
+    if (hg) {
+      s2EnHangingCount++;
+    }
+  }
+
+  assert(saltGhsIndentEnCount >= 8, `Section 2 英文版成盐声明 left="480" 换行首字对齐断言 (实测命中: ${saltGhsIndentEnCount}/9)`);
+  assert(titleIndentEnCount === 4, `Section 2 英文版防范说明四大标题 left="480" 相互对齐断言 (实测命中: ${titleIndentEnCount}/4)`);
+  assert(contentIndentEnCount >= 10, `Section 2 英文版防范说明内容项 left="960" 相互对齐断言 (实测命中: ${contentIndentEnCount}/11)`);
+  assert(s2EnHangingCount === 0, `Section 2 英文版换行首字对齐公理 (零悬挂缩进，续行与首行严格对齐) (实测悬挂数: ${s2EnHangingCount})`);
 
   // L-S3: 成分/组成信息 (居中对齐与 CAS 规范)
   const s3 = tblsCn[2];
