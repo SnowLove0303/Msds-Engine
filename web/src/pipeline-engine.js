@@ -2396,6 +2396,7 @@ export function standardizeEnglishTypographyAndLabels(engine) {
             if (p) {
               let t = (p.textContent || '').replace(/[:：]/g, '').trim();
               removeHangingIndentFromP(p, W_NS);
+              setParagraphAlign(p, 'center', W_NS);
               rebuildRunsWithTypography(p, t, { font: 'Arial', sizeVal: '19', bold: true }, W_NS);
             }
           }
@@ -2409,6 +2410,7 @@ export function standardizeEnglishTypographyAndLabels(engine) {
             if (p) {
               let t = (p.textContent || '').replace(/[:：]$/g, '').trim();
               removeHangingIndentFromP(p, W_NS);
+              setParagraphAlign(p, 'center', W_NS);
               rebuildRunsWithTypography(p, t, { font: 'Arial', sizeVal: '19', bold: false }, W_NS);
             }
           }
@@ -2484,6 +2486,10 @@ export function standardizeEnglishTypographyAndLabels(engine) {
           const c1 = cells[1];
           setCellVAlign(c1, 'center', W_NS);
           formatValueCell(c1, W_NS);
+          const p1 = c1.getElementsByTagNameNS(W_NS, 'p')[0];
+          if (p1) {
+            setParagraphAlign(p1, 'both', W_NS);
+          }
           continue;
         }
       }

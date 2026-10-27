@@ -432,6 +432,19 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
   }
   assert(nonCenterIngredientCells === 0, `Section 3 (L-S3): 成分表格内容居中对齐 (jc=center) (违规格数: ${nonCenterIngredientCells})`);
 
+  // L-S3 英文版成分表居中对齐断言
+  const s3En = tblsEn[2];
+  const s3TrsEn = s3En.getElementsByTagName('w:tr');
+  let nonCenterIngredientCellsEn = 0;
+  for (let r = 3; r < s3TrsEn.length; r++) {
+    const tcs = s3TrsEn[r].getElementsByTagName('w:tc');
+    for (let c = 0; c < tcs.length; c++) {
+      const jc = tcs[c].getElementsByTagName('w:jc')[0]?.getAttribute('w:val');
+      if (jc !== 'center') nonCenterIngredientCellsEn++;
+    }
+  }
+  assert(nonCenterIngredientCellsEn === 0, `Section 3 英文版成分表格内容居中对齐 (jc=center) (违规格数: ${nonCenterIngredientCellsEn})`);
+
   // L-S4: 急救措施 (四维分流)
   assert(/吸入|皮肤接触|眼睛接触|食入/.test(s4TextCn), 'Section 4 (L-S4): 吸入/皮肤/眼睛/食入四维接触途径清晰分流');
 
