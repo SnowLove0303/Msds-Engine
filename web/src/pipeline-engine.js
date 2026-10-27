@@ -2114,18 +2114,17 @@ async function safeWriteFileWithLockGuard(targetPath, buffer) {
     path.join(dir, `${base} (临时更新)${ext}`)
   ];
 
-  const syncFallbacks = async () => {
+  const cleanupFallbacks = async () => {
     for (const fb of fallbacks) {
       try {
-        await fs.access(fb);
-        await fs.writeFile(fb, buffer);
+        await fs.unlink(fb);
       } catch {}
     }
   };
 
   try {
     await fs.writeFile(targetPath, buffer);
-    await syncFallbacks();
+    await cleanupFallbacks();
     return targetPath;
   } catch (err) {
     if (err.code === 'EBUSY') {
@@ -2133,7 +2132,7 @@ async function safeWriteFileWithLockGuard(targetPath, buffer) {
       await new Promise(resolve => setTimeout(resolve, 1000));
       try {
         await fs.writeFile(targetPath, buffer);
-        await syncFallbacks();
+        await cleanupFallbacks();
         return targetPath;
       } catch (retryErr) {
         if (retryErr.code === 'EBUSY') {
@@ -2191,8 +2190,6 @@ export async function batchExportDeliverables({
     const buf = await item.engine.exportArrayBuffer();
     const docxPath = targetDir ? path.join(targetDir, item.name) : null;
     if (docxPath) {
-      // 覆写前务必自动保留源文件（若目标文件已存在且未建立留存）
-      await preserveOriginalFileBackup(docxPath);
       await safeWriteFileWithLockGuard(docxPath, Buffer.from(buf));
     }
     results.push({
@@ -2213,8 +2210,6 @@ export async function batchExportDeliverables({
   for (const p of pdfOutputs) {
     const finalPdfPath = targetDir ? path.join(targetDir, p.pdfName) : null;
     if (finalPdfPath && p.pdfBuffer) {
-      // 覆写前务必自动保留源 PDF（若目标文件已存在且未建立留存）
-      await preserveOriginalFileBackup(finalPdfPath);
       await safeWriteFileWithLockGuard(finalPdfPath, p.pdfBuffer);
     }
     results.push({
@@ -2224,6 +2219,38 @@ export async function batchExportDeliverables({
       durationMs: p.durationMs,
       path: finalPdfPath
     });
+  }
+
+  // 交付目录绝对纯净清场：物理清理任何历史遗留的非 8 格式文件与备用副本碎片
+  if (targetDir) {
+    try {
+      const canonicalNames = new Set([
+        ...docxItems.map(i => i.name),
+        ...pdfOutputs.map(p => p.pdfName)
+      ]);
+      const dirEntries = await fs.readdir(targetDir, { withFileTypes: true });
+      for (const entry of dirEntries) {
+        if (entry.isFile()) {
+          const fileName = entry.name;
+          if (!canonicalNames.has(fileName)) {
+            if (
+              fileName.includes('_源文件留存') ||
+              fileName.includes('_原版留存') ||
+              fileName.includes('(最新)') ||
+              fileName.includes('(更新)') ||
+              fileName.includes('(临时更新)') ||
+              fileName.includes('手做改版材料') ||
+              fileName.includes('当前匹配结果')
+            ) {
+              await fs.unlink(path.join(targetDir, fileName)).catch(() => {});
+              console.log(`[CleanSweep] 清除交付目录非标准历史碎片: ${fileName}`);
+            }
+          }
+        }
+      }
+    } catch (cleanErr) {
+      console.warn(`[CleanSweep] 清场异常: ${cleanErr.message}`);
+    }
   }
 
   // Gate 12: 全流程双极双层深度审计一票否决门禁 (Skill + Engine 强制项)

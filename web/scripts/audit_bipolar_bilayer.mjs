@@ -13,31 +13,10 @@ import { DOMParser } from '@xmldom/xmldom';
  */
 
 export async function loadDocXml(filePath) {
-  const ext = path.extname(filePath);
-  const base = path.basename(filePath, ext);
-  const dir = path.dirname(filePath);
-  const candidates = [
-    filePath,
-    path.join(dir, `${base} (最新)${ext}`),
-    path.join(dir, `${base} (更新)${ext}`),
-    path.join(dir, `${base} (临时更新)${ext}`)
-  ];
-  let actualPath = filePath;
-  let newestMtime = 0;
-  for (const c of candidates) {
-    try {
-      if (fs.existsSync(c)) {
-        const st = fs.statSync(c);
-        if (st.mtimeMs > newestMtime) {
-          newestMtime = st.mtimeMs;
-          actualPath = c;
-        }
-      }
-    } catch {
-      // continue
-    }
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`[LoadDocXml] 目标交付物文件不存在: ${filePath}`);
   }
-  const zip = await JSZip.loadAsync(fs.readFileSync(actualPath));
+  const zip = await JSZip.loadAsync(fs.readFileSync(filePath));
   const xml = await zip.file('word/document.xml').async('text');
   return new DOMParser().parseFromString(xml, 'text/xml');
 }
@@ -80,17 +59,17 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
   // ----------------------------------------------------------------------
   console.log('>>> [层 1: 全局通用规范层审查]');
 
-  // G-01: 8 格式交付物完整性断言
+  // G-01: 交付目录绝对纯净与 8 格式精准交付断言 (Canonical 8-Deliverables Purity Gate)
+  const dirFiles = fs.readdirSync(targetDir).filter(f => !fs.statSync(path.join(targetDir, f)).isDirectory());
+  assert(dirFiles.length === 8, `交付目录纯净门禁 (G-01 Purity): 目录内物理文件总数严格等于 8 (实测: ${dirFiles.length} 个)`);
+  if (dirFiles.length !== 8) {
+    console.error(`     ↳ 目录实际文件列表: \n        - ${dirFiles.join('\n        - ')}`);
+  }
+
   for (const file of DELIVERABLES) {
-    const fullPath = `${targetDir}/${file}`;
-    const ext = path.extname(fullPath);
-    const base = path.basename(fullPath, ext);
-    const dir = path.dirname(fullPath);
-    const exists = fs.existsSync(fullPath) ||
-      fs.existsSync(path.join(dir, `${base} (最新)${ext}`)) ||
-      fs.existsSync(path.join(dir, `${base} (更新)${ext}`)) ||
-      fs.existsSync(path.join(dir, `${base} (临时更新)${ext}`));
-    assert(exists, `交付物存在性 (G-01): ${file}`);
+    const fullPath = path.join(targetDir, file);
+    const exists = fs.existsSync(fullPath);
+    assert(exists, `交付物法定命名存在性 (G-01 Exists): ${file}`);
   }
 
   const docCn = await loadDocXml(`${targetDir}/PA-3223 msds_CN 冠志.docx`);

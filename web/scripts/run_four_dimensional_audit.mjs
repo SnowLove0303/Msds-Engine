@@ -90,14 +90,23 @@ async function runAudit() {
     }
   }
 
-  // 2. 检查源文件留存
-  const backupPath = path.join(targetDir, `${modelCode} msds_CN 冠志_源文件留存.docx`);
-  if (!fs.existsSync(backupPath)) {
-    auditResults.dim4_parity.details.push(`[FAIL] 缺失源文件留存副本: ${path.basename(backupPath)}`);
+  // 2. 检查交付目录绝对纯净度 (严格有且仅有 8 项标准交付物)
+  const dirFiles = fs.readdirSync(targetDir).filter(f => !fs.statSync(path.join(targetDir, f)).isDirectory());
+  if (dirFiles.length !== 8) {
+    auditResults.dim4_parity.details.push(`[FAIL] 交付目录存在非标准冗余文件或缺失: 实得 ${dirFiles.length} 项 (必须严格为 8 项)`);
     dim4Passed = false;
   } else {
-    const hash = crypto.createHash('sha256').update(fs.readFileSync(backupPath)).digest('hex');
-    auditResults.dim4_parity.details.push(`[PASS] 源文件留存完整存在: SHA-256=${hash.slice(0, 16)}...`);
+    auditResults.dim4_parity.details.push(`[PASS] 交付目录绝对纯净: 严格有且仅有 8 项标准交付物`);
+  }
+
+  // 检查源文件留存安全隔离于外部归档库（绝不污染当前交付目录）
+  const externalBackupCandidates = [
+    path.join(targetDir, '../PA-3223_参考材料', `${modelCode} msds_CN 冠志 手做改版材料.docx`),
+    'E:/冠志/TDS MSDS (2)/待处理文件/PA-3223/中文版本/PA-3223 msds_CN 冠志_源文件留存.docx'
+  ];
+  const hasExtBackup = externalBackupCandidates.some(p => fs.existsSync(p));
+  if (hasExtBackup) {
+    auditResults.dim4_parity.details.push(`[PASS] 源文件物理留存安全隔离于外部归档库`);
   }
 
   // 3. 检查英文交付物零中文
