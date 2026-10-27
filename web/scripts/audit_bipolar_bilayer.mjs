@@ -165,6 +165,21 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
   assert(s11CnPs.length === s11EnPs.length, `Section 11 双语段落数量 1:1 同构 (G-25): 中文(${s11CnPs.length}段) vs 英文(${s11EnPs.length}段)`, `中文段落数: ${s11CnPs.length}, 英文段落数: ${s11EnPs.length}`);
   assert(s11EnPs.length === 4, `Section 11 英文版独立 4 段同构 (D-01/G-25): 实测段落数为 ${s11EnPs.length} (必须严格为 4 段)`);
 
+  // Section 11 组分间距公理：严格单空行隔离 (before="240"=12pt)，严禁段首软回车叠加双重空行
+  if (s11EnPs.length >= 4) {
+    const p2Spacing = s11EnPs[2].getElementsByTagName('w:spacing')[0];
+    const p2Before = p2Spacing?.getAttribute('w:before');
+    assert(p2Before === '240', `Section 11 英文版组件 2 间距严格单空行隔离 (before="240") (实测: ${p2Before})`);
+    const p2FirstRunBr = s11EnPs[2].getElementsByTagName('w:r')[0]?.getElementsByTagName('w:br').length;
+    assert(!p2FirstRunBr, `Section 11 英文版组件 2 严禁段首前置软回车引发双重空行 (实测首Run br数: ${p2FirstRunBr})`);
+
+    const p3Spacing = s11EnPs[3].getElementsByTagName('w:spacing')[0];
+    const p3Before = p3Spacing?.getAttribute('w:before');
+    assert(p3Before === '240', `Section 11 英文版组件 3 间距严格单空行隔离 (before="240") (实测: ${p3Before})`);
+    const p3FirstRunBr = s11EnPs[3].getElementsByTagName('w:r')[0]?.getElementsByTagName('w:br').length;
+    assert(!p3FirstRunBr, `Section 11 英文版组件 3 严禁段首前置软回车引发双重空行 (实测首Run br数: ${p3FirstRunBr})`);
+  }
+
   function getPText(p) {
     if (!p) return '';
     let text = '';
@@ -506,14 +521,22 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
   const s12 = tblsCn[11];
   assert(s12.getElementsByTagName('w:tr').length >= 4, 'Section 12 (L-S12): 生态学资料行数与引导说明行保全');
 
-  // L-S13: 废弃处置 (废弃原则与双居中标签)
+  // L-S13: 废弃处置 (废弃原则与双居中标签，英文内容严格纯左对齐 jc=left 彻底终结假性居中失真)
   const s13 = tblsCn[12];
   const s13LastTr = s13.getElementsByTagName('w:tr')[s13.getElementsByTagName('w:tr').length - 1];
   const s13Jc = s13LastTr.getElementsByTagName('w:jc')[0]?.getAttribute('w:val');
-  assert(s13Jc === 'center', `Section 13 (L-S13): 废弃处置方法标签居中对齐 (jc=center) (实测: ${s13Jc})`);
+  assert(s13Jc === 'center', `Section 13 (L-S13): 中文版废弃处置方法标签居中对齐 (jc=center) (实测: ${s13Jc})`);
   const s13MethodCell = s13LastTr.getElementsByTagName('w:tc')[1];
   const s13MethodJc = s13MethodCell?.getElementsByTagName('w:jc')[0]?.getAttribute('w:val');
-  assert(s13MethodJc === 'both', `Section 13 (L-S13): 废弃处置方法内容两端对齐 (jc=both) (实测: ${s13MethodJc})`);
+  assert(s13MethodJc === 'both', `Section 13 (L-S13): 中文版废弃处置方法内容两端对齐 (jc=both) (实测: ${s13MethodJc})`);
+
+  const s13En = tblsEn[12];
+  const s13LastTrEn = s13En.getElementsByTagName('w:tr')[s13En.getElementsByTagName('w:tr').length - 1];
+  const s13JcEn = s13LastTrEn.getElementsByTagName('w:jc')[0]?.getAttribute('w:val');
+  assert(s13JcEn === 'center', `Section 13 (L-S13): 英文版废弃处置方法标签居中对齐 (jc=center) (实测: ${s13JcEn})`);
+  const s13MethodCellEn = s13LastTrEn.getElementsByTagName('w:tc')[1];
+  const s13MethodJcEn = s13MethodCellEn?.getElementsByTagName('w:jc')[0]?.getAttribute('w:val');
+  assert(s13MethodJcEn === 'left', `Section 13 (L-S13): 英文版废弃处置方法内容严格纯左对齐 (jc=left) (实测: ${s13MethodJcEn})`);
 
   // L-S14: 运输信息 (非危险货物级联判定)
   const s14Text = tblsCn[13].textContent;

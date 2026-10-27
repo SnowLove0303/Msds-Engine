@@ -859,15 +859,15 @@ export function buildThreeTierSection11(engine, facts = {}, isEnglish = false) {
     detailParagraphs = [
       '羟基聚丙烯酸酯分散体：\n毒性：无资料；',
       '刺激性：无资料',
-      '\n丙二醇丁醚：\n毒性：经皮（鼠）LD50：＞2000 mg/kg\n      吸入（鼠）LD50：＞1997.718 mg/l/8hE\n      经口（鼠）LD50：＞2000 mg/kg\n刺激性：无资料',
-      '\n二乙二醇丁醚：\n毒性：经皮（鼠）LD50：＞2000 mg/kg\n      经口（鼠）LD50：=4500 mg/kg\n刺激性：无资料',
+      '丙二醇丁醚：\n毒性：经皮（鼠）LD50：＞2000 mg/kg\n      吸入（鼠）LD50：＞1997.718 mg/l/8hE\n      经口（鼠）LD50：＞2000 mg/kg\n刺激性：无资料',
+      '二乙二醇丁醚：\n毒性：经皮（鼠）LD50：＞2000 mg/kg\n      经口（鼠）LD50：=4500 mg/kg\n刺激性：无资料',
     ];
   } else {
     detailParagraphs = [
       'Hydroxy polyacrylate dispersion:\nToxicity: No data available;',
       'Irritation: No data available.',
-      '\nPropylene glycol butyl ether:\nToxicity: Dermal (Rat)   LD50: > 2000 mg/kg\n        Inhalation (Rat) LD50: > 1997.718 mg/l/8hE\n        Oral (Rat)     LD50: > 2000 mg/kg\nIrritation: No data available.',
-      '\n2-(2-Butoxyethoxy)ethanol:\nToxicity: Dermal (Rat)   LD50: > 2000 mg/kg\n        Oral (Rat)     LD50: = 4500 mg/kg\nIrritation: No data available.',
+      'Propylene glycol butyl ether:\nToxicity: Dermal (Rat)   LD50: > 2000 mg/kg\n        Inhalation (Rat) LD50: > 1997.718 mg/l/8hE\n        Oral (Rat)     LD50: > 2000 mg/kg\nIrritation: No data available.',
+      '2-(2-Butoxyethoxy)ethanol:\nToxicity: Dermal (Rat)   LD50: > 2000 mg/kg\n        Oral (Rat)     LD50: = 4500 mg/kg\nIrritation: No data available.',
     ];
   }
   renderFullWidthRow(s11, 3, detailParagraphs, { isEnglish, isSection11: true, leftIndentTwips: 34, boldSubheaders: false, totalWidth: 9781 });
@@ -2506,7 +2506,8 @@ export function standardizeEnglishTypographyAndLabels(engine) {
           formatValueCell(c1, W_NS);
           const p1 = c1.getElementsByTagNameNS(W_NS, 'p')[0];
           if (p1) {
-            setParagraphAlign(p1, 'both', W_NS);
+            // 英文版 Section 13 废弃处置内容严格纯左对齐 (left)，彻底消除 both 两端拉伸导致的假性居中失真
+            setParagraphAlign(p1, 'left', W_NS);
           }
           continue;
         }

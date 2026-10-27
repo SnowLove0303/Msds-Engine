@@ -2439,7 +2439,8 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
   // 3. 填充段落内容 (严格对齐全局规范与 handcraft-typography 5 级缩进及加粗状态机)
   if (content !== undefined && content !== null) {
     const paragraphs = Array.isArray(content) ? content : String(content).split(/\r?\n/);
-    for (const pText of paragraphs) {
+    for (let pIdx = 0; pIdx < paragraphs.length; pIdx++) {
+      const pText = paragraphs[pIdx];
       const pNode = doc.createElementNS(W_NS, 'w:p');
       const pPr = doc.createElementNS(W_NS, 'w:pPr');
       const trimmed = pText.trim();
@@ -2462,6 +2463,10 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
       const spacing = doc.createElementNS(W_NS, 'w:spacing');
       spacing.setAttributeNS(W_NS, 'w:line', '300');
       spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
+      // Section 11 组分间距公理：组件与组件之间严格且唯美地空一行 (before="240"=12pt)，杜绝软回车双重叠加空两行
+      if (options.isSection11 && pIdx >= 2) {
+        spacing.setAttributeNS(W_NS, 'w:before', '240');
+      }
       pPr.appendChild(spacing);
 
       // Section 2 专属 5 级缩进几何状态机 (完全对齐 PA-3223 手做版 AST 事实)
@@ -2699,7 +2704,7 @@ export function enforceSection13DoubleCenter(cellNode) {
 /**
  * 对 Section 13 废弃处置原则/方法内容单元格注入两端对齐 (w:jc val="both")，对齐手做版基准
  */
-export function enforceSection13JustifiedContent(cellNode) {
+export function enforceSection13JustifiedContent(cellNode, isEnglish = false) {
   if (!cellNode) return;
   const ps = cellNode.getElementsByTagNameNS(W_NS, 'p');
   for (let i = 0; i < ps.length; i++) {
@@ -2714,7 +2719,8 @@ export function enforceSection13JustifiedContent(cellNode) {
       jc = cellNode.ownerDocument.createElementNS(W_NS, 'w:jc');
       pPr.appendChild(jc);
     }
-    jc.setAttributeNS(W_NS, 'w:val', 'both');
+    // 英文版严格左对齐 (left)，彻底消除 both 两端分散对齐引发的假性居中失真；中文版保持两端对齐 (both)
+    jc.setAttributeNS(W_NS, 'w:val', isEnglish ? 'left' : 'both');
   }
 }
 
