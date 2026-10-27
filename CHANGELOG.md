@@ -1,5 +1,48 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-10-27 下午] - 英文版 Section 9 理化特性中英 1:1 同构对齐剪枝与标签叠词永久免疫根治 (Gate 14 建立与深度审计闭环)
+
+### 一、 核心复盘与缺陷全景根因解密 (Section 9 EN 9.14 & 9.15)
+1. **中英文理化特性行数错位与下移缺陷 (Row Shift Bug)**：
+   - **现场表象**：用户指出 9.14、9.15 存在极为严重的质量缺陷——中文 9.13 对应英文 9.14，中文 9.14 对应英文 9.15，英文版比中文版凭空多出一行（英文 20 行 vs 中文 19 行）；
+   - **根因深度透视**：
+     * 英文母版 `en_base.docx` 在 9.4 槽位预置了 `9.4 Ionicity: Non-ionic`（离子性）；
+     * PA-3223 中文母版无“离子性”指标（共 19 行：标题行 0 + 18 行物理量 9.1~9.18）；
+     * 在 `pipeline-engine.js` 剪枝算法中，全面检查了饱和蒸气压、表面张力、分解温度等指标，却**唯独遗漏了对 `hasIonicity` 的探测与剪枝**；
+     * 导致英文版中未被测量的 `Ionicity` 成为“死重幽灵行”，从未被删除；从而导致从 9.4 之后的所有小节序号向下整体平移 1 行（log Pow 被迫挤至 9.14，自燃温度被迫挤至 9.15，最终以 9.19 结束）。
+2. **标签多重叠词毒瘤根因 (Stuttering Label Bug)**：
+   - **现场表象**：
+     * 9.14：`log Pow (n-octanol/water partition coefficient): partition coefficient): partition coefficient): No data available.`
+     * 9.15：`Auto-ignition temperature: temperature: temperature: Not applicable`
+   - **根因深度透视**：
+     * **第一层毒瘤（DOM 残留）**：英文母版 XML 中，Row 15 与 Row 16 本身是两段式折行结构（`p[0]` 为 `log Pow (n-octanol/water`，`p[1]` 为 `partition coefficient)：`）。在 `docx-engine.js` 的 `formatSection9LabelCell` 重写标签时，只清空了 `p[0]` 的 Run，但**未从 DOM 树物理移除 `p[1]`**；
+     * **第二层毒瘤（文本拼接积累）**：随后在 `pipeline-engine.js` 的 `formatEnglishLabelCell` 中，通过 `ps.map(p => p.textContent).join(' ')` 将已被重写为完整标签的 `p[0]` 与残留的 `p[1]` 暴力拼接，导致 `partition coefficient):` 和 `temperature:` 被成倍累加；且旧有的正则清洗无法匹配深层套娃重复。
+
+### 二、 工业级彻底根治方案与防线下沉
+1. **同构剪枝补齐 (`web/src/pipeline-engine.js`)**：
+   - 补充 `const hasIonicity = cnIndicators.some(t => /离子性/i.test(t));`；
+   - 增加 `!hasIonicity && /Ionicity/i.test(rowText)` 剪枝分支，同时覆盖 `hasSolids`、`hasCombustion` 等全部槽位；
+   - 英文版 Section 9 严格且仅保留与中文母版 100% 对应的 19 行（标题 + 9.1~9.18），彻底消除行漂移。
+2. **底层 DOM 物理净化与 Canonical 规范映射 (`web/src/docx-engine.js` & `pipeline-engine.js`)**：
+   - `formatSection9LabelCell` 执行时强制物理移除首段之后的所有多余段落（`for (let i = 1; i < ps.length; i++) ps[i].parentNode.removeChild(ps[i])`），彻底切断历史折行段落的毒瘤链条；
+   - 建立权威 Canonical 规范属性映射状态机（强制将匹配项映射为 `'log Pow (n-octanol/water partition coefficient):'`、`'Auto-ignition temperature:'` 等标准字符串），对任何模板污染实现 100% 免疫。
+3. **文件锁机制与审计读取防御升级**：
+   - `safeWriteFileWithLockGuard` 成功写入主文件时，自动同步刷新存在的历史回退文件 `(最新)` 等，防止版本滞后；
+   - `audit_bipolar_bilayer.mjs` 中的 `loadDocXml` 升级为基于 `stat.mtimeMs` 动态获取物理上真正最新的交付物，彻底消灭读取陈旧历史副本导致的假阳性拦截。
+
+### 三、 门禁立法与深度审计结果 [Measured]
+1. **Gate 14 正式立法**：在全景规范中确立 `Gate 14: Section 9 中英文行数 1:1 同构对齐与标签叠词根除 (G-31 理化同构公理)`。
+2. **深度审计套件升级 (`audit_bipolar_bilayer.mjs`)**：
+   - 增加中英文 Section 9 行数严格 1:1 同构对齐断言（实测 19 行 vs 19 行，完全对齐）；
+   - 增加英文 Section 9 全行小节序号（9.1~9.18）与行索引递增断言；
+   - 增加全行标签连续多词叠词零容忍断言（`partition coefficient`、`temperature`、`pressure` 等叠词检出数均为 0）。
+3. **真实实测验收 [Measured Exit Code 0]**：
+   - 双极双层全景机械深度审计：`🎉 终审结论: 【双极双层全景机械深度审计 100% 满分通过】 (Failures: 0)`；
+   - 四维深度审计矩阵终审：`🎉 恭喜！四维深度审计全维度满分通过 (Exit Code 0)！`；
+   - 8 格式交付物（4 DOCX + 4 PDF）全部绿色通过。
+
+---
+
 ## [2026-10-27 中午] - 英文版 Section 2 换行首字对齐与层级对齐 & Section 11 14 空格几何列对齐全面落地与双极终审
 
 ### 一、 核心复盘与排版问题根治 (Section 2 & Section 11 EN)

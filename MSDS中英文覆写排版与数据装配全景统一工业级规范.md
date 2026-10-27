@@ -18,6 +18,8 @@
 │ Gate 10: 严禁连续多空格排版断言 (G-28: 正文连续空格数恒为 0)             │
 │ Gate 11: 中英文结构同构性断言 (G-25: 16 章节行数与段落数 1:1 镜像同构)   │
 │ Gate 12: 强制双极双层全景深度审计门禁 (全局+局部双层 AST 断言，退出码 0) │
+│ Gate 13: Section 2 英文版换行首字对齐与层级对齐 (G-30 首字换行对齐与层级公理) │
+│ Gate 14: Section 9 中英文行数 1:1 同构对齐与标签叠词根除 (G-31 理化同构公理) │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -84,6 +86,13 @@
   2. **内容与内容对齐 (Content Items Align with Each Other)**：四大防范说明下的具体规程与条目（如 `Wear protective...`、`Inhalation...`、`Store in a cool...`、`Empty containers...` 等），统一左缩进 `<w:ind w:left="960"/>`，实现同级内容条目垂直完全对齐；
   3. **换行首字对齐 (First-Letter Alignment on Line Wrap)**：严禁使用 `hanging` 悬挂缩进；段落整体使用 `left="480"` 或 `left="960"`。当条目内部自然换行时（例如成盐声明第 2 行 `concentration limit >= 5%`），续行起始坐标与首行首字（`N,N-...` 的首字母 `N`）完全垂直对齐，彻底消除左侧悬挂突出或参差不齐现象。
 - **一票否决**：检测到子标题未对齐（非 480）、内容条目未对齐（非 960）或存在悬挂缩进导致换行首字错位，立即阻断交付。
+
+### 5.14 Gate 14: Section 9 中英文行数 1:1 同构对齐与标签叠词根除 (G-31 理化特性同构与叠词免疫公理)
+- **规则**：
+  1. **中英文 1:1 动态剪枝同构**：中文母版未测指标行（如离子性 Ionicity、饱和蒸气压 Saturated vapour、分解温度 Decomposition 等），英文版必须且唯一通过同构剪枝算法精准移除，确保中英文 Section 9 表格行数严格 1:1 同构对齐（PA-3223 严格收敛为 19 行），严禁因漏剪枝导致英文多行且行索引阶梯错位；
+  2. **多段折行段落物理净化**：在重编号或格式化 Section 9 第一列标签时，必须物理清除第一段之外的所有多余折行段落（移除 `p[1]` 及后续节点），从源头斩断多段拼接残留引发的叠词链条；
+  3. **标准物理量 Canonical 规范映射**：针对所有标准物理特性（`log Pow (n-octanol/water partition coefficient)`、`Auto-ignition temperature`、`Ignition temperature`、`Saturated vapour pressure` 等），执行强制 Canonical 规范化属性映射，彻底免疫历史残留的重复词毒瘤（如 `partition coefficient): partition coefficient` 或 `temperature: temperature`）。
+- **一票否决**：中英文 Section 9 行数不相等、英文小节序号与行号不匹配，或标签中含有任何连续重复叠词，门禁立即熔断拦截。
 
 ---
 

@@ -17,16 +17,24 @@ export async function loadDocXml(filePath) {
   const base = path.basename(filePath, ext);
   const dir = path.dirname(filePath);
   const candidates = [
+    filePath,
     path.join(dir, `${base} (最新)${ext}`),
     path.join(dir, `${base} (更新)${ext}`),
-    path.join(dir, `${base} (临时更新)${ext}`),
-    filePath
+    path.join(dir, `${base} (临时更新)${ext}`)
   ];
   let actualPath = filePath;
+  let newestMtime = 0;
   for (const c of candidates) {
-    if (fs.existsSync(c)) {
-      actualPath = c;
-      break;
+    try {
+      if (fs.existsSync(c)) {
+        const st = fs.statSync(c);
+        if (st.mtimeMs > newestMtime) {
+          newestMtime = st.mtimeMs;
+          actualPath = c;
+        }
+      }
+    } catch {
+      // continue
     }
   }
   const zip = await JSZip.loadAsync(fs.readFileSync(actualPath));
@@ -462,11 +470,28 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
   const s8Text = tblsCn[7].textContent;
   assert(/工程控制|呼吸系统防护|眼睛防护|手部防护/.test(s8Text), 'Section 8 (L-S8): 个体防护装备 (PPE) 标准分流规范');
 
-  // L-S9: 理化特性 (法定槽位全保全与 420dxa 悬挂缩进)
-  const s9 = tblsCn[8];
-  const s9Trs = s9.getElementsByTagName('w:tr');
-  assert(s9Trs.length >= 19, `Section 9 (L-S9): 法定槽位行数完备保全 (实测行数: ${s9Trs.length})`);
-  assert(!/pH值pH/.test(s9.textContent), 'Section 9 (L-S9): 消除 pH 标签叠词');
+  // L-S9: 理化特性 (中英文法定槽位严格 1:1 同构对齐、小节编号连贯性与防叠词断言)
+  const s9Cn = tblsCn[8];
+  const s9TrsCn = s9Cn.getElementsByTagName('w:tr');
+  assert(s9TrsCn.length >= 19, `Section 9 (L-S9): 中文法定槽位行数完备保全 (实测行数: ${s9TrsCn.length})`);
+  assert(!/pH值pH/.test(s9Cn.textContent), 'Section 9 (L-S9): 消除中文 pH 标签叠词');
+
+  const s9En = tblsEn[8];
+  const s9TrsEn = s9En.getElementsByTagName('w:tr');
+  assert(s9TrsEn.length === s9TrsCn.length, `Section 9 (L-S9): 英文与中文理化特性行数严格 1:1 同构对齐 (CN: ${s9TrsCn.length}, EN: ${s9TrsEn.length})`);
+
+  // 严格全量检查英文 Section 9 每一行标签：
+  // 1. 序号与行索引严格 1:1 一致 (9.1 ~ 9.N)
+  // 2. 绝对不允许出现叠词（如 partition coefficient): partition coefficient, temperature: temperature, pressure: pressure）
+  for (let r = 1; r < s9TrsEn.length; r++) {
+    const c0 = s9TrsEn[r].getElementsByTagName('w:tc')[0];
+    const lblText = (c0?.textContent || '').trim();
+    assert(!/(\b\w{3,}\b)(?:[:\s)]+)\1\b/i.test(lblText), `Section 9 (L-S9): 英文第 ${r} 行标签严禁出现连续叠词 (实测: "${lblText}")`);
+    assert(!/partition coefficient.*partition coefficient/i.test(lblText), `Section 9 (L-S9): 英文第 ${r} 行严禁残留 partition coefficient 叠词`);
+    assert(!/temperature.*temperature/i.test(lblText), `Section 9 (L-S9): 英文第 ${r} 行严禁残留 temperature 叠词`);
+    assert(!/pressure.*pressure/i.test(lblText), `Section 9 (L-S9): 英文第 ${r} 行严禁残留 pressure 叠词`);
+    assert(lblText.startsWith(`9.${r}`), `Section 9 (L-S9): 英文第 ${r} 行小节序号必须为 9.${r} (实测: "${lblText}")`);
+  }
 
   // L-S10: 稳定性和反应性 (六大固定条目)
   const s10Text = tblsCn[9].textContent;

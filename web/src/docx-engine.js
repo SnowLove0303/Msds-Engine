@@ -2113,8 +2113,13 @@ export function formatSection9LabelCell(cell, numberStr, labelText, isEnglish = 
   if (!cell?.node) return;
   // 严格继承模板事实：悬挂缩进 420 dxa，零制表位，行间距 300 dxa
   applyStandardHangingIndent(cell, '420', '420');
-  const p = cell.node.getElementsByTagNameNS(W_NS, 'p')[0] || cell.node.querySelector('p');
-  if (!p) return;
+  const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
+  if (ps.length === 0) return;
+  const p = ps[0];
+  // 物理清除第一段之外的所有多余段落（如模板中原有的折行段落，彻底切断残留重复词链条）
+  for (let i = 1; i < ps.length; i++) {
+    ps[i].parentNode?.removeChild(ps[i]);
+  }
   const existingRuns = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
   existingRuns.forEach(r => p.removeChild(r));
   const localRuns = Array.from(p.getElementsByTagName('r'));
@@ -2122,8 +2127,21 @@ export function formatSection9LabelCell(cell, numberStr, labelText, isEnglish = 
 
   if (isEnglish) {
     // 英文版方案 A 工业合规排版：Arial 9.5pt (sz=19) 加粗，序号与标签之间双半角空格，半角冒号结尾
+    // 标准物理特性 Canonical 规范化，直接免疫任何历史残留重复！
     let cleanLabel = labelText.replace(/：/g, ':').trim();
-    if (!cleanLabel.endsWith(':')) cleanLabel += ':';
+    if (/log Pow|n-octanol/i.test(cleanLabel)) {
+      cleanLabel = 'log Pow (n-octanol/water partition coefficient):';
+    } else if (/Auto-ignition/i.test(cleanLabel)) {
+      cleanLabel = 'Auto-ignition temperature:';
+    } else if (/Ignition temp/i.test(cleanLabel)) {
+      cleanLabel = 'Ignition temperature:';
+    } else if (/Decomposition/i.test(cleanLabel)) {
+      cleanLabel = 'Decomposition temperature:';
+    } else if (/Saturated vapour/i.test(cleanLabel)) {
+      cleanLabel = 'Saturated vapour pressure:';
+    } else {
+      if (!cleanLabel.endsWith(':')) cleanLabel += ':';
+    }
 
     const r = p.ownerDocument.createElementNS(W_NS, 'w:r');
     const rPr = p.ownerDocument.createElementNS(W_NS, 'w:rPr');

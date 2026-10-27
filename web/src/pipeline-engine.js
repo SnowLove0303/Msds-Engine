@@ -1659,6 +1659,7 @@ export async function buildBaseEnglishEngine({
       const cnS9 = baseCnEngine.records.find(r => r.sectionNumber === 9);
       if (cnS9) {
         const cnIndicators = cnS9.rows.map(r => (r.cells[0]?.text || '').trim());
+        const hasIonicity = cnIndicators.some(t => /离子性/i.test(t));
         const hasSaturatedVapour = cnIndicators.some(t => /饱和蒸气压/i.test(t));
         const hasSurfaceTension = cnIndicators.some(t => /表面张力/i.test(t));
         const hasPartition = cnIndicators.some(t => /分配系数/i.test(t));
@@ -1667,12 +1668,15 @@ export async function buildBaseEnglishEngine({
         const hasDecompTemp = cnIndicators.some(t => /分解温度/i.test(t));
         const hasExplosive = cnIndicators.some(t => /爆炸特性|爆炸极限/i.test(t));
         const hasDustExplosion = cnIndicators.some(t => /粉尘爆炸/i.test(t));
+        const hasSolids = cnIndicators.some(t => /固体含量|固含量/i.test(t));
+        const hasCombustion = cnIndicators.some(t => /燃烧值/i.test(t));
 
-        // 倒序对中文不存在的未测死重行执行同构剪枝
+        // 倒序对中文不存在的未测死重行执行同构剪枝 (包含离子性 Ionicity 1:1 同构对齐)
         for (let rIdx = s9.rows.length - 1; rIdx >= 1; rIdx--) {
           const rowText = (s9.rows[rIdx]?.cells[0]?.text || '').trim();
           let shouldPrune = false;
-          if (!hasSaturatedVapour && /Saturated vapour/i.test(rowText)) shouldPrune = true;
+          if (!hasIonicity && /Ionicity/i.test(rowText)) shouldPrune = true;
+          else if (!hasSaturatedVapour && /Saturated vapour/i.test(rowText)) shouldPrune = true;
           else if (!hasSurfaceTension && /Surface tension/i.test(rowText)) shouldPrune = true;
           else if (!hasPartition && /log Pow|Partition/i.test(rowText)) shouldPrune = true;
           else if (!hasAutoIgnition && /Auto-ignition/i.test(rowText)) shouldPrune = true;
@@ -1680,6 +1684,8 @@ export async function buildBaseEnglishEngine({
           else if (!hasDecompTemp && /Decomposition/i.test(rowText)) shouldPrune = true;
           else if (!hasExplosive && /Explosive properties/i.test(rowText)) shouldPrune = true;
           else if (!hasDustExplosion && /Dust explosion/i.test(rowText)) shouldPrune = true;
+          else if (!hasSolids && /Solid(?:s)?\s*content/i.test(rowText)) shouldPrune = true;
+          else if (!hasCombustion && /Heat of combustion|Combustion/i.test(rowText)) shouldPrune = true;
 
           if (shouldPrune) {
             s9 = deleteRow(engine, s9, rIdx);
@@ -2099,8 +2105,27 @@ export async function preserveOriginalFileBackup(filePath) {
  */
 
 async function safeWriteFileWithLockGuard(targetPath, buffer) {
+  const ext = path.extname(targetPath);
+  const base = path.basename(targetPath, ext);
+  const dir = path.dirname(targetPath);
+  const fallbacks = [
+    path.join(dir, `${base} (最新)${ext}`),
+    path.join(dir, `${base} (更新)${ext}`),
+    path.join(dir, `${base} (临时更新)${ext}`)
+  ];
+
+  const syncFallbacks = async () => {
+    for (const fb of fallbacks) {
+      try {
+        await fs.access(fb);
+        await fs.writeFile(fb, buffer);
+      } catch {}
+    }
+  };
+
   try {
     await fs.writeFile(targetPath, buffer);
+    await syncFallbacks();
     return targetPath;
   } catch (err) {
     if (err.code === 'EBUSY') {
@@ -2108,17 +2133,10 @@ async function safeWriteFileWithLockGuard(targetPath, buffer) {
       await new Promise(resolve => setTimeout(resolve, 1000));
       try {
         await fs.writeFile(targetPath, buffer);
+        await syncFallbacks();
         return targetPath;
       } catch (retryErr) {
         if (retryErr.code === 'EBUSY') {
-          const ext = path.extname(targetPath);
-          const base = path.basename(targetPath, ext);
-          const dir = path.dirname(targetPath);
-          const fallbacks = [
-            path.join(dir, `${base} (最新)${ext}`),
-            path.join(dir, `${base} (更新)${ext}`),
-            path.join(dir, `${base} (临时更新)${ext}`)
-          ];
           for (const fb of fallbacks) {
             try {
               console.warn(`[文件锁保护] ${targetPath} 仍被独占锁定，已安全降级写入至备选路径: ${fb}`);
@@ -2631,18 +2649,32 @@ function formatEnglishLabelCell(cell, W_NS, sectionNumber) {
     .replace(/\s+/g, ' ')
     .trim();
 
-  // 清洗多段合并导致的残留重复词
-  cleanLabel = cleanLabel
-    .replace(/pressure:\s*pressure:?/gi, 'pressure:')
-    .replace(/temperature:\s*temperature:?/gi, 'temperature:')
-    .replace(/coefficient\)?:\s*partition coefficient\)?/gi, 'coefficient):')
-    .replace(/partition coefficient\)?:\s*partition coefficient\)?/gi, 'partition coefficient):')
-    .replace(/:\s*:/g, ':')
-    .trim();
+  // 权威规范化：针对标准物理特性标签执行 Canonical 映射，彻底防御多段合并历史残留叠词
+  if (/log Pow|n-octanol/i.test(cleanLabel)) {
+    cleanLabel = 'log Pow (n-octanol/water partition coefficient):';
+  } else if (/Auto-ignition/i.test(cleanLabel)) {
+    cleanLabel = 'Auto-ignition temperature:';
+  } else if (/Ignition temp/i.test(cleanLabel)) {
+    cleanLabel = 'Ignition temperature:';
+  } else if (/Decomposition/i.test(cleanLabel)) {
+    cleanLabel = 'Decomposition temperature:';
+  } else if (/Saturated vapour/i.test(cleanLabel)) {
+    cleanLabel = 'Saturated vapour pressure:';
+  } else {
+    // 通用连续重复词清洗
+    cleanLabel = cleanLabel
+      .replace(/(\b\w{3,}\b)(?:\s+\1\b)+/gi, '$1')
+      .replace(/pressure:\s*pressure:?/gi, 'pressure:')
+      .replace(/temperature:\s*temperature:?/gi, 'temperature:')
+      .replace(/coefficient\)?:\s*partition coefficient\)?/gi, 'coefficient):')
+      .replace(/partition coefficient\)?:\s*partition coefficient\)?/gi, 'partition coefficient):')
+      .replace(/:\s*:/g, ':')
+      .trim();
 
-  // 确保标签末尾带有半角冒号
-  if (!cleanLabel.endsWith(':') && !/Other hazards/i.test(cleanLabel)) {
-    cleanLabel += ':';
+    // 确保标签末尾带有半角冒号
+    if (!cleanLabel.endsWith(':') && !/Other hazards/i.test(cleanLabel)) {
+      cleanLabel += ':';
+    }
   }
 
   // 保留首段并物理移除其余多余的人工断行段落
