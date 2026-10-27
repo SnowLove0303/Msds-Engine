@@ -1198,13 +1198,22 @@ export function extractSection3ExemptionNotes(sourceRecord) {
   const notes = [];
   for (const row of sourceRecord.rows) {
     if (row.index === 0) continue;
-    const combinedText = (row.cells || []).map((c) => c.text || '').join(' ').trim();
-    if (/中和剂|成盐|键合为盐|游离胺|低于分类限值|特定阈值浓度|请注意以下物质|DMEA|二甲基乙醇胺/i.test(combinedText)) {
-      for (const cell of (row.cells || [])) {
-        const text = (cell.text || '').trim();
-        if (text) {
-          notes.push(text);
-        }
+    const cells = row.cells || [];
+    const combinedText = cells.map((c) => c.text || '').join(' ').trim();
+
+    // 过滤规则：若是成分数据表格行（含 CAS 号格式 \d+-\d+-\d+ 或百分比 %），严禁作为豁免附注提取
+    const isIngredientDataRow = /\d+-\d+-\d+/.test(combinedText) || /%|％/.test(combinedText);
+    if (isIngredientDataRow) {
+      continue;
+    }
+
+    if (/中和剂|成盐|键合为盐|游离胺|低于分类限值|特定阈值浓度|请注意以下物质|不适用/i.test(combinedText)) {
+      // 若单元格内包含多段文字（如通过换行或多段落输入），拆分为离散行提取
+      for (const cell of cells) {
+        const cellText = (cell.text || '').trim();
+        if (!cellText) continue;
+        const lines = cellText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        notes.push(...lines);
       }
     }
   }

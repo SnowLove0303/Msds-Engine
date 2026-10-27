@@ -2363,152 +2363,266 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
   const totalCols = (record.structure?.gridWidthsTwips?.length) || record.columns || 2;
   const totalWidth = options.totalWidth || (record.structure?.gridWidthsTwips || []).reduce((sum, w) => sum + (Number(w) || 0), 0) || (options.isSection2 ? 9795 : 9781);
 
-  // 1. 移除 row.node 中多余的 tc，只保留第一个 tc，并彻底剥除 vMerge
-  const tcs = Array.from(row.node.getElementsByTagNameNS(W_NS, 'tc'));
-  for (let i = 1; i < tcs.length; i++) {
-    row.node.removeChild(tcs[i]);
-  }
-  const tcNode = tcs[0];
-  if (!tcNode) return;
+  // 1. 彻底清除现有旧 tc 节点（包括继承的 vMerge 占位 tc 与多余 tc），防止纵向合并导致的数据消失
+  const existingTcs = Array.from(row.node.getElementsByTagNameNS(W_NS, 'tc'));
+  existingTcs.forEach((tc) => row.node.removeChild(tc));
 
-  const vMerges = Array.from(tcNode.getElementsByTagNameNS(W_NS, 'vMerge'));
-  vMerges.forEach((vm) => vm.parentNode?.removeChild(vm));
-  const localVm = Array.from(tcNode.getElementsByTagName('vMerge'));
-  localVm.forEach((vm) => vm.parentNode?.removeChild(vm));
+  // 2. 构造干净、纯粹的单单元格通栏节点
+  const tcNode = doc.createElementNS(W_NS, 'w:tc');
+  row.node.appendChild(tcNode);
 
-  let cell = row.cells?.[0];
-  if (!cell || !cell.node) {
-    cell = {
-      node: tcNode,
-      text: '',
-      editable: true,
-      kind: 'value',
-      rowIndex,
-      cellIndex: 0,
-    };
-    row.cells = [cell];
-  } else if (row.cells.length > 1) {
-    row.cells = [row.cells[0]];
-  }
+  const tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+  tcNode.appendChild(tcPr);
 
-  // 2. 设置 tcPr
-  let tcPr = cell.node.getElementsByTagNameNS(W_NS, 'tcPr')[0];
-  if (!tcPr) {
-    tcPr = doc.createElementNS(W_NS, 'w:tcPr');
-    cell.node.insertBefore(tcPr, cell.node.firstChild);
-  }
-
-  // tcW
-  let tcW = tcPr.getElementsByTagNameNS(W_NS, 'tcW')[0];
-  if (!tcW) {
-    tcW = doc.createElementNS(W_NS, 'w:tcW');
-    tcPr.appendChild(tcW);
-  }
+  const tcW = doc.createElementNS(W_NS, 'w:tcW');
   tcW.setAttributeNS(W_NS, 'w:w', String(totalWidth));
   tcW.setAttributeNS(W_NS, 'w:type', 'dxa');
+  tcPr.appendChild(tcW);
 
-  // gridSpan
   if (totalCols > 1) {
-    let gridSpan = tcPr.getElementsByTagNameNS(W_NS, 'gridSpan')[0];
-    if (!gridSpan) {
-      gridSpan = doc.createElementNS(W_NS, 'w:gridSpan');
-      tcPr.appendChild(gridSpan);
-    }
+    const gridSpan = doc.createElementNS(W_NS, 'w:gridSpan');
     gridSpan.setAttributeNS(W_NS, 'w:val', String(totalCols));
+    tcPr.appendChild(gridSpan);
   }
 
-  // vAlign
-  let vAlign = tcPr.getElementsByTagNameNS(W_NS, 'vAlign')[0];
-  if (!vAlign) {
-    vAlign = doc.createElementNS(W_NS, 'w:vAlign');
-    tcPr.appendChild(vAlign);
-  }
+  const vAlign = doc.createElementNS(W_NS, 'w:vAlign');
   vAlign.setAttributeNS(W_NS, 'w:val', 'center');
+  tcPr.appendChild(vAlign);
 
   // 边框注入
   if (options.borders !== false) {
-    let tcBorders = tcPr.getElementsByTagNameNS(W_NS, 'tcBorders')[0];
-    if (!tcBorders) {
-      tcBorders = doc.createElementNS(W_NS, 'w:tcBorders');
-      tcPr.appendChild(tcBorders);
-    }
+    const tcBorders = doc.createElementNS(W_NS, 'w:tcBorders');
+    tcPr.appendChild(tcBorders);
     const topVal = options.topBorder || 'dotted';
     const bottomVal = options.bottomBorder || 'dotted';
 
-    let top = tcBorders.getElementsByTagNameNS(W_NS, 'top')[0];
-    if (!top) { top = doc.createElementNS(W_NS, 'w:top'); tcBorders.appendChild(top); }
+    const top = doc.createElementNS(W_NS, 'w:top');
     top.setAttributeNS(W_NS, 'w:val', topVal);
     top.setAttributeNS(W_NS, 'w:color', 'auto');
     top.setAttributeNS(W_NS, 'w:sz', '4');
     top.setAttributeNS(W_NS, 'w:space', '0');
+    tcBorders.appendChild(top);
 
-    let bottom = tcBorders.getElementsByTagNameNS(W_NS, 'bottom')[0];
-    if (!bottom) { bottom = doc.createElementNS(W_NS, 'w:bottom'); tcBorders.appendChild(bottom); }
+    const bottom = doc.createElementNS(W_NS, 'w:bottom');
     bottom.setAttributeNS(W_NS, 'w:val', bottomVal);
     bottom.setAttributeNS(W_NS, 'w:color', 'auto');
     bottom.setAttributeNS(W_NS, 'w:sz', '4');
     bottom.setAttributeNS(W_NS, 'w:space', '0');
+    tcBorders.appendChild(bottom);
+
+    const right = doc.createElementNS(W_NS, 'w:right');
+    right.setAttributeNS(W_NS, 'w:val', bottomVal);
+    right.setAttributeNS(W_NS, 'w:color', 'auto');
+    right.setAttributeNS(W_NS, 'w:sz', '4');
+    right.setAttributeNS(W_NS, 'w:space', '0');
+    tcBorders.appendChild(right);
   }
 
-  // 3. 填充段落内容
+  // 3. 填充段落内容 (严格对齐全局规范与 handcraft-typography 5 级缩进及加粗状态机)
   if (content !== undefined && content !== null) {
-    const existingPs = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
-    existingPs.forEach((p) => cell.node.removeChild(p));
-
     const paragraphs = Array.isArray(content) ? content : String(content).split(/\r?\n/);
     for (const pText of paragraphs) {
       const pNode = doc.createElementNS(W_NS, 'w:p');
       const pPr = doc.createElementNS(W_NS, 'w:pPr');
-      const jc = doc.createElementNS(W_NS, 'w:jc');
-      jc.setAttributeNS(W_NS, 'w:val', 'left');
-      pPr.appendChild(jc);
+      const trimmed = pText.trim();
+
+      // 对齐手做版段落对齐：
+      // Section 2: GHS危险性类别、羟基丙烯酸酯聚合物GHS危险性分类、环境危害需显式注入 jc="left"
+      // Section 11: 全行显式注入 jc="left"
+      if (options.isSection2) {
+        if (/^(?:GHS危险性类别|GHS hazard classification|羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification|环境危害|Environmental hazards)/i.test(trimmed)) {
+          const jc = doc.createElementNS(W_NS, 'w:jc');
+          jc.setAttributeNS(W_NS, 'w:val', 'left');
+          pPr.appendChild(jc);
+        }
+      } else if (options.isSection11) {
+        const jc = doc.createElementNS(W_NS, 'w:jc');
+        jc.setAttributeNS(W_NS, 'w:val', 'left');
+        pPr.appendChild(jc);
+      }
 
       const spacing = doc.createElementNS(W_NS, 'w:spacing');
       spacing.setAttributeNS(W_NS, 'w:line', '300');
       spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
       pPr.appendChild(spacing);
 
+      // Section 2 专属 5 级缩进几何状态机 (完全对齐 PA-3223 手做版 AST 事实)
+      if (options.isSection2) {
+        if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃液体3|急性毒性4|皮肤腐蚀1B|特异性靶器官系统毒性)/i.test(trimmed) ||
+            /^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable liquid|Acute toxicity|Skin corrosion|Specific target organ toxicity)/i.test(trimmed)) {
+          const ind = doc.createElementNS(W_NS, 'w:ind');
+          ind.setAttributeNS(W_NS, 'w:firstLine', '480');
+          ind.setAttributeNS(W_NS, 'w:right', '480');
+          pPr.appendChild(ind);
+        } else if (/^(?:预防措施|事故响应|安全存储|安全储存|废弃处置)[：:]/i.test(trimmed) ||
+                   /^(?:Prevention|Response|Storage|Disposal)[：:]/i.test(trimmed)) {
+          const ind = doc.createElementNS(W_NS, 'w:ind');
+          ind.setAttributeNS(W_NS, 'w:firstLine', '482');
+          pPr.appendChild(ind);
+        } else if (/^在室外或通风良好处操作/i.test(trimmed) || /^Use only outdoors or in a well-ventilated area/i.test(trimmed)) {
+          const ind = doc.createElementNS(W_NS, 'w:ind');
+          ind.setAttributeNS(W_NS, 'w:firstLine', '960');
+          pPr.appendChild(ind);
+        } else if (/^(?:请置于避光|装完整|Store in a cool)/i.test(trimmed)) {
+          const ind = doc.createElementNS(W_NS, 'w:ind');
+          if (/^装完整/i.test(trimmed)) {
+            ind.setAttributeNS(W_NS, 'w:left', '1198');
+            ind.setAttributeNS(W_NS, 'w:hanging', '240');
+          } else {
+            ind.setAttributeNS(W_NS, 'w:left', '1199');
+            ind.setAttributeNS(W_NS, 'w:hanging', '720');
+          }
+          pPr.appendChild(ind);
+        } else if (/^(?:使用后的空桶|Empty containers)/i.test(trimmed)) {
+          const ind = doc.createElementNS(W_NS, 'w:ind');
+          ind.setAttributeNS(W_NS, 'w:left', '959');
+          ind.setAttributeNS(W_NS, 'w:hanging', '480');
+          pPr.appendChild(ind);
+        }
+      } else if (options.isSection11 && options.leftIndentTwips) {
+        const ind = doc.createElementNS(W_NS, 'w:ind');
+        ind.setAttributeNS(W_NS, 'w:left', String(options.leftIndentTwips));
+        pPr.appendChild(ind);
+      }
+
       pNode.appendChild(pPr);
 
-      const rNode = doc.createElementNS(W_NS, 'w:r');
-      const rPr = doc.createElementNS(W_NS, 'w:rPr');
-      const rFonts = doc.createElementNS(W_NS, 'w:rFonts');
-      if (options.isEnglish) {
-        rFonts.setAttributeNS(W_NS, 'w:ascii', 'Arial');
-        rFonts.setAttributeNS(W_NS, 'w:hAnsi', 'Arial');
+      // Section 2 细粒度加粗状态机 (精准分离标签加粗与常规体正文)
+      let runSpecs = [];
+      if (options.isSection2) {
+        if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃液体3|急性毒性4|皮肤腐蚀1B|特异性靶器官系统毒性)/i.test(trimmed) ||
+            /^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable liquid|Acute toxicity|Skin corrosion|Specific target organ toxicity)/i.test(trimmed)) {
+          runSpecs = [{ text: pText, bold: false }];
+        } else if (/^(?:预防措施|事故响应|安全存储|安全储存|废弃处置)[：:]/i.test(trimmed) ||
+                   /^(?:Prevention|Response|Storage|Disposal)[：:]/i.test(trimmed)) {
+          runSpecs = [{ text: pText, bold: true }];
+        } else if (/^(?:操作时穿戴|操作后彻底清洗|作业场所不得|在室外或通风良好处操作|吸入[：:]|眼睛|食入[：:]|泄露[：:]|灭火[：:]|请置于避光|装完整|使用后的空桶)/i.test(trimmed) ||
+                   /^(?:Wear protective|Wash contact|Do not eat|Use only outdoors|If inhaled|Skin and eye|Rinse mouth|In case of spillage|In case of fire|Store in a cool|Empty containers)/i.test(trimmed)) {
+          // 保留条目前单空格微偏移
+          if (pText.startsWith('        ')) {
+            runSpecs = [
+              { text: ' ', bold: false },
+              { text: '       ', bold: false },
+              { text: pText.slice(8), bold: false }
+            ];
+          } else if (pText.startsWith('    ')) {
+            runSpecs = [
+              { text: ' ', bold: false },
+              { text: '   ', bold: false },
+              { text: pText.slice(4), bold: false }
+            ];
+          } else {
+            runSpecs = [{ text: pText, bold: false }];
+          }
+        } else if (/^(?:防范说明)[:：]?$/i.test(trimmed) || /^(?:Precautionary statements)[:：]?$/i.test(trimmed)) {
+          runSpecs = [{ text: pText, bold: true }];
+        } else {
+          // 键值对行：标签加粗，值常规体
+          const kvMatch = pText.match(/^(\s*(?:GHS危险性类别|GHS hazard classification|羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification|标签要素|Label elements|象形图|GHS pictograms|警告词|Signal word|危害性说明|Hazard statements|物理化学危险|Physical and chemical hazards|健康危害|Health hazards|环境危害|Environmental hazards))([:：]?)\s*(.*)$/i);
+          if (kvMatch) {
+            const label = kvMatch[1];
+            const colon = kvMatch[2] || '';
+            const val = kvMatch[3];
+            if (!val && (label === '标签要素' || label === 'Label elements')) {
+              runSpecs = [{ text: label, bold: true }, { text: colon, bold: false }];
+            } else if (label.includes('GHS危险性类别') && !options.isEnglish) {
+              // 手做版：'GHS危险性类别:'(粗体) + ' '(常规) + '无'(常规)
+              runSpecs = [{ text: label + colon, bold: true }, { text: ' ', bold: false }, { text: val.trim(), bold: false }];
+            } else {
+              runSpecs = [{ text: label + colon, bold: true }];
+              if (val) {
+                // 中文冒号后手做版无空格，英文冒号后保留一个空格
+                const separator = options.isEnglish ? ' ' : '';
+                runSpecs.push({ text: separator + val.trim(), bold: false });
+              }
+            }
+          } else {
+            runSpecs = [{ text: pText, bold: false }];
+          }
+        }
+      } else if (options.isSection11) {
+        // Section 11 专属 G-11 粗细层级状态机 (完全对齐手做版：说明行常规体，仅组分标题加粗，换行以软回车呈现，对齐保留6空格)
+        if (/^(?:该产品无可用的毒理学研究|No toxicological studies|下面是这些成分的毒理学数据|The following are toxicological data)/i.test(trimmed)) {
+          runSpecs = [{ text: pText, bold: false }];
+        } else {
+          const lines = pText.split('\n');
+          runSpecs = [];
+          for (let li = 0; li < lines.length; li++) {
+            const line = lines[li];
+            if (li > 0) {
+              runSpecs.push({ br: true });
+            }
+            if (line === '') {
+              continue;
+            }
+            const isComponentHeader = options.isEnglish
+              ? /^(?:Hydroxy polyacrylate dispersion|Propylene glycol butyl ether|2-\(2-Butoxyethoxy\)ethanol):\s*$/i.test(line.trim())
+              : /^(?:羟基聚丙烯酸酯分散体|丙二醇丁醚|二乙二醇丁醚)：$/.test(line.trim());
+            runSpecs.push({ text: line, bold: isComponentHeader });
+          }
+        }
       } else {
-        rFonts.setAttributeNS(W_NS, 'w:ascii', 'SimSun');
-        rFonts.setAttributeNS(W_NS, 'w:eastAsia', 'SimSun');
-        rFonts.setAttributeNS(W_NS, 'w:hAnsi', 'SimSun');
-      }
-      rPr.appendChild(rFonts);
-
-      const sz = doc.createElementNS(W_NS, 'w:sz');
-      sz.setAttributeNS(W_NS, 'w:val', options.fontSizeTwips ? String(options.fontSizeTwips) : '18'); // 9pt
-      rPr.appendChild(sz);
-
-      if (options.boldSubheaders && /^(?:预防措施|事故响应|安全储存|安全存储|废弃处置|Prevention|Response|Storage|Disposal|物理化学危险|健康危害|环境危害|Physical and chemical hazards|Health hazards|Environmental hazards)[:：]/i.test(pText.trim())) {
-        const b = doc.createElementNS(W_NS, 'w:b');
-        rPr.appendChild(b);
+        // 通用通栏行：按 boldSubheaders 整体判断
+        const isBold = options.isEnglish
+          ? /^(?:GHS hazard classification|Label elements|GHS pictograms|Signal word|Hazard statements|Precautionary statements|Prevention|Response|Storage|Disposal|Physical and chemical hazards|Health hazards|Environmental hazards)[:：]/i.test(trimmed)
+          : /^(?:GHS危险性类别|羟基丙烯酸酯聚合物GHS危险性分类|标签要素|象形图|警告词|危害性说明|防范说明|预防措施|事故响应|安全储存|安全存储|废弃处置|物理化学危险|健康危害|环境危害)[:：]?/i.test(trimmed);
+        runSpecs = [{ text: pText, bold: Boolean(options.boldSubheaders && isBold) }];
       }
 
-      rNode.appendChild(rPr);
-      const t = doc.createElementNS(W_NS, 'w:t');
-      t.setAttribute('xml:space', 'preserve');
-      t.textContent = pText;
-      rNode.appendChild(t);
-      pNode.appendChild(rNode);
+      for (const rSpec of runSpecs) {
+        const rNode = doc.createElementNS(W_NS, 'w:r');
+        const rPr = doc.createElementNS(W_NS, 'w:rPr');
+        const rFonts = doc.createElementNS(W_NS, 'w:rFonts');
+        if (options.isEnglish) {
+          rFonts.setAttributeNS(W_NS, 'w:ascii', 'Arial');
+          rFonts.setAttributeNS(W_NS, 'w:hAnsi', 'Arial');
+        } else {
+          rFonts.setAttributeNS(W_NS, 'w:hint', 'eastAsia');
+          rFonts.setAttributeNS(W_NS, 'w:ascii', options.isSection11 ? '宋体' : 'Times New Roman');
+          rFonts.setAttributeNS(W_NS, 'w:hAnsi', options.isSection11 ? '宋体' : 'Times New Roman');
+          rFonts.setAttributeNS(W_NS, 'w:eastAsia', '宋体');
+        }
+        rPr.appendChild(rFonts);
 
-      cell.node.appendChild(pNode);
+        const sz = doc.createElementNS(W_NS, 'w:sz');
+        const defaultTwips = options.isEnglish ? '19' : '24';
+        sz.setAttributeNS(W_NS, 'w:val', options.fontSizeTwips ? String(options.fontSizeTwips) : defaultTwips);
+        rPr.appendChild(sz);
+
+        if (rSpec.bold) {
+          const b = doc.createElementNS(W_NS, 'w:b');
+          rPr.appendChild(b);
+        }
+
+        rNode.appendChild(rPr);
+
+        if (rSpec.br) {
+          const br = doc.createElementNS(W_NS, 'w:br');
+          br.setAttributeNS(W_NS, 'w:type', 'textWrapping');
+          rNode.appendChild(br);
+        } else {
+          const t = doc.createElementNS(W_NS, 'w:t');
+          t.setAttribute('xml:space', 'preserve');
+          t.textContent = rSpec.text;
+          rNode.appendChild(t);
+        }
+        pNode.appendChild(rNode);
+      }
+
+      tcNode.appendChild(pNode);
     }
-    cell.text = Array.isArray(content) ? content.join('\n') : content;
   }
+
+  row.cells = [{
+    node: tcNode,
+    text: Array.isArray(content) ? content.join('\n') : (content || ''),
+    editable: true,
+    kind: 'value',
+    rowIndex,
+    cellIndex: 0,
+  }];
 }
 
-/**
- * 针对 Section 13 标签格实施双居中对齐（垂直居中 + 水平居中）
- * 彻底消除多余制表位与悬挂缩进
- */
 export function enforceSection13DoubleCenter(cellNode) {
   if (!cellNode) return;
   let tcPr = cellNode.getElementsByTagNameNS(W_NS, 'tcPr')[0];
@@ -2542,6 +2656,28 @@ export function enforceSection13DoubleCenter(cellNode) {
     if (tabs) pPr.removeChild(tabs);
     const ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
     if (ind) pPr.removeChild(ind);
+  }
+}
+
+/**
+ * 对 Section 13 废弃处置原则/方法内容单元格注入两端对齐 (w:jc val="both")，对齐手做版基准
+ */
+export function enforceSection13JustifiedContent(cellNode) {
+  if (!cellNode) return;
+  const ps = cellNode.getElementsByTagNameNS(W_NS, 'p');
+  for (let i = 0; i < ps.length; i++) {
+    const p = ps[i];
+    let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+    if (!pPr) {
+      pPr = cellNode.ownerDocument.createElementNS(W_NS, 'w:pPr');
+      p.insertBefore(pPr, p.firstChild);
+    }
+    let jc = pPr.getElementsByTagNameNS(W_NS, 'jc')[0];
+    if (!jc) {
+      jc = cellNode.ownerDocument.createElementNS(W_NS, 'w:jc');
+      pPr.appendChild(jc);
+    }
+    jc.setAttributeNS(W_NS, 'w:val', 'both');
   }
 }
 

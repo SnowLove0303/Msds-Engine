@@ -66,7 +66,8 @@ import {
   normalizeRowGeometry,
   transferDrawingToCell,
   renderFullWidthRow,
-  enforceSection13DoubleCenter
+  enforceSection13DoubleCenter,
+  enforceSection13JustifiedContent
 } from './docx-engine.js';
 import {
   runSmartMatching,
@@ -695,8 +696,8 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         '急性毒性4 吸入性 H332；',
         '急性毒性4 经皮H312；',
         '皮肤腐蚀1B H314；',
-        '特异性靶器官系统毒性（一次接触）3 H335',
-        '特异性靶器官系统毒性（一次接触）3 H335'
+        '特异性靶器官系统毒性（一次接触）3 H335；',
+        '特异性靶器官系统毒性（一次接触）3 H335；'
       );
     }
     paragraphs.push(
@@ -705,20 +706,21 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       '危害性说明:没有明显的已知作用或严重危险。',
       '防范说明:',
       '预防措施：',
-      '操作时穿戴必要的防护用品（手套、防护镜、工作服等）。',
-      '操作后彻底清洗身体接触部位。',
-      '作业场所不得进食，饮水或吸烟。',
+      '        操作时穿戴必要的防护用品（手套、防护镜、工作服等）。',
+      '        操作后彻底清洗身体接触部位。',
+      '        作业场所不得进食，饮水或吸烟。',
       '在室外或通风良好处操作。',
       '事故响应：',
-      '吸入：一旦吸入，如有不适，就医。',
-      '眼睛、皮肤接触；使用肥皂、清水等清洗即可。如有不适感，就医。',
-      '食入：立即漱口，禁止催吐，立即就医诊治。',
-      '泄露：收集泄漏物。',
-      '灭火：火灾时，使用干粉、泡沫、二氧化碳灭火。',
+      '        吸入：一旦吸入，如有不适，就医。',
+      '        眼睛、皮肤接触；使用肥皂、清水等清洗即可。如有不适感，就医。',
+      '        食入：立即漱口，禁止催吐，立即就医诊治。',
+      '        泄露：收集泄漏物。',
+      '        灭火：火灾时，使用干粉、泡沫、二氧化碳灭火。',
       '安全存储：',
-      '请置于避光、阴凉干燥处存放，存储温度应保持在5-35℃，避免霜冻，保持产品包装完整。每次取用之后立即密封，打开包装后尽快使用完毕。',
+      '    请置于避光、阴凉干燥处存放，存储温度应保持在5-35℃，避免霜冻，保持产品',
+      '装完整。每次取用之后立即密封，打开包装后尽快使用完毕。',
       '废弃处置：',
-      '使用后的空桶未经无害化处理前，不得存储食物及其他物品，以免对人体、环境造成危害；包装物的回收、利用、处置应符合国家及当地相关法律、法规规定，因包装物处置不当造成的危害及损失，由处置方承担。',
+      '    使用后的空桶未经无害化处理前，不得存储食物及其他物品，以免对人体、环境造成危害；包装物的回收、利用、处置应符合国家及当地相关法律、法规规定，因包装物处置不当造成的危害及损失，由处置方承担。',
       '物理化学危险：对水体、土壤可造成一定的污染。',
       '健康危害：无',
       '环境危害：无危险物质释放，防止进入下水道，以防聚合物沉积阻塞下水道。'
@@ -735,8 +737,8 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       'Acute toxicity, Inhalation (Category 4), H332;',
       'Acute toxicity, Dermal (Category 4), H312;',
       'Skin corrosion (Category 1B), H314;',
-      'Specific target organ toxicity - single exposure (Category 3), H335',
-      'Specific target organ toxicity - single exposure (Category 3), H335',
+      'Specific target organ toxicity - single exposure (Category 3), H335;',
+      'Specific target organ toxicity - single exposure (Category 3), H335;',
       'GHS pictograms: None',
       'Signal word: Warning',
       'Hazard statements: No known significant effects or critical hazards.',
@@ -776,6 +778,61 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
  * 构建 Section 11 三级责任隔离通栏拓扑
  * [免责通栏] -> [原料前言通栏] -> [原料端点通栏]
  */
+/**
+ * Section 11 双范式动态路由判定算法 (对齐 OpenSpec handcraft-typography-and-s11-dual-paradigm)
+ * @param {object|Array} section11FactsOrRecords
+ * @returns {'PARADIGM_1_FULL_WIDTH_MERGED'|'PARADIGM_2_STANDARD_SLOTS'}
+ */
+export function detectSection11Paradigm(section11FactsOrRecords) {
+  if (!section11FactsOrRecords) return 'PARADIGM_2_STANDARD_SLOTS';
+  
+  if (section11FactsOrRecords.isMultiComponentComposite || section11FactsOrRecords.isMultiComponentS11) {
+    return 'PARADIGM_1_FULL_WIDTH_MERGED';
+  }
+
+  // 提取文本，安全支持 Record 对象、数组或纯文本，杜绝循环引用
+  let rawText = '';
+  if (typeof section11FactsOrRecords === 'string') {
+    rawText = section11FactsOrRecords;
+  } else if (Array.isArray(section11FactsOrRecords)) {
+    rawText = section11FactsOrRecords.map(item => (typeof item === 'string' ? item : item?.text || '')).join(' ');
+  } else if (section11FactsOrRecords.rows && Array.isArray(section11FactsOrRecords.rows)) {
+    rawText = section11FactsOrRecords.rows.map(r => (r.cells || []).map(c => c.text || '').join(' ')).join(' ');
+  } else if (section11FactsOrRecords.node && typeof section11FactsOrRecords.node.textContent === 'string') {
+    rawText = section11FactsOrRecords.node.textContent;
+  } else {
+    try {
+      rawText = JSON.stringify(section11FactsOrRecords, (key, value) => {
+        if (key === 'node' || key === 'record' || key === 'table' || key === 'parent') return undefined;
+        return value;
+      });
+    } catch {
+      rawText = String(section11FactsOrRecords);
+    }
+  }
+
+  const componentMatches = new Set();
+  
+  // 1. CAS 号提取
+  const casMatches = rawText.match(/\b\d{2,7}-\d{2}-\d\b/g) || [];
+  casMatches.forEach(c => componentMatches.add(c));
+
+  // 2. 常见化学组分关键词识别
+  const knownComponentKeywords = [
+    '分散体', '丙二醇丁醚', '二乙二醇丁醚', '聚合物', '溶剂', '添加剂'
+  ];
+  knownComponentKeywords.forEach(kw => {
+    if (rawText.includes(kw)) componentMatches.add(kw);
+  });
+
+  // 判定阈值：>= 2 个不同化学组分试验数据，走范式一；否则走范式二
+  if (componentMatches.size >= 2) {
+    return 'PARADIGM_1_FULL_WIDTH_MERGED';
+  }
+
+  return 'PARADIGM_2_STANDARD_SLOTS';
+}
+
 export function buildThreeTierSection11(engine, facts = {}, isEnglish = false) {
   let s11 = engine.records.find((r) => r.sectionNumber === 11);
   if (!s11) return;
@@ -789,31 +846,31 @@ export function buildThreeTierSection11(engine, facts = {}, isEnglish = false) {
 
   const disclaimerText = !isEnglish
     ? '该产品无可用的毒理学研究。'
-    : 'No toxicological studies are available for this product.';
-  renderFullWidthRow(s11, 1, disclaimerText, { isEnglish, totalWidth: 9781 });
+    : 'No toxicological studies are available on the product.';
+  renderFullWidthRow(s11, 1, disclaimerText, { isEnglish, isSection11: true, boldSubheaders: false, totalWidth: 9781 });
 
   const preambleText = !isEnglish
     ? '下面是这些成分的毒理学数据。'
-    : 'The following are toxicological data for the components:';
-  renderFullWidthRow(s11, 2, preambleText, { isEnglish, totalWidth: 9781 });
+    : 'The following is toxicological data for these ingredients.';
+  renderFullWidthRow(s11, 2, preambleText, { isEnglish, isSection11: true, leftIndentTwips: 34, boldSubheaders: false, totalWidth: 9781 });
 
   let detailParagraphs = [];
   if (!isEnglish) {
     detailParagraphs = [
-      '羟基聚丙烯酸酯分散体：毒性：无资料；',
+      '羟基聚丙烯酸酯分散体：\n毒性：无资料；',
       '刺激性：无资料',
-      '丙二醇丁醚：毒性：经皮（鼠）LD50：＞2000 mg/kg      吸入（鼠）LD50：＞1997.718 mg/l/8hE      经口（鼠）LD50：＞2000 mg/kg刺激性：无资料',
-      '二乙二醇丁醚：毒性：经皮（鼠）LD50：＞2000 mg/kg      经口（鼠）LD50：=4500 mg/kg刺激性：无资料',
+      '\n丙二醇丁醚：\n毒性：经皮（鼠）LD50：＞2000 mg/kg\n      吸入（鼠）LD50：＞1997.718 mg/l/8hE\n      经口（鼠）LD50：＞2000 mg/kg\n刺激性：无资料',
+      '\n二乙二醇丁醚：\n毒性：经皮（鼠）LD50：＞2000 mg/kg\n      经口（鼠）LD50：=4500 mg/kg\n刺激性：无资料',
     ];
   } else {
     detailParagraphs = [
-      'Hydroxy polyacrylate dispersion: Toxicity: No data available;',
-      'Irritation: No data available',
-      'Propylene glycol butyl ether: Toxicity: Dermal (Rat) LD50: > 2000 mg/kg      Inhalation (Rat) LD50: > 1997.718 mg/l/8hE      Oral (Rat) LD50: > 2000 mg/kg Irritation: No data available',
-      '2-(2-Butoxyethoxy)ethanol: Toxicity: Dermal (Rat) LD50: > 2000 mg/kg      Oral (Rat) LD50: = 4500 mg/kg Irritation: No data available',
+      'Hydroxy polyacrylate dispersion:\nToxicity: No data available;',
+      'Irritation: No data available.',
+      '\nPropylene glycol butyl ether:\nToxicity: Dermal (Rat) LD50: > 2000 mg/kg\n          Inhalation (Rat) LD50: > 1997.718 mg/l/8hE\n          Oral (Rat) LD50: > 2000 mg/kg\nIrritation: No data available.',
+      '\n2-(2-Butoxyethoxy)ethanol:\nToxicity: Dermal (Rat) LD50: > 2000 mg/kg\n          Oral (Rat) LD50: = 4500 mg/kg\nIrritation: No data available.',
     ];
   }
-  renderFullWidthRow(s11, 3, detailParagraphs, { isEnglish, totalWidth: 9781 });
+  renderFullWidthRow(s11, 3, detailParagraphs, { isEnglish, isSection11: true, leftIndentTwips: 34, boldSubheaders: false, totalWidth: 9781 });
   engine.refresh();
 }
 
@@ -882,12 +939,58 @@ export async function buildBaseChineseEngine({
     entity: '冠志'
   });
 
-  // 7. 规范化 Section 13 (严格保持 3 行或 4 行结构，并对标签格实施双居中)
+  // 6.5 规范化 Section 4、Section 5、Section 7 全局独立完整句子结尾标点 (G-08/D-06)
+  const s4Rec = engine.records.find(r => r.sectionNumber === 4);
+  if (s4Rec) {
+    for (const row of s4Rec.rows) {
+      const lbl = (row.cells[0]?.text || '').trim();
+      if (/皮肤接触|接触皮肤/i.test(lbl) && row.cells[1]) {
+        let val = (row.cells[1].text || '').trim();
+        if (val.includes('若发生皮肤反应，就医') && !val.includes('若发生皮肤反应，就医。')) {
+          val = val.replace(/若发生皮肤反应，就医(?![。])/g, '若发生皮肤反应，就医。');
+          safeWriteCellValue(row.cells[1], val);
+        }
+      }
+    }
+  }
+
+  const s5Rec = engine.records.find(r => r.sectionNumber === 5);
+  if (s5Rec) {
+    for (const row of s5Rec.rows) {
+      const lbl = (row.cells[0]?.text || '').trim();
+      if (/合适的灭火剂/i.test(lbl) && row.cells[1]) {
+        let val = (row.cells[1].text || '').trim();
+        if (val.includes('大火时应用喷洒水') && !val.includes('大火时应用喷洒水。')) {
+          val = val.replace(/大火时应用喷洒水(?![。])/g, '大火时应用喷洒水。');
+          safeWriteCellValue(row.cells[1], val);
+        }
+      }
+    }
+  }
+
+  const s7Rec = engine.records.find(r => r.sectionNumber === 7);
+  if (s7Rec) {
+    for (const row of s7Rec.rows) {
+      const lbl = (row.cells[0]?.text || '').trim();
+      if (/安全操作防范/i.test(lbl) && row.cells[1]) {
+        let val = (row.cells[1].text || '').trim();
+        if (val.includes('更换被污染或浸湿的衣物') && !val.includes('更换被污染或浸湿的衣物。')) {
+          val = val.replace(/更换被污染或浸湿的衣物(?![。])/g, '更换被污染或浸湿的衣物。');
+          safeWriteCellValue(row.cells[1], val);
+        }
+      }
+    }
+  }
+
+  // 7. 规范化 Section 13 (严格保持 3 行或 4 行结构，对标签格实施双居中，对方法内容格实施两端对齐 jc="both")
   let s13 = engine.records.find(r => r.sectionNumber === 13);
   if (s13) {
     const lastRow = s13.rows[s13.rows.length - 1];
     if (lastRow && lastRow.cells[0]?.node) {
       enforceSection13DoubleCenter(lastRow.cells[0].node);
+    }
+    if (lastRow && lastRow.cells.length >= 2 && lastRow.cells[1]?.node) {
+      enforceSection13JustifiedContent(lastRow.cells[1].node);
     }
   }
 
@@ -938,9 +1041,12 @@ export async function buildBaseChineseEngine({
     }
   }
 
-  // 9.5 Section 11 & Section 12 复合模态处理
-  if (isNonHazComposite) {
+  // 9.5 Section 11 & Section 12 双范式动态分流处理
+  const s11Paradigm = detectSection11Paradigm(facts?.section11 || srcEngine?.records?.find(r => r.sectionNumber === 11) || (isNonHazComposite ? { isMultiComponentComposite: true } : null));
+  if (s11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
     buildThreeTierSection11(engine, facts, false);
+    cleanSection12Preambles(engine, false);
+  } else if (isNonHazComposite) {
     cleanSection12Preambles(engine, false);
   }
 
@@ -1014,13 +1120,20 @@ export async function buildBaseChineseEngine({
     }
   }
 
-  // 12. 统一值格左对齐与清除首行公文缩进 (根除底模残留的 jc="both" 与 firstLine="26")
+  // 12. 统一值格左对齐与清除首行公文缩进 (根除底模残留的 jc="both" 与 firstLine="26"，豁免 Section 13 方法内容格两端对齐)
   const allTbls = Array.from(engine.documentXml.getElementsByTagNameNS(W_NS, 'tbl'));
-  for (const tbl of allTbls) {
+  for (let tIdx = 0; tIdx < allTbls.length; tIdx++) {
+    const tbl = allTbls[tIdx];
+    const isSection13Tbl = (tIdx === 12); // 表格序号 12 对应 Section 13
     const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
-    for (const row of rows) {
+    for (let rIdx = 0; rIdx < rows.length; rIdx++) {
+      const row = rows[rIdx];
       const cells = Array.from(row.getElementsByTagNameNS(W_NS, 'tc'));
       if (cells.length < 2) continue;
+      // Section 13 尾行方法内容格 (rIdx === rows.length - 1 && c === 1) 豁免保持 both
+      if (isSection13Tbl && rIdx === rows.length - 1) {
+        continue;
+      }
       for (let c = 1; c < cells.length; c++) {
         const cell = cells[c];
         const pList = Array.from(cell.getElementsByTagNameNS(W_NS, 'p'));
@@ -1046,6 +1159,14 @@ export async function buildBaseChineseEngine({
         }
       }
     }
+  }
+
+  // 13. 全量拔除中文母版中残留的所有非法 <w:tabs> 制表位与 <w:tab/>，确保全篇首列纯净 (对齐全局规范 G-09)
+  for (const tbl of allTbls) {
+    const tabsInTbl = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tabs'));
+    tabsInTbl.forEach(t => t.parentNode?.removeChild(t));
+    const tabRuns = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tab'));
+    tabRuns.forEach(t => t.parentNode?.removeChild(t));
   }
 
   // 严格保留模板原装序号与格式，严禁全局重排序号
@@ -1201,6 +1322,7 @@ export async function buildBaseEnglishEngine({
   const todayDateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '/');
   const isOutdated = !baseCnEngine?._adaptiveRevisionDate || baseCnEngine._adaptiveRevisionDate.startsWith('2023') || baseCnEngine._adaptiveRevisionDate.startsWith('2024') || baseCnEngine._adaptiveRevisionDate.startsWith('2025');
   const effectiveRevisionDate = revisionDate || (!isOutdated ? baseCnEngine._adaptiveRevisionDate : todayDateStr);
+  const isNonHazComposite = Boolean(facts.isNonHazardousComposite || (baseCnEngine && detectNonHazardousComposite(baseCnEngine.records, facts)));
 
   updateHeaderFooterData(engine, {
     model: modelCode,
@@ -1259,7 +1381,10 @@ export async function buildBaseEnglishEngine({
     const isNonHazComposite = Boolean(facts.isNonHazardousComposite || (baseCnEngine && detectNonHazardousComposite(baseCnEngine.records, facts)));
     if (isNonHazComposite) {
       buildFullWidthSection2(engine, facts, true);
-      buildThreeTierSection11(engine, facts, true);
+      const enS11Paradigm = detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || { isMultiComponentComposite: true });
+      if (enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
+        buildThreeTierSection11(engine, facts, true);
+      }
       cleanSection12Preambles(engine, true);
     } else if (isNonHaz) {
       // 非危险化学品：严格收敛为 4 行结构 (标题 + 2.1分类 + 2.2标签 + 2.3其他危害)，彻底物理删除 2.3 防范说明旧行
@@ -1596,7 +1721,9 @@ export async function buildBaseEnglishEngine({
 
   // Section 11 【核心重构：彻底废除硬编码假数据与粗暴删行，基于中文母版实测端点动态英译装配】
   let s11 = engine.records.find(r => r.sectionNumber === 11);
-  if (s11) {
+  if (s11 && isNonHazComposite) {
+    // Mode B 通栏复合豁免模态：已由 buildThreeTierSection11 全权接管，跳过传统单端点映射以防中文污染
+  } else if (s11) {
     const cnS11 = baseCnEngine?.records?.find(r => r.sectionNumber === 11);
     
     // 1. 动态自适应顶部的产品毒理学声明语（双说明行对齐中文母版）
@@ -2067,6 +2194,23 @@ export async function batchExportDeliverables({
     });
   }
 
+  // Gate 12: 全流程双极双层深度审计一票否决门禁 (Skill + Engine 强制项)
+  // 必须对导出的 8 格式生成物进行最终机器级 AST 深度审计，任何一项违章立即抛出异常熔断阻断交付！
+  if (targetDir) {
+    try {
+      const auditModule = await import('../scripts/audit_bipolar_bilayer.mjs');
+      if (auditModule?.runBipolarBilayerAudit) {
+        const auditRes = await auditModule.runBipolarBilayerAudit(targetDir);
+        if (!auditRes.success) {
+          throw new Error(`【质量门禁拦截 (Gate 12)】${modelCode} 产出物双极双层全景深度审计未通过，存在 ${auditRes.failCount} 项严重违章！立即阻断交付。`);
+        }
+      }
+    } catch (auditErr) {
+      if (auditErr.message?.includes('质量门禁拦截')) throw auditErr;
+      console.warn(`[Pipeline] 深度审计模块执行提示: ${auditErr.message}`);
+    }
+  }
+
   return results;
 }
 
@@ -2260,6 +2404,10 @@ export function standardizeEnglishTypographyAndLabels(engine) {
 
       // 3. Section 11 专属：二级标签 (Oral:, Inhalation:, Dermal:, Fertility:) 加粗，续行标签空首列
       if (sectionNumber === 11 && rIdx >= 3) {
+        // 通栏单元格 (cells.length === 1，如 Mode B 通栏复合豁免模态) 严格豁免，严禁压平 4 段或强加尾部冒号
+        if (cells.length === 1) {
+          continue;
+        }
         const c0 = cells[0];
         if (c0) {
           cleanTabsInNode(c0, W_NS);
@@ -2900,7 +3048,9 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
         for (const p of pList) {
           const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
           const jc = pPr?.getElementsByTagNameNS(W_NS, 'jc')[0]?.getAttributeNS(W_NS, 'val');
-          if (jc === 'both' || jc === 'distribute') {
+          // 法定豁免：Section 13 (Table 13) 尾行方法内容格允许且要求 both (对齐手做版两端对齐规格)
+          const isS13DisposalMethods = (t === 12 && r === rows.length - 1 && c === 1);
+          if (!isS13DisposalMethods && (jc === 'both' || jc === 'distribute')) {
             throw new Error(`【质量门禁拦截 (Gate 6)】${docName} 表格 ${t + 1} 行 ${r + 1} 列 ${c + 1} 值格出现非法 "${jc}" 对齐！严禁两端对齐/分散对齐造成词间拉大。`);
           }
           const ind = pPr?.getElementsByTagNameNS(W_NS, 'ind')[0];
@@ -2954,6 +3104,49 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
           }
         }
       }
+    }
+  }
+
+  // Gate 9: 标点完整性与句末闭合/防悬挂标点 (G-26)
+  if (isEnglish) {
+    const s11En = engine.records.find(r => r.sectionNumber === 11);
+    if (s11En && s11En.rows.length >= 4) {
+      const row3PList = Array.from(s11En.rows[3].cells[0]?.node?.getElementsByTagNameNS(W_NS, 'p') || []);
+      for (const p of row3PList) {
+        const t = (p.textContent || '').trim();
+        if (/:$/.test(t)) {
+          throw new Error(`【质量门禁拦截 (Gate 9)】${docName} Section 11 通栏详述段落发现非法尾部悬挂冒号: "${t}"！必须以句号或分号闭合。`);
+        }
+      }
+    }
+  } else {
+    const s11Cn = engine.records.find(r => r.sectionNumber === 11);
+    if (s11Cn && s11Cn.rows.length >= 4) {
+      const row3Text = s11Cn.rows[3].cells[0]?.text || '';
+      if (!row3Text.includes('\n') && /mg\/kg刺激性|mg\/l刺激性|mg\/m3刺激性/.test(row3Text)) {
+        throw new Error(`【质量门禁拦截 (Gate 9)】${docName} Section 11 通栏详述段落发现文本标签粘连碰撞: "mg/kg刺激性"！必须以分号分隔并句末闭合。`);
+      }
+    }
+  }
+
+  // Gate 10: 反多空格排版公理 (G-28: 正文中严禁无序连续空格；但在 Section 11 软换行垂直列对齐中，允许法定 6 空格(CN)与 10 空格(EN)缩进)
+  const s11Check = engine.records.find(r => r.sectionNumber === 11);
+  if (s11Check && s11Check.rows.length >= 4) {
+    const r3PList = Array.from(s11Check.rows[3].cells[0]?.node?.getElementsByTagNameNS(W_NS, 'p') || []);
+    for (const p of r3PList) {
+      const t = p.textContent || '';
+      const sanitized = t.replace(/ {10}| {6}/g, '');
+      if (/[ ]{2,}/.test(sanitized)) {
+        throw new Error(`【质量门禁拦截 (Gate 10)】${docName} Section 11 发现连续多空格伪造对齐: "${t}"！正文严禁出现 2 个及以上连续空格。`);
+      }
+    }
+  }
+
+  // Gate 11: 中英文双语结构拓扑同构公理 (G-25)
+  if (s11Check && s11Check.rows.length === 4) {
+    const r3PList = Array.from(s11Check.rows[3].cells[0]?.node?.getElementsByTagNameNS(W_NS, 'p') || []);
+    if (r3PList.length !== 4) {
+      throw new Error(`【质量门禁拦截 (Gate 11)】${docName} Section 11 通栏模式段落数异常: 实测 ${r3PList.length} 段 (必须严格保持 4 段同构)!`);
     }
   }
 }
