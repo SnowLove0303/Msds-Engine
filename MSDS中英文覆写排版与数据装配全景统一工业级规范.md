@@ -122,3 +122,10 @@
 | **全量 12 大质量门禁断言** | `web/src/pipeline-engine.js` | `assertDeliverableQuality()` |
 | **双极双层机械终审套件** | `web/scripts/audit_bipolar_bilayer.mjs` | `runBipolarBilayerAudit()` |
 | **Section 2 & 11 自适应通栏排版与格式继承** | `web/src/docx-engine.js` / `pipeline-engine.js` | `renderFullWidthRow()` / `buildFullWidthSection2()` |
+
+### Gate 16: G-33 值格零标签前缀叠词公理与 G-34 实测化学端点零损耗公理
+- **规则要求**：
+  1. **零前缀叠词 (G-33)**：任何填写值单元格首部，严禁出现与行标签完全相同的冗余前缀（如“吸入：”、“致癌性：”）；装配前必须物理剥离；
+  2. **实测端点零损耗 (G-34)**：源文件中包含的急性毒性经口、吸入（1h & 4h）、经皮三大端点必须 100% 完整保留，英文版 1:1 双语同构对齐；
+  3. **Section 11 单组分原版分列表格**：中英双语严格 15 行，值列加粗数严格为 0，换行分行展示。
+- **一票否决**：发现值列遗漏经皮端点、存在前缀叠词或加粗泄露，立即阻断交付。

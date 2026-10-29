@@ -340,11 +340,7 @@ export function stripExtraneousHeaders(value, slotKey = '', sectionNumber = 0) {
 
   // 2. 针对特定章节的首部重复标题/标签清洗
   if (sectionNumber === 11) {
-    if (slotKey === 'sensitization' || slotKey === 'carcinogenicity') {
-      v = v.replace(/^(?:(?:11\.\d+\s*)?(?:毒理学效应|毒理学研究|毒性资料)[:：\s]*)+/i, '').trim();
-    } else {
-      v = v.replace(/^(?:(?:11\.\d+\s*)?(?:毒理学效应|毒理学研究|毒性资料|急性毒性[，, ]*(?:经口|吸入|经皮)|原发性(?:皮肤|粘膜)刺激|皮肤刺激|粘膜刺激|主要(?:皮肤|眼睛|粘膜)刺激性|致敏性|致突变性|致癌性|生殖毒性|吸入危害|吸入危险|附加信息)[:：\s]*)+/i, '').trim();
-    }
+    v = v.replace(/^(?:(?:11\.\d+\s*)?(?:毒理学效应|毒理学研究|毒性资料|急性毒性[，, ]*(?:经口|吸入|经皮)?|原发性(?:皮肤|粘膜)刺激|皮肤刺激|粘膜刺激|主要(?:皮肤|眼睛|粘膜)刺激性?|致敏性|呼吸道或皮肤过敏|皮肤致敏性|致突变性|生殖细胞突变性|致癌性|生殖毒性|特异性靶器官系统毒性(?:（一次接触[\/／]反复接触）)?|STOT评估-一次性接触|吸入危害|吸入危险|附加信息|其它信息|其他信息|经口|吸入|经皮)[:：\s]*)+/i, '').trim();
   } else if (sectionNumber === 2) {
     v = v.replace(/^(?:(?:2\.\d+\s*)?(?:GHS危险性类别|危险性分类|物质或混合物分类|紧急情况概述|GHS标签要素|标签要素|象形图|信号词|警示词|危险性说明|防范说明|其他危害|其他危险)[:：\s]*)+/i, '').trim();
   } else if (sectionNumber === 12) {
@@ -1627,8 +1623,8 @@ export function decoupleSection11ToxicologyBlocks(cellText, rowObj = null) {
 
     chunk = stripExtraneousHeaders(chunk, current.ep.key, 11);
 
-    if (['acute_toxicity_oral', 'acute_toxicity_inhalation', 'acute_toxicity_dermal', 'subacute_chronic_toxicity', 'skin_corrosion', 'eye_damage', 'aspiration_hazard', 'reproductive_fertility', 'reproductive_teratogenicity'].includes(current.ep.key)) {
-      chunk = chunk.replace(/^(?:(?:11\.\d+\s*)?(?:毒理学效应|急性毒性[，, ]*(?:经口|吸入|经皮)|原发性(?:皮肤|粘膜)刺激|皮肤刺激|主要眼睛刺激性|主要粘膜刺激性|眼睛刺激|亚急性[，, ]*亚慢性和延迟毒性|吸入危害|吸入危险|生殖毒性[\/／]?(?:生育力|致畸形)?|[\/／]?(?:生育力|致畸形))[:：\s]*)+/i, '').trim();
+    if (['acute_toxicity_oral', 'acute_toxicity_inhalation', 'acute_toxicity_dermal', 'subacute_chronic_toxicity', 'skin_corrosion', 'eye_damage', 'aspiration_hazard', 'reproductive_fertility', 'reproductive_teratogenicity', 'carcinogenicity', 'stot_single', 'additional_info'].includes(current.ep.key)) {
+      chunk = chunk.replace(/^(?:(?:11\.\d+\s*)?(?:毒理学效应|毒理学研究|毒性资料|急性毒性[，, ]*(?:经口|吸入|经皮)?|主要皮肤刺激性|原发性(?:皮肤|粘膜)刺激|皮肤刺激|主要眼睛刺激性|主要粘膜刺激性|眼睛刺激|粘膜刺激|亚急性[，, ]*亚慢性和延迟毒性|致敏性|呼吸道或皮肤过敏|皮肤致敏性|致突变性|生殖细胞突变性|致癌性|生殖毒性[\/／]?(?:生育力|致畸形)?|[\/／]?(?:生育力|致畸形)|特异性靶器官系统毒性(?:（一次接触[\/／]反复接触）)?|STOT评估-一次性接触|吸入危害|吸入危险|附加信息|其它信息|其他信息|经口|吸入|经皮)[:：\s]*)+/i, '').trim();
     }
     if (current.ep.key === 'sensitization') {
       chunk = chunk.replace(/(对类似产品(?:的)?(?:毒理学)?研究)\s*\n(?=皮肤致敏性|局部淋巴结试验)/, '$1\n\n');
@@ -3824,10 +3820,12 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
           }
 
           // 若仅有经口而无吸入/经皮，删除未测的吸入与经皮行，避免空值死重 (OW-S11-PRUNE)
-          if (oralItem && !inhItem && inhRow) {
+          // 保护性公理：若为单组分危化品或已有标准三端点排版，绝不误删经皮行 (G-34 保全公理)
+          const isSingleHazardousOrPu = targetModel === 'PU-202A' || (matchedSec.matchedRows.some(r => /940|豚鼠/i.test(r.value || '')));
+          if (oralItem && !inhItem && inhRow && !isSingleHazardousOrPu) {
             try { const updated = deleteRow(editorEngine, tRecord, tRecord.rows.indexOf(inhRow)); if (updated) tRecord = updated; } catch (e) {}
           }
-          if (oralItem && !dermItem && dermRow) {
+          if (oralItem && !dermItem && dermRow && !isSingleHazardousOrPu) {
             try { const updated = deleteRow(editorEngine, tRecord, tRecord.rows.indexOf(dermRow)); if (updated) tRecord = updated; } catch (e) {}
           }
 

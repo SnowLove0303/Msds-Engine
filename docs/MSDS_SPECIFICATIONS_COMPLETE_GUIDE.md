@@ -25,6 +25,20 @@
   - [15. 值格字体分离公理 (Font Weight Separation Axiom)](#15-值格字体分离公理-font-weight-separation-axiom)
   - [16. 全流程双极双层深度审计强制门禁 (Bipolar Bilayer Panoramic Deep Audit Mandate)](#16-全流程双极双层深度审计强制门禁-bipolar-bilayer-panoramic-deep-audit-mandate)
   - [17. 通栏跨列拓扑与编辑器格式继承总则 (G-32 Full-Width GridSpan & Editor Formatting Fidelity Axiom)](#17-通栏跨列拓扑与编辑器格式继承总则-g-32-full-width-gridspan--editor-formatting-fidelity-axiom)
+  - [18. 值格零标签前缀叠词公理 (G-33 Anti-Stuttering-Prefix Invariant Axiom)](#18-值格零标签前缀叠词公理-g-33-anti-stuttering-prefix-invariant-axiom)
+  - [19. 源文件实测化学端点零损耗保全公理 (G-34 Source Chemical Endpoints Zero-Loss Axiom)](#19-源文件实测化学端点零损耗保全公理-g-34-source-chemical-endpoints-zero-loss-axiom)
+### 18. 值格零标签前缀叠词公理 (G-33 Anti-Stuttering-Prefix Invariant Axiom)
+- **通俗解释**：表格左边如果已经写了标签名（比如“吸入：”、“致癌性：”），右边的值格里绝对不能一上来又重复一遍“吸入：”或“致癌性：”，否则在 Word 里看着就像结巴说话（“吸入：吸入：...”）。
+- **底层法则**：
+  - 流水线向所有值单元格（Value Cells）装配文本时，必须前置通过正则状态机物理剥离与当前标签或当前章节子标签完全重合的前缀字符串；
+  - 严禁任何形式的标签-值文本粘连与重复叠词，审计套件对其执行零容忍硬断言。
+
+### 19. 源文件实测化学端点零损耗保全公理 (G-34 Source Chemical Endpoints Zero-Loss Axiom)
+- **通俗解释**：源文件里白纸黑字写出来的所有具体毒理学实验项目（比如经口、吸入、经皮，或者 1h/4h 多个测试浓度），一个字都不能丢！绝不能借口“模板只有两行”就把关键的经皮毒性或 4h 测试值随手删掉！
+- **底层法则**：
+  - 模板装配必须具备自适应插槽扩展能力，当单组分危化品源文件包含经口、吸入、经皮三大急性毒性数据时，表格行数自适应定格为 15 行，三大端点 100% 完整保留；
+  - 英文版必须 1:1 双语同构对齐，严禁单边丢失。
+
 - [第二篇：16 个 Section 章节专属局部规范](#第二篇16-个-section-章节专属局部规范)
   - [Section 1: 物料及供应商标识 (Identification)](#section-1-物料及供应商标识-identification)
   - [Section 2: 危险性概述 (Hazards Identification)](#section-2-危险性概述-hazards-identification)
@@ -329,6 +343,12 @@
      - 原版模板中 11.7 为带“生育力”等子项的多列复合行，在收敛为标准单行时，中间列删除后，右侧值格必须自愈扩展为 `6262 dxa`，显式挂载 `gridSpan="3"`，并彻底清除残留悬空的 `vMerge` 属性，确保右边框绝对对齐。
   5. **Section 11 双范式动态路由与三级责任隔离通栏排版准则 (单空行 before="240" 与多指标垂向对齐)**：
      - **双范式动态路由**：当检测到包含 $\ge 2$ 种独立化学组分的毒理学试验数据时，自动触发范式 1（通栏模式）；仅含 1 种组分或未拆解数据时，严格遵循范式 2（模板原装 18 行标准双列槽位模式）。
+     - **单组分危化品原版分列表格 15 行同构与三项必齐准则 (L-S11.1)**：
+       - 当源文档为单组分危险品（如 PU-202A 仅含 DMAC）时，严格遵循原版分列表格（中英双语严格 15 行 1:1 对齐）；
+       - 急性毒性必须完整保留三大端点：① 经口（Oral）；② 吸入（Inhalation，完整保留 1h 与 4h 两个测试浓度事实）；③ 经皮（Dermal，如豚鼠 <940mg/kg），绝不允许丢失经皮行；
+       - 11.2 标签术语严格遵从源文件法律事实（若源文件为“主要皮肤刺激性:”，严禁被篡改为“原发性皮肤刺激:”）；
+       - 11.4 致敏性与 11.10 附加信息保留多测试项换行独立分段展示；
+       - 值单元格（Value Cells）全篇全为常规体（Regular，加粗数严格为 0），中文宋体五号 12pt（24 twips），英文 Arial 9.5pt（19 twips）。
      - **三级责任隔离 4 行拓扑**：
        - Row 0：章节标题（`11. 毒理学信息`）；
        - Row 1（Level 1 产品级免责通栏，`gridSpan="3"`，`w="9781"`）：`该产品无可用的毒理学研究。`（常规体，`jc="left"`）；
