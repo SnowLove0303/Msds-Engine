@@ -1,5 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
 import JSZip from 'jszip';
 import { DOMParser } from '@xmldom/xmldom';
 
@@ -71,6 +73,30 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
     const fullPath = path.join(targetDir, file);
     const exists = fs.existsSync(fullPath);
     assert(exists, `交付物法定命名存在性 (G-01 Exists): ${file}`);
+  }
+
+  // G-36: 交付物物理新鲜度与同步性门禁 (G-Freshness Invariant - 防文件锁假成功与陈旧旧版残留)
+  const now = Date.now();
+  const mtimes = DELIVERABLES.map(file => {
+    const fullPath = path.join(targetDir, file);
+    return fs.statSync(fullPath).mtimeMs;
+  });
+  const maxMtime = Math.max(...mtimes);
+  const minMtime = Math.min(...mtimes);
+  const mtimeDiffSec = (maxMtime - minMtime) / 1000;
+  assert(mtimeDiffSec < 300, `物理时间戳同步性 (G-36): 8 份交付物修改时间差严禁超过 5 分钟！(实测差值: ${mtimeDiffSec.toFixed(1)} 秒，存在未被覆盖的陈旧旧版)`);
+  const ageSec = (now - maxMtime) / 1000;
+  assert(ageSec < 1200, `物理时间戳新鲜度 (G-36): 最新交付物必须在 20 分钟内生成 (实测距今: ${ageSec.toFixed(1)} 秒)`);
+
+  // G-37: PDF 物理真实渲染字号硬断言 (G-PDF-Typography Invariant - 绝不信任假打勾，实测 PDF 像素字号)
+  try {
+    const checkPdfScript = path.join(path.dirname(fileURLToPath(import.meta.url)), 'check_pdf_preamble_sz.py');
+    const guanzhiPdf = path.join(targetDir, `${model} msds_EN Guanzhi.pdf`);
+    const guocaiPdf = path.join(targetDir, `${model} msds_EN Guocai.pdf`);
+    const pyOutput = execSync(`python "${checkPdfScript}" "${guanzhiPdf}" "${guocaiPdf}"`, { encoding: 'utf8' }).trim();
+    assert(pyOutput.includes('PASS'), `PDF 物理渲染字号硬断言 (G-37): 英文版 PDF 说明行实际字号必须为 9.50pt (实测输出: ${pyOutput})`);
+  } catch (err) {
+    assert(false, `PDF 物理渲染字号硬断言 (G-37): 拦截到英文版 PDF 说明行渲染字号违背 9.5pt (实测报错: ${err.message})`);
   }
 
   const docCn = await loadDocXml(`${targetDir}/${model} msds_CN 冠志.docx`);

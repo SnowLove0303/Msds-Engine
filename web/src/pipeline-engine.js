@@ -2555,56 +2555,24 @@ export async function preserveOriginalFileBackup(filePath) {
  * 注入源文件不可逆灭失防御：覆写前务必自动保留源文件留存副本
  */
 
-async function safeWriteFileWithLockGuard(targetPath, buffer) {
-  const ext = path.extname(targetPath);
-  const base = path.basename(targetPath, ext);
-  const dir = path.dirname(targetPath);
-  const fallbacks = [
-    path.join(dir, `${base} (最新)${ext}`),
-    path.join(dir, `${base} (更新)${ext}`),
-    path.join(dir, `${base} (临时更新)${ext}`)
-  ];
-
-  const cleanupFallbacks = async () => {
-    for (const fb of fallbacks) {
-      try {
-        await fs.unlink(fb);
-      } catch {}
-    }
-  };
-
-  try {
-    await fs.writeFile(targetPath, buffer);
-    await cleanupFallbacks();
-    return targetPath;
-  } catch (err) {
-    if (err.code === 'EBUSY') {
-      console.warn(`[文件锁防御] ${targetPath} 正被外部编辑器占用，尝试等待 1 秒后重试...`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      try {
-        await fs.writeFile(targetPath, buffer);
-        await cleanupFallbacks();
-        return targetPath;
-      } catch (retryErr) {
-        if (retryErr.code === 'EBUSY') {
-          for (const fb of fallbacks) {
-            try {
-              console.warn(`[文件锁保护] ${targetPath} 仍被独占锁定，已安全降级写入至备选路径: ${fb}`);
-              await fs.writeFile(fb, buffer);
-              return fb;
-            } catch (fbErr) {
-              if (fbErr.code === 'EBUSY') {
-                continue;
-              }
-              throw fbErr;
-            }
-          }
-          throw retryErr;
-        }
-        throw retryErr;
+async function safeWriteFileWithLockGuard(targetPath, buffer, maxRetries = 3) {
+  let attempt = 0;
+  while (attempt <= maxRetries) {
+    try {
+      await fs.writeFile(targetPath, buffer);
+      return targetPath;
+    } catch (err) {
+      if ((err.code === 'EBUSY' || err.code === 'EPERM') && attempt < maxRetries) {
+        attempt++;
+        console.warn(`[文件锁拦截] 目标物理文件 ${targetPath} 正被外部编辑器/阅读器独占占用！正在进行第 ${attempt}/${maxRetries} 次等待重试...`);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        continue;
       }
+      if (err.code === 'EBUSY' || err.code === 'EPERM') {
+        throw new Error(`【文件独占锁定致命拦截 (Hard Blocker)】无法写入目标交付物: ${targetPath}！该文件当前正被外部程序（如 PDF 阅读器、Word 或 WPS）独占锁定。请先在外部软件中关闭该文件，然后重新执行！绝不允许静默降级或吞下异常！`);
+      }
+      throw err;
     }
-    throw err;
   }
 }
 

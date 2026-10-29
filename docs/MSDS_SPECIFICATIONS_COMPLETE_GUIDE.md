@@ -28,6 +28,8 @@
   - [18. 值格零标签前缀叠词公理 (G-33 Anti-Stuttering-Prefix Invariant Axiom)](#18-值格零标签前缀叠词公理-g-33-anti-stuttering-prefix-invariant-axiom)
   - [19. 源文件实测化学端点零损耗保全公理 (G-34 Source Chemical Endpoints Zero-Loss Axiom)](#19-源文件实测化学端点零损耗保全公理-g-34-source-chemical-endpoints-zero-loss-axiom)
   - [20. 英文表格说明行均一正文字号公理 (G-35 English Table Preamble Typography Normalization Axiom)](#20-英文表格说明行均一正文字号公理-g-35-english-table-preamble-typography-normalization-axiom)
+  - [21. 交付物物理新鲜度与文件锁硬阻断公理 (G-36 Deliverables Freshness & File-Lock Hard-Blocker Axiom)](#21-交付物物理新鲜度与文件锁硬阻断公理-g-36-deliverables-freshness--file-lock-hard-blocker-axiom)
+  - [22. PDF 物理渲染字号终审双向硬断言公理 (G-37 PDF Physical Typography Dual-Audit Axiom)](#22-pdf-物理渲染字号终审双向硬断言公理-g-37-pdf-physical-typography-dual-audit-axiom)
 ### 18. 值格零标签前缀叠词公理 (G-33 Anti-Stuttering-Prefix Invariant Axiom)
 - **通俗解释**：表格左边如果已经写了标签名（比如“吸入：”、“致癌性：”），右边的值格里绝对不能一上来又重复一遍“吸入：”或“致癌性：”，否则在 Word 里看着就像结巴说话（“吸入：吸入：...”）。
 - **底层法则**：
@@ -47,6 +49,18 @@
   - **均一性与语义归属**：说明行与前言行在英文语义下属于 Value 内容流，字号必须统一收敛为 9.5pt Arial Regular；
   - **Section 2 绝对豁免（REQ-S2-EXEMPT）**：英文版 Section 2 属于 GHS 专有危险性分类排版，维持现状绝对豁免；
   - **中文版五号字保全（REQ-CN-PRESERVE）**：中文版说明行维持 12pt（sz="24"）宋体不变。
+
+### 21. 交付物物理新鲜度与文件锁硬阻断公理 (G-36 Deliverables Freshness & File-Lock Hard-Blocker Axiom)
+- **通俗解释**：绝对不允许“用户开着 PDF，流水线覆写失败却吞掉错误假装成功”！只要目标交付物被占用，重试失败必须立即抛出致命硬阻断异常（Exit Code 1），杜绝任何伪造成功与陈旧文件放行。
+- **底层法则**：
+  - **拒绝静默降级**：严禁将目标交付物降级写入 `(最新).pdf` 并随后由清理机制将其误删，严禁吞下 EBUSY 异常；
+  - **物理时间戳新鲜度硬阻断 (G-Freshness)**：机械审计套件必须物理扫描 8 份交付物（4 DOCX + 4 PDF）的物理最后修改时间戳（mtime），8 个文件的生成时间差严禁超过 5 分钟，且必须严格处于本次构建时间窗口内，陈旧文件一票否决。
+
+### 22. PDF 物理渲染字号终审双向硬断言公理 (G-37 PDF Physical Typography Dual-Audit Axiom)
+- **通俗解释**：绝不能“只看 Word 里的 XML，不看最终给客户的 PDF”！必须由机械审计亲自用 Python PyMuPDF 穿透 PDF 文件，实测每一行文字在屏幕上真实的渲染像素与字号，所见即所审。
+- **底层法则**：
+  - **终审双极双向**：DOCX 底层 XML 断言与 PDF 实际渲染字号断言并重；
+  - **PDF 9.5pt 硬指标**：英文版 Section 11、12、13 等说明行在 PDF 内的 span 实际字号必须严格在 9.4~9.6pt 之间，严禁残留 12.00pt。
 
 - [第二篇：16 个 Section 章节专属局部规范](#第二篇16-个-section-章节专属局部规范)
   - [Section 1: 物料及供应商标识 (Identification)](#section-1-物料及供应商标识-identification)
