@@ -27,6 +27,7 @@
   - [17. 通栏跨列拓扑与编辑器格式继承总则 (G-32 Full-Width GridSpan & Editor Formatting Fidelity Axiom)](#17-通栏跨列拓扑与编辑器格式继承总则-g-32-full-width-gridspan--editor-formatting-fidelity-axiom)
   - [18. 值格零标签前缀叠词公理 (G-33 Anti-Stuttering-Prefix Invariant Axiom)](#18-值格零标签前缀叠词公理-g-33-anti-stuttering-prefix-invariant-axiom)
   - [19. 源文件实测化学端点零损耗保全公理 (G-34 Source Chemical Endpoints Zero-Loss Axiom)](#19-源文件实测化学端点零损耗保全公理-g-34-source-chemical-endpoints-zero-loss-axiom)
+  - [20. 英文表格说明行均一正文字号公理 (G-35 English Table Preamble Typography Normalization Axiom)](#20-英文表格说明行均一正文字号公理-g-35-english-table-preamble-typography-normalization-axiom)
 ### 18. 值格零标签前缀叠词公理 (G-33 Anti-Stuttering-Prefix Invariant Axiom)
 - **通俗解释**：表格左边如果已经写了标签名（比如“吸入：”、“致癌性：”），右边的值格里绝对不能一上来又重复一遍“吸入：”或“致癌性：”，否则在 Word 里看着就像结巴说话（“吸入：吸入：...”）。
 - **底层法则**：
@@ -38,6 +39,14 @@
 - **底层法则**：
   - 模板装配必须具备自适应插槽扩展能力，当单组分危化品源文件包含经口、吸入、经皮三大急性毒性数据时，表格行数自适应定格为 15 行，三大端点 100% 完整保留；
   - 英文版必须 1:1 双语同构对齐，严禁单边丢失。
+
+### 20. 英文表格说明行均一正文字号公理 (G-35 English Table Preamble Typography Normalization Axiom)
+- **通俗解释**：除 Section 2 外，英文版 MSDS 中凡属于说明行、前言行、免责通栏行，字号必须与英文表格标准填报值统一采用 9.5pt（底层 XML 对应 sz="19" 与 szCs="19"），严禁混入中文五号字 12pt（sz="24"）导致字体偏大 26.3% 的层级突兀感。
+- **底层法则**：
+  - **英文表格正文基准**：英文普通单元格标准字号为 9.5pt（sz="19"），中文表格标准字号为五号 12pt（sz="24"）；
+  - **均一性与语义归属**：说明行与前言行在英文语义下属于 Value 内容流，字号必须统一收敛为 9.5pt Arial Regular；
+  - **Section 2 绝对豁免（REQ-S2-EXEMPT）**：英文版 Section 2 属于 GHS 专有危险性分类排版，维持现状绝对豁免；
+  - **中文版五号字保全（REQ-CN-PRESERVE）**：中文版说明行维持 12pt（sz="24"）宋体不变。
 
 - [第二篇：16 个 Section 章节专属局部规范](#第二篇16-个-section-章节专属局部规范)
   - [Section 1: 物料及供应商标识 (Identification)](#section-1-物料及供应商标识-identification)
@@ -349,6 +358,7 @@
        - 11.2 标签术语严格遵从源文件法律事实（若源文件为“主要皮肤刺激性:”，严禁被篡改为“原发性皮肤刺激:”）；
        - 11.4 致敏性与 11.10 附加信息保留多测试项换行独立分段展示；
        - 值单元格（Value Cells）全篇全为常规体（Regular，加粗数严格为 0），中文宋体五号 12pt（24 twips），英文 Arial 9.5pt（19 twips）。
+        - 英文版说明行统一 9.5pt（G-35 / L-S11-EN）：Row 1（产品免责说明行）与 Row 2（前言说明行）在英文版中底层 XML sz 与 szCs 严格为 "19"（9.5pt Arial Regular），与表格值保持绝对一致，中文版维持 "24"（12pt 宋体）。
      - **三级责任隔离 4 行拓扑**：
        - Row 0：章节标题（`11. 毒理学信息`）；
        - Row 1（Level 1 产品级免责通栏，`gridSpan="3"`，`w="9781"`）：`该产品无可用的毒理学研究。`（常规体，`jc="left"`）；

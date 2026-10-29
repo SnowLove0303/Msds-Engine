@@ -184,7 +184,18 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
       assert(enVal.length > 0, `Section 11 英文版 Row ${rIdx} 严禁出现纯空值单元格！(实测长度: 0)`);
     }
 
-    // Row 2 前言行原生样式硬断言 (缩进 left="34", 字号 sz="24", 无整段加粗)
+    // G-35: 说明行字号均一公理硬断言 (中文 12pt sz="24", 英文统一 9.5pt sz="19", Section 2 绝对豁免)
+    const cnRow1 = s11CnTrs[1];
+    const enRow1 = s11EnTrs[1];
+    const cnRow1Sz = cnRow1?.getElementsByTagName('w:sz')[0]?.getAttribute('w:val');
+    assert(cnRow1Sz === '24', `Section 11 中文版 Row 1 免责说明行字号严格保持五号 (sz="24") (实测: ${cnRow1Sz})`);
+    
+    // 强化全单元格字号纯净度断言：英文版 Row 1 严禁残留任何 24pt
+    const enRow1AllSz = Array.from(enRow1?.getElementsByTagName('w:sz') || []).map(s => s.getAttribute('w:val'));
+    assert(!enRow1AllSz.includes('24'), `Section 11 英文版 Row 1 严禁残留五号字 24pt！(实测节点: ${enRow1AllSz.join(',')}) (G-35 公理)`);
+    assert(enRow1AllSz.includes('19'), `Section 11 英文版 Row 1 免责说明行必须具备 9.5pt (sz="19") (实测节点: ${enRow1AllSz.join(',')})`);
+
+    // Row 2 前言行原生样式硬断言 (缩进 left="34", 中文 sz="24", 英文统一 sz="19", 无整段加粗)
     const cnRow2 = s11CnTrs[2];
     const enRow2 = s11EnTrs[2];
     const cnRow2Ind = cnRow2.getElementsByTagName('w:ind')[0]?.getAttribute('w:left');
@@ -194,9 +205,10 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
     assert(/N,N[-－]二甲基乙酰胺毒理学数据/.test(cnRow2.textContent), 'Section 11 中文版 Row 2 文本内容正确');
 
     const enRow2Ind = enRow2.getElementsByTagName('w:ind')[0]?.getAttribute('w:left');
-    const enRow2Sz = enRow2.getElementsByTagName('w:sz')[0]?.getAttribute('w:val');
+    const enRow2AllSz = Array.from(enRow2?.getElementsByTagName('w:sz') || []).map(s => s.getAttribute('w:val'));
     assert(enRow2Ind === '34', `Section 11 英文版 Row 2 前言行严格具备原生左缩进 (left="34") (实测: ${enRow2Ind})`);
-    assert(enRow2Sz === '24', `Section 11 英文版 Row 2 前言行严格具备五号字号 (sz="24") (实测: ${enRow2Sz})`);
+    assert(!enRow2AllSz.includes('24'), `Section 11 英文版 Row 2 前言行严禁残留五号字 24pt！(实测节点: ${enRow2AllSz.join(',')}) (G-35 公理)`);
+    assert(enRow2AllSz.includes('19'), `Section 11 英文版 Row 2 前言行字号必须为 9.5pt (sz="19") (实测节点: ${enRow2AllSz.join(',')})`);
     assert(/N,N-Dimethylacetamide/i.test(enRow2.textContent), 'Section 11 英文版 Row 2 文本内容正确');
 
     // 皮肤刺激性与眼睛刺激性细粒度分行与全常规体物理硬断言 (G-29 值格绝对不加粗)

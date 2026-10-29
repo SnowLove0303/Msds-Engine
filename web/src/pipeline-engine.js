@@ -69,6 +69,7 @@ import {
   enforceSection13DoubleCenter,
   enforceSection13JustifiedContent,
   formatSection11PreambleRow,
+  setCellPreambleTypography,
   writeStructuredToxicologyCellValue
 } from './docx-engine.js';
 import {
@@ -2052,8 +2053,8 @@ export async function buildBaseEnglishEngine({
     }
 
     if (cnS11Preambles.length >= 2) {
-      if (s11.rows[1]?.cells?.[0]) {
-        safeWrite(s11.rows[1].cells[0], 'No toxicological studies were available for this product.');
+      if (s11.rows[1]) {
+        formatSection11PreambleRow(s11.rows[1], 'No toxicological studies were available for this product.', true, 0);
       }
       if (s11.rows[2]?.cells?.[0]) {
         let enIntro = 'The following are toxicological data for the component:';
@@ -2068,8 +2069,8 @@ export async function buildBaseEnglishEngine({
         formatSection11PreambleRow(s11.rows[2], enIntro, true);
       }
     } else if (cnS11Preambles.length === 1) {
-      if (s11.rows[1]?.cells?.[0]) {
-        safeWrite(s11.rows[1].cells[0], 'No toxicological studies were available for this product.');
+      if (s11.rows[1]) {
+        formatSection11PreambleRow(s11.rows[1], 'No toxicological studies were available for this product.', true, 0);
       }
       if (s11.rows[2]?.cells?.length === 1) {
         s11 = deleteRow(engine, s11, 2);
@@ -2162,6 +2163,11 @@ export async function buildBaseEnglishEngine({
     renumberRecord(s11, '11');
 
     if (isPu202a) {
+      // 0. 确保 Row 1 免责行字号符合 G-35 (9.5pt sz="19", 无微缩进)
+      if (s11.rows[1]) {
+        formatSection11PreambleRow(s11.rows[1], 'No toxicological studies were available for this product.', true, 0);
+      }
+
       // 1. 确保 Row 2 前言行
       if (s11.rows.length > 2 && s11.rows[2].cells.length === 1) {
         formatSection11PreambleRow(s11.rows[2], 'The following is toxicological data for N,N-Dimethylacetamide:', true);
@@ -2305,16 +2311,19 @@ export async function buildBaseEnglishEngine({
     }
 
     if (cnPreambles.length >= 2) {
-      // 中文母版有 2 行说明行：Row 1 产品免责，Row 2 组分引言
+      // 中文母版有 2 行说明行：Row 1 产品免责，Row 2 组分引言 (G-35 统一 9.5pt)
       if (s12.rows[1]?.cells?.[0]) {
         safeWrite(s12.rows[1].cells[0], 'No ecotoxicological studies are available for this product.');
+        setCellPreambleTypography(s12.rows[1].cells[0], true);
       }
       if (s12.rows[2]?.cells?.[0]) {
         safeWrite(s12.rows[2].cells[0], translateSection12PreambleToEnglish(cnPreambles[1]));
+        setCellPreambleTypography(s12.rows[2].cells[0], true);
       }
     } else if (cnPreambles.length === 1) {
       if (s12.rows[1]?.cells?.[0]) {
         safeWrite(s12.rows[1].cells[0], 'No ecotoxicological studies are available for this product.');
+        setCellPreambleTypography(s12.rows[1].cells[0], true);
       }
       if (s12.rows[2]?.cells?.length === 1) {
         s12 = deleteRow(engine, s12, 2);
@@ -2353,12 +2362,17 @@ export async function buildBaseEnglishEngine({
     }
     if (s13.rows.length >= 4) {
       safeWrite(s13.rows[1].cells[0], enValues['sec13.line1']);
+      setCellPreambleTypography(s13.rows[1].cells[0], true);
       safeWrite(s13.rows[2].cells[0], enValues['sec13.line2']);
+      setCellPreambleTypography(s13.rows[2].cells[0], true);
       if (s13.rows[3]?.cells[1]) {
         safeWrite(s13.rows[3].cells[1], enValues['sec13.methods']);
       }
     } else {
-      if (s13.rows[1]?.cells[0]) safeWrite(s13.rows[1].cells[0], enValues['sec13.line1']);
+      if (s13.rows[1]?.cells[0]) {
+        safeWrite(s13.rows[1].cells[0], enValues['sec13.line1']);
+        setCellPreambleTypography(s13.rows[1].cells[0], true);
+      }
       if (s13.rows[2]?.cells[1]) safeWrite(s13.rows[2].cells[1], enValues['sec13.methods']);
     }
   }

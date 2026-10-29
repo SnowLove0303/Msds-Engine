@@ -1,5 +1,47 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-10-29 晚] - 英文版全章节说明行 9.5pt 正文字号统一规范与下沉 (G-35 英文表格说明行均一正文字号公理) 100% 满分通过
+
+### 一、 痛点根因穿透 (5-Whys Root-Cause)
+- **用户痛点**：
+  * *“No toxicological studies were available for this product. The following is toxicological data for N,N-Dimethylacetamid 为什么看起来比其他值字体要大一些，是不是我没把说明行归类为值属性的原因？”*
+  * *“采用方案A，后续所有section，涉及到说明行的都采用9.5pt（除了section2）”*
+- **5-Whys 根因穿透**：
+  1. **字号层级割裂**：此前将前言行独立视为“通栏提示语”，在 `formatSection11PreambleRow` 中硬编码了中文正文字号五号 12pt（`<w:sz w:val="24"/>`）；
+  2. **中英文字号断层**：中文版普通值也是 12pt（五号），中文字号全篇均一；但在英文版中，普通表格值是 9.5pt（`sz="19"`），前言行使用 12pt（`sz="24"`）产生了整整 2.5pt（大出 26.3%）的视觉突兀断层；
+  3. **架构语义归属**：未将英文说明行纳入“英文表格值属性（Value 语义）”进行统一字号派发；
+  4. **全章节一致性要求**：除 Section 2（GHS 危险性分类专有版式）保持绝对豁免外，后续所有 Section（Section 11、12、13 等）凡涉及到说明行、前言行、免责行，字号必须统一下沉为 9.5pt。
+
+### 二、 架构立法与双层机械防线
+1. **全局规范立法 (`docs/MSDS_SPECIFICATIONS_COMPLETE_GUIDE.md`)**：
+   - **G-35 英文表格说明行均一正文字号公理**：英文版 MSDS 文档中，除 Section 2 保持豁免外，所有章节说明行底层 XML 字号必须严格收敛为 9.5pt（`<w:sz w:val="19"/>` 与 `<w:szCs w:val="19"/>`），字体为 Arial Regular；中文版保持五号宋体 12pt（`sz="24"`）不变；
+   - **L-S11 局部规范**：明确 Section 11 Row 1（免责行）与 Row 2（组分引言行）字号下沉为 9.5pt。
+2. **机械审计升级 (`web/scripts/audit_bipolar_bilayer.mjs`)**：
+   - 升级硬断言：Section 11 英文版 Row 1 与 Row 2 全节点严禁残留任何 24pt，必须包含 19pt；
+   - **TDD 红灯先行实测**：修改引擎前先跑审计，实测精确抛出 2 项红灯违章（Exit Code 1）。
+
+### 三、 引擎中枢重构 (`docx-engine.js` & `pipeline-engine.js`)
+1. **`formatSection11PreambleRow` 动态字号派发**：
+   - 增加 `leftIndentTwips` 参数（Row 1 传 0 无缩进，Row 2 传 34 原生微缩进）；
+   - 字号动态派发：`const targetSz = isEnglish ? '19' : '24'`，统一设置 `pPr/rPr/sz`、`rPr/sz`、`rPr/szCs`。
+2. **`setCellPreambleTypography` 纯净字号赋权器**：
+   - 针对 Section 12、Section 13 等说明行单元格，就地统一改写 `w:sz` 与 `w:szCs` 为 9.5pt，杜绝命名空间与属性重复。
+3. **`pipeline-engine.js` 全章节说明行收敛**：
+   - Section 11 Row 1 & Row 2、Section 12 Row 1 & Row 2、Section 13 Row 1 & Row 2 英文版统一调用 9.5pt 派发；
+   - Section 2 危险性分类严格豁免保持现状。
+
+### 四、 终审成果与双向物理核销
+- **双极双层全景机械深度审计**：100% 满分通过（**Failures: 0, Exit Code: 0**）；
+- **物理纯净度**：交付目录文件数严格恒等于 8（4 DOCX + 4 PDF）；
+- **物理 XML 抽查**：
+  * Section 11 Row 1 sz: `['19', '19']`
+  * Section 11 Row 2 sz: `['19', '19']`
+  * Section 12 Row 1 & Row 2 sz: `['19', '19']`
+  * Section 13 Row 1 & Row 2 sz: `['19', '19']`
+  * Section 2 保持原有排版未受影响。
+
+---
+
 ## [2026-10-29 晚间] - Section 11 端点完备性、叠词清洗与硬审计闭环：确立 G-33 值格零标签前缀叠词公理与 G-34 实测端点零损耗保全公理、严格 15 行同构与双极双层终审 100% 满分通过 (Failures: 0)
 
 ### 一、 核心复盘与痛点穿透 (5-Whys Root-Cause)

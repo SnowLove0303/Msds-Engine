@@ -1624,7 +1624,7 @@ export function writeStructuredToxicologyCellValue(cell, value, options = {}) {
   refreshCellText(cell);
 }
 
-export function formatSection11PreambleRow(row, text, isEnglish = false) {
+export function formatSection11PreambleRow(row, text, isEnglish = false, leftIndentTwips = 34) {
   if (!row?.node) return;
   const doc = row.node.ownerDocument;
   const tcs = Array.from(row.node.getElementsByTagNameNS(W_NS, 'tc'));
@@ -1653,6 +1653,9 @@ export function formatSection11PreambleRow(row, text, isEnglish = false) {
   const oldPs = Array.from(tc.getElementsByTagNameNS(W_NS, 'p'));
   for (const p of oldPs) tc.removeChild(p);
 
+  // G-35: 英文版说明行统一采用 9.5pt (sz="19", szCs="19")，中文版维持五号字 12pt (sz="24")
+  const targetSz = isEnglish ? '19' : '24';
+
   const p = doc.createElementNS(W_NS, 'w:p');
   const pPr = doc.createElementNS(W_NS, 'w:pPr');
   const spacing = doc.createElementNS(W_NS, 'w:spacing');
@@ -1660,11 +1663,13 @@ export function formatSection11PreambleRow(row, text, isEnglish = false) {
   spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
   pPr.appendChild(spacing);
 
-  const ind = doc.createElementNS(W_NS, 'w:ind');
-  ind.setAttributeNS(W_NS, 'w:left', '34');
-  ind.setAttributeNS(W_NS, 'w:leftChars', '16');
-  ind.setAttributeNS(W_NS, 'w:right', '480');
-  pPr.appendChild(ind);
+  if (leftIndentTwips > 0) {
+    const ind = doc.createElementNS(W_NS, 'w:ind');
+    ind.setAttributeNS(W_NS, 'w:left', String(leftIndentTwips));
+    ind.setAttributeNS(W_NS, 'w:leftChars', '16');
+    ind.setAttributeNS(W_NS, 'w:right', '480');
+    pPr.appendChild(ind);
+  }
 
   const jc = doc.createElementNS(W_NS, 'w:jc');
   jc.setAttributeNS(W_NS, 'w:val', 'left');
@@ -1672,7 +1677,7 @@ export function formatSection11PreambleRow(row, text, isEnglish = false) {
 
   const pRPr = doc.createElementNS(W_NS, 'w:rPr');
   const pSz = doc.createElementNS(W_NS, 'w:sz');
-  pSz.setAttributeNS(W_NS, 'w:val', '24');
+  pSz.setAttributeNS(W_NS, 'w:val', targetSz);
   pRPr.appendChild(pSz);
   pPr.appendChild(pRPr);
   p.appendChild(pPr);
@@ -1683,6 +1688,7 @@ export function formatSection11PreambleRow(row, text, isEnglish = false) {
   if (isEnglish) {
     rFonts.setAttributeNS(W_NS, 'w:ascii', 'Arial');
     rFonts.setAttributeNS(W_NS, 'w:hAnsi', 'Arial');
+    rFonts.setAttributeNS(W_NS, 'w:cs', 'Arial');
   } else {
     rFonts.setAttributeNS(W_NS, 'w:ascii', '宋体');
     rFonts.setAttributeNS(W_NS, 'w:hAnsi', '宋体');
@@ -1694,10 +1700,10 @@ export function formatSection11PreambleRow(row, text, isEnglish = false) {
   b.setAttributeNS(W_NS, 'w:val', '0');
   rPr.appendChild(b);
   const sz = doc.createElementNS(W_NS, 'w:sz');
-  sz.setAttributeNS(W_NS, 'w:val', '24');
+  sz.setAttributeNS(W_NS, 'w:val', targetSz);
   rPr.appendChild(sz);
   const szCs = doc.createElementNS(W_NS, 'w:szCs');
-  szCs.setAttributeNS(W_NS, 'w:val', '24');
+  szCs.setAttributeNS(W_NS, 'w:val', targetSz);
   rPr.appendChild(szCs);
   r.appendChild(rPr);
 
@@ -1708,6 +1714,23 @@ export function formatSection11PreambleRow(row, text, isEnglish = false) {
   p.appendChild(r);
 
   tc.appendChild(p);
+}
+
+/**
+ * G-35: 英文版表格说明行与前言行字号统一赋值器 (除 Section 2 外均一化为 9.5pt sz="19")
+ */
+export function setCellPreambleTypography(cell, isEnglish = false) {
+  if (!cell?.node) return;
+  const targetSz = isEnglish ? '19' : '24';
+
+  const allSz = Array.from(cell.node.getElementsByTagName('w:sz'));
+  for (const s of allSz) {
+    s.setAttribute('w:val', targetSz);
+  }
+  const allSzCs = Array.from(cell.node.getElementsByTagName('w:szCs'));
+  for (const s of allSzCs) {
+    s.setAttribute('w:val', targetSz);
+  }
 }
 
 function replaceCellValueContent(cell, value, roleStyle) {
