@@ -3117,11 +3117,11 @@ function formatValueCell(cell, W_NS) {
       }
       const bEl = r.getElementsByTagNameNS(W_NS, 'b')[0];
       const isAlreadyBold = bEl && bEl.getAttributeNS(W_NS, 'val') !== '0';
-      const isSubLabel = /^(?:Species|Classification|Result|Repeated dose toxicity|Pathological changes|Oral|Inhalation|Dermal|Prevention|Response|Storage|Disposal):?$/i.test(runTxt);
+      const isSubLabel = /^(?:Oral|Inhalation|Dermal|Prevention|Response|Storage|Disposal):?$/i.test(runTxt);
       applyRunStyle(r, {
         font: 'Arial',
         sizeVal: '19', // 9.5pt
-        bold: Boolean(isAlreadyBold || isSubLabel)
+        bold: Boolean(isSubLabel)
       }, W_NS);
     }
   }

@@ -176,28 +176,33 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
     assert(enRow2Sz === '24', `Section 11 英文版 Row 2 前言行严格具备五号字号 (sz="24") (实测: ${enRow2Sz})`);
     assert(/N,N-Dimethylacetamide/i.test(enRow2.textContent), 'Section 11 英文版 Row 2 文本内容正确');
 
-    // Row 5 (皮肤刺激) 与 Row 6 (眼睛刺激) 细粒度分行与粗细分离物理硬断言
+    // Row 5 (皮肤刺激) 与 Row 6 (眼睛刺激) 细粒度分行与全常规体物理硬断言 (G-29 值格绝对不加粗)
     const cnRow5 = s11CnTrs[5];
     const cnRow5Cell = cnRow5.getElementsByTagName('w:tc')[cnRow5.getElementsByTagName('w:tc').length - 1];
     const cnRow5Ps = Array.from(cnRow5Cell.getElementsByTagName('w:p'));
     assert(cnRow5Ps.length >= 3, `Section 11 (PU-202A 中文版): 皮肤刺激性必须独立分行展示物种/分类/结果 (实测段落数: ${cnRow5Ps.length}, 期望 >= 3)`);
     const cnRow5Bolds = Array.from(cnRow5Cell.getElementsByTagName('w:b')).filter(b => b.getAttribute('w:val') !== '0');
-    assert(cnRow5Bolds.length >= 3, `Section 11 (PU-202A 中文版): 皮肤刺激性子标签必须独立加粗 (实测加粗数: ${cnRow5Bolds.length}, 期望 >= 3)`);
+    assert(cnRow5Bolds.length === 0, `Section 11 (PU-202A 中文版): 皮肤刺激性值单元格严禁加粗，必须全常规体 (实测加粗数: ${cnRow5Bolds.length}, 期望 0)`);
 
     const enRow5 = s11EnTrs[5];
     const enRow5Cell = enRow5.getElementsByTagName('w:tc')[enRow5.getElementsByTagName('w:tc').length - 1];
     const enRow5Ps = Array.from(enRow5Cell.getElementsByTagName('w:p'));
     assert(enRow5Ps.length >= 3, `Section 11 (PU-202A 英文版): 皮肤刺激性必须独立分行展示 Species/Classification/Result (实测段落数: ${enRow5Ps.length}, 期望 >= 3)`);
     const enRow5Bolds = Array.from(enRow5Cell.getElementsByTagName('w:b')).filter(b => b.getAttribute('w:val') !== '0');
-    assert(enRow5Bolds.length >= 3, `Section 11 (PU-202A 英文版): 皮肤刺激性子标签必须独立加粗 (实测加粗数: ${enRow5Bolds.length}, 期望 >= 3)`);
+    assert(enRow5Bolds.length === 0, `Section 11 (PU-202A 英文版): 皮肤刺激性值单元格严禁加粗，必须全常规体 (实测加粗数: ${enRow5Bolds.length}, 期望 0)`);
 
-    // Row 7 (致敏性) 细粒度分行与粗细分离硬断言
+    // Row 7 (致敏性) 细粒度分行与全常规体硬断言
     const cnRow7 = s11CnTrs[7];
     const cnRow7Cell = cnRow7.getElementsByTagName('w:tc')[cnRow7.getElementsByTagName('w:tc').length - 1];
     const cnRow7Ps = Array.from(cnRow7Cell.getElementsByTagName('w:p'));
     assert(cnRow7Ps.length >= 6, `Section 11 (PU-202A 中文版): 致敏性必须分行展示豚鼠与人类试验 (实测段落数: ${cnRow7Ps.length}, 期望 >= 6)`);
     const cnRow7Bolds = Array.from(cnRow7Cell.getElementsByTagName('w:b')).filter(b => b.getAttribute('w:val') !== '0');
-    assert(cnRow7Bolds.length >= 6, `Section 11 (PU-202A 中文版): 致敏性子标签必须独立加粗 (实测加粗数: ${cnRow7Bolds.length}, 期望 >= 6)`);
+    assert(cnRow7Bolds.length === 0, `Section 11 (PU-202A 中文版): 致敏性值单元格严禁加粗，必须全常规体 (实测加粗数: ${cnRow7Bolds.length}, 期望 0)`);
+
+    const enRow7 = s11EnTrs[7];
+    const enRow7Cell = enRow7.getElementsByTagName('w:tc')[enRow7.getElementsByTagName('w:tc').length - 1];
+    const enRow7Bolds = Array.from(enRow7Cell.getElementsByTagName('w:b')).filter(b => b.getAttribute('w:val') !== '0');
+    assert(enRow7Bolds.length === 0, `Section 11 (PU-202A 英文版): 致敏性值单元格严禁加粗，必须全常规体 (实测加粗数: ${enRow7Bolds.length}, 期望 0)`);
 
     // Row 13 (附加信息) 完整注入与结构化断言
     const cnRow13 = s11CnTrs[13];

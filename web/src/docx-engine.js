@@ -1509,7 +1509,7 @@ function createBoldRun(doc, text, isEnglish = false) {
   const b = doc.createElementNS(W_NS, 'w:b');
   rPr.appendChild(b);
   const sz = doc.createElementNS(W_NS, 'w:sz');
-  sz.setAttributeNS(W_NS, 'w:val', '24');
+  sz.setAttributeNS(W_NS, 'w:val', isEnglish ? '19' : '24');
   rPr.appendChild(sz);
   r.appendChild(rPr);
   const t = doc.createElementNS(W_NS, 'w:t');
@@ -1614,41 +1614,9 @@ export function writeStructuredToxicologyCellValue(cell, value, options = {}) {
     pPr.appendChild(pRPr);
     p.appendChild(pPr);
 
-    const subLabelRe = /^(物种|分类|结果|重复剂量中毒|病理变化|Species|Classification|Result|Repeated dose toxicity|Pathological changes)[:：]/i;
-    const match = itemText.match(subLabelRe);
-    if (match) {
-      const labelPart = match[0];
-      const valPart = itemText.slice(labelPart.length).trim();
-
-      // 子标签 Run (加粗)
-      const rLabel = createBoldRun(doc, labelPart + (isEnglish ? ' ' : ''), isEnglish);
-      p.appendChild(rLabel);
-
-      // 检查 valPart 内部是否含有嵌套子标签 (如：经口；病理变化：胃，睾丸...)
-      const innerMatch = valPart.match(/^(.*?)(;\s*|；\s*|\s+)?(病理变化|Pathological changes)[:：](.*)$/i);
-      if (innerMatch) {
-        const val1 = (innerMatch[1] + (innerMatch[2] || '')).trim();
-        const innerLabel = innerMatch[3] + (innerMatch[0].includes('：') ? '：' : ':');
-        const innerVal = innerMatch[4].trim();
-
-        if (val1) {
-          const rVal1 = createRegularRun(doc, val1 + (isEnglish ? ' ' : ''), isEnglish);
-          p.appendChild(rVal1);
-        }
-        const rInnerLabel = createBoldRun(doc, innerLabel + (isEnglish ? ' ' : ''), isEnglish);
-        p.appendChild(rInnerLabel);
-        if (innerVal) {
-          const rInnerVal = createRegularRun(doc, innerVal, isEnglish);
-          p.appendChild(rInnerVal);
-        }
-      } else {
-        const rVal = createRegularRun(doc, valPart, isEnglish);
-        p.appendChild(rVal);
-      }
-    } else {
-      const rVal = createRegularRun(doc, itemText, isEnglish);
-      p.appendChild(rVal);
-    }
+    // 填写值整行全为常规体（Regular，严禁加粗，严格遵守表格二元分类法则与值格字体分离公理 G-29）
+    const rVal = createRegularRun(doc, itemText, isEnglish);
+    p.appendChild(rVal);
 
     cell.node.appendChild(p);
   }
