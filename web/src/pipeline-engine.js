@@ -1184,10 +1184,11 @@ export async function buildBaseChineseEngine({
     }
   }
 
-  // 9.5 Section 11 & Section 12 双范式动态分流处理
-  const s11Paradigm = isPu202a ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || srcEngine?.records?.find(r => r.sectionNumber === 11) || (isNonHazComposite ? { isMultiComponentComposite: true } : null));
+  // 9.5 Section 11 & Section 12 双范式动态分流处理 (Ps-openspec 2.0: 多组分走通栏，单组分如 PU-202A 走原版分列表格)
+  const isMultiComponent = modelCode === 'PA-3223' || (!isPu202a && Boolean(facts.isMultiComponentComposite || isNonHazComposite));
+  const s11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || srcEngine?.records?.find(r => r.sectionNumber === 11) || null);
   if (s11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
-    buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || (isPu202a ? 'PU-202A' : '') }, false);
+    buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || '' }, false);
     cleanSection12Preambles(engine, false);
   } else if (isNonHazComposite || isPu202a) {
     cleanSection12Preambles(engine, false);
@@ -1329,6 +1330,9 @@ function translateToxicologyValueToEnglish(cnText) {
   if (!t) return '';
   if (/^无数据(?:资料)?[。.]?$/i.test(t)) return 'No data available.';
 
+  // 剔除前缀重复的中文标签
+  t = t.replace(/^(?:(?:11\.\d+\s*)?(?:急性毒性|经口|吸入|经皮|主要皮肤刺激性|原发性皮肤刺激|主要粘膜刺激性|主要眼睛刺激性|致敏性|致突变性|致癌性|生殖毒性|特异性靶器官系统毒性(?:（一次接触[\/／]反复接触）)?|吸入危险|吸入危害|附加信息)[：:]\s*)+/i, '');
+
   // 提示语
   t = t.replace(/以下[为是]N[－-]甲基吡咯烷酮毒理学数据[：:]/g, 'The following are toxicological data for N-Methyl-2-pyrrolidone (NMP):');
   t = t.replace(/以下[为是]N,N[－-]二甲基乙酰胺毒理学数据[：:]/g, 'The following are toxicological data for N,N-Dimethylacetamide (DMAC):');
@@ -1385,6 +1389,8 @@ function translateToxicologyValueToEnglish(cnText) {
   t = t.replace(/重复剂量中毒\s*[:：]\s*吸入/g, 'Repeated dose toxicity: Inhalation');
   t = t.replace(/病理变化\s*[:：]\s*肾、肝影响，视网膜损伤。?/g, 'Pathological changes: kidney and liver effects, retinal damage.');
 
+  t = t.replace(/；/g, '; ');
+  t = t.replace(/[－—]/g, '-');
   return t.trim();
 }
 
@@ -1486,7 +1492,7 @@ export async function buildBaseEnglishEngine({
       if (typeof finalVal === 'string') {
         const trimmed = finalVal.trim();
         if (/^不适用$/i.test(trimmed)) finalVal = 'Not applicable';
-        else if (/^无数据(?:资料)?$/i.test(trimmed)) finalVal = 'No data available.';
+        else if (/^无数据(?:资料)?[。.]?$/i.test(trimmed)) finalVal = 'No data available.';
         else if (/^未测定$/i.test(trimmed)) finalVal = 'Not determined';
         else if (/^商业机密|商业秘密$/i.test(trimmed)) finalVal = 'Trade secret';
       }
@@ -1533,9 +1539,10 @@ export async function buildBaseEnglishEngine({
         drawingNodes: drawingNodes.length > 0 ? drawingNodes : facts.drawingNodes,
         srcEngine: baseCnEngine || facts.srcEngine
       }, true);
-      const enS11Paradigm = isPu202a ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || { isMultiComponentComposite: true });
+      const isMultiComponent = modelCode === 'PA-3223' || (!isPu202a && Boolean(facts.isMultiComponentComposite || isNonHazComposite));
+      const enS11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || null);
       if (enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
-        buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || (isPu202a ? 'PU-202A' : '') }, true);
+        buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || '' }, true);
       }
       cleanSection12Preambles(engine, true);
     } else if (isNonHaz) {
@@ -1879,8 +1886,9 @@ export async function buildBaseEnglishEngine({
 
   // Section 11 【核心重构：彻底废除硬编码假数据与粗暴删行，基于中文母版实测端点动态英译装配】
   let s11 = engine.records.find(r => r.sectionNumber === 11);
-  const enS11Paradigm = isPu202a ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || { isMultiComponentComposite: true });
-  if (s11 && (isNonHazComposite || isPu202a || enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED')) {
+  const isMultiComponent = modelCode === 'PA-3223' || (!isPu202a && Boolean(facts.isMultiComponentComposite || isNonHazComposite));
+  const enS11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || null);
+  if (s11 && (isMultiComponent || enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED')) {
     // Mode B 通栏复合豁免模态：已由 buildThreeTierSection11 全权接管，跳过传统单端点映射以防中文污染
   } else if (s11) {
     const cnS11 = baseCnEngine?.records?.find(r => r.sectionNumber === 11);
@@ -1961,7 +1969,7 @@ export async function buildBaseEnglishEngine({
         else if (/Reproductive toxicity/i.test(rText) && repCn) safeWrite(lastCell, translateToxicologyValueToEnglish(repCn));
         else if (/Specific target organ/i.test(rText) && stotCn) safeWrite(lastCell, translateToxicologyValueToEnglish(stotCn));
         else if (/Aspiration hazard/i.test(rText) && aspCn) safeWrite(lastCell, translateToxicologyValueToEnglish(aspCn));
-        else if (/Additional information/i.test(rText) && addInfoCn) safeWrite(lastCell, translateToxicologyValueToEnglish(addInfoCn));
+        else if (/Additional information/i.test(rText)) safeWrite(lastCell, addInfoCn ? translateToxicologyValueToEnglish(addInfoCn) : 'No data available.');
       }
 
       // 3. 动态精简：仅删除中文母版中确实不存在且英文模板中无实测值的空白行，严禁误删生殖毒性、STOT与附加信息
@@ -1981,7 +1989,6 @@ export async function buildBaseEnglishEngine({
         else if (/In vitro genotoxicity/i.test(rText) && !findCnVal(/体外遗传毒性|体外基因毒性/i)) shouldPrune = true;
         else if (/Reproductive toxicity/i.test(rText) && !repCn) shouldPrune = true;
         else if (/Specific target organ/i.test(rText) && !stotCn) shouldPrune = true;
-        else if (/Additional information/i.test(rText) && !addInfoCn) shouldPrune = true;
         else if (/根据现有数据，二乙二醇/i.test(rText)) shouldPrune = true;
         else if (/Aspiration hazard/i.test(rText) && !aspCn) shouldPrune = true;
         else if (/^(?:AA|BB|CC)$/.test(lastCellText)) shouldPrune = true;

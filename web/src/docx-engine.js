@@ -2564,34 +2564,15 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
             pPr.appendChild(ind);
           } else if (/^(?:预防措施|事故响应|安全存储|安全储存|废弃处置)[：:]/i.test(trimmed)) {
             const ind = doc.createElementNS(W_NS, 'w:ind');
-            ind.setAttributeNS(W_NS, 'w:firstLine', '482');
+            ind.setAttributeNS(W_NS, 'w:left', '480');
             pPr.appendChild(ind);
           } else if (/^H\d{3}/i.test(trimmed)) {
             const ind = doc.createElementNS(W_NS, 'w:ind');
-            ind.setAttributeNS(W_NS, 'w:firstLine', '1200');
+            ind.setAttributeNS(W_NS, 'w:left', '480');
             pPr.appendChild(ind);
-          } else if (/^P\d{3}/i.test(trimmed)) {
+          } else if (/^P\d{3}/i.test(trimmed) || /^(?:操作时穿戴|操作后彻底清洗|作业场所不得|在室外或通风良好处操作|吸入[：:]|眼睛|食入[：:]|泄露[：:]|灭火[：:]|请置于避光|装完整|使用后的空桶)/i.test(trimmed)) {
             const ind = doc.createElementNS(W_NS, 'w:ind');
-            ind.setAttributeNS(W_NS, 'w:firstLine', '1200');
-            pPr.appendChild(ind);
-          } else if (/^在室外或通风良好处操作/i.test(trimmed)) {
-            const ind = doc.createElementNS(W_NS, 'w:ind');
-            ind.setAttributeNS(W_NS, 'w:firstLine', '960');
-            pPr.appendChild(ind);
-          } else if (/^(?:请置于避光|装完整)/i.test(trimmed)) {
-            const ind = doc.createElementNS(W_NS, 'w:ind');
-            if (/^装完整/i.test(trimmed)) {
-              ind.setAttributeNS(W_NS, 'w:left', '1198');
-              ind.setAttributeNS(W_NS, 'w:hanging', '240');
-            } else {
-              ind.setAttributeNS(W_NS, 'w:left', '1199');
-              ind.setAttributeNS(W_NS, 'w:hanging', '720');
-            }
-            pPr.appendChild(ind);
-          } else if (/^(?:使用后的空桶)/i.test(trimmed)) {
-            const ind = doc.createElementNS(W_NS, 'w:ind');
-            ind.setAttributeNS(W_NS, 'w:left', '959');
-            ind.setAttributeNS(W_NS, 'w:hanging', '480');
+            ind.setAttributeNS(W_NS, 'w:left', '960');
             pPr.appendChild(ind);
           }
         }
@@ -2635,7 +2616,7 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
           runSpecs = [{ text: pText, bold: true }];
         } else {
           // 键值对行：标签加粗，值常规体 (全面兼容 2.1~2.3 编号与未加编号标签)
-          const kvMatch = pText.match(/^(\s*(?:(?:2\.\d+\s*)?(?:GHS危险性类别|GHS hazard classification|物质或混合物的分类|Classification of the substance or mixture)|羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification|(?:2\.\d+\s*)?(?:GHS\s*)?标签要素|Label elements|(?:2\.\d+\s*)?GHS Label Elements|象形图|GHS\s*象形图|GHS pictograms|警告词|信号词|Signal word|危险性说明|Hazard statements|防范说明|Precautionary statements|物理化学危险|Physical and chemical hazards|健康危害|Health hazards|环境危害|Environmental hazards|(?:2\.\d+\s*)?其他危害|Other Hazards))([:：]?)\s*(.*)$/i);
+          const kvMatch = pText.match(/^(\s*(?:(?:2\.\d+\s*)?(?:GHS危险性类别|GHS hazard classification|物质或混合物的分类|Classification of the substance or mixture)|羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification|(?:2\.\d+\s*)?(?:GHS\s*)?标签要素|Label elements|(?:2\.\d+\s*)?GHS Label Elements|象形图|GHS\s*象形图|GHS pictograms|警告词|信号词|Signal word|危险性说明|Hazard statements|防范说明|Precautionary statements|物理化学危险|Physical and chemical hazards|健康危害|Health hazards|环境危害|Environmental hazards|(?:2\.\d+\s*)?(?:其他危害|其他危险)|(?:2\.\d+\s*)?Other\s*Hazards?))([:：]?)\s*(.*)$/i);
           if (kvMatch) {
             const label = kvMatch[1];
             const colon = kvMatch[2] || '';
@@ -2656,7 +2637,7 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
           }
         }
       } else if (options.isSection11) {
-        // Section 11 专属 G-11 粗细层级状态机 (完全对齐手做版：说明行常规体，仅组分标题加粗，换行以软回车呈现，对齐保留6空格)
+        // Section 11 专属 G-11 粗细层级状态机：继承编辑器体系，组件标题与各项指标子标签强制加粗，数值常规体
         if (/^(?:该产品无可用的毒理学研究|No toxicological studies|(?:下面是|以下是).*?(?:成分|组分|数据|毒理学数据)|The following (?:is|are) toxicological data)/i.test(trimmed)) {
           runSpecs = [{ text: pText, bold: false }];
         } else {
@@ -2673,7 +2654,29 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
             const isComponentHeader = options.isEnglish
               ? /^(?:N,N-Dimethylacetamide|Hydroxy polyacrylate dispersion|Propylene glycol butyl ether|2-\(2-Butoxyethoxy\)ethanol)[:：]\s*$/i.test(line.trim()) || (li === 0 && /^[^:\n]+[:：]\s*$/i.test(line.trim()) && !/^(?:Toxicity|Irritation|Acute toxicity|Primary|Sensitization|Mutagenicity|Carcinogenicity|Reproductive|Specific target|Aspiration|Additional)[:：]/i.test(line.trim()))
               : /^(?:N,N-二甲基乙酰胺|羟基聚丙烯酸酯分散体|丙二醇丁醚|二乙二醇丁醚)[：:]\s*$/.test(line.trim()) || (li === 0 && /^[^：\n]+[：:]\s*$/.test(line.trim()) && !/^(?:毒性|刺激性|急性毒性|主要|致敏性|致突变性|致癌性|生殖毒性|特异性靶器官|吸入危险|附加信息)[：:]/.test(line.trim()));
-            runSpecs.push({ text: line, bold: isComponentHeader });
+            if (isComponentHeader) {
+              runSpecs.push({ text: line, bold: true });
+            } else {
+              // 匹配指标子标签：如 "毒性："、"刺激性："、"经皮（鼠）LD50："、"吸入（鼠）LD50："、"经口（鼠）LD50：" 等
+              const labelMatch = line.match(/^(\s*(?:毒性|刺激性|急性毒性|主要皮肤刺激性|主要粘膜刺激性|主要眼睛刺激性|致敏性|致突变性|致癌性|生殖毒性|特异性靶器官系统毒性(?:（一次接触\/反复接触）)?|吸入危险|附加信息|重复剂量中毒|经皮（鼠）LD50|吸入（鼠）LD50|经口（鼠）LD50|经皮|吸入|经口|物种|分类|结果|病理变化|生育力|致畸形|体外遗传毒性|Toxicity|Irritation|Acute toxicity|Primary skin irritation|Primary mucous membrane irritation|Sensitization|Mutagenicity|Carcinogenicity|Reproductive toxicity|Specific target organ toxicity|Aspiration hazard|Additional information|Repeated dose toxicity|Dermal|Oral|Inhalation|Species|Classification|Result|Fertility|Teratogenicity|In vitro genotoxicity)[：:])\s*(.*)$/i);
+              if (labelMatch) {
+                const subLabel = labelMatch[1];
+                const restVal = labelMatch[2];
+                runSpecs.push({ text: subLabel, bold: true });
+                if (restVal) {
+                  // 嵌套子标签匹配
+                  const innerMatch = restVal.match(/^((?:经皮（鼠）LD50|吸入（鼠）LD50|经口（鼠）LD50|经皮|吸入|经口|物种|分类|结果|病理变化|Dermal|Oral|Inhalation|Species|Classification|Result)[：:])\s*(.*)$/i);
+                  if (innerMatch) {
+                    runSpecs.push({ text: innerMatch[1], bold: true });
+                    if (innerMatch[2]) runSpecs.push({ text: innerMatch[2], bold: false });
+                  } else {
+                    runSpecs.push({ text: restVal, bold: false });
+                  }
+                }
+              } else {
+                runSpecs.push({ text: line, bold: false });
+              }
+            }
           }
         }
       } else {

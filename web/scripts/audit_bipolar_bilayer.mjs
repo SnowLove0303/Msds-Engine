@@ -135,7 +135,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   // G-25: 中英文双语结构拓扑同构公理 (Bilingual Structural Isomorphism)
   assert(tblsCn.length === tblsEn.length, `双语表格数量同构 (G-25): 中文(${tblsCn.length}) vs 英文(${tblsEn.length})`);
   
-  // Section 11 模态判断：Paradigm 1 (通栏 4 行复合模式) vs Paradigm 2 (标准插槽模式)
+  // Section 11 模态判断：Paradigm 1 (通栏 4 行复合模式 - PA-3223) vs Paradigm 2 (原版分列表格模式 - PU-202A)
   const s11Cn = tblsCn[10];
   const s11En = tblsEn[10];
   const s11CnTrs = s11Cn.getElementsByTagName('w:tr');
@@ -143,6 +143,12 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   const s11CnRow3 = s11CnTrs[3];
   const s11EnRow3 = s11EnTrs[3];
   const isS11FullWidth = (s11CnTrs.length === 4 && s11CnRow3?.getElementsByTagName('w:tc')?.length === 1);
+
+  if (model === 'PU-202A') {
+    assert(!isS11FullWidth, 'Section 11 (PU-202A 单组分): 严禁强行压成通栏 4 行大单元格，必须恢复原版分列表格！');
+    assert(s11CnTrs.length >= 12, `Section 11 (PU-202A 单组分): 原版分列表格行数完整 (实测: ${s11CnTrs.length} 行，期望 >= 12 行)`);
+    assert(s11EnTrs.length >= 12, `Section 11 (PU-202A 英文版): 原版分列表格行数完整 (实测: ${s11EnTrs.length} 行，期望 >= 12 行)`);
+  }
 
   function getPText(p) {
     if (!p) return '';
@@ -347,6 +353,38 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
       assert(/信号词[：:]\s*危险/.test(s2Text), 'Section 2 (L-S2): 信号词危险准确');
       assert(/防范说明|预防措施|事故响应/.test(s2Text), 'Section 2 (L-S2): GHS 防范说明通栏完备');
       assert(/其他危险[：:]\s*无适用资料/.test(s2Text), 'Section 2 (L-S2): 其他危险通栏完备');
+
+      // 物理级 AST 断言：防范说明统一左缩进 left="960"，实现换行首字绝对垂直垂向对齐
+      const s2Ps = Array.from(s2Row1.getElementsByTagName('w:p'));
+      let p960Count = 0;
+      let pFirstLine1200Count = 0;
+      let otherDangerBoldPass = false;
+
+      for (const p of s2Ps) {
+        const pText = (p.textContent || '').trim();
+        const ind = p.getElementsByTagName('w:ind')[0];
+        const lt = ind?.getAttribute('w:left');
+        const fl = ind?.getAttribute('w:firstLine');
+        if (/^P\d{3}/.test(pText)) {
+          if (lt === '960') p960Count++;
+          if (fl === '1200') pFirstLine1200Count++;
+        }
+        if (/其他危险[：:]/.test(pText)) {
+          const runs = Array.from(p.getElementsByTagName('w:r'));
+          for (const r of runs) {
+            const rText = r.textContent || '';
+            if (/其他危险/.test(rText)) {
+              const b = r.getElementsByTagName('w:b')[0];
+              if (b && b.getAttribute('w:val') !== '0') {
+                otherDangerBoldPass = true;
+              }
+            }
+          }
+        }
+      }
+      assert(p960Count >= 4, `Section 2 通栏防范说明统一 left="960" 换行首字垂向对齐断言 (实测命中: ${p960Count} 段)`);
+      assert(pFirstLine1200Count === 0, `Section 2 通栏严禁 firstLine="1200" 导致换行回缩顶格 (实测违规数: ${pFirstLine1200Count})`);
+      assert(otherDangerBoldPass, 'Section 2 通栏 "其他危险" 法定标签加粗格式继承断言 (<w:b/> 存在)');
 
       const s2EnRow1 = tblsEn[1].getElementsByTagName('w:tr')[1];
       const s2EnText = s2EnRow1?.textContent || '';
@@ -553,15 +591,11 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
       assert(/羟基聚丙烯酸酯分散体/.test(s11Row3Text) && /丙二醇丁醚/.test(s11Row3Text) && /二乙二醇丁醚/.test(s11Row3Text), 'Section 11 (L-S11): 组分实测毒理试验数据 100% 内容守恒且无空值截断');
     }
   } else {
-    if (model === 'PU-202A') {
-      assert(false, `Section 11 (L-S11): PU-202A 必须为通栏 4 行三级隔离排版，禁止分列！(实测行数: ${s11Cn.getElementsByTagName('w:tr').length})`);
-    } else {
-      const s11CnTrCount = s11Cn.getElementsByTagName('w:tr').length;
-      assert(s11CnTrCount >= 10, `Section 11 (L-S11): 标准端点插槽完备 (实测行数: ${s11CnTrCount})`);
-      assert(/急性毒性|刺激性|毒性/i.test(s11Cn.textContent), 'Section 11 (L-S11): 毒理学测试数据保全');
-      const s11EnTrCount = tblsEn[10].getElementsByTagName('w:tr').length;
-      assert(s11EnTrCount >= 10, `Section 11 英文版端点插槽完备 (实测行数: ${s11EnTrCount})`);
-    }
+    const s11CnTrCount = s11Cn.getElementsByTagName('w:tr').length;
+    assert(s11CnTrCount >= 12, `Section 11 (L-S11): 标准分列表格端点插槽完备 (实测行数: ${s11CnTrCount})`);
+    assert(/急性毒性|刺激性|毒性/i.test(s11Cn.textContent), 'Section 11 (L-S11): 毒理学测试数据保全');
+    const s11EnTrCount = tblsEn[10].getElementsByTagName('w:tr').length;
+    assert(s11EnTrCount >= 12, `Section 11 英文版端点插槽完备 (实测行数: ${s11EnTrCount})`);
   }
 
   // L-S12: 生态学信息 (说明行与生态指标)

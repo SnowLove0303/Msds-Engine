@@ -1567,23 +1567,23 @@ export function decoupleSection11ToxicologyBlocks(cellText, rowObj = null) {
   const text = String(cellText).trim();
 
   const endpoints = [
-    { key: 'acute_toxicity_oral', label: '经口：', re: /(?:^|\n)\s*(?:11\.1\s*毒理学效应[\s\S]*?急性毒性[，, ]*经口|急性毒性[，, ]*经口|急性毒性，经口)/i },
-    { key: 'acute_toxicity_dermal', label: '经皮：', re: /(?:^|\n)\s*(?:急性毒性[，, ]*经皮|急性毒性，经皮)/i },
-    { key: 'acute_toxicity_inhalation', label: '吸入：', re: /(?:^|\n)\s*(?:急性毒性[，, ]*吸入|急性毒性，吸入)/i },
+    { key: 'acute_toxicity_oral', label: '经口：', re: /(?:^|\n)\s*(?:(?:11\.1\s*)?(?:急性毒性[：:])?\s*经口[：:]|急性毒性[，, ]*经口)/i },
+    { key: 'acute_toxicity_dermal', label: '经皮：', re: /(?:^|\n)\s*(?:(?:11\.1\s*)?(?:急性毒性[：:])?\s*经皮[：:]|急性毒性[，, ]*经皮)/i },
+    { key: 'acute_toxicity_inhalation', label: '吸入：', re: /(?:^|\n)\s*(?:(?:11\.1\s*)?(?:急性毒性[：:])?\s*吸入[：:]|急性毒性[，, ]*吸入)/i },
     { key: 'subacute_chronic_toxicity', label: '11.2 亚急性，亚慢性和延迟毒性：', re: /(?:^|\n)\s*(?:亚急性[，, ]*亚慢性和延迟毒性)/i },
-    { key: 'skin_corrosion', label: '11.3 皮肤腐蚀或刺激：', re: /(?:^|\n)\s*(?:原发性皮肤刺激|皮肤刺激|主要皮肤刺激性)/i },
-    { key: 'eye_damage', label: '11.4 严重眼损伤或刺激：', re: /(?:^|\n)\s*(?:原发性粘膜刺激|主要眼睛刺激性|主要粘膜刺激性|眼睛刺激)/i },
-    { key: 'sensitization', label: '11.5 呼吸道或皮肤过敏：', re: /(?:^|\n)\s*(?:致敏性|皮肤致敏性)/i },
-    { key: 'carcinogenicity', label: '11.7 致癌性：', re: /(?:^|\n)\s*(?:致癌性)/i },
-    { key: 'reproductive_fertility', label: '生育力', re: /(?:^|\n)\s*(?:生殖毒性\/生育力|生殖毒性／生育力)/i },
-    { key: 'reproductive_teratogenicity', label: '致畸形', re: /(?:^|\n)\s*(?:生殖毒性\/致畸形|生殖毒性／致畸形)/i },
+    { key: 'skin_corrosion', label: '11.2 主要皮肤刺激性：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:主要皮肤刺激性|原发性皮肤刺激|皮肤刺激)[：:])/i },
+    { key: 'eye_damage', label: '11.3 主要粘膜刺激性：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:主要粘膜刺激性|主要眼睛刺激性|原发性粘膜刺激|眼睛刺激)[：:])/i },
+    { key: 'sensitization', label: '11.4 致敏性：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:致敏性|呼吸道或皮肤过敏|皮肤致敏性)[：:])/i },
+    { key: 'germ_mutagenicity', label: '11.5 致突变性：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:致突变性|生殖细胞突变性|测试种类：体外染色体畸变试验)[：:])/i },
+    { key: 'carcinogenicity', label: '11.6 致癌性：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:致癌性)[：:])/i },
+    { key: 'reproductive_toxicity', label: '11.7 生殖毒性：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:生殖毒性)[：:])/i },
+    { key: 'reproductive_fertility', label: '生育力', re: /(?:^|\n)\s*(?:生殖毒性[\/／]生育力)/i },
+    { key: 'reproductive_teratogenicity', label: '致畸形', re: /(?:^|\n)\s*(?:生殖毒性[\/／]致畸形)/i },
     { key: 'in_vitro_genotoxicity', label: '体外遗传毒性', re: /(?:^|\n)\s*(?:体外遗传毒性)/i },
-    { key: 'germ_mutagenicity', label: '11.6 生殖细胞突变性：', re: /(?:^|\n)\s*(?:测试种类：体外染色体畸变试验|体外染色体畸变试验|致突变性)/i },
     { key: 'in_vivo_genotoxicity', label: '体内基因毒性', re: /(?:^|\n)\s*(?:体内基因毒性)/i },
-    { key: 'stot_single', label: '11.9 特异性靶器官系统毒性——一次接触：', re: /(?:^|\n)\s*(?:STOT评估-一次性接触|STOT一次接触)/i },
-    { key: 'stot_repeated', label: '11.9 特异性靶器官系统毒性——反复接触：', re: /(?:^|\n)\s*(?:STOT评估-重复性接触|STOT反复接触)/i },
-    { key: 'aspiration_hazard', label: '11.10 吸入危害：', re: /(?:^|\n)\s*(?:吸入危害|吸入危险)/i },
-    { key: 'additional_info', label: '11.11 附加信息：', re: /(?:^|\n)\s*(?:附加信息|其它信息|其他信息|CMR评估)/i },
+    { key: 'stot_single', label: '11.8 特异性靶器官系统毒性（一次接触/反复接触）：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:特异性靶器官系统毒性(?:（一次接触[\/／]反复接触）)?|STOT评估-一次性接触)[：:])/i },
+    { key: 'aspiration_hazard', label: '11.9 吸入危险：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:吸入危害|吸入危险)[：:])/i },
+    { key: 'additional_info', label: '11.10 附加信息：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:附加信息|其它信息|其他信息|CMR评估)[：:])/i },
   ];
 
   let matchCount = 0;
@@ -4078,7 +4078,8 @@ origRefresh.call(editorEngine);
             if (addRow && addRow.cells?.length > 1) {
               const valCell = addRow.cells[addRow.cells.length - 1];
               const fullText = addInfoItems.map(item => item.value.trim()).filter(Boolean).join('\n\n');
-              if (valCell && valCell.editable) {
+              if (valCell) {
+                valCell.editable = true;
                 try { writeCellValue(valCell, fullText, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
               }
             }
