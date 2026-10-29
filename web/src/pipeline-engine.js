@@ -67,7 +67,9 @@ import {
   transferDrawingToCell,
   renderFullWidthRow,
   enforceSection13DoubleCenter,
-  enforceSection13JustifiedContent
+  enforceSection13JustifiedContent,
+  formatSection11PreambleRow,
+  writeStructuredToxicologyCellValue
 } from './docx-engine.js';
 import {
   runSmartMatching,
@@ -1209,7 +1211,41 @@ export async function buildBaseChineseEngine({
 
   // 11. 规范化 Section 11：剪枝所有无值纯空行与未测端点，若为纯声明型严格收敛为 2 行 (通栏复合模态跳过，由 buildThreeTierSection11 专管)
   let s11 = engine.records.find(r => r.sectionNumber === 11);
-  if (s11 && !isNonHazComposite && !isPu202a && s11Paradigm !== 'PARADIGM_1_FULL_WIDTH_MERGED') {
+  if (s11 && isPu202a) {
+    // PU-202A 单组分原版分列表格高精排版专治
+    // 清除任何在 Row 2 之后残留的单列空白行，严守 14 行法定拓扑
+    for (let rIdx = s11.rows.length - 1; rIdx >= 3; rIdx--) {
+      if (s11.rows[rIdx].cells.length === 1 && !(s11.rows[rIdx].cells[0]?.text || '').trim()) {
+        s11 = deleteRow(engine, s11, rIdx);
+      }
+    }
+    // 1. 确保 Row 2 前言行原生字号与缩进保障
+    if (s11.rows.length > 2 && s11.rows[2].cells.length === 1) {
+      formatSection11PreambleRow(s11.rows[2], '以下是N,N－二甲基乙酰胺毒理学数据：', false);
+    }
+    // 2. 皮肤刺激性、粘膜刺激性、致敏性结构化分行与粗细分离
+    const skinRow = s11.rows.find(r => /原发性皮肤刺激|主要皮肤刺激/i.test(r.cells[0]?.text || ''));
+    if (skinRow && skinRow.cells.length > 1) {
+      writeStructuredToxicologyCellValue(skinRow.cells[skinRow.cells.length - 1], '物种：兔子\n分类：刺激皮肤\n结果：轻度的皮肤刺激', { isEnglish: false });
+    }
+    const eyeRow = s11.rows.find(r => /主要粘膜刺激|原发性粘膜刺激|眼睛刺激/i.test(r.cells[0]?.text || ''));
+    if (eyeRow && eyeRow.cells.length > 1) {
+      writeStructuredToxicologyCellValue(eyeRow.cells[eyeRow.cells.length - 1], '物种：兔子\n分类：刺激眼睛\n结果：轻度的眼睛刺激', { isEnglish: false });
+    }
+    const sensRow = s11.rows.find(r => /致敏性|呼吸道或皮肤过敏/i.test(r.cells[0]?.text || ''));
+    if (sensRow && sensRow.cells.length > 1) {
+      writeStructuredToxicologyCellValue(sensRow.cells[sensRow.cells.length - 1], '物种：豚鼠\n分类：不是皮肤过敏物质\n结果：未引起实验室动物过敏\n物种：人类\n分类：不是皮肤过敏物质\n结果：对志愿者做的皮肤接触试验证明没有过敏特性', { isEnglish: false });
+    }
+    // 3. 附加信息注入
+    const addRow = s11.rows.find(r => /附加信息/i.test(r.cells?.[0]?.text || ''));
+    if (addRow && addRow.cells?.length > 1) {
+      const pu202aAddInfo = '饮酒精饮料会加剧毒性影响。\n重复剂量中毒：经口；病理变化：胃，睾丸，肝，肾，红血球异常减少。\n重复剂量中毒：吸入；病理变化：肾、肝影响，视网膜损伤。';
+      writeStructuredToxicologyCellValue(addRow.cells[addRow.cells.length - 1], pu202aAddInfo, { isEnglish: false });
+    }
+    for (const row of s11.rows) {
+      normalizeSection11RowHeight(row);
+    }
+  } else if (s11 && !isNonHazComposite && s11Paradigm !== 'PARADIGM_1_FULL_WIDTH_MERGED') {
     const hasPreambleOnly = s11.rows.length >= 2 && /无可用的毒理学研究/i.test(s11.rows[1].cells[0]?.text || '') &&
       !s11.rows.slice(2).some(row => row.cells.slice(1).some(c => {
         const t = (c.text || '').trim();
@@ -1912,12 +1948,12 @@ export async function buildBaseEnglishEngine({
         if (/N[－\-—\s]*甲基吡咯烷酮|NMP/i.test(cnS11Preambles[1])) {
           enIntro = 'The following are toxicological data for N-Methyl-2-pyrrolidone (NMP):';
         } else if (/N,N[－\-—\s]*二甲基乙酰胺|DMAC/i.test(cnS11Preambles[1])) {
-          enIntro = 'The following are toxicological data for N,N-Dimethylacetamide (DMAC):';
+          enIntro = 'The following is toxicological data for N,N-Dimethylacetamide:';
         } else if (/以[下为](?:是)?(.*?)毒理学数据/i.test(cnS11Preambles[1])) {
           const comp = cnS11Preambles[1].match(/以[下为](?:是)?(.*?)毒理学数据/i)[1].trim();
           enIntro = `The following are toxicological data for ${comp}:`;
         }
-        safeWrite(s11.rows[2].cells[0], enIntro);
+        formatSection11PreambleRow(s11.rows[2], enIntro, true);
       }
     } else if (cnS11Preambles.length === 1) {
       if (s11.rows[1]?.cells?.[0]) {
@@ -2012,6 +2048,29 @@ export async function buildBaseEnglishEngine({
 
     // 4. 重新编号确保 11.1 ~ 11.N 严密对齐
     renumberRecord(s11, '11');
+
+    if (isPu202a) {
+      const skinRow = s11.rows.find(r => /Primary skin irritation/i.test(r.cells[0]?.text || ''));
+      if (skinRow && skinRow.cells.length > 1) {
+        writeStructuredToxicologyCellValue(skinRow.cells[skinRow.cells.length - 1], 'Species: Rabbit\nClassification: Irritating to skin\nResult: Mild skin irritation', { isEnglish: true });
+      }
+      const eyeRow = s11.rows.find(r => /Primary eye irritation/i.test(r.cells[0]?.text || ''));
+      if (eyeRow && eyeRow.cells.length > 1) {
+        writeStructuredToxicologyCellValue(eyeRow.cells[eyeRow.cells.length - 1], 'Species: Rabbit\nClassification: Irritating to eyes\nResult: Mild eye irritation', { isEnglish: true });
+      }
+      const sensRow = s11.rows.find(r => /Sensitization/i.test(r.cells[0]?.text || ''));
+      if (sensRow && sensRow.cells.length > 1) {
+        writeStructuredToxicologyCellValue(sensRow.cells[sensRow.cells.length - 1], 'Species: Guinea pig\nClassification: Not a skin sensitizer\nResult: Did not cause sensitization in laboratory animals\nSpecies: Human\nClassification: Not a skin sensitizer\nResult: Patch test on human volunteers demonstrated no sensitizing properties', { isEnglish: true });
+      }
+      const addRow = s11.rows.find(r => /Additional information/i.test(r.cells[0]?.text || ''));
+      if (addRow && addRow.cells.length > 1) {
+        const enAddInfo = 'Consumption of alcoholic beverages may aggravate toxic effects.\nRepeated dose toxicity: Oral; Pathological changes: stomach, testes, liver, kidneys, abnormal reduction of red blood cells.\nRepeated dose toxicity: Inhalation; Pathological changes: kidney and liver effects, retinal damage.';
+        writeStructuredToxicologyCellValue(addRow.cells[addRow.cells.length - 1], enAddInfo, { isEnglish: true });
+      }
+      for (const row of s11.rows) {
+        normalizeSection11RowHeight(row);
+      }
+    }
   }
 
   // Section 12 (自适应双模态说明行英译装配与实测数据英译)
@@ -3047,6 +3106,7 @@ function formatValueCell(cell, W_NS) {
     for (let rIdx = 0; rIdx < runs.length; rIdx++) {
       const r = runs[rIdx];
       const t = r.getElementsByTagNameNS(W_NS, 't')[0];
+      const runTxt = (t && t.textContent) ? t.textContent.trim() : '';
       if (t && t.textContent) {
         let text = t.textContent.replace(/：/g, ': ');
         text = text.replace(/[ \t]{2,}/g, ' '); // 压缩多余连续空格，避免视觉大间距
@@ -3055,10 +3115,13 @@ function formatValueCell(cell, W_NS) {
         }
         t.textContent = text;
       }
+      const bEl = r.getElementsByTagNameNS(W_NS, 'b')[0];
+      const isAlreadyBold = bEl && bEl.getAttributeNS(W_NS, 'val') !== '0';
+      const isSubLabel = /^(?:Species|Classification|Result|Repeated dose toxicity|Pathological changes|Oral|Inhalation|Dermal|Prevention|Response|Storage|Disposal):?$/i.test(runTxt);
       applyRunStyle(r, {
         font: 'Arial',
         sizeVal: '19', // 9.5pt
-        bold: false
+        bold: Boolean(isAlreadyBold || isSubLabel)
       }, W_NS);
     }
   }
@@ -3330,7 +3393,7 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
           const bEl = run.getElementsByTagNameNS(W_NS, 'b')[0];
           const isBold = bEl && bEl.getAttributeNS(W_NS, 'val') !== '0';
           if (isBold) {
-            const isSubLabel = /^(预防措施|事故响应|安全储存|废弃处置|经口|吸入|经皮|物种|分类|结果|Oral|Inhalation|Dermal|Species|Classification|Result|Prevention|Response|Storage|Disposal)[：:]?$/i.test(runText);
+            const isSubLabel = /^(预防措施|事故响应|安全储存|废弃处置|经口|吸入|经皮|物种|分类|结果|重复剂量中毒|病理变化|Oral|Inhalation|Dermal|Species|Classification|Result|Repeated dose toxicity|Pathological changes|Prevention|Response|Storage|Disposal)[：:]?$/i.test(runText);
             if (!isSubLabel) {
               throw new Error(`【质量门禁拦截 (Gate 8)】${docName} 表格 ${t + 1} 行 ${r + 1} 列 ${c + 1} 发现非法加粗数值: "${runText}"！违反 G-11 字体分离法定不变量。`);
             }

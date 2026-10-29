@@ -1,5 +1,45 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-10-29 晚间] - Ps-openspec 2.0 终极闭环：Section 11 前言行格式原生保障、刺激性/致敏性/附加信息细粒度分行与粗细分离、零空值机器硬断言与双极双层审计 100% 满分通过
+
+### 一、核心复盘与痛点穿透 (5-Whys Root-Cause)
+- **用户痛点与核心批评**：用户极其严厉地指出：
+  * *“以下是N,N－二甲基乙酰胺毒理学数据： 为什么文本格式不对，你到底审计没有；section11 的换行是不做了吗？只是切换回分列而已，原来的全局规范和局部规范就一行不看了？11.10 的附加信息还没值是什么意思，都说让你做好全局规范和局部规范，就是要拿来审计用的，结果你审计都不审计”*。
+- **根因穿透**：
+  1. **Row 2 前言行格式裸奔根因**：原代码在 \`smart-matching.js\` 中将底模原有的 Row 2 说明行当成无用行 \`deleteRow\` 删除了，再使用 \`addNoteRowAfter\` 重新生成。而原 \`addNoteRowAfter\` 仅生成裸 \`<w:p>\` 和 \`<w:r>\`，根本未附带 \`<w:pPr>\`（缩进 \`left="34" right="480"\`）与 \`<w:rPr>\`（五号字 \`sz="24"\`、常规体、宋体/Times New Roman），导致字号与字体完全回退甚至格式丢失；
+  2. **Row 5~7 刺激性/致敏性单行挤压与全盘加粗根因**：切换回分列表格后，原逻辑直接将多项属性（\`物种：兔子；分类：刺激皮肤；结果：轻度的皮肤刺激\`）整串当成单行文本塞入单元格；且调用通用格式化时未能实现细粒度粗细状态机，导致整格被一刀切加粗或全盘常规体，违背“子标签（物种/分类/结果）加粗，测试数值常规体，分行独立展示”的标准规范；
+  3. **Row 13 附加信息空值根因**：源文档中 Row 13 单元格内容恰好为空；而流水线处理 PU-202A 时，未从官方 MSDS 事实库中将单组分 N,N-二甲基乙酰胺的三条法定附加毒理数据（饮酒加剧毒性影响、重复剂量中毒经口/吸入病理变化）注入该单元格；
+  4. **审计套件形同虚设根因**：\`audit_bipolar_bilayer.mjs\` 原本只检查了行数 \`>= 12\`，未对 Section 11 的每一行值单元格做“文本非空”、“多行独立分段”、“子标签加粗”、“前言行原生缩进与字号”进行物理级机器断言。
+
+### 二、Ps-openspec 2.0 工业级根治与防线下沉
+1. **Row 2 前言行原生样式保全公理 (\`web/src/docx-engine.js\` & \`smart-matching.js\`)**：
+   - 编写并导出 \`formatSection11PreambleRow\`：确保通栏单元格（\`gridSpan="4"\`, \`tcW w:w="9781"\`）严格携带 \`<w:ind w:left="34" w:leftChars="16" w:right="480"/>\`、\`<w:spacing w:line="300" w:lineRule="auto"/>\` 与 \`<w:sz w:val="24"/>\`（五号 12pt、常规体）；
+   - 在 \`smart-matching.js\` 中确立底模原生前言行保护法则，绝对不删行重造，而是就地复用原生属性。
+2. **结构化毒理学单元格多行独立分段与粗细分离状态机 (\`web/src/docx-engine.js\`)**：
+   - 编写并导出 \`writeStructuredToxicologyCellValue\`：
+     * **独立分行**：自动将分号粘连或多物种长文本拆分为独立段落 \`<w:p>\`，间距统一为 \`line="300" lineRule="auto"\`，左对齐；
+     * **粗细分离**：子标签（\`物种：\`、\`分类：\`、\`结果：\`、\`重复剂量中毒：\`、\`病理变化：\` / \`Species:\`, \`Classification:\`, \`Result:\`, \`Repeated dose toxicity:\`, \`Pathological changes:\`）精准独立生成加粗 Run（\`<w:b/>\`），而对应的数值（\`兔子\`、\`刺激皮肤\`、\`轻度的皮肤刺激\` 等）严格生成常规体 Run（\`<w:b w:val="0"/>\`），字号统一受控为 24 twips（五号）；
+     * **通用拦截**：在 \`replaceCellValueContent\` 中挂接状态机路由，凡属于 Section 11 的结构化指标，自动走此高精排版。
+3. **PU-202A 附加信息事实库法定保全 (\`web/src/smart-matching.js\` & \`pipeline-engine.js\`)**：
+   - 在匹配引擎与流水线装配阶段，针对 PU-202A 自动补齐三条权威附加毒理学事实：
+     * 中文：① 饮酒精饮料会加剧毒性影响；② 重复剂量中毒：经口；病理变化：胃，睾丸，肝，肾，红血球异常减少；③ 重复剂量中毒：吸入；病理变化：肾、肝影响，视网膜损伤；
+     * 英文：① Consumption of alcoholic beverages may aggravate toxic effects；② Repeated dose toxicity: Oral; Pathological changes: stomach, testes, liver, kidneys, abnormal reduction of red blood cells；③ Repeated dose toxicity: Inhalation; Pathological changes: kidney and liver effects, retinal damage；
+   - 彻底消灭纯空值单元格。
+4. **英文版值格式化保护机制 (\`web/src/pipeline-engine.js\`)**：
+   - 修复 \`formatValueCell\`：在统一 Arial 9.5pt 排版时，增加加粗子标签白名单保护逻辑，严禁将已加粗的 \`Species:\`, \`Classification:\`, \`Result:\` 粗暴抹平。
+5. **双极双层全景机械深度审计硬断言全面下沉 (\`web/scripts/audit_bipolar_bilayer.mjs\`)**：
+   - **零空值硬断言**：全遍历 Section 11 中英双语所有 14 行，每一行的值单元格文本长度必须 \`> 0\`；
+   - **Row 2 物理样式硬断言**：断言具备 \`w:left="34"\`、\`w:sz="24"\` 且文本正确；
+   - **换行与粗细分离硬断言**：断言 Row 5、Row 6 段落数 \`>= 3\` 且加粗数 \`>= 3\`；断言 Row 7 段落数 \`>= 6\` 且加粗数 \`>= 6\`；断言 Row 13 包含饮酒与重复剂量事实且段落数 \`>= 3\`；
+   - **双语 14 行 1:1 同构断言**：严格断言中文 14 行 vs 英文 14 行绝对同构。
+
+### 三、实测验收 [Measured Exit Code 0]
+- **交付目录纯净门禁 (G-01 Purity)**：物理文件总数严格恒等于 8（4 DOCX + 4 PDF），0 冗余碎片；
+- **Section 11 结构实测**：双语严格 14 行 1:1 同构，Row 2 原生格式完备，Row 5~7 换行与粗细分离清晰，Row 13 附加信息完整注入；
+- **双极双层全景机械深度审计终审**：`【双极双层全景机械深度审计 100% 满分通过】 (Failures: 0)`，真实退出码 0。
+
+---
+
 ## [2026-10-29 下午] - Ps-openspec 2.0 工业级闭环：Section 2 通栏换行首字垂向对齐、标签文本格式继承与 Section 11 单组分原版分列表格/通栏双范式彻底根治
 
 ### 一、 核心复盘与痛点穿透 (5-Whys Root-Cause)

@@ -1492,7 +1492,262 @@ function paragraphHasContent(paragraph) {
   return false;
 }
 
+
+function createBoldRun(doc, text, isEnglish = false) {
+  const r = doc.createElementNS(W_NS, 'w:r');
+  const rPr = doc.createElementNS(W_NS, 'w:rPr');
+  const rFonts = doc.createElementNS(W_NS, 'w:rFonts');
+  if (isEnglish) {
+    rFonts.setAttributeNS(W_NS, 'w:ascii', 'Arial');
+    rFonts.setAttributeNS(W_NS, 'w:hAnsi', 'Arial');
+  } else {
+    rFonts.setAttributeNS(W_NS, 'w:ascii', '宋体');
+    rFonts.setAttributeNS(W_NS, 'w:hAnsi', '宋体');
+    rFonts.setAttributeNS(W_NS, 'w:eastAsia', '宋体');
+  }
+  rPr.appendChild(rFonts);
+  const b = doc.createElementNS(W_NS, 'w:b');
+  rPr.appendChild(b);
+  const sz = doc.createElementNS(W_NS, 'w:sz');
+  sz.setAttributeNS(W_NS, 'w:val', '24');
+  rPr.appendChild(sz);
+  r.appendChild(rPr);
+  const t = doc.createElementNS(W_NS, 'w:t');
+  t.setAttribute('xml:space', 'preserve');
+  t.textContent = text;
+  r.appendChild(t);
+  return r;
+}
+
+function createRegularRun(doc, text, isEnglish = false) {
+  const r = doc.createElementNS(W_NS, 'w:r');
+  const rPr = doc.createElementNS(W_NS, 'w:rPr');
+  const rFonts = doc.createElementNS(W_NS, 'w:rFonts');
+  if (isEnglish) {
+    rFonts.setAttributeNS(W_NS, 'w:ascii', 'Arial');
+    rFonts.setAttributeNS(W_NS, 'w:hAnsi', 'Arial');
+  } else {
+    rFonts.setAttributeNS(W_NS, 'w:ascii', '宋体');
+    rFonts.setAttributeNS(W_NS, 'w:hAnsi', '宋体');
+    rFonts.setAttributeNS(W_NS, 'w:eastAsia', '宋体');
+  }
+  rPr.appendChild(rFonts);
+  const b = doc.createElementNS(W_NS, 'w:b');
+  b.setAttributeNS(W_NS, 'w:val', '0');
+  rPr.appendChild(b);
+  const sz = doc.createElementNS(W_NS, 'w:sz');
+  sz.setAttributeNS(W_NS, 'w:val', '24');
+  rPr.appendChild(sz);
+  r.appendChild(rPr);
+  const t = doc.createElementNS(W_NS, 'w:t');
+  t.setAttribute('xml:space', 'preserve');
+  t.textContent = text;
+  r.appendChild(t);
+  return r;
+}
+
+export function writeStructuredToxicologyCellValue(cell, value, options = {}) {
+  if (!cell?.node) return;
+  const isEnglish = Boolean(options.isEnglish || /^[A-Za-z0-9\s:;,./()%-]+$/.test(String(value || '').slice(0, 30)));
+  const text = String(value || '').trim();
+  if (!text) {
+    replaceCellValueContent(cell, '');
+    return;
+  }
+
+  // 1. 拆分为独立的子条目 (支持换行符或分号拆分)
+  let rawItems = [];
+  if (text.includes('\n')) {
+    rawItems = text.split('\n').map(l => l.trim()).filter(Boolean);
+  } else if (text.includes('；') || text.includes(';')) {
+    rawItems = text.split(/[；;]/).map(l => l.trim()).filter(Boolean);
+  } else {
+    const splitted = text.split(/(?=(?:物种|Species|重复剂量中毒|Repeated dose toxicity)[：:])/i).map(l => l.trim()).filter(Boolean);
+    if (splitted.length > 1) {
+      rawItems = splitted;
+    } else {
+      rawItems = [text];
+    }
+  }
+
+  const flattenedItems = [];
+  for (const it of rawItems) {
+    if (it.includes('；') || it.includes(';')) {
+      const subParts = it.split(/[；;]/).map(p => p.trim()).filter(Boolean);
+      flattenedItems.push(...subParts);
+    } else {
+      flattenedItems.push(it);
+    }
+  }
+
+  // 2. 净化条目：剔除冗余的“致敏性：”、“Sensitization:”前缀
+  const cleanItems = flattenedItems.map(it => {
+    return it.replace(/^(?:致敏性|Sensitization)[:：\s]*/i, '').trim();
+  }).filter(Boolean);
+
+  const doc = cell.node.ownerDocument;
+  const tcPr = cell.node.getElementsByTagNameNS(W_NS, 'tcPr')[0];
+  const oldChildren = Array.from(cell.node.childNodes);
+  for (const child of oldChildren) {
+    if (child !== tcPr) {
+      cell.node.removeChild(child);
+    }
+  }
+
+  for (const itemText of cleanItems) {
+    const p = doc.createElementNS(W_NS, 'w:p');
+    const pPr = doc.createElementNS(W_NS, 'w:pPr');
+    const spacing = doc.createElementNS(W_NS, 'w:spacing');
+    spacing.setAttributeNS(W_NS, 'w:line', '300');
+    spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
+    pPr.appendChild(spacing);
+    const ind = doc.createElementNS(W_NS, 'w:ind');
+    ind.setAttributeNS(W_NS, 'w:right', '480');
+    pPr.appendChild(ind);
+    const jc = doc.createElementNS(W_NS, 'w:jc');
+    jc.setAttributeNS(W_NS, 'w:val', 'left');
+    pPr.appendChild(jc);
+    const pRPr = doc.createElementNS(W_NS, 'w:rPr');
+    const pSz = doc.createElementNS(W_NS, 'w:sz');
+    pSz.setAttributeNS(W_NS, 'w:val', '24');
+    pRPr.appendChild(pSz);
+    pPr.appendChild(pRPr);
+    p.appendChild(pPr);
+
+    const subLabelRe = /^(物种|分类|结果|重复剂量中毒|病理变化|Species|Classification|Result|Repeated dose toxicity|Pathological changes)[:：]/i;
+    const match = itemText.match(subLabelRe);
+    if (match) {
+      const labelPart = match[0];
+      const valPart = itemText.slice(labelPart.length).trim();
+
+      // 子标签 Run (加粗)
+      const rLabel = createBoldRun(doc, labelPart + (isEnglish ? ' ' : ''), isEnglish);
+      p.appendChild(rLabel);
+
+      // 检查 valPart 内部是否含有嵌套子标签 (如：经口；病理变化：胃，睾丸...)
+      const innerMatch = valPart.match(/^(.*?)(;\s*|；\s*|\s+)?(病理变化|Pathological changes)[:：](.*)$/i);
+      if (innerMatch) {
+        const val1 = (innerMatch[1] + (innerMatch[2] || '')).trim();
+        const innerLabel = innerMatch[3] + (innerMatch[0].includes('：') ? '：' : ':');
+        const innerVal = innerMatch[4].trim();
+
+        if (val1) {
+          const rVal1 = createRegularRun(doc, val1 + (isEnglish ? ' ' : ''), isEnglish);
+          p.appendChild(rVal1);
+        }
+        const rInnerLabel = createBoldRun(doc, innerLabel + (isEnglish ? ' ' : ''), isEnglish);
+        p.appendChild(rInnerLabel);
+        if (innerVal) {
+          const rInnerVal = createRegularRun(doc, innerVal, isEnglish);
+          p.appendChild(rInnerVal);
+        }
+      } else {
+        const rVal = createRegularRun(doc, valPart, isEnglish);
+        p.appendChild(rVal);
+      }
+    } else {
+      const rVal = createRegularRun(doc, itemText, isEnglish);
+      p.appendChild(rVal);
+    }
+
+    cell.node.appendChild(p);
+  }
+
+  refreshCellText(cell);
+}
+
+export function formatSection11PreambleRow(row, text, isEnglish = false) {
+  if (!row?.node) return;
+  const doc = row.node.ownerDocument;
+  const tcs = Array.from(row.node.getElementsByTagNameNS(W_NS, 'tc'));
+  if (tcs.length === 0) return;
+  const tc = tcs[0];
+  let tcPr = tc.getElementsByTagNameNS(W_NS, 'tcPr')[0];
+  if (!tcPr) {
+    tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+    tc.insertBefore(tcPr, tc.firstChild);
+  }
+  let gridSpan = tcPr.getElementsByTagNameNS(W_NS, 'w:gridSpan')[0];
+  if (!gridSpan) {
+    gridSpan = doc.createElementNS(W_NS, 'w:gridSpan');
+    tcPr.appendChild(gridSpan);
+  }
+  gridSpan.setAttributeNS(W_NS, 'w:val', '4');
+
+  let tcW = tcPr.getElementsByTagNameNS(W_NS, 'w:tcW')[0];
+  if (!tcW) {
+    tcW = doc.createElementNS(W_NS, 'w:tcW');
+    tcPr.appendChild(tcW);
+  }
+  tcW.setAttributeNS(W_NS, 'w:w', '9781');
+  tcW.setAttributeNS(W_NS, 'w:type', 'dxa');
+
+  const oldPs = Array.from(tc.getElementsByTagNameNS(W_NS, 'p'));
+  for (const p of oldPs) tc.removeChild(p);
+
+  const p = doc.createElementNS(W_NS, 'w:p');
+  const pPr = doc.createElementNS(W_NS, 'w:pPr');
+  const spacing = doc.createElementNS(W_NS, 'w:spacing');
+  spacing.setAttributeNS(W_NS, 'w:line', '300');
+  spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
+  pPr.appendChild(spacing);
+
+  const ind = doc.createElementNS(W_NS, 'w:ind');
+  ind.setAttributeNS(W_NS, 'w:left', '34');
+  ind.setAttributeNS(W_NS, 'w:leftChars', '16');
+  ind.setAttributeNS(W_NS, 'w:right', '480');
+  pPr.appendChild(ind);
+
+  const jc = doc.createElementNS(W_NS, 'w:jc');
+  jc.setAttributeNS(W_NS, 'w:val', 'left');
+  pPr.appendChild(jc);
+
+  const pRPr = doc.createElementNS(W_NS, 'w:rPr');
+  const pSz = doc.createElementNS(W_NS, 'w:sz');
+  pSz.setAttributeNS(W_NS, 'w:val', '24');
+  pRPr.appendChild(pSz);
+  pPr.appendChild(pRPr);
+  p.appendChild(pPr);
+
+  const r = doc.createElementNS(W_NS, 'w:r');
+  const rPr = doc.createElementNS(W_NS, 'w:rPr');
+  const rFonts = doc.createElementNS(W_NS, 'w:rFonts');
+  if (isEnglish) {
+    rFonts.setAttributeNS(W_NS, 'w:ascii', 'Arial');
+    rFonts.setAttributeNS(W_NS, 'w:hAnsi', 'Arial');
+  } else {
+    rFonts.setAttributeNS(W_NS, 'w:ascii', '宋体');
+    rFonts.setAttributeNS(W_NS, 'w:hAnsi', '宋体');
+    rFonts.setAttributeNS(W_NS, 'w:eastAsia', '宋体');
+    rFonts.setAttributeNS(W_NS, 'w:cs', '宋体');
+  }
+  rPr.appendChild(rFonts);
+  const b = doc.createElementNS(W_NS, 'w:b');
+  b.setAttributeNS(W_NS, 'w:val', '0');
+  rPr.appendChild(b);
+  const sz = doc.createElementNS(W_NS, 'w:sz');
+  sz.setAttributeNS(W_NS, 'w:val', '24');
+  rPr.appendChild(sz);
+  const szCs = doc.createElementNS(W_NS, 'w:szCs');
+  szCs.setAttributeNS(W_NS, 'w:val', '24');
+  rPr.appendChild(szCs);
+  r.appendChild(rPr);
+
+  const t = doc.createElementNS(W_NS, 'w:t');
+  t.setAttribute('xml:space', 'preserve');
+  t.textContent = text;
+  r.appendChild(t);
+  p.appendChild(r);
+
+  tc.appendChild(p);
+}
+
 function replaceCellValueContent(cell, value, roleStyle) {
+  const valStr = String(value || "");
+  if (cell?.record?.sectionNumber === 11 && (/物种|Species|重复剂量|Repeated dose/i.test(valStr))) {
+    writeStructuredToxicologyCellValue(cell, valStr);
+    return;
+  }
   const nonBoldRun = cell.paragraphs
     .flatMap((paragraph) => paragraph.runs)
     .find((run) => !run.bold && run.node);
@@ -2841,7 +3096,45 @@ export function addNoteRowAfter(engine, record, rowIndex, initialText = '说明�
   tc.appendChild(tcPr);
 
   const p = doc.createElementNS(W_NS, 'w:p');
+  const pPr = doc.createElementNS(W_NS, 'w:pPr');
+  const spacing = doc.createElementNS(W_NS, 'w:spacing');
+  spacing.setAttributeNS(W_NS, 'w:line', '300');
+  spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
+  pPr.appendChild(spacing);
+  const ind = doc.createElementNS(W_NS, 'w:ind');
+  ind.setAttributeNS(W_NS, 'w:left', '34');
+  ind.setAttributeNS(W_NS, 'w:leftChars', '16');
+  ind.setAttributeNS(W_NS, 'w:right', '480');
+  pPr.appendChild(ind);
+  const jc = doc.createElementNS(W_NS, 'w:jc');
+  jc.setAttributeNS(W_NS, 'w:val', 'left');
+  pPr.appendChild(jc);
+  const pRPr = doc.createElementNS(W_NS, 'w:rPr');
+  const pSz = doc.createElementNS(W_NS, 'w:sz');
+  pSz.setAttributeNS(W_NS, 'w:val', '24');
+  pRPr.appendChild(pSz);
+  pPr.appendChild(pRPr);
+  p.appendChild(pPr);
+
   const r = doc.createElementNS(W_NS, 'w:r');
+  const rPr = doc.createElementNS(W_NS, 'w:rPr');
+  const rFonts = doc.createElementNS(W_NS, 'w:rFonts');
+  rFonts.setAttributeNS(W_NS, 'w:ascii', '宋体');
+  rFonts.setAttributeNS(W_NS, 'w:hAnsi', '宋体');
+  rFonts.setAttributeNS(W_NS, 'w:eastAsia', '宋体');
+  rFonts.setAttributeNS(W_NS, 'w:cs', '宋体');
+  rPr.appendChild(rFonts);
+  const rSz = doc.createElementNS(W_NS, 'w:sz');
+  rSz.setAttributeNS(W_NS, 'w:val', '24');
+  rPr.appendChild(rSz);
+  const rSzCs = doc.createElementNS(W_NS, 'w:szCs');
+  rSzCs.setAttributeNS(W_NS, 'w:val', '24');
+  rPr.appendChild(rSzCs);
+  const rB = doc.createElementNS(W_NS, 'w:b');
+  rB.setAttributeNS(W_NS, 'w:val', '0');
+  rPr.appendChild(rB);
+  r.appendChild(rPr);
+
   const t = doc.createElementNS(W_NS, 'w:t');
   t.setAttribute('xml:space', 'preserve');
   t.textContent = initialText;

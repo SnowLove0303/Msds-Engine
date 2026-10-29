@@ -146,8 +146,73 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
 
   if (model === 'PU-202A') {
     assert(!isS11FullWidth, 'Section 11 (PU-202A 单组分): 严禁强行压成通栏 4 行大单元格，必须恢复原版分列表格！');
-    assert(s11CnTrs.length >= 12, `Section 11 (PU-202A 单组分): 原版分列表格行数完整 (实测: ${s11CnTrs.length} 行，期望 >= 12 行)`);
-    assert(s11EnTrs.length >= 12, `Section 11 (PU-202A 英文版): 原版分列表格行数完整 (实测: ${s11EnTrs.length} 行，期望 >= 12 行)`);
+    assert(s11CnTrs.length === 14, `Section 11 (PU-202A 单组分): 原版分列表格行数严格等于 14 行 (实测: ${s11CnTrs.length} 行)`);
+    assert(s11EnTrs.length === 14, `Section 11 (PU-202A 英文版): 原版分列表格行数严格等于 14 行 (实测: ${s11EnTrs.length} 行)`);
+
+    // 零空值单元格硬断言：Section 11 中文与英文每一行的值区域必须存在有效字符 (尤其是 Row 13 附加信息)
+    for (let rIdx = 1; rIdx < s11CnTrs.length; rIdx++) {
+      const cnRow = s11CnTrs[rIdx];
+      const enRow = s11EnTrs[rIdx];
+      const cnLastCell = cnRow.getElementsByTagName('w:tc')[cnRow.getElementsByTagName('w:tc').length - 1];
+      const enLastCell = enRow.getElementsByTagName('w:tc')[enRow.getElementsByTagName('w:tc').length - 1];
+      const cnVal = (cnLastCell?.textContent || '').trim();
+      const enVal = (enLastCell?.textContent || '').trim();
+      assert(cnVal.length > 0, `Section 11 中文版 Row ${rIdx} 严禁出现纯空值单元格！(实测长度: 0)`);
+      assert(enVal.length > 0, `Section 11 英文版 Row ${rIdx} 严禁出现纯空值单元格！(实测长度: 0)`);
+    }
+
+    // Row 2 前言行原生样式硬断言 (缩进 left="34", 字号 sz="24", 无整段加粗)
+    const cnRow2 = s11CnTrs[2];
+    const enRow2 = s11EnTrs[2];
+    const cnRow2Ind = cnRow2.getElementsByTagName('w:ind')[0]?.getAttribute('w:left');
+    const cnRow2Sz = cnRow2.getElementsByTagName('w:sz')[0]?.getAttribute('w:val');
+    assert(cnRow2Ind === '34', `Section 11 中文版 Row 2 前言行严格具备原生左缩进 (left="34") (实测: ${cnRow2Ind})`);
+    assert(cnRow2Sz === '24', `Section 11 中文版 Row 2 前言行严格具备五号字号 (sz="24") (实测: ${cnRow2Sz})`);
+    assert(/N,N[-－]二甲基乙酰胺毒理学数据/.test(cnRow2.textContent), 'Section 11 中文版 Row 2 文本内容正确');
+
+    const enRow2Ind = enRow2.getElementsByTagName('w:ind')[0]?.getAttribute('w:left');
+    const enRow2Sz = enRow2.getElementsByTagName('w:sz')[0]?.getAttribute('w:val');
+    assert(enRow2Ind === '34', `Section 11 英文版 Row 2 前言行严格具备原生左缩进 (left="34") (实测: ${enRow2Ind})`);
+    assert(enRow2Sz === '24', `Section 11 英文版 Row 2 前言行严格具备五号字号 (sz="24") (实测: ${enRow2Sz})`);
+    assert(/N,N-Dimethylacetamide/i.test(enRow2.textContent), 'Section 11 英文版 Row 2 文本内容正确');
+
+    // Row 5 (皮肤刺激) 与 Row 6 (眼睛刺激) 细粒度分行与粗细分离物理硬断言
+    const cnRow5 = s11CnTrs[5];
+    const cnRow5Cell = cnRow5.getElementsByTagName('w:tc')[cnRow5.getElementsByTagName('w:tc').length - 1];
+    const cnRow5Ps = Array.from(cnRow5Cell.getElementsByTagName('w:p'));
+    assert(cnRow5Ps.length >= 3, `Section 11 (PU-202A 中文版): 皮肤刺激性必须独立分行展示物种/分类/结果 (实测段落数: ${cnRow5Ps.length}, 期望 >= 3)`);
+    const cnRow5Bolds = Array.from(cnRow5Cell.getElementsByTagName('w:b')).filter(b => b.getAttribute('w:val') !== '0');
+    assert(cnRow5Bolds.length >= 3, `Section 11 (PU-202A 中文版): 皮肤刺激性子标签必须独立加粗 (实测加粗数: ${cnRow5Bolds.length}, 期望 >= 3)`);
+
+    const enRow5 = s11EnTrs[5];
+    const enRow5Cell = enRow5.getElementsByTagName('w:tc')[enRow5.getElementsByTagName('w:tc').length - 1];
+    const enRow5Ps = Array.from(enRow5Cell.getElementsByTagName('w:p'));
+    assert(enRow5Ps.length >= 3, `Section 11 (PU-202A 英文版): 皮肤刺激性必须独立分行展示 Species/Classification/Result (实测段落数: ${enRow5Ps.length}, 期望 >= 3)`);
+    const enRow5Bolds = Array.from(enRow5Cell.getElementsByTagName('w:b')).filter(b => b.getAttribute('w:val') !== '0');
+    assert(enRow5Bolds.length >= 3, `Section 11 (PU-202A 英文版): 皮肤刺激性子标签必须独立加粗 (实测加粗数: ${enRow5Bolds.length}, 期望 >= 3)`);
+
+    // Row 7 (致敏性) 细粒度分行与粗细分离硬断言
+    const cnRow7 = s11CnTrs[7];
+    const cnRow7Cell = cnRow7.getElementsByTagName('w:tc')[cnRow7.getElementsByTagName('w:tc').length - 1];
+    const cnRow7Ps = Array.from(cnRow7Cell.getElementsByTagName('w:p'));
+    assert(cnRow7Ps.length >= 6, `Section 11 (PU-202A 中文版): 致敏性必须分行展示豚鼠与人类试验 (实测段落数: ${cnRow7Ps.length}, 期望 >= 6)`);
+    const cnRow7Bolds = Array.from(cnRow7Cell.getElementsByTagName('w:b')).filter(b => b.getAttribute('w:val') !== '0');
+    assert(cnRow7Bolds.length >= 6, `Section 11 (PU-202A 中文版): 致敏性子标签必须独立加粗 (实测加粗数: ${cnRow7Bolds.length}, 期望 >= 6)`);
+
+    // Row 13 (附加信息) 完整注入与结构化断言
+    const cnRow13 = s11CnTrs[13];
+    const cnRow13Text = cnRow13.textContent;
+    assert(/饮酒精饮料会加剧毒性影响/.test(cnRow13Text), 'Section 11 中文版 Row 13 必须包含饮酒精饮料影响事实');
+    assert(/重复剂量中毒/.test(cnRow13Text), 'Section 11 中文版 Row 13 必须包含重复剂量中毒事实');
+    const cnRow13Cell = cnRow13.getElementsByTagName('w:tc')[cnRow13.getElementsByTagName('w:tc').length - 1];
+    assert(cnRow13Cell.getElementsByTagName('w:p').length >= 3, 'Section 11 中文版 Row 13 附加信息必须分段展示 (>= 3段)');
+
+    const enRow13 = s11EnTrs[13];
+    const enRow13Text = enRow13.textContent;
+    assert(/Consumption of alcoholic beverages|Drinking alcoholic beverages/i.test(enRow13Text), 'Section 11 英文版 Row 13 必须包含饮酒影响英文事实');
+    assert(/Repeated dose toxicity/i.test(enRow13Text), 'Section 11 英文版 Row 13 必须包含重复剂量中毒英文事实');
+    const enRow13Cell = enRow13.getElementsByTagName('w:tc')[enRow13.getElementsByTagName('w:tc').length - 1];
+    assert(enRow13Cell.getElementsByTagName('w:p').length >= 3, 'Section 11 英文版 Row 13 附加信息必须分段展示 (>= 3段)');
   }
 
   function getPText(p) {
