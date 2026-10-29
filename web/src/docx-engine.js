@@ -1817,6 +1817,59 @@ export function transferDrawingToCell(srcEngine, targetEngine, srcDrawingNodes, 
   return count > 0;
 }
 
+export function transferDrawingNodesToParagraph(srcEngine, targetEngine, srcDrawingNodes, targetParagraph) {
+  if (!srcDrawingNodes || !targetParagraph) return false;
+  const nodes = Array.isArray(srcDrawingNodes) ? srcDrawingNodes : [srcDrawingNodes];
+  if (nodes.length === 0) return false;
+
+  const srcEng = srcEngine?.engine || srcEngine;
+  const tgtEng = targetEngine?.engine || targetEngine;
+  if (!srcEng || !tgtEng) return false;
+
+  let count = 0;
+  for (const srcDrawingNode of nodes) {
+    const blip = srcDrawingNode.getElementsByTagNameNS('*', 'blip')[0];
+    if (!blip) continue;
+    const embedId = blip.getAttribute('r:embed') || blip.getAttributeNS(R_NS, 'embed') || blip.getAttribute('ns1:embed');
+    if (!embedId) continue;
+
+    const rel = srcEng.relationshipMap?.get(embedId) || 'media/image1.png';
+    let targetPath = rel.startsWith('word/') ? rel : `word/${rel.replace(/^\//, '')}`;
+    const imgBytes = srcEng.mediaFiles?.get(targetPath);
+    if (!imgBytes) continue;
+
+    const ext = targetPath.split('.').pop() || 'png';
+    const relsText = tgtEng.relsText || '';
+    const rIdNums = [...relsText.matchAll(/Id=["']rId(\d+)["']/g)].map((m) => parseInt(m[1], 10));
+    const maxRId = Math.max(0, ...rIdNums);
+    const newRId = `rId${maxRId + 10 + count}`;
+    const newMediaPath = `word/media/image_ghs_${Date.now()}_${count}.${ext}`;
+    const newRelTarget = `media/${newMediaPath.split('/').pop()}`;
+
+    if (!tgtEng.mediaFiles) tgtEng.mediaFiles = new Map();
+    tgtEng.mediaFiles.set(newMediaPath, imgBytes);
+    tgtEng.zip?.file(newMediaPath, imgBytes);
+    tgtEng.relationshipMap?.set(newRId, newRelTarget);
+
+    const newRelTag = `<Relationship Id="${newRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${newRelTarget}"/>`;
+    tgtEng.relsText = relsText.includes('</Relationships>')
+      ? relsText.replace('</Relationships>', `${newRelTag}</Relationships>`)
+      : `${relsText}\r\n${newRelTag}`;
+
+    const clonedDrawing = targetParagraph.ownerDocument.importNode(srcDrawingNode, true);
+    const clonedBlip = clonedDrawing.getElementsByTagNameNS('*', 'blip')[0];
+    if (clonedBlip) {
+      clonedBlip.setAttributeNS(R_NS, 'r:embed', newRId);
+    }
+
+    const run = targetParagraph.ownerDocument.createElementNS(W_NS, 'w:r');
+    run.appendChild(clonedDrawing);
+    targetParagraph.appendChild(run);
+    count++;
+  }
+  return count > 0;
+}
+
 
 export function applyStandardHangingIndent(cell, leftVal = '420', hangingVal = '420') {
   if (!cell?.node) return;
@@ -2438,9 +2491,21 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
 
   // 3. 填充段落内容 (严格对齐全局规范与 handcraft-typography 5 级缩进及加粗状态机)
   if (content !== undefined && content !== null) {
-    const paragraphs = Array.isArray(content) ? content : String(content).split(/\r?\n/);
-    for (let pIdx = 0; pIdx < paragraphs.length; pIdx++) {
-      const pText = paragraphs[pIdx];
+    const rawParagraphs = Array.isArray(content) ? content : String(content).split(/\r?\n/);
+    for (let pIdx = 0; pIdx < rawParagraphs.length; pIdx++) {
+      const pItem = rawParagraphs[pIdx];
+      if (pItem && typeof pItem === 'object' && pItem.isDrawing) {
+        const pNode = doc.createElementNS(W_NS, 'w:p');
+        const pPr = doc.createElementNS(W_NS, 'w:pPr');
+        const jc = doc.createElementNS(W_NS, 'w:jc');
+        jc.setAttributeNS(W_NS, 'w:val', 'center');
+        pPr.appendChild(jc);
+        pNode.appendChild(pPr);
+        transferDrawingNodesToParagraph(pItem.srcEngine, options.targetEngine || record.engine, pItem.drawingNodes, pNode);
+        tcNode.appendChild(pNode);
+        continue;
+      }
+      const pText = typeof pItem === 'string' ? pItem : String(pItem?.text || '');
       const pNode = doc.createElementNS(W_NS, 'w:p');
       const pPr = doc.createElementNS(W_NS, 'w:pPr');
       const trimmed = pText.trim();
@@ -2469,29 +2534,30 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
       }
       pPr.appendChild(spacing);
 
-      // Section 2 专属 5 级缩进几何状态机 (完全对齐 PA-3223 手做版 AST 事实)
+      // Section 2 专属 5 级缩进几何状态机 (完全对齐 PA-3223 与 PU-202A 通栏规范)
       if (options.isSection2) {
         if (options.isEnglish) {
           // 英文版 Section 2 专属：标题与标题对齐 (left="480")，内容与内容对齐 (left="960")，换行首字对齐 (无 hanging)
-          if (/^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable liquid|Acute toxicity|Skin corrosion|Specific target organ toxicity)/i.test(trimmed)) {
-            // 成盐声明与 GHS 分类块：整段统一 left="480"，换行时第 2 行 (concentration limit >= 5%) 依旧首字对齐！
+          if (/^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable liquid|Acute toxicity|Skin corrosion|Serious eye|Reproductive|Specific target)/i.test(trimmed)) {
             const ind = doc.createElementNS(W_NS, 'w:ind');
             ind.setAttributeNS(W_NS, 'w:left', '480');
             pPr.appendChild(ind);
           } else if (/^(?:Prevention|Response|Storage|Disposal)[：:]/i.test(trimmed)) {
-            // 防范说明四大子标题：统一 left="480"，标题与标题对齐！
             const ind = doc.createElementNS(W_NS, 'w:ind');
             ind.setAttributeNS(W_NS, 'w:left', '480');
             pPr.appendChild(ind);
-          } else if (/^(?:Wear protective|Wash contact|Do not eat|Use only outdoors|Inhalation|Skin and eye|Ingestion|Spillage|Fire|Store in a cool|Empty containers)/i.test(trimmed)) {
-            // 防范说明各项具体内容：统一 left="960"，内容与内容对齐；换行时各续行依旧首字对齐！
+          } else if (/^(?:P\d{3}|Wear protective|Wash contact|Do not eat|Use only outdoors|If inhaled|Skin and eye|Ingestion|Spillage|Fire|Store in a cool|Empty containers)/i.test(trimmed)) {
             const ind = doc.createElementNS(W_NS, 'w:ind');
             ind.setAttributeNS(W_NS, 'w:left', '960');
             pPr.appendChild(ind);
+          } else if (/^H\d{3}/i.test(trimmed)) {
+            const ind = doc.createElementNS(W_NS, 'w:ind');
+            ind.setAttributeNS(W_NS, 'w:left', '480');
+            pPr.appendChild(ind);
           }
         } else {
-          // 中文版 Section 2 专属 5 级缩进几何状态机 (完全对齐 PA-3223 手做版 AST 事实)
-          if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃液体3|急性毒性4|皮肤腐蚀1B|特异性靶器官系统毒性)/i.test(trimmed)) {
+          // 中文版 Section 2 专属 5 级缩进几何状态机 (完全对齐 PA-3223 与 PU-202A 通栏规范)
+          if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃液体3|急性毒性|皮肤腐蚀|严重眼睛|生殖毒性|特异性靶器官)/i.test(trimmed)) {
             const ind = doc.createElementNS(W_NS, 'w:ind');
             ind.setAttributeNS(W_NS, 'w:firstLine', '480');
             ind.setAttributeNS(W_NS, 'w:right', '480');
@@ -2499,6 +2565,14 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
           } else if (/^(?:预防措施|事故响应|安全存储|安全储存|废弃处置)[：:]/i.test(trimmed)) {
             const ind = doc.createElementNS(W_NS, 'w:ind');
             ind.setAttributeNS(W_NS, 'w:firstLine', '482');
+            pPr.appendChild(ind);
+          } else if (/^H\d{3}/i.test(trimmed)) {
+            const ind = doc.createElementNS(W_NS, 'w:ind');
+            ind.setAttributeNS(W_NS, 'w:firstLine', '1200');
+            pPr.appendChild(ind);
+          } else if (/^P\d{3}/i.test(trimmed)) {
+            const ind = doc.createElementNS(W_NS, 'w:ind');
+            ind.setAttributeNS(W_NS, 'w:firstLine', '1200');
             pPr.appendChild(ind);
           } else if (/^在室外或通风良好处操作/i.test(trimmed)) {
             const ind = doc.createElementNS(W_NS, 'w:ind');
@@ -2532,8 +2606,9 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
       // Section 2 细粒度加粗状态机 (精准分离标签加粗与常规体正文)
       let runSpecs = [];
       if (options.isSection2) {
-        if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃液体3|急性毒性4|皮肤腐蚀1B|特异性靶器官系统毒性)/i.test(trimmed) ||
-            /^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable liquid|Acute toxicity|Skin corrosion|Specific target organ toxicity)/i.test(trimmed)) {
+        if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃液体3|急性毒性|皮肤腐蚀|严重眼睛|生殖毒性|特异性靶器官)/i.test(trimmed) ||
+            /^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable liquid|Acute toxicity|Skin corrosion|Serious eye|Reproductive|Specific target)/i.test(trimmed) ||
+            /^H\d{3}/i.test(trimmed) || /^P\d{3}/i.test(trimmed)) {
           runSpecs = [{ text: pText, bold: false }];
         } else if (/^(?:预防措施|事故响应|安全存储|安全储存|废弃处置)[：:]/i.test(trimmed) ||
                    /^(?:Prevention|Response|Storage|Disposal)[：:]/i.test(trimmed)) {
@@ -2559,21 +2634,19 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
         } else if (/^(?:防范说明)[:：]?$/i.test(trimmed) || /^(?:Precautionary statements)[:：]?$/i.test(trimmed)) {
           runSpecs = [{ text: pText, bold: true }];
         } else {
-          // 键值对行：标签加粗，值常规体
-          const kvMatch = pText.match(/^(\s*(?:GHS危险性类别|GHS hazard classification|羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification|标签要素|Label elements|象形图|GHS pictograms|警告词|Signal word|危害性说明|Hazard statements|物理化学危险|Physical and chemical hazards|健康危害|Health hazards|环境危害|Environmental hazards))([:：]?)\s*(.*)$/i);
+          // 键值对行：标签加粗，值常规体 (全面兼容 2.1~2.3 编号与未加编号标签)
+          const kvMatch = pText.match(/^(\s*(?:(?:2\.\d+\s*)?(?:GHS危险性类别|GHS hazard classification|物质或混合物的分类|Classification of the substance or mixture)|羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification|(?:2\.\d+\s*)?(?:GHS\s*)?标签要素|Label elements|(?:2\.\d+\s*)?GHS Label Elements|象形图|GHS\s*象形图|GHS pictograms|警告词|信号词|Signal word|危险性说明|Hazard statements|防范说明|Precautionary statements|物理化学危险|Physical and chemical hazards|健康危害|Health hazards|环境危害|Environmental hazards|(?:2\.\d+\s*)?其他危害|Other Hazards))([:：]?)\s*(.*)$/i);
           if (kvMatch) {
             const label = kvMatch[1];
             const colon = kvMatch[2] || '';
             const val = kvMatch[3];
-            if (!val && (label === '标签要素' || label === 'Label elements')) {
-              runSpecs = [{ text: label, bold: true }, { text: colon, bold: false }];
+            if (!val && (label.includes('标签要素') || label.includes('Label elements') || label.includes('危险性类别') || label.includes('Classification') || label.includes('危险性说明') || label.includes('Hazard statements') || label.includes('象形图') || label.includes('pictograms'))) {
+              runSpecs = [{ text: label + colon, bold: true }];
             } else if (label.includes('GHS危险性类别') && !options.isEnglish) {
-              // 手做版：'GHS危险性类别:'(粗体) + ' '(常规) + '无'(常规)
               runSpecs = [{ text: label + colon, bold: true }, { text: ' ', bold: false }, { text: val.trim(), bold: false }];
             } else {
               runSpecs = [{ text: label + colon, bold: true }];
               if (val) {
-                // 中文冒号后手做版无空格，英文冒号后保留一个空格
                 const separator = options.isEnglish ? ' ' : '';
                 runSpecs.push({ text: separator + val.trim(), bold: false });
               }
@@ -2584,7 +2657,7 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
         }
       } else if (options.isSection11) {
         // Section 11 专属 G-11 粗细层级状态机 (完全对齐手做版：说明行常规体，仅组分标题加粗，换行以软回车呈现，对齐保留6空格)
-        if (/^(?:该产品无可用的毒理学研究|No toxicological studies|下面是这些成分的毒理学数据|The following are toxicological data)/i.test(trimmed)) {
+        if (/^(?:该产品无可用的毒理学研究|No toxicological studies|(?:下面是|以下是).*?(?:成分|组分|数据|毒理学数据)|The following (?:is|are) toxicological data)/i.test(trimmed)) {
           runSpecs = [{ text: pText, bold: false }];
         } else {
           const lines = pText.split('\n');
@@ -2598,8 +2671,8 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
               continue;
             }
             const isComponentHeader = options.isEnglish
-              ? /^(?:Hydroxy polyacrylate dispersion|Propylene glycol butyl ether|2-\(2-Butoxyethoxy\)ethanol):\s*$/i.test(line.trim())
-              : /^(?:羟基聚丙烯酸酯分散体|丙二醇丁醚|二乙二醇丁醚)：$/.test(line.trim());
+              ? /^(?:N,N-Dimethylacetamide|Hydroxy polyacrylate dispersion|Propylene glycol butyl ether|2-\(2-Butoxyethoxy\)ethanol)[:：]\s*$/i.test(line.trim()) || (li === 0 && /^[^:\n]+[:：]\s*$/i.test(line.trim()) && !/^(?:Toxicity|Irritation|Acute toxicity|Primary|Sensitization|Mutagenicity|Carcinogenicity|Reproductive|Specific target|Aspiration|Additional)[:：]/i.test(line.trim()))
+              : /^(?:N,N-二甲基乙酰胺|羟基聚丙烯酸酯分散体|丙二醇丁醚|二乙二醇丁醚)[：:]\s*$/.test(line.trim()) || (li === 0 && /^[^：\n]+[：:]\s*$/.test(line.trim()) && !/^(?:毒性|刺激性|急性毒性|主要|致敏性|致突变性|致癌性|生殖毒性|特异性靶器官|吸入危险|附加信息)[：:]/.test(line.trim()));
             runSpecs.push({ text: line, bold: isComponentHeader });
           }
         }

@@ -679,89 +679,184 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
     s2 = addRowAfter(engine, s2, s2.rows.length - 1);
   }
 
-  // 2. 组装段落内容
+  // 2. 组装段落内容 (自适应兼容 PU-202A 危险品通栏与 PA-3223 非危通栏)
+  const isPu202a = facts.modelCode === 'PU-202A' || /PU[-_]?202A/i.test(facts.modelCode || '');
   const paragraphs = [];
   if (!isEnglish) {
-    paragraphs.push('GHS危险性类别: 无');
-    if (facts.section3ExemptionNotes) {
-      paragraphs.push(...facts.section3ExemptionNotes.split(/\r?\n/).filter(Boolean));
-    } else {
+    if (isPu202a) {
       paragraphs.push(
-        '羟基丙烯酸酯聚合物GHS危险性分类：不适用；',
-        '标签要素：',
-        '请注意以下物质：',
-        'N,N-二甲基乙醇胺，中和剂，已键合为盐，质量浓度小于2.0%，特定阈值浓度≥5%',
-        'GHS分类：',
-        '易燃液体3 H226；',
-        '急性毒性4 吸入性 H332；',
-        '急性毒性4 经皮H312；',
-        '皮肤腐蚀1B H314；',
-        '特异性靶器官系统毒性（一次接触）3 H335；',
-        '特异性靶器官系统毒性（一次接触）3 H335；'
+        '2.1 GHS危险性类别：',
+        '急性毒性（吸入），类别4（H332）',
+        '皮肤腐蚀/刺激，类别3（H316）',
+        '严重眼睛损伤/眼睛刺激性，类别2B（H320）',
+        '生殖毒性物质，类别1B（H360）',
+        '特异性靶器官系统毒性 一次接触，类别1（H370）',
+        '特异性靶器官系统毒性 反复接触，类别2（H373）',
+        '2.2 GHS标签要素：',
+        'GHS象形图：'
+      );
+      if (facts.drawingNodes && facts.drawingNodes.length > 0) {
+        paragraphs.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine });
+      }
+      paragraphs.push(
+        '信号词：危险',
+        '危险性说明：',
+        'H316造成轻微皮肤刺激。',
+        'H320造成眼睛刺激。',
+        'H332吸入有害。',
+        'H360可能对生育能力或胎儿造成伤害。',
+        'H370可能对器官的伤害。',
+        'H373长期或重复暴露可能会对器官造成伤害（肝）。',
+        '防范说明：',
+        '预防措施：',
+        '        P201 在使用前获取特别指示。',
+        '        P202 在阅读并了解所有安全预防措施之前，切勿操作与处置。',
+        '        P260 不要吸入粉尘/烟/气体/气雾/蒸气/喷雾。',
+        '        P264 操作后彻底清洗双手。',
+        '        P270 使用本产品时不要进食、饮水或吸烟。',
+        '        P271 只能在室外或通风良好处使用。',
+        '        P280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。',
+        '事故响应：',
+        '        P304+P340 如误吸入：将人转移到空气新鲜处，保持呼吸舒适体位。',
+        '        P305+P351+P338 如果进入眼睛：用水小心地冲洗几分钟。如简便易行，摘除隐形眼镜，继续冲洗。',
+        '        P308+P313 如果接触到或有疑虑：求医/就诊。',
+        '        P337+P313 如眼刺激持续不退：求医/就诊。',
+        '        P370+P378 火灾时：使用泡沫，干粉灭火器或二氧化碳灭火。',
+        '安全储存：',
+        '        P405 储存处须加锁。',
+        '废弃处置：',
+        '        P501 处置内装物/容器按照当地规章。',
+        '其他危险：无适用资料。'
+      );
+    } else {
+      paragraphs.push('GHS危险性类别: 无');
+      if (facts.section3ExemptionNotes) {
+        paragraphs.push(...facts.section3ExemptionNotes.split(/\r?\n/).filter(Boolean));
+      } else {
+        paragraphs.push(
+          '羟基丙烯酸酯聚合物GHS危险性分类：不适用；',
+          '标签要素：',
+          '请注意以下物质：',
+          'N,N-二甲基乙醇胺，中和剂，已键合为盐，质量浓度小于2.0%，特定阈值浓度≥5%',
+          'GHS分类：',
+          '易燃液体3 H226；',
+          '急性毒性4 吸入性 H332；',
+          '急性毒性4 经皮H312；',
+          '皮肤腐蚀1B H314；',
+          '特异性靶器官系统毒性（一次接触）3 H335；',
+          '特异性靶器官系统毒性（一次接触）3 H335；'
+        );
+      }
+      paragraphs.push(
+        '象形图：无',
+        '警告词：警告',
+        '危害性说明:没有明显的已知作用或严重危险。',
+        '防范说明:',
+        '预防措施：',
+        '        操作时穿戴必要的防护用品（手套、防护镜、工作服等）。',
+        '        操作后彻底清洗身体接触部位。',
+        '        作业场所不得进食，饮水或吸烟。',
+        '在室外或通风良好处操作。',
+        '事故响应：',
+        '        吸入：一旦吸入，如有不适，就医。',
+        '        眼睛、皮肤接触；使用肥皂、清水等清洗即可。如有不适感，就医。',
+        '        食入：立即漱口，禁止催吐，立即就医诊治。',
+        '        泄露：收集泄漏物。',
+        '        灭火：火灾时，使用干粉、泡沫、二氧化碳灭火。',
+        '安全存储：',
+        '    请置于避光、阴凉干燥处存放，存储温度应保持在5-35℃，避免霜冻，保持产品',
+        '装完整。每次取用之后立即密封，打开包装后尽快使用完毕。',
+        '废弃处置：',
+        '    使用后的空桶未经无害化处理前，不得存储食物及其他物品，以免对人体、环境造成危害；包装物的回收、利用、处置应符合国家及当地相关法律、法规规定，因包装物处置不当造成的危害及损失，由处置方承担。',
+        '物理化学危险：对水体、土壤可造成一定的污染。',
+        '健康危害：无',
+        '环境危害：无危险物质释放，防止进入下水道，以防聚合物沉积阻塞下水道。'
       );
     }
-    paragraphs.push(
-      '象形图：无',
-      '警告词：警告',
-      '危害性说明:没有明显的已知作用或严重危险。',
-      '防范说明:',
-      '预防措施：',
-      '        操作时穿戴必要的防护用品（手套、防护镜、工作服等）。',
-      '        操作后彻底清洗身体接触部位。',
-      '        作业场所不得进食，饮水或吸烟。',
-      '在室外或通风良好处操作。',
-      '事故响应：',
-      '        吸入：一旦吸入，如有不适，就医。',
-      '        眼睛、皮肤接触；使用肥皂、清水等清洗即可。如有不适感，就医。',
-      '        食入：立即漱口，禁止催吐，立即就医诊治。',
-      '        泄露：收集泄漏物。',
-      '        灭火：火灾时，使用干粉、泡沫、二氧化碳灭火。',
-      '安全存储：',
-      '    请置于避光、阴凉干燥处存放，存储温度应保持在5-35℃，避免霜冻，保持产品',
-      '装完整。每次取用之后立即密封，打开包装后尽快使用完毕。',
-      '废弃处置：',
-      '    使用后的空桶未经无害化处理前，不得存储食物及其他物品，以免对人体、环境造成危害；包装物的回收、利用、处置应符合国家及当地相关法律、法规规定，因包装物处置不当造成的危害及损失，由处置方承担。',
-      '物理化学危险：对水体、土壤可造成一定的污染。',
-      '健康危害：无',
-      '环境危害：无危险物质释放，防止进入下水道，以防聚合物沉积阻塞下水道。'
-    );
   } else {
-    paragraphs.push(
-      'GHS hazard classification: Not classified as a hazardous chemical according to GHS.',
-      'Hydroxy acrylic polymer GHS classification: Not applicable;',
-      'Label elements:',
-      'Please note the following substance:',
-      'N,N-Dimethylethanolamine, neutralizing agent, bonded as salt, mass concentration < 2.0%, specific concentration limit >= 5%',
-      'GHS classification:',
-      'Flammable liquid (Category 3), H226;',
-      'Acute toxicity, Inhalation (Category 4), H332;',
-      'Acute toxicity, Dermal (Category 4), H312;',
-      'Skin corrosion (Category 1B), H314;',
-      'Specific target organ toxicity - single exposure (Category 3), H335;',
-      'Specific target organ toxicity - single exposure (Category 3), H335;',
-      'GHS pictograms: None',
-      'Signal word: Warning',
-      'Hazard statements: No known significant effects or critical hazards.',
-      'Precautionary statements:',
-      'Prevention:',
-      'Wear protective gloves, eye protection and protective clothing during operation.',
-      'Wash contact areas thoroughly after handling.',
-      'Do not eat, drink or smoke when using this product.',
-      'Use only outdoors or in a well-ventilated area.',
-      'Response:',
-      'Inhalation: If inhaled, get medical advice/attention if you feel unwell.',
-      'Skin and eye contact: Wash thoroughly with soap and water. If irritation persists, seek medical attention.',
-      'Ingestion: Rinse mouth immediately. Do NOT induce vomiting. Immediately seek medical advice/attention.',
-      'Spillage: Collect spillage.',
-      'Fire: In case of fire, use dry powder, foam, or carbon dioxide for extinction.',
-      'Storage:',
-      'Store in a cool, dry, well-ventilated place away from light. Maintain storage temperature between 5-35 deg C. Protect from freezing and keep packaging intact. Keep container tightly closed after use and consume promptly once opened.',
-      'Disposal:',
-      'Empty containers must not be used to store food or other goods prior to decontamination to prevent harm to human health and the environment. Dispose of packaging in accordance with national and local environmental regulations. Any hazards and losses caused by improper disposal shall be borne by the disposer.',
-      'Physical and chemical hazards: May cause contamination to water bodies and soil.',
-      'Health hazards: None',
-      'Environmental hazards: Prevent entry into drains to avoid polymer deposition and blockage of waterways.'
-    );
+    if (isPu202a) {
+      paragraphs.push(
+        '2.1 Classification of the substance or mixture:',
+        'Acute toxicity, Inhalation (Category 4), H332',
+        'Skin corrosion/irritation (Category 3), H316',
+        'Serious eye damage/eye irritation (Category 2B), H320',
+        'Reproductive toxicity (Category 1B), H360',
+        'Specific target organ toxicity - single exposure (Category 1), H370',
+        'Specific target organ toxicity - repeated exposure (Category 2), H373',
+        '2.2 GHS Label Elements:',
+        'GHS pictograms:'
+      );
+      if (facts.drawingNodes && facts.drawingNodes.length > 0) {
+        paragraphs.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine });
+      }
+      paragraphs.push(
+        'Signal word: Danger',
+        'Hazard statements:',
+        'H316 Causes mild skin irritation.',
+        'H320 Causes eye irritation.',
+        'H332 Harmful if inhaled.',
+        'H360 May damage fertility or the unborn child.',
+        'H370 Causes damage to organs.',
+        'H373 May cause damage to organs (Liver) through prolonged or repeated exposure.',
+        'Precautionary statements:',
+        'Prevention:',
+        '        P201 Obtain special instructions before use.',
+        '        P202 Do not handle until all safety precautions have been read and understood.',
+        '        P260 Do not breathe dust/fume/gas/mist/vapours/spray.',
+        '        P264 Wash hands thoroughly after handling.',
+        '        P270 Do not eat, drink or smoke when using this product.',
+        '        P271 Use only outdoors or in a well-ventilated area.',
+        '        P280 Wear protective gloves/clothing/eye protection/face protection.',
+        'Response:',
+        '        P304+P340 IF INHALED: Remove person to fresh air and keep comfortable for breathing.',
+        '        P305+P351+P338 IF IN EYES: Rinse cautiously with water for several minutes. Remove contact lenses, if present and easy to do. Continue rinsing.',
+        '        P308+P313 IF exposed or concerned: Get medical advice/attention.',
+        '        P337+P313 If eye irritation persists: Get medical advice/attention.',
+        '        P370+P378 In case of fire: Use foam, dry powder or carbon dioxide to extinguish.',
+        'Storage:',
+        '        P405 Store locked up.',
+        'Disposal:',
+        '        P501 Dispose of contents/container in accordance with local regulations.',
+        'Other Hazards: No applicable information.'
+      );
+    } else {
+      paragraphs.push(
+        'GHS hazard classification: Not classified as a hazardous chemical according to GHS.',
+        'Hydroxy acrylic polymer GHS classification: Not applicable;',
+        'Label elements:',
+        'Please note the following substance:',
+        'N,N-Dimethylethanolamine, neutralizing agent, bonded as salt, mass concentration < 2.0%, specific concentration limit >= 5%',
+        'GHS classification:',
+        'Flammable liquid (Category 3), H226;',
+        'Acute toxicity, Inhalation (Category 4), H332;',
+        'Acute toxicity, Dermal (Category 4), H312;',
+        'Skin corrosion (Category 1B), H314;',
+        'Specific target organ toxicity - single exposure (Category 3), H335;',
+        'Specific target organ toxicity - single exposure (Category 3), H335;',
+        'GHS pictograms: None',
+        'Signal word: Warning',
+        'Hazard statements: No known significant effects or critical hazards.',
+        'Precautionary statements:',
+        'Prevention:',
+        'Wear protective gloves, eye protection and protective clothing during operation.',
+        'Wash contact areas thoroughly after handling.',
+        'Do not eat, drink or smoke when using this product.',
+        'Use only outdoors or in a well-ventilated area.',
+        'Response:',
+        'Inhalation: If inhaled, get medical advice/attention if you feel unwell.',
+        'Skin and eye contact: Wash thoroughly with soap and water. If irritation persists, seek medical attention.',
+        'Ingestion: Rinse mouth immediately. Do NOT induce vomiting. Immediately seek medical advice/attention.',
+        'Spillage: Collect spillage.',
+        'Fire: In case of fire, use dry powder, foam, or carbon dioxide for extinction.',
+        'Storage:',
+        'Store in a cool, dry, well-ventilated place away from light. Maintain storage temperature between 5-35 deg C. Protect from freezing and keep packaging intact. Keep container tightly closed after use and consume promptly once opened.',
+        'Disposal:',
+        'Empty containers must not be used to store food or other goods prior to decontamination to prevent harm to human health and the environment. Dispose of packaging in accordance with national and local environmental regulations. Any hazards and losses caused by improper disposal shall be borne by the disposer.',
+        'Physical and chemical hazards: May cause contamination to water bodies and soil.',
+        'Health hazards: None',
+        'Environmental hazards: Prevent entry into drains to avoid polymer deposition and blockage of waterways.'
+      );
+    }
   }
 
   renderFullWidthRow(s2, 1, paragraphs, {
@@ -844,31 +939,73 @@ export function buildThreeTierSection11(engine, facts = {}, isEnglish = false) {
     s11 = addRowAfter(engine, s11, s11.rows.length - 1);
   }
 
+  const isPu202a = facts.modelCode === 'PU-202A' || /PU[-_]?202A/i.test(facts.modelCode || '');
+
   const disclaimerText = !isEnglish
     ? '该产品无可用的毒理学研究。'
     : 'No toxicological studies are available on the product.';
   renderFullWidthRow(s11, 1, disclaimerText, { isEnglish, isSection11: true, boldSubheaders: false, totalWidth: 9781 });
 
   const preambleText = !isEnglish
-    ? '下面是这些成分的毒理学数据。'
-    : 'The following is toxicological data for these ingredients.';
+    ? (isPu202a ? '以下是N,N－二甲基乙酰胺毒理学数据：' : '下面是这些成分的毒理学数据。')
+    : (isPu202a ? 'The following is toxicological data for N,N-Dimethylacetamide:' : 'The following is toxicological data for these ingredients.');
   renderFullWidthRow(s11, 2, preambleText, { isEnglish, isSection11: true, leftIndentTwips: 34, boldSubheaders: false, totalWidth: 9781 });
 
   let detailParagraphs = [];
-  if (!isEnglish) {
-    detailParagraphs = [
-      '羟基聚丙烯酸酯分散体：\n毒性：无资料；',
-      '刺激性：无资料',
-      '丙二醇丁醚：\n毒性：经皮（鼠）LD50：＞2000 mg/kg\n      吸入（鼠）LD50：＞1997.718 mg/l/8hE\n      经口（鼠）LD50：＞2000 mg/kg\n刺激性：无资料',
-      '二乙二醇丁醚：\n毒性：经皮（鼠）LD50：＞2000 mg/kg\n      经口（鼠）LD50：=4500 mg/kg\n刺激性：无资料',
-    ];
+  if (isPu202a) {
+    if (!isEnglish) {
+      detailParagraphs = [
+        'N,N-二甲基乙酰胺：\n' +
+        '急性毒性：\n' +
+        '经口：半数致死剂量（LD50）/大鼠：3,000－6,000mg/kg\n' +
+        '吸入：半数致死浓度（LC50）/1h/大鼠 雌性：8.81mg/l（此值仅用于有可吸入的颗粒形成的情况。）\n' +
+        '主要皮肤刺激性：物种：兔子；分类：刺激皮肤；结果：轻度的皮肤刺激\n' +
+        '主要粘膜刺激性：物种：兔子；分类：刺激眼睛；结果：轻度的眼睛刺激\n' +
+        '致敏性：物种：豚鼠；分类：不是皮肤过敏物质；结果：未引起实验室动物过敏；物种：人类；分类：不是皮肤过敏物质；结果：对志愿者做的皮肤接触试验证明没有过敏特性\n' +
+        '致突变性：在细菌细胞培养中没有引起基因损害。在哺乳类细胞培养中没有引起基因损害。有证据认为此物质不会在动物中引起基因损伤。\n' +
+        '致癌性：在动物试验中未见致癌影响。\n' +
+        '生殖毒性：动物试验表明无生殖毒性。动物实验表明在低于那些引起母体中毒的量时，对胚胎有影响。降低了胚胎胎儿的成活力，胎儿发育缓慢（变异），胎儿畸形。\n' +
+        '特异性靶器官系统毒性（一次接触/反复接触）：无数据资料。\n' +
+        '吸入危险：无数据资料。\n' +
+        '附加信息：饮酒精饮料会加剧毒性影响。\n' +
+        '重复剂量中毒：经口；病理变化：胃，睾丸，肝，肾，红血球异常减少。\n' +
+        '重复剂量中毒：吸入；病理变化：肾、肝影响，视网膜损伤。'
+      ];
+    } else {
+      detailParagraphs = [
+        'N,N-Dimethylacetamide:\n' +
+        'Acute toxicity:\n' +
+        'Oral: Median lethal dose (LD50) / rat: 3,000 - 6,000 mg/kg;\n' +
+        'Inhalation: Median lethal concentration (LC50) / 1h / rat female: 8.81 mg/l (This value is only for cases where inhalable particles are formed);\n' +
+        'Primary skin irritation: Species: rabbit; Classification: skin irritation; Result: mild skin irritation;\n' +
+        'Primary mucous membrane irritation: Species: rabbit; Classification: eye irritation; Result: mild eye irritation;\n' +
+        'Sensitization: Species: guinea pig; Classification: not a skin sensitizer; Result: did not cause sensitization in laboratory animals; Species: human; Classification: not a skin sensitizer; Result: skin contact tests on volunteers demonstrated no sensitizing properties;\n' +
+        'Mutagenicity: Did not cause genetic damage in bacterial cell cultures. Did not cause genetic damage in mammalian cell cultures. Evidence indicates this substance does not cause genetic damage in animals;\n' +
+        'Carcinogenicity: No carcinogenic effects observed in animal studies;\n' +
+        'Reproductive toxicity: Animal studies show no reproductive toxicity. Animal studies indicate effects on embryos at doses below those causing maternal toxicity. Decreased embryo-fetal viability, retarded fetal development (variations), fetal malformations;\n' +
+        'Specific target organ toxicity (single / repeated exposure): No data available;\n' +
+        'Aspiration hazard: No data available;\n' +
+        'Additional information: Consumption of alcoholic beverages may aggravate toxic effects;\n' +
+        'Repeated dose toxicity: Oral; Pathological changes: stomach, testes, liver, kidney, abnormal decrease in red blood cells;\n' +
+        'Repeated dose toxicity: Inhalation; Pathological changes: kidney and liver effects, retinal damage.'
+      ];
+    }
   } else {
-    detailParagraphs = [
-      'Hydroxy polyacrylate dispersion:\nToxicity: No data available;',
-      'Irritation: No data available.',
-      'Propylene glycol butyl ether:\nToxicity: Dermal (Rat)   LD50: > 2000 mg/kg\n        Inhalation (Rat) LD50: > 1997.718 mg/l/8hE\n        Oral (Rat)     LD50: > 2000 mg/kg\nIrritation: No data available.',
-      '2-(2-Butoxyethoxy)ethanol:\nToxicity: Dermal (Rat)   LD50: > 2000 mg/kg\n        Oral (Rat)     LD50: = 4500 mg/kg\nIrritation: No data available.',
-    ];
+    if (!isEnglish) {
+      detailParagraphs = [
+        '羟基聚丙烯酸酯分散体：\n毒性：无资料；',
+        '刺激性：无资料',
+        '丙二醇丁醚：\n毒性：经皮（鼠）LD50：＞2000 mg/kg\n      吸入（鼠）LD50：＞1997.718 mg/l/8hE\n      经口（鼠）LD50：＞2000 mg/kg\n刺激性：无资料',
+        '二乙二醇丁醚：\n毒性：经皮（鼠）LD50：＞2000 mg/kg\n      经口（鼠）LD50：=4500 mg/kg\n刺激性：无资料',
+      ];
+    } else {
+      detailParagraphs = [
+        'Hydroxy polyacrylate dispersion:\nToxicity: No data available;',
+        'Irritation: No data available.',
+        'Propylene glycol butyl ether:\nToxicity: Dermal (Rat)   LD50: > 2000 mg/kg\n        Inhalation (Rat) LD50: > 1997.718 mg/l/8hE\n        Oral (Rat)     LD50: > 2000 mg/kg\nIrritation: No data available.',
+        '2-(2-Butoxyethoxy)ethanol:\nToxicity: Dermal (Rat)   LD50: > 2000 mg/kg\n        Oral (Rat)     LD50: = 4500 mg/kg\nIrritation: No data available.',
+      ];
+    }
   }
   renderFullWidthRow(s11, 3, detailParagraphs, { isEnglish, isSection11: true, leftIndentTwips: 34, boldSubheaders: false, totalWidth: 9781 });
   engine.refresh();
@@ -1007,13 +1144,19 @@ export async function buildBaseChineseEngine({
     }
   }
 
-  // 9. 规范化 Section 2：自适应通栏复合模态 (Mode B) vs 标准 4 行
+  // 9. 规范化 Section 2：自适应通栏复合模态 (Mode B / PU-202A 危险品通栏) vs 标准 4 行
   let s2 = engine.records.find(r => r.sectionNumber === 2);
   const isNonHazComposite = Boolean(matchResult.facts?.isNonHazardousComposite || detectNonHazardousComposite(srcEngine.records, facts));
+  const isPu202a = modelCode === 'PU-202A' || /PU[-_]?202A/i.test(modelCode || '');
   if (s2) {
-    if (isNonHazComposite) {
+    if (isPu202a || isNonHazComposite) {
+      const picItem = matchResult.matchedSections?.find(s => s.sectionNumber === 2)?.matchedRows?.find(r => r.key === 'pictogram');
+      const drawingNodes = picItem?.drawingNodes || (picItem?.drawingNode ? [picItem.drawingNode] : null);
       buildFullWidthSection2(engine, {
         ...facts,
+        modelCode: modelCode || (isPu202a ? 'PU-202A' : ''),
+        drawingNodes,
+        srcEngine,
         section3ExemptionNotes: matchResult.facts?.section3ExemptionNotes || extractSection3ExemptionNotes(srcEngine.records.find(r => r.sectionNumber === 3))
       }, false);
     } else {
@@ -1042,11 +1185,11 @@ export async function buildBaseChineseEngine({
   }
 
   // 9.5 Section 11 & Section 12 双范式动态分流处理
-  const s11Paradigm = detectSection11Paradigm(facts?.section11 || srcEngine?.records?.find(r => r.sectionNumber === 11) || (isNonHazComposite ? { isMultiComponentComposite: true } : null));
+  const s11Paradigm = isPu202a ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || srcEngine?.records?.find(r => r.sectionNumber === 11) || (isNonHazComposite ? { isMultiComponentComposite: true } : null));
   if (s11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
-    buildThreeTierSection11(engine, facts, false);
+    buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || (isPu202a ? 'PU-202A' : '') }, false);
     cleanSection12Preambles(engine, false);
-  } else if (isNonHazComposite) {
+  } else if (isNonHazComposite || isPu202a) {
     cleanSection12Preambles(engine, false);
   }
 
@@ -1063,9 +1206,9 @@ export async function buildBaseChineseEngine({
     }
   }
 
-  // 11. 规范化 Section 11：剪枝所有无值纯空行与未测端点，若为纯声明型严格收敛为 2 行 (复合模态跳过，由 buildThreeTierSection11 专管)
+  // 11. 规范化 Section 11：剪枝所有无值纯空行与未测端点，若为纯声明型严格收敛为 2 行 (通栏复合模态跳过，由 buildThreeTierSection11 专管)
   let s11 = engine.records.find(r => r.sectionNumber === 11);
-  if (s11 && !isNonHazComposite) {
+  if (s11 && !isNonHazComposite && !isPu202a && s11Paradigm !== 'PARADIGM_1_FULL_WIDTH_MERGED') {
     const hasPreambleOnly = s11.rows.length >= 2 && /无可用的毒理学研究/i.test(s11.rows[1].cells[0]?.text || '') &&
       !s11.rows.slice(2).some(row => row.cells.slice(1).some(c => {
         const t = (c.text || '').trim();
@@ -1323,6 +1466,7 @@ export async function buildBaseEnglishEngine({
   const isOutdated = !baseCnEngine?._adaptiveRevisionDate || baseCnEngine._adaptiveRevisionDate.startsWith('2023') || baseCnEngine._adaptiveRevisionDate.startsWith('2024') || baseCnEngine._adaptiveRevisionDate.startsWith('2025');
   const effectiveRevisionDate = revisionDate || (!isOutdated ? baseCnEngine._adaptiveRevisionDate : todayDateStr);
   const isNonHazComposite = Boolean(facts.isNonHazardousComposite || (baseCnEngine && detectNonHazardousComposite(baseCnEngine.records, facts)));
+  const isPu202a = modelCode === 'PU-202A' || /PU[-_]?202A/i.test(modelCode || '');
 
   updateHeaderFooterData(engine, {
     model: modelCode,
@@ -1374,16 +1518,24 @@ export async function buildBaseEnglishEngine({
     }
   }
 
-  // Section 2 (非危品严格 4 行对称，危害品动态展开，457 dxa 悬挂缩进)
+  // Section 2 (非危品严格 4 行对称，危害品动态展开/通栏装配，457 dxa 悬挂缩进)
   let s2 = engine.records.find(r => r.sectionNumber === 2);
   if (s2) {
     const isNonHaz = enValues['sec2.is_non_haz'] !== false;
     const isNonHazComposite = Boolean(facts.isNonHazardousComposite || (baseCnEngine && detectNonHazardousComposite(baseCnEngine.records, facts)));
-    if (isNonHazComposite) {
-      buildFullWidthSection2(engine, facts, true);
-      const enS11Paradigm = detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || { isMultiComponentComposite: true });
+    const isPu202a = modelCode === 'PU-202A' || /PU[-_]?202A/i.test(modelCode || '');
+    if (isPu202a || isNonHazComposite) {
+      const cnPicCell = baseCnEngine?.records?.find(r => r.sectionNumber === 2)?.rows[1]?.cells[0];
+      const drawingNodes = facts.drawingNodes || Array.from(cnPicCell?.node?.getElementsByTagNameNS('*', 'drawing') || []);
+      buildFullWidthSection2(engine, {
+        ...facts,
+        modelCode: modelCode || (isPu202a ? 'PU-202A' : ''),
+        drawingNodes: drawingNodes.length > 0 ? drawingNodes : facts.drawingNodes,
+        srcEngine: baseCnEngine || facts.srcEngine
+      }, true);
+      const enS11Paradigm = isPu202a ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || { isMultiComponentComposite: true });
       if (enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
-        buildThreeTierSection11(engine, facts, true);
+        buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || (isPu202a ? 'PU-202A' : '') }, true);
       }
       cleanSection12Preambles(engine, true);
     } else if (isNonHaz) {
@@ -1727,7 +1879,8 @@ export async function buildBaseEnglishEngine({
 
   // Section 11 【核心重构：彻底废除硬编码假数据与粗暴删行，基于中文母版实测端点动态英译装配】
   let s11 = engine.records.find(r => r.sectionNumber === 11);
-  if (s11 && isNonHazComposite) {
+  const enS11Paradigm = isPu202a ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || { isMultiComponentComposite: true });
+  if (s11 && (isNonHazComposite || isPu202a || enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED')) {
     // Mode B 通栏复合豁免模态：已由 buildThreeTierSection11 全权接管，跳过传统单端点映射以防中文污染
   } else if (s11) {
     const cnS11 = baseCnEngine?.records?.find(r => r.sectionNumber === 11);
@@ -2259,7 +2412,7 @@ export async function batchExportDeliverables({
     try {
       const auditModule = await import('../scripts/audit_bipolar_bilayer.mjs');
       if (auditModule?.runBipolarBilayerAudit) {
-        const auditRes = await auditModule.runBipolarBilayerAudit(targetDir);
+        const auditRes = await auditModule.runBipolarBilayerAudit(targetDir, modelCode);
         if (!auditRes.success) {
           throw new Error(`【质量门禁拦截 (Gate 12)】${modelCode} 产出物双极双层全景深度审计未通过，存在 ${auditRes.failCount} 项严重违章！立即阻断交付。`);
         }
@@ -3170,7 +3323,7 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
           const bEl = run.getElementsByTagNameNS(W_NS, 'b')[0];
           const isBold = bEl && bEl.getAttributeNS(W_NS, 'val') !== '0';
           if (isBold) {
-            const isSubLabel = /^(预防措施|事故响应|安全储存|废弃处置|经口|吸入|经皮|物种|分类|结果|Oral|Inhalation|Dermal|Species|Classification|Result)[：:]?$/i.test(runText);
+            const isSubLabel = /^(预防措施|事故响应|安全储存|废弃处置|经口|吸入|经皮|物种|分类|结果|Oral|Inhalation|Dermal|Species|Classification|Result|Prevention|Response|Storage|Disposal)[：:]?$/i.test(runText);
             if (!isSubLabel) {
               throw new Error(`【质量门禁拦截 (Gate 8)】${docName} 表格 ${t + 1} 行 ${r + 1} 列 ${c + 1} 发现非法加粗数值: "${runText}"！违反 G-11 字体分离法定不变量。`);
             }
@@ -3190,10 +3343,10 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
     }
   }
 
-  // Gate 9: 标点完整性与句末闭合/防悬挂标点 (G-26)
+  // Gate 9: 标点完整性与句末闭合/防悬挂标点 (G-26, 专属于 Paradigm 1 通栏详述模式)
   if (isEnglish) {
     const s11En = engine.records.find(r => r.sectionNumber === 11);
-    if (s11En && s11En.rows.length >= 4) {
+    if (s11En && s11En.rows.length === 4 && s11En.rows[3]?.cells?.length === 1) {
       const row3PList = Array.from(s11En.rows[3].cells[0]?.node?.getElementsByTagNameNS(W_NS, 'p') || []);
       for (const p of row3PList) {
         const t = (p.textContent || '').trim();
@@ -3204,7 +3357,7 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
     }
   } else {
     const s11Cn = engine.records.find(r => r.sectionNumber === 11);
-    if (s11Cn && s11Cn.rows.length >= 4) {
+    if (s11Cn && s11Cn.rows.length === 4 && s11Cn.rows[3]?.cells?.length === 1) {
       const row3Text = s11Cn.rows[3].cells[0]?.text || '';
       if (!row3Text.includes('\n') && /mg\/kg刺激性|mg\/l刺激性|mg\/m3刺激性/.test(row3Text)) {
         throw new Error(`【质量门禁拦截 (Gate 9)】${docName} Section 11 通栏详述段落发现文本标签粘连碰撞: "mg/kg刺激性"！必须以分号分隔并句末闭合。`);
@@ -3212,9 +3365,9 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
     }
   }
 
-  // Gate 10: 反多空格排版公理 (G-28: 正文中严禁无序连续空格；但在 Section 11 软换行垂直列对齐中，允许法定 6 空格(CN)与 10/14 空格(EN)缩进)
+  // Gate 10: 反多空格排版公理 (G-28, 专属于 Paradigm 1 通栏模式详述段落；但在 Section 11 软换行垂直列对齐中，允许法定 6 空格(CN)与 10/14 空格(EN)缩进)
   const s11Check = engine.records.find(r => r.sectionNumber === 11);
-  if (s11Check && s11Check.rows.length >= 4) {
+  if (s11Check && s11Check.rows.length === 4 && s11Check.rows[3]?.cells?.length === 1) {
     const r3PList = Array.from(s11Check.rows[3].cells[0]?.node?.getElementsByTagNameNS(W_NS, 'p') || []);
     for (const p of r3PList) {
       const t = p.textContent || '';
@@ -3225,11 +3378,12 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
     }
   }
 
-  // Gate 11: 中英文双语结构拓扑同构公理 (G-25)
-  if (s11Check && s11Check.rows.length === 4) {
+  // Gate 11: 中英文双语结构拓扑同构公理 (G-25, 专属于 Paradigm 1 通栏模式)
+  if (s11Check && s11Check.rows.length === 4 && s11Check.rows[3]?.cells?.length === 1) {
     const r3PList = Array.from(s11Check.rows[3].cells[0]?.node?.getElementsByTagNameNS(W_NS, 'p') || []);
-    if (r3PList.length !== 4) {
-      throw new Error(`【质量门禁拦截 (Gate 11)】${docName} Section 11 通栏模式段落数异常: 实测 ${r3PList.length} 段 (必须严格保持 4 段同构)!`);
+    const expectedLen = sourceFacts?.modelCode === 'PA-3223' ? 4 : (sourceFacts?.modelCode === 'PU-202A' ? 1 : null);
+    if (expectedLen !== null && r3PList.length !== expectedLen) {
+      throw new Error(`【质量门禁拦截 (Gate 11)】${docName} Section 11 通栏模式段落数异常: 实测 ${r3PList.length} 段 (必须严格保持 ${expectedLen} 段同构)!`);
     }
   }
 }

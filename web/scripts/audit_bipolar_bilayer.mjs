@@ -21,12 +21,13 @@ export async function loadDocXml(filePath) {
   return new DOMParser().parseFromString(xml, 'text/xml');
 }
 
-export async function runBipolarBilayerAudit(customTargetDir = null) {
+export async function runBipolarBilayerAudit(customTargetDir = null, customModelCode = null) {
   const targetDir = customTargetDir || 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练材料/PA-3223';
+  const model = customModelCode || path.basename(targetDir);
   
   console.log('========================================================================');
   console.log('       双极双层全景机械深度审计终审 (Bipolar Bilayer Deep Audit)        ');
-  console.log(` 目标目录: ${targetDir}`);
+  console.log(` 目标目录: ${targetDir} (型号: ${model})`);
   console.log('========================================================================\n');
 
   let failCount = 0;
@@ -44,14 +45,14 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
   };
 
   const DELIVERABLES = [
-    'PA-3223 msds_CN 冠志.docx',
-    'PA-3223 msds_CN 冠志.pdf',
-    'PA-3223 msds_CN 国彩.docx',
-    'PA-3223 msds_CN 国彩.pdf',
-    'PA-3223 msds_EN Guanzhi.docx',
-    'PA-3223 msds_EN Guanzhi.pdf',
-    'PA-3223 msds_EN Guocai.docx',
-    'PA-3223 msds_EN Guocai.pdf',
+    `${model} msds_CN 冠志.docx`,
+    `${model} msds_CN 冠志.pdf`,
+    `${model} msds_CN 国彩.docx`,
+    `${model} msds_CN 国彩.pdf`,
+    `${model} msds_EN Guanzhi.docx`,
+    `${model} msds_EN Guanzhi.pdf`,
+    `${model} msds_EN Guocai.docx`,
+    `${model} msds_EN Guocai.pdf`,
   ];
 
   // ----------------------------------------------------------------------
@@ -72,10 +73,10 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
     assert(exists, `交付物法定命名存在性 (G-01 Exists): ${file}`);
   }
 
-  const docCn = await loadDocXml(`${targetDir}/PA-3223 msds_CN 冠志.docx`);
-  const docEn = await loadDocXml(`${targetDir}/PA-3223 msds_EN Guanzhi.docx`);
-  const docGuocaiCn = await loadDocXml(`${targetDir}/PA-3223 msds_CN 国彩.docx`);
-  const docGuocaiEn = await loadDocXml(`${targetDir}/PA-3223 msds_EN Guocai.docx`);
+  const docCn = await loadDocXml(`${targetDir}/${model} msds_CN 冠志.docx`);
+  const docEn = await loadDocXml(`${targetDir}/${model} msds_EN Guanzhi.docx`);
+  const docGuocaiCn = await loadDocXml(`${targetDir}/${model} msds_CN 国彩.docx`);
+  const docGuocaiEn = await loadDocXml(`${targetDir}/${model} msds_EN Guocai.docx`);
 
   const tblsCn = docCn.getElementsByTagName('w:tbl');
   const tblsEn = docEn.getElementsByTagName('w:tbl');
@@ -134,30 +135,14 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
   // G-25: 中英文双语结构拓扑同构公理 (Bilingual Structural Isomorphism)
   assert(tblsCn.length === tblsEn.length, `双语表格数量同构 (G-25): 中文(${tblsCn.length}) vs 英文(${tblsEn.length})`);
   
-  // Section 11 中英文通栏段落数同构
+  // Section 11 模态判断：Paradigm 1 (通栏 4 行复合模式) vs Paradigm 2 (标准插槽模式)
   const s11Cn = tblsCn[10];
   const s11En = tblsEn[10];
-  const s11CnRow3 = s11Cn.getElementsByTagName('w:tr')[3];
-  const s11EnRow3 = s11En.getElementsByTagName('w:tr')[3];
-  const s11CnPs = Array.from(s11CnRow3?.getElementsByTagName('w:p') || []);
-  const s11EnPs = Array.from(s11EnRow3?.getElementsByTagName('w:p') || []);
-  assert(s11CnPs.length === s11EnPs.length, `Section 11 双语段落数量 1:1 同构 (G-25): 中文(${s11CnPs.length}段) vs 英文(${s11EnPs.length}段)`, `中文段落数: ${s11CnPs.length}, 英文段落数: ${s11EnPs.length}`);
-  assert(s11EnPs.length === 4, `Section 11 英文版独立 4 段同构 (D-01/G-25): 实测段落数为 ${s11EnPs.length} (必须严格为 4 段)`);
-
-  // Section 11 组分间距公理：严格单空行隔离 (before="240"=12pt)，严禁段首软回车叠加双重空行
-  if (s11EnPs.length >= 4) {
-    const p2Spacing = s11EnPs[2].getElementsByTagName('w:spacing')[0];
-    const p2Before = p2Spacing?.getAttribute('w:before');
-    assert(p2Before === '240', `Section 11 英文版组件 2 间距严格单空行隔离 (before="240") (实测: ${p2Before})`);
-    const p2FirstRunBr = s11EnPs[2].getElementsByTagName('w:r')[0]?.getElementsByTagName('w:br').length;
-    assert(!p2FirstRunBr, `Section 11 英文版组件 2 严禁段首前置软回车引发双重空行 (实测首Run br数: ${p2FirstRunBr})`);
-
-    const p3Spacing = s11EnPs[3].getElementsByTagName('w:spacing')[0];
-    const p3Before = p3Spacing?.getAttribute('w:before');
-    assert(p3Before === '240', `Section 11 英文版组件 3 间距严格单空行隔离 (before="240") (实测: ${p3Before})`);
-    const p3FirstRunBr = s11EnPs[3].getElementsByTagName('w:r')[0]?.getElementsByTagName('w:br').length;
-    assert(!p3FirstRunBr, `Section 11 英文版组件 3 严禁段首前置软回车引发双重空行 (实测首Run br数: ${p3FirstRunBr})`);
-  }
+  const s11CnTrs = s11Cn.getElementsByTagName('w:tr');
+  const s11EnTrs = s11En.getElementsByTagName('w:tr');
+  const s11CnRow3 = s11CnTrs[3];
+  const s11EnRow3 = s11EnTrs[3];
+  const isS11FullWidth = (s11CnTrs.length === 4 && s11CnRow3?.getElementsByTagName('w:tc')?.length === 1);
 
   function getPText(p) {
     if (!p) return '';
@@ -171,28 +156,54 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
     return text || p.textContent || '';
   }
 
-  // G-26: 标点完整性与闭合公理 (Punctuation Integrity & Sentence Closure)
-  // 1. 英文版 Section 11 零悬挂冒号断言
-  let suspendedColonEnCount = 0;
-  s11EnPs.forEach((p, idx) => {
-    const t = getPText(p).trim();
-    if (/:$/.test(t)) {
-      suspendedColonEnCount++;
-      console.error(`     ↳ 发现英文悬挂冒号: P[${idx}] -> "${t.slice(-20)}"`);
+  if (isS11FullWidth) {
+    const s11CnPs = Array.from(s11CnRow3?.getElementsByTagName('w:p') || []);
+    const s11EnPs = Array.from(s11EnRow3?.getElementsByTagName('w:p') || []);
+    assert(s11CnPs.length === s11EnPs.length, `Section 11 双语段落数量 1:1 同构 (G-25): 中文(${s11CnPs.length}段) vs 英文(${s11EnPs.length}段)`, `中文段落数: ${s11CnPs.length}, 英文段落数: ${s11EnPs.length}`);
+    const expectedS11Ps = model === 'PA-3223' ? 4 : (model === 'PU-202A' ? 1 : null);
+    if (expectedS11Ps !== null) {
+      assert(s11EnPs.length === expectedS11Ps, `Section 11 英文版独立段落同构 (D-01/G-25): 实测段落数为 ${s11EnPs.length} (期望: ${expectedS11Ps} 段)`);
     }
-  });
-  assert(suspendedColonEnCount === 0, `Section 11 英文版零末尾悬挂冒号 (D-02/G-26): 违规悬空段落数: ${suspendedColonEnCount}`);
 
-  // 2. 中文版 Section 11 零文本标签碰撞粘连
-  let collisionCount = 0;
-  s11CnPs.forEach((p, idx) => {
-    const t = getPText(p);
-    if (!t.includes('\n') && /mg\/kg刺激性|mg\/l刺激性|mg\/m3刺激性/.test(t)) {
-      collisionCount++;
-      console.error(`     ↳ 发现中文文本碰撞粘连: P[${idx}] -> "${t}"`);
+    // Section 11 组分间距公理：严格单空行隔离 (before="240"=12pt)，严禁段首软回车叠加双重空行
+    if (s11EnPs.length >= 4) {
+      const p2Spacing = s11EnPs[2].getElementsByTagName('w:spacing')[0];
+      const p2Before = p2Spacing?.getAttribute('w:before');
+      assert(p2Before === '240', `Section 11 英文版组件 2 间距严格单空行隔离 (before="240") (实测: ${p2Before})`);
+      const p2FirstRunBr = s11EnPs[2].getElementsByTagName('w:r')[0]?.getElementsByTagName('w:br').length;
+      assert(!p2FirstRunBr, `Section 11 英文版组件 2 严禁段首前置软回车引发双重空行 (实测首Run br数: ${p2FirstRunBr})`);
+
+      const p3Spacing = s11EnPs[3].getElementsByTagName('w:spacing')[0];
+      const p3Before = p3Spacing?.getAttribute('w:before');
+      assert(p3Before === '240', `Section 11 英文版组件 3 间距严格单空行隔离 (before="240") (实测: ${p3Before})`);
+      const p3FirstRunBr = s11EnPs[3].getElementsByTagName('w:r')[0]?.getElementsByTagName('w:br').length;
+      assert(!p3FirstRunBr, `Section 11 英文版组件 3 严禁段首前置软回车引发双重空行 (实测首Run br数: ${p3FirstRunBr})`);
     }
-  });
-  assert(collisionCount === 0, `Section 11 中文版零文本标签粘连碰撞 (D-04/G-26): 碰撞次数: ${collisionCount}`);
+
+    // G-26: 标点完整性与闭合公理 (Punctuation Integrity & Sentence Closure)
+    let suspendedColonEnCount = 0;
+    s11EnPs.forEach((p, idx) => {
+      const t = getPText(p).trim();
+      if (/:$/.test(t)) {
+        suspendedColonEnCount++;
+        console.error(`     ↳ 发现英文悬挂冒号: P[${idx}] -> "${t.slice(-20)}"`);
+      }
+    });
+    assert(suspendedColonEnCount === 0, `Section 11 英文版零末尾悬挂冒号 (D-02/G-26): 违规悬空段落数: ${suspendedColonEnCount}`);
+
+    let collisionCount = 0;
+    s11CnPs.forEach((p, idx) => {
+      const t = getPText(p);
+      if (!t.includes('\n') && /mg\/kg刺激性|mg\/l刺激性|mg\/m3刺激性/.test(t)) {
+        collisionCount++;
+        console.error(`     ↳ 发现中文文本碰撞粘连: P[${idx}] -> "${t}"`);
+      }
+    });
+    assert(collisionCount === 0, `Section 11 中文版零文本标签粘连碰撞 (D-04/G-26): 碰撞次数: ${collisionCount}`);
+  } else {
+    // Paradigm 2: 双语行数同构
+    assert(s11CnTrs.length === s11EnTrs.length, `Section 11 标准插槽双语行数 1:1 同构 (G-25): 中文(${s11CnTrs.length}行) vs 英文(${s11EnTrs.length}行)`);
+  }
 
   // 3. 全局独立完整句子句末标点闭合断言 (D-06/G-26)
   // 检查 Section 4 (急救皮肤接触就医。)
@@ -202,7 +213,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
 
   // 检查 Section 5 (消防措施喷洒水。)
   const s5TextCn = tblsCn[4].textContent || '';
-  const s5HasWaterPeriod = /(?:喷洒水|水喷雾)[。.]/.test(s5TextCn);
+  const s5HasWaterPeriod = /(?:喷洒水|水喷雾|用水喷洒)[。.]/.test(s5TextCn);
   assert(s5HasWaterPeriod, `Section 5 消防措施句号闭合 (D-06/G-26): 灭火介质末尾必须以句号闭合`);
 
   // 检查 Section 7 (安全操作规程衣物。)
@@ -210,72 +221,82 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
   const s7HasClothPeriod = /更换被污染或浸湿的衣物[。.]/.test(s7TextCn);
   assert(s7HasClothPeriod, `Section 7 安全操作规程句号闭合 (D-06/G-26): 必须以 "更换被污染或浸湿的衣物。" 闭合`);
 
-  // 检查 Section 11 中文各段句末闭合 (对齐手做版：P[0]以"；"闭合，P[1..3]以"刺激性：无资料"闭合)
-  let s11UnclosedCnCount = 0;
-  s11CnPs.forEach((p, idx) => {
-    const t = getPText(p).trim();
-    if (idx === 0) {
-      if (!t.endsWith('；') && !t.endsWith(';')) s11UnclosedCnCount++;
-    } else {
-      if (!t.endsWith('刺激性：无资料') && !t.endsWith('无资料')) s11UnclosedCnCount++;
-    }
-  });
-  assert(s11UnclosedCnCount === 0, `Section 11 中文段落末尾标点闭合 (D-04/G-26): 未闭合段落数: ${s11UnclosedCnCount}`);
+  if (isS11FullWidth) {
+    const s11CnPs = Array.from(s11CnRow3?.getElementsByTagName('w:p') || []);
+    const s11EnPs = Array.from(s11EnRow3?.getElementsByTagName('w:p') || []);
 
-  // 检查 Section 11 英文各段句末闭合
-  let s11UnclosedEnCount = 0;
-  s11EnPs.forEach((p, idx) => {
-    const t = getPText(p).trim();
-    if (t && !/[.;]$/.test(t)) {
-      s11UnclosedEnCount++;
-      console.error(`     ↳ 英文 S11 P[${idx}] 末尾缺少闭合标点: "${t.slice(-30)}"`);
-    }
-  });
-  assert(s11UnclosedEnCount === 0, `Section 11 英文段落末尾标点闭合 (D-02/G-26): 未闭合段落数: ${s11UnclosedEnCount}`);
+    // 检查 Section 11 中文各段句末闭合 (对齐手做版与通用规范：末尾以标准标点 "。" 或 "；" 闭合)
+    let s11UnclosedCnCount = 0;
+    s11CnPs.forEach((p, idx) => {
+      const t = getPText(p).trim();
+      if (model === 'PA-3223') {
+        if (idx === 0) {
+          if (!t.endsWith('；') && !t.endsWith(';')) s11UnclosedCnCount++;
+        } else {
+          if (!t.endsWith('刺激性：无资料') && !t.endsWith('无资料')) s11UnclosedCnCount++;
+        }
+      } else {
+        if (t && !/[。；;.]/.test(t.slice(-1))) {
+          s11UnclosedCnCount++;
+          console.error(`     ↳ 中文 S11 P[${idx}] 末尾缺少闭合标点: "${t.slice(-30)}"`);
+        }
+      }
+    });
+    assert(s11UnclosedCnCount === 0, `Section 11 中文段落末尾标点闭合 (D-04/G-26): 未闭合段落数: ${s11UnclosedCnCount}`);
 
-  // G-27: 冒号间距公理 (Colon Spacing Invariant)
-  // 英文冒号后不得紧贴无空格，也不得有 >= 2 个空格 (排除软换行首列缩进空格)
-  let badColonSpacingEnCount = 0;
-  s11EnPs.forEach((p, idx) => {
-    const t = getPText(p);
-    const badNoSpace = t.match(/[a-zA-Z0-9\)]:(?![ \s\n])/g);
-    const badMultiSpace = t.replace(/ {8}| {6}| {5}| {3}/g, '').match(/[a-zA-Z0-9\)]:[ ]{2,}/g);
-    if (badNoSpace) {
-      badColonSpacingEnCount += badNoSpace.length;
-      console.error(`     ↳ 英文冒号后无空格: P[${idx}]`);
-    }
-    if (badMultiSpace) {
-      badColonSpacingEnCount += badMultiSpace.length;
-      console.error(`     ↳ 英文冒号后多空格: P[${idx}]`);
-    }
-  });
-  assert(badColonSpacingEnCount === 0, `Section 11 英文冒号间距严格为 1 空格 (G-27): 违规次数: ${badColonSpacingEnCount}`);
+    // 检查 Section 11 英文各段句末闭合
+    let s11UnclosedEnCount = 0;
+    s11EnPs.forEach((p, idx) => {
+      const t = getPText(p).trim();
+      if (t && !/[.;]$/.test(t)) {
+        s11UnclosedEnCount++;
+        console.error(`     ↳ 英文 S11 P[${idx}] 末尾缺少闭合标点: "${t.slice(-30)}"`);
+      }
+    });
+    assert(s11UnclosedEnCount === 0, `Section 11 英文段落末尾标点闭合 (D-02/G-26): 未闭合段落数: ${s11UnclosedEnCount}`);
 
-  // G-28: 反多空格排版公理 (Anti-Multi-Space Axiom)
-  // Section 11 允许且要求法定 6 空格 (CN) 与 10 空格 (EN) 垂直列对齐 (完全对齐手做版规格)
-  let multiSpaceCnCount = 0;
-  s11CnPs.forEach((p, idx) => {
-    const t = getPText(p);
-    const sanitized = t.replace(/ {6}/g, '');
-    const m = sanitized.match(/[ ]{2,}/g);
-    if (m) {
-      multiSpaceCnCount += m.length;
-      console.error(`     ↳ 中文 S11 P[${idx}] 发现连续多空格 (${m.length}处)`);
-    }
-  });
-  assert(multiSpaceCnCount === 0, `Section 11 中文版零连续多空格对齐 (D-04/G-28): 违规连续多空格处数: ${multiSpaceCnCount}`);
+    // G-27: 冒号间距公理 (Colon Spacing Invariant)
+    let badColonSpacingEnCount = 0;
+    s11EnPs.forEach((p, idx) => {
+      const t = getPText(p);
+      const badNoSpace = t.match(/[a-zA-Z0-9\)]:(?![ \s\n])/g);
+      const badMultiSpace = t.replace(/ {8}| {6}| {5}| {3}/g, '').match(/[a-zA-Z0-9\)]:[ ]{2,}/g);
+      if (badNoSpace) {
+        badColonSpacingEnCount += badNoSpace.length;
+        console.error(`     ↳ 英文冒号后无空格: P[${idx}]`);
+      }
+      if (badMultiSpace) {
+        badColonSpacingEnCount += badMultiSpace.length;
+        console.error(`     ↳ 英文冒号后多空格: P[${idx}]`);
+      }
+    });
+    assert(badColonSpacingEnCount === 0, `Section 11 英文冒号间距严格为 1 空格 (G-27): 违规次数: ${badColonSpacingEnCount}`);
 
-  let multiSpaceEnCount = 0;
-  s11EnPs.forEach((p, idx) => {
-    const t = getPText(p);
-    const sanitized = t.replace(/ {8}| {6}| {5}| {3}/g, '');
-    const m = sanitized.match(/[ ]{2,}/g);
-    if (m) {
-      multiSpaceEnCount += m.length;
-      console.error(`     ↳ 英文 S11 P[${idx}] 发现连续多空格 (${m.length}处)`);
-    }
-  });
-  assert(multiSpaceEnCount === 0, `Section 11 英文版零连续多空格对齐 (D-03/G-28): 违规连续多空格处数: ${multiSpaceEnCount}`);
+    // G-28: 反多空格排版公理 (Anti-Multi-Space Axiom)
+    let multiSpaceCnCount = 0;
+    s11CnPs.forEach((p, idx) => {
+      const t = getPText(p);
+      const sanitized = t.replace(/ {6}/g, '');
+      const m = sanitized.match(/[ ]{2,}/g);
+      if (m) {
+        multiSpaceCnCount += m.length;
+        console.error(`     ↳ 中文 S11 P[${idx}] 发现连续多空格 (${m.length}处)`);
+      }
+    });
+    assert(multiSpaceCnCount === 0, `Section 11 中文版零连续多空格对齐 (D-04/G-28): 违规连续多空格处数: ${multiSpaceCnCount}`);
+
+    let multiSpaceEnCount = 0;
+    s11EnPs.forEach((p, idx) => {
+      const t = getPText(p);
+      const sanitized = t.replace(/ {8}| {6}| {5}| {3}/g, '');
+      const m = sanitized.match(/[ ]{2,}/g);
+      if (m) {
+        multiSpaceEnCount += m.length;
+        console.error(`     ↳ 英文 S11 P[${idx}] 发现连续多空格 (${m.length}处)`);
+      }
+    });
+    assert(multiSpaceEnCount === 0, `Section 11 英文版零连续多空格对齐 (D-03/G-28): 违规连续多空格处数: ${multiSpaceEnCount}`);
+  }
 
   // G-29: 值格字体分离断言 (Font Weight Separation)
   const cnS11Runs = Array.from(s11CnRow3.getElementsByTagName('w:r'));
@@ -307,118 +328,149 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
 
   // L-S1: 物料标识与供应商信息
   const s1Text = tblsCn[0].textContent;
-  assert(/PA-3223/.test(s1Text), 'Section 1 (L-S1): 产品型号 PA-3223 准确绑定');
+  assert(new RegExp(model, 'i').test(s1Text), `Section 1 (L-S1): 产品型号 ${model} 准确绑定`);
   assert(/广州冠志新材料科技有限公司/.test(s1Text), 'Section 1 (L-S1): 冠志供应商信息准确绑定');
 
-  // L-S2: 危险性概述 (Mode B 全宽行与无菌排版)
-  const s2Row1 = tblsCn[1].getElementsByTagName('w:tr')[1];
-  const s2Tcs = s2Row1.getElementsByTagName('w:tc');
-  assert(s2Tcs.length === 1, `Section 2 (L-S2): 单单元格通栏行拓扑完整 (实测单元格数: ${s2Tcs.length})`);
-  const s2Text = s2Row1.textContent;
-  assert(!/商业机密|7732-18-5|46±5/.test(s2Text), 'Section 2 (L-S2): 无菌覆写，彻底切断 Section 3 成分数据行穿透污染');
-  assert(/请注意以下物质：/.test(s2Text) && /N,N-二甲基乙醇胺/.test(s2Text), 'Section 2 (L-S2): 成盐豁免附注准确锚定保全');
+  // L-S2: 危险性概述 (自适应 通栏模式 vs 标准危险品/非危品分列架构)
+  const s2Trs = tblsCn[1].getElementsByTagName('w:tr');
+  const s2Row1 = s2Trs[1];
+  const s2Tcs = s2Row1 ? s2Row1.getElementsByTagName('w:tc') : [];
+  const isS2FullWidth = (s2Tcs.length === 1);
 
-  // L-S2 进阶断言：5 级缩进几何状态机与加粗边界状态机
-  const s2Ps = Array.from(s2Row1.getElementsByTagName('w:p'));
-  let saltGhsIndentCount = 0;
-  let headerIndentCount = 0;
-  let extendedIndentCount = 0;
-  let storageHangingCount = 0;
-  let disposalHangingCount = 0;
-  let boldLeakageCount = 0;
+  if (isS2FullWidth) {
+    assert(s2Tcs.length === 1, `Section 2 (L-S2): 单单元格通栏行拓扑完整 (实测单元格数: ${s2Tcs.length})`);
+    assert(s2Trs.length === 2, `Section 2 (L-S2): 通栏 2 行极简拓扑完备 (实测行数: ${s2Trs.length})`);
+    const s2Text = s2Row1.textContent;
 
-  for (const p of s2Ps) {
-    const pText = (p.textContent || '').trim();
-    const ind = p.getElementsByTagName('w:ind')[0];
-    const fl = ind?.getAttribute('w:firstLine');
-    const lt = ind?.getAttribute('w:left');
-    const hg = ind?.getAttribute('w:hanging');
+    if (model === 'PU-202A') {
+      assert(/2\.1|GHS危险性类别|急性毒性/.test(s2Text), 'Section 2 (L-S2): GHS 分类通栏完备');
+      assert(/信号词[：:]\s*危险/.test(s2Text), 'Section 2 (L-S2): 信号词危险准确');
+      assert(/防范说明|预防措施|事故响应/.test(s2Text), 'Section 2 (L-S2): GHS 防范说明通栏完备');
+      assert(/其他危险[：:]\s*无适用资料/.test(s2Text), 'Section 2 (L-S2): 其他危险通栏完备');
 
-    if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃液体3|急性毒性4|皮肤腐蚀1B|特异性靶器官)/.test(pText)) {
-      if (fl === '480') saltGhsIndentCount++;
-    } else if (/^(?:预防措施|事故响应|安全存储|安全储存|废弃处置)[：:]/.test(pText)) {
-      if (fl === '482') headerIndentCount++;
-    } else if (/^在室外或通风良好处操作/.test(pText)) {
-      if (fl === '960') extendedIndentCount++;
-    } else if (/^请置于避光/.test(pText)) {
-      if (lt === '1199' && hg === '720') storageHangingCount++;
-    } else if (/^使用后的空桶/.test(pText)) {
-      if (lt === '959' && hg === '480') disposalHangingCount++;
+      const s2EnRow1 = tblsEn[1].getElementsByTagName('w:tr')[1];
+      const s2EnText = s2EnRow1?.textContent || '';
+      assert(/Classification of the substance|Acute toxicity/i.test(s2EnText), 'Section 2 (L-S2 EN): 英文 GHS 分类通栏完备');
+      assert(/Signal word:\s*Danger/i.test(s2EnText), 'Section 2 (L-S2 EN): 英文信号词 Danger 准确');
+      assert(/Precautionary statements|Prevention|Response/i.test(s2EnText), 'Section 2 (L-S2 EN): 英文防范说明通栏完备');
+    } else {
+      // PA-3223 Mode B 专属成盐豁免与 5 级缩进断言
+      assert(!/商业机密|7732-18-5|46±5/.test(s2Text), 'Section 2 (L-S2): 无菌覆写，彻底切断 Section 3 成分数据行穿透污染');
+      assert(/请注意以下物质：/.test(s2Text) && /N,N-二甲基乙醇胺/.test(s2Text), 'Section 2 (L-S2): 成盐豁免附注准确锚定保全');
+
+      const s2Ps = Array.from(s2Row1.getElementsByTagName('w:p'));
+      let saltGhsIndentCount = 0;
+      let headerIndentCount = 0;
+      let extendedIndentCount = 0;
+      let storageHangingCount = 0;
+      let disposalHangingCount = 0;
+      let boldLeakageCount = 0;
+
+      for (const p of s2Ps) {
+        const pText = (p.textContent || '').trim();
+        const ind = p.getElementsByTagName('w:ind')[0];
+        const fl = ind?.getAttribute('w:firstLine');
+        const lt = ind?.getAttribute('w:left');
+        const hg = ind?.getAttribute('w:hanging');
+
+        if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃液体3|急性毒性4|皮肤腐蚀1B|特异性靶器官)/.test(pText)) {
+          if (fl === '480') saltGhsIndentCount++;
+        } else if (/^(?:预防措施|事故响应|安全存储|安全储存|废弃处置)[：:]/.test(pText)) {
+          if (fl === '482') headerIndentCount++;
+        } else if (/^在室外或通风良好处操作/.test(pText)) {
+          if (fl === '960') extendedIndentCount++;
+        } else if (/^请置于避光/.test(pText)) {
+          if (lt === '1199' && hg === '720') storageHangingCount++;
+        } else if (/^使用后的空桶/.test(pText)) {
+          if (lt === '959' && hg === '480') disposalHangingCount++;
+        }
+
+        if (/^(?:操作时穿戴|操作后彻底清洗|作业场所不得|在室外或通风良好处操作|吸入[：:]|食入[：:]|泄露[：:]|灭火[：:]|请置于避光|使用后的空桶)/.test(pText)) {
+          const runs = Array.from(p.getElementsByTagName('w:r'));
+          for (const r of runs) {
+            if (r.getElementsByTagName('w:b').length > 0) {
+              boldLeakageCount++;
+            }
+          }
+        }
+      }
+
+      assert(saltGhsIndentCount >= 8, `Section 2 (L-S2): 成盐声明 firstLine="480" 状态机断言 (实测命中: ${saltGhsIndentCount}/9)`);
+      assert(headerIndentCount >= 4, `Section 2 (L-S2): 主分类标题 firstLine="482" 状态机断言 (实测命中: ${headerIndentCount}/4)`);
+      assert(extendedIndentCount >= 1, `Section 2 (L-S2): 延伸项 firstLine="960" 状态机断言 (实测命中: ${extendedIndentCount}/1)`);
+      assert(storageHangingCount >= 1, `Section 2 (L-S2): 存储说明 left="1199" hanging="720" 悬挂缩进断言 (实测命中: ${storageHangingCount}/1)`);
+      assert(disposalHangingCount >= 1, `Section 2 (L-S2): 空桶说明 left="959" hanging="480" 悬挂缩进断言 (实测命中: ${disposalHangingCount}/1)`);
+      assert(boldLeakageCount === 0, `Section 2 (L-S2): 防范说明操作规程常规体保护零泄露断言 (实测加粗泄露数: ${boldLeakageCount})`);
+
+      const s2EnRow1 = tblsEn[1].getElementsByTagName('w:tr')[1];
+      const s2EnPs = Array.from(s2EnRow1.getElementsByTagName('w:p'));
+      let saltGhsIndentEnCount = 0;
+      let titleIndentEnCount = 0;
+      let contentIndentEnCount = 0;
+      let s2EnHangingCount = 0;
+
+      for (const p of s2EnPs) {
+        const pText = (p.textContent || '').trim();
+        const ind = p.getElementsByTagName('w:ind')[0];
+        const lt = ind?.getAttribute('w:left');
+        const hg = ind?.getAttribute('w:hanging');
+
+        if (/^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable liquid|Acute toxicity|Skin corrosion|Specific target organ)/i.test(pText)) {
+          if (lt === '480') saltGhsIndentEnCount++;
+        } else if (/^(?:Prevention|Response|Storage|Disposal)[：:]/i.test(pText)) {
+          if (lt === '480') titleIndentEnCount++;
+        } else if (/^(?:Wear protective|Wash contact|Do not eat|Use only outdoors|Inhalation|Skin and eye|Ingestion|Spillage|Fire|Store in a cool|Empty containers)/i.test(pText)) {
+          if (lt === '960') contentIndentEnCount++;
+        }
+        if (hg) {
+          s2EnHangingCount++;
+        }
+      }
+
+      assert(saltGhsIndentEnCount >= 8, `Section 2 英文版成盐声明 left="480" 换行首字对齐断言 (实测命中: ${saltGhsIndentEnCount}/9)`);
+      assert(titleIndentEnCount === 4, `Section 2 英文版防范说明四大标题 left="480" 相互对齐断言 (实测命中: ${titleIndentEnCount}/4)`);
+      assert(contentIndentEnCount >= 10, `Section 2 英文版防范说明内容项 left="960" 相互对齐断言 (实测命中: ${contentIndentEnCount}/11)`);
+      assert(s2EnHangingCount === 0, `Section 2 英文版换行首字对齐公理 (零悬挂缩进，续行与首行严格对齐) (实测悬挂数: ${s2EnHangingCount})`);
     }
-
-    if (/^(?:操作时穿戴|操作后彻底清洗|作业场所不得|在室外或通风良好处操作|吸入[：:]|食入[：:]|泄露[：:]|灭火[：:]|请置于避光|使用后的空桶)/.test(pText)) {
-      const runs = Array.from(p.getElementsByTagName('w:r'));
-      for (const r of runs) {
-        if (r.getElementsByTagName('w:b').length > 0) {
-          boldLeakageCount++;
+  } else {
+    assert(s2Trs.length >= 4, `Section 2 (L-S2): 标准行数结构完备 (实测行数: ${s2Trs.length})`);
+    const s2CnText = tblsCn[1].textContent;
+    assert(/GHS危险性类别|GHS hazard/i.test(s2CnText), 'Section 2 (L-S2): GHS 分类插槽完备');
+    assert(/防范说明|Precautionary statements/i.test(s2CnText), 'Section 2 (L-S2): GHS 防范说明插槽完备');
+  }
+  // L-S11 英文版双列垂直对齐公理 (仅在 Paradigm 1 通栏复合模式下触发)
+  const isS11FullWidthEn = (s11EnTrs.length === 4 && s11EnTrs[3]?.getElementsByTagName('w:tc')?.length === 1);
+  if (isS11FullWidthEn && model === 'PA-3223') {
+    const s11EnRow3Target = s11EnTrs[3];
+    const s11EnRow3Ps = Array.from(s11EnRow3Target.getElementsByTagName('w:p'));
+    let s11ColAlignPassCount = 0;
+    for (const p of s11EnRow3Ps) {
+      const t = getPText(p);
+      if (t.includes('Propylene glycol butyl ether:')) {
+        const hasDermalAlign = /Toxicity: Dermal \(Rat\) {3}LD50:/.test(t);
+        const hasInhalAlign = / {8}Inhalation \(Rat\) LD50:/.test(t);
+        const hasOralAlign = / {8}Oral \(Rat\) {5}LD50:/.test(t);
+        if (hasDermalAlign && hasInhalAlign && hasOralAlign) {
+          s11ColAlignPassCount++;
+        } else {
+          console.error('     ↳ 丙二醇丁醚列对齐断言失败: ' + JSON.stringify(t));
+        }
+      } else if (t.includes('2-(2-Butoxyethoxy)ethanol:')) {
+        const hasDermalAlign = /Toxicity: Dermal \(Rat\) {3}LD50:/.test(t);
+        const hasOralAlign = / {8}Oral \(Rat\) {5}LD50:/.test(t);
+        if (hasDermalAlign && hasOralAlign) {
+          s11ColAlignPassCount++;
+        } else {
+          console.error('     ↳ 二乙二醇丁醚列对齐断言失败: ' + JSON.stringify(t));
         }
       }
     }
+    assert(s11ColAlignPassCount === 2, `Section 11 英文版测试端点与 LD50: 双列绝对垂直列对齐断言 (实测命中: ${s11ColAlignPassCount}/2)`);
+  } else if (isS11FullWidthEn && model === 'PU-202A') {
+    const s11EnText = tblsEn[10].textContent;
+    assert(/N,N-Dimethylacetamide/.test(s11EnText), 'Section 11 英文版包含 N,N-Dimethylacetamide 组分标题');
+    assert(/Acute toxicity/i.test(s11EnText) && /Oral/i.test(s11EnText), 'Section 11 英文版包含经口急毒试验数据');
   }
-
-  assert(saltGhsIndentCount >= 8, `Section 2 (L-S2): 成盐声明 firstLine="480" 状态机断言 (实测命中: ${saltGhsIndentCount}/9)`);
-  assert(headerIndentCount >= 4, `Section 2 (L-S2): 主分类标题 firstLine="482" 状态机断言 (实测命中: ${headerIndentCount}/4)`);
-  assert(extendedIndentCount >= 1, `Section 2 (L-S2): 延伸项 firstLine="960" 状态机断言 (实测命中: ${extendedIndentCount}/1)`);
-  assert(storageHangingCount >= 1, `Section 2 (L-S2): 存储说明 left="1199" hanging="720" 悬挂缩进断言 (实测命中: ${storageHangingCount}/1)`);
-  assert(disposalHangingCount >= 1, `Section 2 (L-S2): 空桶说明 left="959" hanging="480" 悬挂缩进断言 (实测命中: ${disposalHangingCount}/1)`);
-  assert(boldLeakageCount === 0, `Section 2 (L-S2): 防范说明操作规程常规体保护零泄露断言 (实测加粗泄露数: ${boldLeakageCount})`);
-
-  // L-S2 英文版专属断言：标题与标题对齐 (left="480")，内容与内容对齐 (left="960")，换行首字对齐 (无 hanging)
-  const s2EnRow1 = tblsEn[1].getElementsByTagName('w:tr')[1];
-  const s2EnPs = Array.from(s2EnRow1.getElementsByTagName('w:p'));
-  let saltGhsIndentEnCount = 0;
-  let titleIndentEnCount = 0;
-  let contentIndentEnCount = 0;
-  let s2EnHangingCount = 0;
-
-  for (const p of s2EnPs) {
-    const pText = (p.textContent || '').trim();
-    const ind = p.getElementsByTagName('w:ind')[0];
-    const lt = ind?.getAttribute('w:left');
-    const hg = ind?.getAttribute('w:hanging');
-
-    if (/^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable liquid|Acute toxicity|Skin corrosion|Specific target organ)/i.test(pText)) {
-      if (lt === '480') saltGhsIndentEnCount++;
-    } else if (/^(?:Prevention|Response|Storage|Disposal)[：:]/i.test(pText)) {
-      if (lt === '480') titleIndentEnCount++;
-    } else if (/^(?:Wear protective|Wash contact|Do not eat|Use only outdoors|Inhalation|Skin and eye|Ingestion|Spillage|Fire|Store in a cool|Empty containers)/i.test(pText)) {
-      if (lt === '960') contentIndentEnCount++;
-    }
-    if (hg) {
-      s2EnHangingCount++;
-    }
-  }
-
-  assert(saltGhsIndentEnCount >= 8, `Section 2 英文版成盐声明 left="480" 换行首字对齐断言 (实测命中: ${saltGhsIndentEnCount}/9)`);
-  assert(titleIndentEnCount === 4, `Section 2 英文版防范说明四大标题 left="480" 相互对齐断言 (实测命中: ${titleIndentEnCount}/4)`);
-  assert(contentIndentEnCount >= 10, `Section 2 英文版防范说明内容项 left="960" 相互对齐断言 (实测命中: ${contentIndentEnCount}/11)`);
-  assert(s2EnHangingCount === 0, `Section 2 英文版换行首字对齐公理 (零悬挂缩进，续行与首行严格对齐) (实测悬挂数: ${s2EnHangingCount})`);
-  // L-S11 英文版双列垂直对齐公理 (Endpoints & LD50: Dual-Column Vertical Alignment)
-  const s11EnRow3Target = tblsEn[10].getElementsByTagName('w:tr')[3];
-  const s11EnRow3Ps = Array.from(s11EnRow3Target.getElementsByTagName('w:p'));
-  let s11ColAlignPassCount = 0;
-  for (const p of s11EnRow3Ps) {
-    const t = getPText(p);
-    if (t.includes('Propylene glycol butyl ether:')) {
-      const hasDermalAlign = /Toxicity: Dermal \(Rat\) {3}LD50:/.test(t);
-      const hasInhalAlign = / {8}Inhalation \(Rat\) LD50:/.test(t);
-      const hasOralAlign = / {8}Oral \(Rat\) {5}LD50:/.test(t);
-      if (hasDermalAlign && hasInhalAlign && hasOralAlign) {
-        s11ColAlignPassCount++;
-      } else {
-        console.error('     ↳ 丙二醇丁醚列对齐断言失败: ' + JSON.stringify(t));
-      }
-    } else if (t.includes('2-(2-Butoxyethoxy)ethanol:')) {
-      const hasDermalAlign = /Toxicity: Dermal \(Rat\) {3}LD50:/.test(t);
-      const hasOralAlign = / {8}Oral \(Rat\) {5}LD50:/.test(t);
-      if (hasDermalAlign && hasOralAlign) {
-        s11ColAlignPassCount++;
-      } else {
-        console.error('     ↳ 二乙二醇丁醚列对齐断言失败: ' + JSON.stringify(t));
-      }
-    }
-  }
-  assert(s11ColAlignPassCount === 2, `Section 11 英文版测试端点与 LD50: 双列绝对垂直列对齐断言 (实测命中: ${s11ColAlignPassCount}/2)`);
 
 
   // L-S3: 成分/组成信息 (居中对齐与 CAS 规范)
@@ -458,7 +510,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
   assert(/作业人员防护|环境保护措施|收容、清除方法/.test(s6Text), 'Section 6 (L-S6): 人员防护、环境保护、收容清除三大处置闭环');
 
   // L-S7: 操作处置与储存
-  assert(/安全操作防范/.test(s7TextCn) && /安全储存条件/.test(s7TextCn) && /干燥通风/.test(s7TextCn), 'Section 7 (L-S7): 安全操作防范与安全储存条件法定守恒');
+  assert(/安全操作防范/.test(s7TextCn) && /安全储存条件/.test(s7TextCn) && /(?:干燥通风|凉爽通风|阴凉通风|通风)/.test(s7TextCn), 'Section 7 (L-S7): 安全操作防范与安全储存条件法定守恒');
 
   // L-S8: 接触控制与个体防护 (PPE 四件套)
   const s8Text = tblsCn[7].textContent;
@@ -491,10 +543,26 @@ export async function runBipolarBilayerAudit(customTargetDir = null) {
   const s10Text = tblsCn[9].textContent;
   assert(/反应性|化学稳定性|可能发生的危险反应|应避免的条件|不相容的物质|危险的分解产物/.test(s10Text), 'Section 10 (L-S10): 六大反应性条目完备性保全');
 
-  // L-S11: 毒理学信息 (三级责任隔离与实测数据保全)
-  assert(s11Cn.getElementsByTagName('w:tr').length === 4, `Section 11 (L-S11): 规范化收敛为 4 行三层排版`);
-  const s11Row3Text = s11CnRow3?.textContent || '';
-  assert(/羟基聚丙烯酸酯分散体/.test(s11Row3Text) && /丙二醇丁醚/.test(s11Row3Text) && /二乙二醇丁醚/.test(s11Row3Text), 'Section 11 (L-S11): 组分实测毒理试验数据 100% 内容守恒且无空值截断');
+  // L-S11: 毒理学信息 (自适应 Paradigm 1 通栏复合 vs Paradigm 2 标准端点插槽)
+  if (isS11FullWidth) {
+    assert(s11Cn.getElementsByTagName('w:tr').length === 4, `Section 11 (L-S11): 规范化收敛为 4 行三层排版`);
+    const s11Row3Text = s11CnRow3?.textContent || '';
+    if (model === 'PU-202A') {
+      assert(/N,N[-－]二甲基乙酰胺/.test(s11Row3Text), 'Section 11 (L-S11): PU-202A DMAC 实测毒理试验数据保全');
+    } else {
+      assert(/羟基聚丙烯酸酯分散体/.test(s11Row3Text) && /丙二醇丁醚/.test(s11Row3Text) && /二乙二醇丁醚/.test(s11Row3Text), 'Section 11 (L-S11): 组分实测毒理试验数据 100% 内容守恒且无空值截断');
+    }
+  } else {
+    if (model === 'PU-202A') {
+      assert(false, `Section 11 (L-S11): PU-202A 必须为通栏 4 行三级隔离排版，禁止分列！(实测行数: ${s11Cn.getElementsByTagName('w:tr').length})`);
+    } else {
+      const s11CnTrCount = s11Cn.getElementsByTagName('w:tr').length;
+      assert(s11CnTrCount >= 10, `Section 11 (L-S11): 标准端点插槽完备 (实测行数: ${s11CnTrCount})`);
+      assert(/急性毒性|刺激性|毒性/i.test(s11Cn.textContent), 'Section 11 (L-S11): 毒理学测试数据保全');
+      const s11EnTrCount = tblsEn[10].getElementsByTagName('w:tr').length;
+      assert(s11EnTrCount >= 10, `Section 11 英文版端点插槽完备 (实测行数: ${s11EnTrCount})`);
+    }
+  }
 
   // L-S12: 生态学信息 (说明行与生态指标)
   const s12 = tblsCn[11];
