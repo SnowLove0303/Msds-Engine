@@ -70,7 +70,8 @@ import {
   enforceSection13JustifiedContent,
   formatSection11PreambleRow,
   setCellPreambleTypography,
-  writeStructuredToxicologyCellValue
+  writeStructuredToxicologyCellValue,
+  formatSection9LabelCell
 } from './docx-engine.js';
 import {
   runSmartMatching,
@@ -1132,17 +1133,25 @@ export async function buildBaseChineseEngine({
     if (lastRow && lastRow.cells.length >= 2 && lastRow.cells[1]?.node) {
       enforceSection13JustifiedContent(lastRow.cells[1].node);
     }
-  }
-
-  // 8. 若传入 viscosityOverride，原子级确保 Section 9 粘度值
-  if (viscosityOverride) {
-    const s9 = engine.records.find(r => r.sectionNumber === 9);
-    if (s9) {
+  }  // 8. Section 9 理化特性全量标签激光绝对垂直对齐 (G-38: 原生 <w:tab/> 锚定 + 420 dxa 悬挂缩进)
+  const s9 = engine.records.find(r => r.sectionNumber === 9);
+  if (s9) {
+    if (viscosityOverride) {
       for (const row of s9.rows) {
         const lbl = (row.cells[0]?.text || '').trim();
         if (/粘度/i.test(lbl) && row.cells[1]) {
           safeWriteCellValue(row.cells[1], viscosityOverride);
         }
+      }
+    }
+    // 全量遍历 Section 9 每一行标签，标准化格式并注入 <w:tab/> 锚定，彻底终结序号位数与中英文差异错位
+    for (let rIdx = 1; rIdx < s9.rows.length; rIdx++) {
+      const c0 = s9.rows[rIdx]?.cells[0];
+      if (!c0) continue;
+      const text = (c0.text || '').trim();
+      const match = text.match(/^(\d+\.\d+)\s*(.*)$/);
+      if (match) {
+        formatSection9LabelCell(c0, match[1], match[2], false);
       }
     }
   }
@@ -1454,12 +1463,18 @@ export async function buildBaseChineseEngine({
     }
   }
 
-  // 13. 全量拔除中文母版中残留的所有非法 <w:tabs> 制表位与 <w:tab/>，确保全篇首列纯净 (对齐全局规范 G-09)
+  // 13. 全量拔除中文母版中残留的非法自定义 <w:tabs> 制表位与值格非法 <w:tab/> (对齐全局规范 G-09，首列标签法定 <w:tab/> 严格保全)
   for (const tbl of allTbls) {
     const tabsInTbl = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tabs'));
     tabsInTbl.forEach(t => t.parentNode?.removeChild(t));
-    const tabRuns = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tab'));
-    tabRuns.forEach(t => t.parentNode?.removeChild(t));
+    const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
+    for (const r of rows) {
+      const cells = Array.from(r.getElementsByTagNameNS(W_NS, 'tc'));
+      for (let c = 1; c < cells.length; c++) {
+        const valTabs = Array.from(cells[c].getElementsByTagNameNS(W_NS, 'tab'));
+        valTabs.forEach(t => t.parentNode?.removeChild(t));
+      }
+    }
   }
 
   // 严格保留模板原装序号与格式，严禁全局重排序号

@@ -99,6 +99,19 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
     assert(false, `PDF 物理渲染字号硬断言 (G-37): 拦截到英文版 PDF 说明行渲染字号违背 9.5pt (实测报错: ${err.message})`);
   }
 
+  // G-38: PDF 物理真实渲染 Section 9 标签首字绝对垂直对齐硬断言 (x0=80.28pt 激光垂线)
+  try {
+    const checkAlignScript = path.join(path.dirname(fileURLToPath(import.meta.url)), 'check_pdf_s9_alignment.py');
+    const cnGzPdf = path.join(targetDir, `${model} msds_CN 冠志.pdf`);
+    const cnGcPdf = path.join(targetDir, `${model} msds_CN 国彩.pdf`);
+    const enGzPdf = path.join(targetDir, `${model} msds_EN Guanzhi.pdf`);
+    const enGcPdf = path.join(targetDir, `${model} msds_EN Guocai.pdf`);
+    const alignOutput = execSync(`python "${checkAlignScript}" "${cnGzPdf}" "${cnGcPdf}" "${enGzPdf}" "${enGcPdf}"`, { encoding: 'utf8' }).trim();
+    assert(alignOutput.includes('ALL Section 9 label alignments PASS'), `Section 9 标签首字绝对垂直对齐硬断言 (G-38): 中英文 4 份 PDF 全量标签必须绝对垂直对齐至 80.28pt (实测输出: ${alignOutput})`);
+  } catch (err) {
+    assert(false, `Section 9 标签首字绝对垂直对齐硬断言 (G-38): 拦截到 PDF 标签首字错位参差 (实测报错: ${err.message})`);
+  }
+
   const docCn = await loadDocXml(`${targetDir}/${model} msds_CN 冠志.docx`);
   const docEn = await loadDocXml(`${targetDir}/${model} msds_EN Guanzhi.docx`);
   const docGuocaiCn = await loadDocXml(`${targetDir}/${model} msds_CN 国彩.docx`);
@@ -109,13 +122,20 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   const tblsGuocaiCn = docGuocaiCn.getElementsByTagName('w:tbl');
   const tblsGuocaiEn = docGuocaiEn.getElementsByTagName('w:tbl');
 
-  // G-02 / G-03: 全文制表符纯度断言 (零非法 <w:tabs> / 零非法 <w:tab/>)
-  let illegalTabsCountCn = 0;
+  // G-02 / G-03: 全文制表符纯度断言 (零非法 <w:tabs> / 零非法值格 <w:tab/>，标签列合法使用制表符垂直对齐)
+  let customTabsCountCn = 0;
+  let illegalValueTabsCountCn = 0;
   for (let t = 0; t < tblsCn.length; t++) {
-    illegalTabsCountCn += tblsCn[t].getElementsByTagName('w:tabs').length;
-    illegalTabsCountCn += tblsCn[t].getElementsByTagName('w:tab').length;
+    customTabsCountCn += tblsCn[t].getElementsByTagName('w:tabs').length;
+    const rows = tblsCn[t].getElementsByTagName('w:tr');
+    for (let r = 0; r < rows.length; r++) {
+      const cells = rows[r].getElementsByTagName('w:tc');
+      for (let c = 1; c < cells.length; c++) {
+        illegalValueTabsCountCn += cells[c].getElementsByTagName('w:tab').length;
+      }
+    }
   }
-  assert(illegalTabsCountCn === 0, `全局制表符纯度 (G-09 CN): 中文版全篇非法制表位/符为 0 (实测: ${illegalTabsCountCn})`);
+  assert(customTabsCountCn === 0 && illegalValueTabsCountCn === 0, `全局制表符纯度 (G-09 CN): 中文版非法自定义制表位 <w:tabs> 为 0 (实测: ${customTabsCountCn})，值格非法 <w:tab/> 为 0 (实测: ${illegalValueTabsCountCn})`);
 
   let customTabsCountEn = 0;
   let illegalValueTabsCountEn = 0;
@@ -782,7 +802,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
 
 // 支持 CLI 独立运行
 if (process.argv[1] && process.argv[1].endsWith('audit_bipolar_bilayer.mjs')) {
-  runBipolarBilayerAudit().then(res => {
+  runBipolarBilayerAudit(process.argv[2], process.argv[3]).then(res => {
     if (!res.success) process.exit(1);
     process.exit(0);
   }).catch(err => {

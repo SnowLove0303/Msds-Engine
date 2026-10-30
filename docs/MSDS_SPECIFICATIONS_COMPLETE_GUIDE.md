@@ -30,6 +30,7 @@
   - [20. 英文表格说明行均一正文字号公理 (G-35 English Table Preamble Typography Normalization Axiom)](#20-英文表格说明行均一正文字号公理-g-35-english-table-preamble-typography-normalization-axiom)
   - [21. 交付物物理新鲜度与文件锁硬阻断公理 (G-36 Deliverables Freshness & File-Lock Hard-Blocker Axiom)](#21-交付物物理新鲜度与文件锁硬阻断公理-g-36-deliverables-freshness--file-lock-hard-blocker-axiom)
   - [22. PDF 物理渲染字号终审双向硬断言公理 (G-37 PDF Physical Typography Dual-Audit Axiom)](#22-pdf-物理渲染字号终审双向硬断言公理-g-37-pdf-physical-typography-dual-audit-axiom)
+  - [23. 标签首字物理垂直绝对对齐公理 (G-38 Label Text First-Character Laser Vertical Alignment Axiom)](#23-标签首字物理垂直绝对对齐公理-g-38-label-text-first-character-laser-vertical-alignment-axiom)
 ### 18. 值格零标签前缀叠词公理 (G-33 Anti-Stuttering-Prefix Invariant Axiom)
 - **通俗解释**：表格左边如果已经写了标签名（比如“吸入：”、“致癌性：”），右边的值格里绝对不能一上来又重复一遍“吸入：”或“致癌性：”，否则在 Word 里看着就像结巴说话（“吸入：吸入：...”）。
 - **底层法则**：

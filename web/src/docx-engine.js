@@ -2442,35 +2442,61 @@ export function formatSection9LabelCell(cell, numberStr, labelText, isEnglish = 
       if (!cleanLabel.endsWith(':')) cleanLabel += ':';
     }
 
-    const r = p.ownerDocument.createElementNS(W_NS, 'w:r');
-    const rPr = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
-    const rFonts = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
-    rFonts.setAttributeNS(W_NS, 'w:ascii', 'Arial');
-    rFonts.setAttributeNS(W_NS, 'w:hAnsi', 'Arial');
-    rFonts.setAttributeNS(W_NS, 'w:eastAsia', 'Arial');
-    rFonts.setAttributeNS(W_NS, 'w:cs', 'Arial');
-    rPr.appendChild(rFonts);
-    const b = p.ownerDocument.createElementNS(W_NS, 'w:b');
-    rPr.appendChild(b);
-    const sz = p.ownerDocument.createElementNS(W_NS, 'w:sz');
-    sz.setAttributeNS(W_NS, 'w:val', '19');
-    rPr.appendChild(sz);
-    const szCs = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
-    szCs.setAttributeNS(W_NS, 'w:val', '19');
-    rPr.appendChild(szCs);
-    r.appendChild(rPr);
+    // 英文版激光绝对垂直对齐 (G-38): Run 1 序号加粗 + <w:tab/>，Run 2 标签 Arial 9.5pt 加粗
+    const r1 = p.ownerDocument.createElementNS(W_NS, 'w:r');
+    const rPr1 = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
+    const rFonts1 = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+    rFonts1.setAttributeNS(W_NS, 'w:ascii', 'Arial');
+    rFonts1.setAttributeNS(W_NS, 'w:hAnsi', 'Arial');
+    rFonts1.setAttributeNS(W_NS, 'w:eastAsia', 'Arial');
+    rFonts1.setAttributeNS(W_NS, 'w:cs', 'Arial');
+    rPr1.appendChild(rFonts1);
+    const b1 = p.ownerDocument.createElementNS(W_NS, 'w:b');
+    rPr1.appendChild(b1);
+    const sz1 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
+    sz1.setAttributeNS(W_NS, 'w:val', '19');
+    rPr1.appendChild(sz1);
+    const szCs1 = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
+    szCs1.setAttributeNS(W_NS, 'w:val', '19');
+    rPr1.appendChild(szCs1);
+    r1.appendChild(rPr1);
 
-    const t = p.ownerDocument.createElementNS(W_NS, 'w:t');
-    t.setAttribute('xml:space', 'preserve');
-    t.textContent = `${numberStr}  ${cleanLabel}`;
-    r.appendChild(t);
-    p.appendChild(r);
+    const t1 = p.ownerDocument.createElementNS(W_NS, 'w:t');
+    t1.textContent = numberStr;
+    r1.appendChild(t1);
+
+    const tab = p.ownerDocument.createElementNS(W_NS, 'w:tab');
+    r1.appendChild(tab);
+    p.appendChild(r1);
+
+    const r2 = p.ownerDocument.createElementNS(W_NS, 'w:r');
+    const rPr2 = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
+    const rFonts2 = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+    rFonts2.setAttributeNS(W_NS, 'w:ascii', 'Arial');
+    rFonts2.setAttributeNS(W_NS, 'w:hAnsi', 'Arial');
+    rFonts2.setAttributeNS(W_NS, 'w:eastAsia', 'Arial');
+    rFonts2.setAttributeNS(W_NS, 'w:cs', 'Arial');
+    rPr2.appendChild(rFonts2);
+    const b2 = p.ownerDocument.createElementNS(W_NS, 'w:b');
+    rPr2.appendChild(b2);
+    const sz2 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
+    sz2.setAttributeNS(W_NS, 'w:val', '19');
+    rPr2.appendChild(sz2);
+    const szCs2 = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
+    szCs2.setAttributeNS(W_NS, 'w:val', '19');
+    rPr2.appendChild(szCs2);
+    r2.appendChild(rPr2);
+
+    const t2 = p.ownerDocument.createElementNS(W_NS, 'w:t');
+    t2.textContent = cleanLabel;
+    r2.appendChild(t2);
+    p.appendChild(r2);
 
     refreshCellText(cell);
     return;
   }
 
-  // 中文母版原装几何保持不变 (Run 1: 序号部分 Times New Roman 10.5pt 加粗；Run 2: 标签部分 Arial 12pt 加粗)
+  // 中文母版激光绝对垂直对齐 (G-38): Run 1 序号加粗 + <w:tab/>，Run 2 标签 Arial 12pt 加粗
   const r1 = p.ownerDocument.createElementNS(W_NS, 'w:r');
   const rPr1 = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
   const rFonts1 = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
@@ -2489,10 +2515,14 @@ export function formatSection9LabelCell(cell, numberStr, labelText, isEnglish = 
   szCs1.setAttributeNS(W_NS, 'w:val', '21');
   rPr1.appendChild(szCs1);
   r1.appendChild(rPr1);
+
   const t1 = p.ownerDocument.createElementNS(W_NS, 'w:t');
-  t1.setAttribute('xml:space', 'preserve');
-  t1.textContent = `${numberStr} `;
+  t1.textContent = numberStr;
   r1.appendChild(t1);
+
+  // 关键：注入法定 <w:tab/>，配合 420 dxa 悬挂缩进，将后随标签首字符死死锁定在 80.28pt 同一垂直线上
+  const tab = p.ownerDocument.createElementNS(W_NS, 'w:tab');
+  r1.appendChild(tab);
   p.appendChild(r1);
 
   // Run 2: 标签部分（中文一律强制与模板保持 100% 对齐：Arial 12pt 加粗，严禁私自改为黑体！）
@@ -2513,8 +2543,13 @@ export function formatSection9LabelCell(cell, numberStr, labelText, isEnglish = 
   szCs2.setAttributeNS(W_NS, 'w:val', '24');
   rPr2.appendChild(szCs2);
   r2.appendChild(rPr2);
+
+  let cleanLabel = String(labelText || '').trim();
+  if (!/[：:]$/.test(cleanLabel) && !cleanLabel.includes('其他信息')) {
+    cleanLabel += '：';
+  }
   const t2 = p.ownerDocument.createElementNS(W_NS, 'w:t');
-  t2.textContent = labelText;
+  t2.textContent = cleanLabel;
   r2.appendChild(t2);
   p.appendChild(r2);
 
