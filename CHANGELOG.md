@@ -1,5 +1,33 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-10-30 上午] - PU-202B 8 格式多组分全量交付与人机融合穿透审计 (G-39 OPC 完备性确立)
+
+### 一、 业务场景与多组分混合物特性
+- **目标型号**：`PU-202B`（水性聚氨酯分散体，含有 $11.0\% \sim 12.0\%$ 的 N-甲基吡咯烷酮 NMP）；
+- **核心风险与契约**：具备生殖毒性 1B（H360 可能对胎儿造成伤害）与经皮吸收危险；Section 11 毒理学分列表格包含生育力与致畸性（16 行分列同构模式）。
+
+### 二、 人机融合深度审计发现的核心隐患与彻底根治
+1. **OPC 标准包媒体声明缺失致命漏洞 (确立 G-39 公理)**：
+   - **穿透发现**：在人机融合审计中通过 python-docx 解析产出物时，抛出 `KeyError: no content type for partname '/word/media/image_ghs_...png' in [Content_Types].xml`；
+   - **根因分析**：`docx-engine.js` 导出媒体文件时，未向 OPC `[Content_Types].xml` 声明 Default Extension 映射，导致外部 OPC 解析器与严谨 Office 软件报错或提示文档损坏；
+   - **架构根治**：在 `docx-engine.js` exportArrayBuffer 中自动扫描 `this.mediaFiles`，同步在 `[Content_Types].xml` 注入 `png/jpeg/jpg` 等 MIME 声明；并在 `audit_bipolar_bilayer.mjs` 中下沉 **G-39 门禁**，硬阻断任何未声明媒体文件。
+2. **Section 11 英文版 Teratogenicity 误删与双语不同构修复**：
+   - **穿透发现**：双语表格行数不同构（中文 16 行 vs 英文 15 行，触发 G-25 拦截）；
+   - **根因分析**：英文版组装循环中漏掉了针对 `Teratogenicity` 标签的英译写入，其单元格值残留占位符 `BB`，在精简阶段被误判为未定义行删除；
+   - **架构根治**：在 `pipeline-engine.js` 中补齐 `Teratogenicity` 与 `Fertility` 双端点映射与英译，使中英文 Section 11 达到严格 16 行 1:1 绝对同构。
+3. **英文版全角中文标点与冒号瑕疵彻底净化**：
+   - **穿透发现**：英文版 Section 11 子标签与废弃处置等单元格中残留 `：`、`“`、`”` 等中文全角标点；
+   - **架构根治**：在 `standardizeEnglishTypographyAndLabels` 尾部增加全局西文标点规范化收敛，实现英文版中文字符数量 = 0、全角标点数量 = 0 的双零最高标准。
+4. **CleanSweep 源文件留存防灭失机制**：
+   - 优化交付目录清场逻辑，遇到 `_源文件留存` 文件时自动安全归档至子目录 `源文件留存/`，严禁执行 `fs.unlink` 彻底销毁，既确保交付根目录 8 格式纯净（G-01），又保全历史源文件。
+
+### 三、 终审验收与实测指标
+- **机械终审结果**：`node web/scripts/audit_bipolar_bilayer.mjs "算法训练材料/PU-202B" "PU-202B"` 真实退出码为 0，**Failures: 0, 100% 满分通过**；
+- **G-38 激光对齐**：4 份 PDF 中 Section 9 全量 23 项标签首字 $X_0 = 80.28	ext{ pt}$（误差 $\le 1.2	ext{ pt}$）；
+- **G-39 OPC 完备性**：4 份 DOCX 所有嵌入 GHS 图标在 `[Content_Types].xml` 中 100% 合法声明；
+- **双语行数同构 (G-25)**：中英文 16 个章节表格行数严格一致（Section 11 均为 16 行）。
+
+---
 ## [2026-10-30 早] - 标签首字物理垂直绝对对齐 (G-38 激光垂线公理) 建立与底模空格狗牙错位彻底终结
 
 ### 一、 用户质疑与 5-Whys 深度穿透 (用户反馈：9.3 pH值字母P未对齐嗅字，9.10饱字未对齐9.9燃字)

@@ -1283,9 +1283,38 @@ export async function loadDocx(source, sourceName = 'document.docx') {
       if (this.relsText) {
         output.file('word/_rels/document.xml.rels', this.relsText);
       }
-      if (this.mediaFiles) {
+      if (this.mediaFiles && this.mediaFiles.size > 0) {
         for (const [name, bytes] of this.mediaFiles.entries()) {
           output.file(name, bytes);
+        }
+        // OPC 完备性保障 (G-39)：同步更新 [Content_Types].xml 注入媒体扩展名声明，防止外部解析器 KeyError
+        const ctFile = output.file('[Content_Types].xml');
+        if (ctFile) {
+          let ctText = await ctFile.async('text');
+          const extensions = new Set();
+          for (const name of this.mediaFiles.keys()) {
+            const ext = name.split('.').pop().toLowerCase();
+            if (ext) extensions.add(ext);
+          }
+          const mimeMap = {
+            png: 'image/png',
+            jpg: 'image/jpeg',
+            jpeg: 'image/jpeg',
+            gif: 'image/gif',
+            svg: 'image/svg+xml',
+            webp: 'image/webp'
+          };
+          let modified = false;
+          for (const ext of extensions) {
+            if (!ctText.includes(`Extension="${ext}"`) && mimeMap[ext]) {
+              const defaultTag = `<Default Extension="${ext}" ContentType="${mimeMap[ext]}"/>`;
+              ctText = ctText.replace('</Types>', `${defaultTag}</Types>`);
+              modified = true;
+            }
+          }
+          if (modified) {
+            output.file('[Content_Types].xml', ctText);
+          }
         }
       }
       for (const [name, text] of Object.entries(this.supportingXml)) {

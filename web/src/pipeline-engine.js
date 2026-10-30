@@ -70,7 +70,8 @@ import {
   enforceSection13JustifiedContent,
   formatSection11PreambleRow,
   setCellPreambleTypography,
-  writeStructuredToxicologyCellValue,
+  writeStructuredToxicologyCellValue
+,
   formatSection9LabelCell
 } from './docx-engine.js';
 import {
@@ -2112,6 +2113,8 @@ export async function buildBaseEnglishEngine({
       const mutCn = findCnVal(/致突变性|遗传毒性/i);
       const carcCn = findCnVal(/致癌性/i);
       const repCn = findCnVal(/生殖毒性/i);
+      const teratoCn = findCnVal(/致畸/i);
+      const fertCn = findCnVal(/生育/i) || repCn;
       const stotCn = findCnVal(/特异性靶器官/i);
       const aspCn = findCnVal(/吸入危险|吸入危害/i);
       const addInfoCn = findCnVal(/附加信息/i);
@@ -2130,6 +2133,8 @@ export async function buildBaseEnglishEngine({
         else if (/Sensitization/i.test(rText) && sensCn) safeWrite(lastCell, translateToxicologyValueToEnglish(sensCn));
         else if (/Mutagenicity/i.test(rText) && mutCn) safeWrite(lastCell, translateToxicologyValueToEnglish(mutCn));
         else if (/Carcinogenicity/i.test(rText) && carcCn) safeWrite(lastCell, translateToxicologyValueToEnglish(carcCn));
+        else if (/Teratogenicity/i.test(rText) && teratoCn) safeWrite(lastCell, translateToxicologyValueToEnglish(teratoCn));
+        else if (/Fertility/i.test(rText) && fertCn) safeWrite(lastCell, translateToxicologyValueToEnglish(fertCn));
         else if (/Reproductive toxicity/i.test(rText) && repCn) safeWrite(lastCell, translateToxicologyValueToEnglish(repCn));
         else if (/Specific target organ/i.test(rText) && stotCn) safeWrite(lastCell, translateToxicologyValueToEnglish(stotCn));
         else if (/Aspiration hazard/i.test(rText) && aspCn) safeWrite(lastCell, translateToxicologyValueToEnglish(aspCn));
@@ -2176,6 +2181,14 @@ export async function buildBaseEnglishEngine({
 
     // 4. 重新编号确保 11.1 ~ 11.N 严密对齐
     renumberRecord(s11, '11');
+
+    // 消除英文版 Section 11 中残留的中文全角冒号与标点瑕疵
+    const s11XmlTexts = Array.from(s11.node?.getElementsByTagNameNS(W_NS, 't') || []);
+    for (const tNode of s11XmlTexts) {
+      if (tNode.textContent && tNode.textContent.includes('：')) {
+        tNode.textContent = tNode.textContent.replace(/：/g, ':');
+      }
+    }
 
     if (isPu202a) {
       // 0. 确保 Row 1 免责行字号符合 G-35 (9.5pt sz="19", 无微缩进)
@@ -2669,7 +2682,13 @@ export async function batchExportDeliverables({
           if (!canonicalNames.has(fileName)) {
             if (
               fileName.includes('_源文件留存') ||
-              fileName.includes('_原版留存') ||
+              fileName.includes('_原版留存')
+            ) {
+              const archiveSubdir = path.join(targetDir, '源文件留存');
+              await fs.mkdir(archiveSubdir, { recursive: true }).catch(() => {});
+              await fs.rename(path.join(targetDir, fileName), path.join(archiveSubdir, fileName)).catch(() => {});
+              console.log(`[CleanSweep] 安全归档源文件留存至子目录: ${fileName} -> 源文件留存/`);
+            } else if (
               fileName.includes('(最新)') ||
               fileName.includes('(更新)') ||
               fileName.includes('(临时更新)') ||
@@ -2994,6 +3013,21 @@ export function standardizeEnglishTypographyAndLabels(engine) {
           }
         }
       }
+    }
+  }
+
+  // 全局清洗英文版中残留的全角中文标点符号（如全角引号、冒号、括号等，确保西文标点合规）
+  const allTNodes = Array.from(xmlDoc.getElementsByTagNameNS(W_NS, 't'));
+  for (const tNode of allTNodes) {
+    if (tNode.textContent) {
+      tNode.textContent = tNode.textContent
+        .replace(/：/g, ':')
+        .replace(/[“”]/g, '"')
+        .replace(/[‘’]/g, "'")
+        .replace(/（/g, '(')
+        .replace(/）/g, ')')
+        .replace(/，/g, ', ')
+        .replace(/；/g, '; ');
     }
   }
 
@@ -3608,7 +3642,7 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
           const bEl = run.getElementsByTagNameNS(W_NS, 'b')[0];
           const isBold = bEl && bEl.getAttributeNS(W_NS, 'val') !== '0';
           if (isBold) {
-            const isSubLabel = /^(预防措施|事故响应|安全储存|废弃处置|经口|吸入|经皮|物种|分类|结果|重复剂量中毒|病理变化|Oral|Inhalation|Dermal|Species|Classification|Result|Repeated dose toxicity|Pathological changes|Prevention|Response|Storage|Disposal)[：:]?$/i.test(runText);
+            const isSubLabel = /^(预防措施|事故响应|安全储存|废弃处置|经口|吸入|经皮|物种|分类|结果|重复剂量中毒|病理变化|致畸形|致畸|生育力|Oral|Inhalation|Dermal|Species|Classification|Result|Repeated dose toxicity|Pathological changes|Teratogenicity|Fertility|Prevention|Response|Storage|Disposal)[：:]?$/i.test(runText) || /^[：:]$/.test(runText);
             if (!isSubLabel) {
               throw new Error(`【质量门禁拦截 (Gate 8)】${docName} 表格 ${t + 1} 行 ${r + 1} 列 ${c + 1} 发现非法加粗数值: "${runText}"！违反 G-11 字体分离法定不变量。`);
             }

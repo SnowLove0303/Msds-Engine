@@ -112,6 +112,30 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
     assert(false, `Section 9 标签首字绝对垂直对齐硬断言 (G-38): 拦截到 PDF 标签首字错位参差 (实测报错: ${err.message})`);
   }
 
+  // G-39: OPC 包与 [Content_Types].xml 媒体声明完备性公理 (防止第三方解析器与 Office 损坏报错)
+  const docxList = [
+    `${model} msds_CN 冠志.docx`,
+    `${model} msds_CN 国彩.docx`,
+    `${model} msds_EN Guanzhi.docx`,
+    `${model} msds_EN Guocai.docx`
+  ];
+  for (const docxName of docxList) {
+    const fullDocxPath = path.join(targetDir, docxName);
+    const docxBuf = fs.readFileSync(fullDocxPath);
+    const docxZip = await JSZip.loadAsync(docxBuf);
+    const ctFile = docxZip.file('[Content_Types].xml');
+    assert(ctFile, `OPC 完备性 (G-39): ${docxName} 必须包含 [Content_Types].xml`);
+    const ctXml = await ctFile.async('text');
+    const mediaFiles = Object.keys(docxZip.files).filter(k => /^word\/media\/.+\.[a-zA-Z0-9]+$/i.test(k));
+    for (const mf of mediaFiles) {
+      const ext = mf.split('.').pop().toLowerCase();
+      const hasExtDefault = ctXml.includes(`Extension="${ext}"`) || ctXml.includes(`Extension="${ext.toUpperCase()}"`);
+      const hasPartOverride = ctXml.includes(`PartName="/${mf}"`);
+      assert(hasExtDefault || hasPartOverride, `OPC 媒体声明完备性 (G-39): ${docxName} 中的 ${mf} 缺少 [Content_Types].xml 声明！`);
+    }
+  }
+  console.log(`✅ [PASS] OPC 媒体声明完备性 (G-39): 4 份 DOCX 所有嵌入媒体在 [Content_Types].xml 中 100% 合法声明`);
+
   const docCn = await loadDocXml(`${targetDir}/${model} msds_CN 冠志.docx`);
   const docEn = await loadDocXml(`${targetDir}/${model} msds_EN Guanzhi.docx`);
   const docGuocaiCn = await loadDocXml(`${targetDir}/${model} msds_CN 国彩.docx`);

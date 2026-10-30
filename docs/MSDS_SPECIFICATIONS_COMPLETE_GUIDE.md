@@ -199,6 +199,15 @@
   - **一票否决**：任何一个格式、标点或排版缺陷未达标，立即阻断交付，杜绝假绿灯；
   - **Agent 自觉复审**：后续任何任务产出后，Agent 必须直接依据双极双层审计结果进行自审自纠，无需用户重复提醒。
 
+### 24. OPC 包与 [Content_Types].xml 媒体声明完备性公理 (G-39 Open Packaging Conventions Fidelity Axiom)
+- **通俗解释**：Word (.docx) 本质上是一个符合 Open Packaging Conventions (OPC) 规范的 ZIP 压缩包。文档内嵌入的任何图片（如 Section 2 GHS 危险象形图），除了在 `_rels` 关系文件中建立关联外，**必须在根目录的 `[Content_Types].xml` 中声明对应的媒体格式扩展名映射**（如 `<Default Extension="png" ContentType="image/png"/>`）。
+- **底层规矩**：
+  1. **零 KeyError 容忍**：严禁仅将媒体文件塞入 `word/media/` 而忘记在 `[Content_Types].xml` 声明 Default 或 Override；
+  2. **跨平台与第三方解析器兼容**：确保 python-docx、Apache POI、LibreOffice 以及各版本 Microsoft Office 打开时 100% 具备合法 MIME 声明，绝不弹出“文件损坏需要修复”的错误提示；
+  3. **自动化机检**：在双极双层审计 G-39 门禁中逐个解包核查 4 份 DOCX，确保媒体文件与内容类型声明 100% 闭环。
+
+---
+
 ### 17. 通栏跨列拓扑与编辑器格式继承总则 (G-32 Full-Width GridSpan & Editor Formatting Fidelity Axiom)
 - **通俗解释**：当复杂的复配物化学品（如 PA-3223 水性树脂分散体）具备长篇扩展防范说明或多组分实测毒理数据时，原有多列独立小单元格排版割裂拥挤。系统全面支持“自适应通栏排版”，将整行收敛合并为横跨整表的大单元格。
 - **底层规矩（编辑器体系继承铁律）**：
