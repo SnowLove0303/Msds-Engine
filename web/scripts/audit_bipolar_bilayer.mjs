@@ -518,18 +518,25 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   assert(new RegExp(model, 'i').test(s1Text), `Section 1 (L-S1): 产品型号 ${model} 准确绑定`);
   assert(/广州冠志新材料科技有限公司/.test(s1Text), 'Section 1 (L-S1): 冠志供应商信息准确绑定');
 
-  // L-S2: 危险性概述 (自适应 通栏模式 vs 标准危险品/非危品分列架构)
+  // L-S2: 危险性概述 (G-40 Section 2 强制默认全量通栏绝对公理硬阻断)
   const s2Trs = tblsCn[1].getElementsByTagName('w:tr');
   const s2Row1 = s2Trs[1];
   const s2Tcs = s2Row1 ? s2Row1.getElementsByTagName('w:tc') : [];
-  const isS2FullWidth = (s2Tcs.length === 1);
 
-  if (isS2FullWidth) {
-    assert(s2Tcs.length === 1, `Section 2 (L-S2): 单单元格通栏行拓扑完整 (实测单元格数: ${s2Tcs.length})`);
-    assert(s2Trs.length === 2, `Section 2 (L-S2): 通栏 2 行极简拓扑完备 (实测行数: ${s2Trs.length})`);
+  const s2TrsEn = tblsEn[1].getElementsByTagName('w:tr');
+  const s2Row1En = s2TrsEn[1];
+  const s2TcsEn = s2Row1En ? s2Row1En.getElementsByTagName('w:tc') : [];
+
+  // G-40 核心硬断言：无论是任何型号、任何危险类别，中英文 Section 2 必须 100% 恒为 2 行单单元格通栏！
+  assert(s2Trs.length === 2, `Section 2 中文版 (G-40): 必须严格收敛为 2 行极简通栏拓扑 (实测行数: ${s2Trs.length})`);
+  assert(s2Tcs.length === 1, `Section 2 中文版 (G-40): 必须为单单元格通栏，严禁多列分列 (实测单元格数: ${s2Tcs.length})`);
+  assert(s2TrsEn.length === 2, `Section 2 英文版 (G-40): 必须严格收敛为 2 行极简通栏拓扑 (实测行数: ${s2TrsEn.length})`);
+  assert(s2TcsEn.length === 1, `Section 2 英文版 (G-40): 必须为单单元格通栏，严禁多列分列 (实测单元格数: ${s2TcsEn.length})`);
+
+  if (s2Tcs.length === 1 && s2Trs.length === 2) {
     const s2Text = s2Row1.textContent;
 
-    if (model === 'PU-202A') {
+    if (model === 'PU-202A' || model === 'PU-202C') {
       assert(/2\.1|GHS危险性类别|急性毒性/.test(s2Text), 'Section 2 (L-S2): GHS 分类通栏完备');
       assert(/信号词[：:]\s*危险/.test(s2Text), 'Section 2 (L-S2): 信号词危险准确');
       assert(/防范说明|预防措施|事故响应/.test(s2Text), 'Section 2 (L-S2): GHS 防范说明通栏完备');
@@ -572,6 +579,17 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
       assert(/Classification of the substance|Acute toxicity/i.test(s2EnText), 'Section 2 (L-S2 EN): 英文 GHS 分类通栏完备');
       assert(/Signal word:\s*Danger/i.test(s2EnText), 'Section 2 (L-S2 EN): 英文信号词 Danger 准确');
       assert(/Precautionary statements|Prevention|Response/i.test(s2EnText), 'Section 2 (L-S2 EN): 英文防范说明通栏完备');
+    } else if (model === 'PU-202B') {
+      assert(/2\.1|GHS危险性类别|生殖毒性/.test(s2Text), 'Section 2 (L-S2): PU-202B 生殖毒性分类通栏完备');
+      assert(/信号词[：:]\s*危险/.test(s2Text), 'Section 2 (L-S2): PU-202B 信号词危险准确');
+      assert(/防范说明|预防措施|事故响应/.test(s2Text), 'Section 2 (L-S2): PU-202B GHS 防范说明通栏完备');
+      assert(/其他危险[：:].*N[－-]甲基吡咯烷酮/.test(s2Text), 'Section 2 (L-S2): PU-202B NMP 透皮吸收其他危险通栏完备');
+
+      const s2EnRow1 = tblsEn[1].getElementsByTagName('w:tr')[1];
+      const s2EnText = s2EnRow1?.textContent || '';
+      assert(/Reproductive toxicity/i.test(s2EnText), 'Section 2 (L-S2 EN): PU-202B 英文生殖毒性通栏完备');
+      assert(/Signal word:\s*Danger/i.test(s2EnText), 'Section 2 (L-S2 EN): PU-202B 英文信号词 Danger 准确');
+      assert(/Precautionary statements|Prevention|Response/i.test(s2EnText), 'Section 2 (L-S2 EN): PU-202B 英文防范说明通栏完备');
     } else {
       // PA-3223 Mode B 专属成盐豁免与 5 级缩进断言
       assert(!/商业机密|7732-18-5|46±5/.test(s2Text), 'Section 2 (L-S2): 无菌覆写，彻底切断 Section 3 成分数据行穿透污染');
@@ -651,11 +669,6 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
       assert(contentIndentEnCount >= 10, `Section 2 英文版防范说明内容项 left="960" 相互对齐断言 (实测命中: ${contentIndentEnCount}/11)`);
       assert(s2EnHangingCount === 0, `Section 2 英文版换行首字对齐公理 (零悬挂缩进，续行与首行严格对齐) (实测悬挂数: ${s2EnHangingCount})`);
     }
-  } else {
-    assert(s2Trs.length >= 4, `Section 2 (L-S2): 标准行数结构完备 (实测行数: ${s2Trs.length})`);
-    const s2CnText = tblsCn[1].textContent;
-    assert(/GHS危险性类别|GHS hazard/i.test(s2CnText), 'Section 2 (L-S2): GHS 分类插槽完备');
-    assert(/防范说明|Precautionary statements/i.test(s2CnText), 'Section 2 (L-S2): GHS 防范说明插槽完备');
   }
   // L-S11 英文版双列垂直对齐公理 (仅在 Paradigm 1 通栏复合模式下触发)
   const isS11FullWidthEn = (s11EnTrs.length === 4 && s11EnTrs[3]?.getElementsByTagName('w:tc')?.length === 1);

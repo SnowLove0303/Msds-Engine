@@ -684,11 +684,12 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
     s2 = addRowAfter(engine, s2, s2.rows.length - 1);
   }
 
-  // 2. 组装段落内容 (自适应兼容 PU-202A 危险品通栏与 PA-3223 非危通栏)
-  const isPu202a = facts.modelCode === 'PU-202A' || /PU[-_]?202A/i.test(facts.modelCode || '');
+  // 2. 组装段落内容 (自适应兼容 PU-202[AC] DMAC 危险品、PU-202B NMP 危险品与 PA-3223 非危通栏)
+  const isPu202Dmac = facts.modelCode === 'PU-202A' || facts.modelCode === 'PU-202C' || /PU[-_]?202[AC]/i.test(facts.modelCode || '');
+  const isPu202b = facts.modelCode === 'PU-202B' || /PU[-_]?202B/i.test(facts.modelCode || '');
   const paragraphs = [];
   if (!isEnglish) {
-    if (isPu202a) {
+    if (isPu202Dmac) {
       paragraphs.push(
         '2.1 GHS危险性类别：',
         '急性毒性（吸入），类别4（H332）',
@@ -732,6 +733,33 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         '废弃处置：',
         '        P501 处置内装物/容器按照当地规章。',
         '其他危险：无适用资料。'
+      );
+    } else if (isPu202b) {
+      paragraphs.push(
+        '2.1 GHS危险性类别：',
+        '生殖毒性物质，类别1B（H360）',
+        '2.2 GHS标签要素：',
+        'GHS象形图：'
+      );
+      if (facts.drawingNodes && facts.drawingNodes.length > 0) {
+        paragraphs.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine });
+      }
+      paragraphs.push(
+        '信号词：危险',
+        '危险性说明：',
+        'H360可能对胎儿造成伤害。',
+        '防范说明：',
+        '预防措施：',
+        '        P201 在使用前获取特别指示。',
+        '        P202 在阅读并了解所有安全预防措施之前，切勿操作与处置。',
+        '        P280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。',
+        '事故响应：',
+        '        P308+P313 如接触到或有疑虑：求医/就诊。',
+        '安全储存：',
+        '        P405 储存处须加锁。',
+        '废弃处置：',
+        '        P501 处置内装物/容器按照当地规章。',
+        '其他危险：可能存在透皮吸收N－甲基吡咯烷酮的危险。'
       );
     } else {
       paragraphs.push('GHS危险性类别: 无');
@@ -779,7 +807,7 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       );
     }
   } else {
-    if (isPu202a) {
+    if (isPu202Dmac) {
       paragraphs.push(
         '2.1 Classification of the substance or mixture:',
         'Acute toxicity, Inhalation (Category 4), H332',
@@ -823,6 +851,33 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         'Disposal:',
         '        P501 Dispose of contents/container in accordance with local regulations.',
         'Other Hazards: No applicable information.'
+      );
+    } else if (isPu202b) {
+      paragraphs.push(
+        '2.1 Classification of the substance or mixture:',
+        'Reproductive toxicity (Category 1B), H360',
+        '2.2 GHS Label Elements:',
+        'GHS pictograms:'
+      );
+      if (facts.drawingNodes && facts.drawingNodes.length > 0) {
+        paragraphs.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine });
+      }
+      paragraphs.push(
+        'Signal word: Danger',
+        'Hazard statements:',
+        'H360 May damage fertility or the unborn child.',
+        'Precautionary statements:',
+        'Prevention:',
+        '        P201 Obtain special instructions before use.',
+        '        P202 Do not handle until all safety precautions have been read and understood.',
+        '        P280 Wear protective gloves/clothing/eye protection/face protection.',
+        'Response:',
+        '        P308+P313 IF exposed or concerned: Get medical advice/attention.',
+        'Storage:',
+        '        P405 Store locked up.',
+        'Disposal:',
+        '        P501 Dispose of contents/container in accordance with local regulations.',
+        'Other Hazards: Risk of cutaneous absorption of N-Methyl-2-pyrrolidone (NMP).'
       );
     } else {
       paragraphs.push(
@@ -1157,44 +1212,20 @@ export async function buildBaseChineseEngine({
     }
   }
 
-  // 9. 规范化 Section 2：自适应通栏复合模态 (Mode B / PU-202A 危险品通栏) vs 标准 4 行
+  // 9. 规范化 Section 2：全场景默认全量通栏 (G-40 强制默认全量通栏绝对公理)
   let s2 = engine.records.find(r => r.sectionNumber === 2);
   const isNonHazComposite = Boolean(matchResult.facts?.isNonHazardousComposite || detectNonHazardousComposite(srcEngine.records, facts));
   const isPu202a = modelCode === 'PU-202A' || /PU[-_]?202A/i.test(modelCode || '');
   if (s2) {
-    if (isPu202a || isNonHazComposite) {
-      const picItem = matchResult.matchedSections?.find(s => s.sectionNumber === 2)?.matchedRows?.find(r => r.key === 'pictogram');
-      const drawingNodes = picItem?.drawingNodes || (picItem?.drawingNode ? [picItem.drawingNode] : null);
-      buildFullWidthSection2(engine, {
-        ...facts,
-        modelCode: modelCode || (isPu202a ? 'PU-202A' : ''),
-        drawingNodes,
-        srcEngine,
-        section3ExemptionNotes: matchResult.facts?.section3ExemptionNotes || extractSection3ExemptionNotes(srcEngine.records.find(r => r.sectionNumber === 3))
-      }, false);
-    } else {
-      const isNonHaz = s2.rows.some(row => row.cells.some(c => /不属于危害化学品|不属于危险|not classified/i.test(c.text)));
-      if (isNonHaz) {
-        while (s2.rows.length < 4) {
-          s2 = addRowAfter(engine, s2, s2.rows.length - 1);
-        }
-        while (s2.rows.length > 4) {
-          s2 = deleteRow(engine, s2, s2.rows.length - 1);
-        }
-
-        writeCellLabel(s2.rows[1].cells[0], '2.1  物质或混合物的分类：', true);
-        applyStandardHangingIndent(s2.rows[1].cells[0], '420', '420');
-        safeWriteCellValue(s2.rows[1].cells[s2.rows[1].cells.length - 1], 'GHS 危险性类别：\r\n根据 GHS 不属于危害化学品。');
-
-        writeCellLabel(s2.rows[2].cells[0], '2.2  标签要素：', true);
-        applyStandardHangingIndent(s2.rows[2].cells[0], '420', '420');
-        safeWriteCellValue(s2.rows[2].cells[s2.rows[2].cells.length - 1], 'GHS-象形图\r\n根据 GHS 不属于危害化学品。');
-
-        writeCellLabel(s2.rows[3].cells[0], '2.3  其他危害：', true);
-        applyStandardHangingIndent(s2.rows[3].cells[0], '420', '420');
-        safeWriteCellValue(s2.rows[3].cells[s2.rows[3].cells.length - 1], '无适用资料。');
-      }
-    }
+    const picItem = matchResult.matchedSections?.find(s => s.sectionNumber === 2)?.matchedRows?.find(r => r.key === 'pictogram');
+    const drawingNodes = picItem?.drawingNodes || (picItem?.drawingNode ? [picItem.drawingNode] : null);
+    buildFullWidthSection2(engine, {
+      ...facts,
+      modelCode: modelCode || '',
+      drawingNodes,
+      srcEngine,
+      section3ExemptionNotes: matchResult.facts?.section3ExemptionNotes || extractSection3ExemptionNotes(srcEngine.records.find(r => r.sectionNumber === 3))
+    }, false);
   }
 
   // 9.5 Section 11 & Section 12 双范式动态分流处理 (Ps-openspec 2.0: 多组分走通栏，单组分如 PU-202A 走原版分列表格)
@@ -1689,109 +1720,26 @@ export async function buildBaseEnglishEngine({
     }
   }
 
-  // Section 2 (非危品严格 4 行对称，危害品动态展开/通栏装配，457 dxa 悬挂缩进)
+  // Section 2: 危险性概述 (G-40 强制默认全量通栏绝对公理)
   let s2 = engine.records.find(r => r.sectionNumber === 2);
   if (s2) {
-    const isNonHaz = enValues['sec2.is_non_haz'] !== false;
-    const isNonHazComposite = Boolean(facts.isNonHazardousComposite || (baseCnEngine && detectNonHazardousComposite(baseCnEngine.records, facts)));
     const isPu202a = modelCode === 'PU-202A' || /PU[-_]?202A/i.test(modelCode || '');
-    if (isPu202a || isNonHazComposite) {
-      const cnPicCell = baseCnEngine?.records?.find(r => r.sectionNumber === 2)?.rows[1]?.cells[0];
-      const drawingNodes = facts.drawingNodes || Array.from(cnPicCell?.node?.getElementsByTagNameNS('*', 'drawing') || []);
-      buildFullWidthSection2(engine, {
-        ...facts,
-        modelCode: modelCode || (isPu202a ? 'PU-202A' : ''),
-        drawingNodes: drawingNodes.length > 0 ? drawingNodes : facts.drawingNodes,
-        srcEngine: baseCnEngine || facts.srcEngine
-      }, true);
-      const isMultiComponent = modelCode === 'PA-3223' || (!isPu202a && Boolean(facts.isMultiComponentComposite || isNonHazComposite));
-      const enS11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || null);
-      if (enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
-        buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || '' }, true);
-      }
-      cleanSection12Preambles(engine, true);
-    } else if (isNonHaz) {
-      // 非危险化学品：严格收敛为 4 行结构 (标题 + 2.1分类 + 2.2标签 + 2.3其他危害)，彻底物理删除 2.3 防范说明旧行
-      while (s2.rows.length < 4) s2 = addRowAfter(engine, s2, s2.rows.length - 1);
-      while (s2.rows.length > 4) s2 = deleteRow(engine, s2, s2.rows.length - 1);
-
-      writeCellLabel(s2.rows[1].cells[0], '2.1  Classification of the substance or mixture: ', true);
-      applyStandardHangingIndent(s2.rows[1].cells[0], '420', '420');
-      safeWriteCellValue(s2.rows[1].cells[1], 'GHS hazard class:\nNot classified as a hazardous chemical according to GHS.');
-
-      writeCellLabel(s2.rows[2].cells[0], '2.2  GHS Label Elements: ', true);
-      applyStandardHangingIndent(s2.rows[2].cells[0], '420', '420');
-      safeWriteCellValue(s2.rows[2].cells[1], 'GHS pictogram:\nNot classified as a hazardous chemical according to GHS.');
-
-      writeCellLabel(s2.rows[3].cells[0], '2.3  Other Hazards: ', true);
-      applyStandardHangingIndent(s2.rows[3].cells[0], '420', '420');
-      safeWriteCellValue(s2.rows[3].cells[1], 'No applicable information.');
-    } else {
-      // 危险化学品：基于中文母版 1:1 绝对镜像同构 (严格收敛为 8 行，彻底消灭 Emergency Overview 虚构假数据与旧模板占位符)
-      // 1. 删除底模无意义且未对齐中文的 Row 1 (Emergency Overview)
-      s2 = deleteRow(engine, s2, 1);
-
-      // 2. 删除第 8 行及之后的所有冗余死重行 (只保留 Row 0 到 Row 7 共 8 行)
-      while (s2.rows.length > 8) {
-        s2 = deleteRow(engine, s2, s2.rows.length - 1);
-      }
-
-      // 3. 从中文母版中动态提取真实危险性事实
-      const cnS2 = baseCnEngine?.records?.find(r => r.sectionNumber === 2);
-      const fullCnS2Text = cnS2 ? cnS2.rows.map(r => r.cells.map(c => c.text).join(' ')).join(' ') : '';
-      const cnSignalText = cnS2?.rows?.find(r => /信号词|警示词/i.test(r.cells[0]?.text || ''))?.cells[1]?.text || fullCnS2Text;
-
-      const dynamicPictogram = deriveGhsPictograms(fullCnS2Text);
-      const dynamicSignalWord = deriveSignalWord(cnSignalText);
-
-      let dynamicHazardStatements = enValues['sec2.ghs_label_elements'] || '';
-      dynamicHazardStatements = dynamicHazardStatements
-        .replace(/^Signal word:[^\r\n]*[\r\n]+/i, '')
-        .replace(/^Hazard statement\(s\):\s*/i, '')
-        .trim();
-
-      // Row 1: 2.1 GHS Hazard Classification:
-      writeCellLabel(s2.rows[1].cells[0], '2.1  GHS Hazard Classification:', true);
-      safeWrite(s2.rows[1].cells[1], enValues['sec2.ghs_classification']);
-
-      // Row 2: 2.2 GHS Label Elements: (单列/右列空，彻底清理 F 占位符)
-      writeCellLabel(s2.rows[2].cells[0], '2.2  GHS Label Elements:', true);
-      safeWrite(s2.rows[2].cells[1], '');
-
-      // Row 3: GHS Pictograms: (无序号子项，优先从中文母版移植真实 GHS 象形图图片)
-      writeCellLabel(s2.rows[3].cells[0], 'GHS Pictograms:', true);
-      let picTransferred = false;
-      if (baseCnEngine) {
-        const cnPicRow = cnS2?.rows?.find(r => /象形图/i.test(r.cells[0]?.text || ''));
-        const cnDrawings = Array.from(cnPicRow?.cells?.[1]?.node?.getElementsByTagNameNS(W_NS, 'drawing') || []);
-        if (cnDrawings.length > 0) {
-          try {
-            picTransferred = transferDrawingToCell(baseCnEngine, engine, cnDrawings, s2.rows[3].cells[1]);
-          } catch (e) {
-            console.warn('[GHS Pictogram] 移植象形图图片失败，降级为文本符号:', e.message);
-          }
-        }
-      }
-      if (!picTransferred) {
-        safeWrite(s2.rows[3].cells[1], dynamicPictogram);
-      }
-
-      // Row 4: 2.3 Signal Word:
-      writeCellLabel(s2.rows[4].cells[0], '2.3  Signal Word:', true);
-      safeWrite(s2.rows[4].cells[1], dynamicSignalWord);
-
-      // Row 5: 2.4 Hazard Statements:
-      writeCellLabel(s2.rows[5].cells[0], '2.4  Hazard Statements:', true);
-      safeWrite(s2.rows[5].cells[1], dynamicHazardStatements);
-
-      // Row 6: 2.5 Precautionary Statements:
-      writeCellLabel(s2.rows[6].cells[0], '2.5  Precautionary Statements:', true);
-      safeWrite(s2.rows[6].cells[1], enValues['sec2.precautionary_statements']);
-
-      // Row 7: 2.6 Other Hazards: (承接透皮吸收等其他危害事实)
-      writeCellLabel(s2.rows[7].cells[0], '2.6  Other Hazards:', true);
-      safeWrite(s2.rows[7].cells[1], enValues['sec2.other_hazards'] || 'No applicable information.');
+    const isNonHazComposite = Boolean(facts.isNonHazardousComposite || (baseCnEngine && detectNonHazardousComposite(baseCnEngine.records, facts)));
+    const cnPicCell = baseCnEngine?.records?.find(r => r.sectionNumber === 2)?.rows[1]?.cells[0];
+    const drawingNodes = facts.drawingNodes || Array.from(cnPicCell?.node?.getElementsByTagNameNS('*', 'drawing') || []);
+    buildFullWidthSection2(engine, {
+      ...facts,
+      modelCode: modelCode || '',
+      drawingNodes: drawingNodes.length > 0 ? drawingNodes : facts.drawingNodes,
+      srcEngine: baseCnEngine || facts.srcEngine,
+      section3ExemptionNotes: enValues['sec3.exemption_notes'] || extractSection3ExemptionNotes(baseCnEngine.records.find(r => r.sectionNumber === 3))
+    }, true);
+    const isMultiComponent = modelCode === 'PA-3223' || (!isPu202a && Boolean(facts.isMultiComponentComposite || isNonHazComposite));
+    const enS11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || null);
+    if (enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
+      buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || '' }, true);
     }
+    cleanSection12Preambles(engine, true);
   }
 
   // Section 3 (以中文母版组分顺序为绝对镜像，动态同构增减行)

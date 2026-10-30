@@ -31,6 +31,8 @@
   - [21. 交付物物理新鲜度与文件锁硬阻断公理 (G-36 Deliverables Freshness & File-Lock Hard-Blocker Axiom)](#21-交付物物理新鲜度与文件锁硬阻断公理-g-36-deliverables-freshness--file-lock-hard-blocker-axiom)
   - [22. PDF 物理渲染字号终审双向硬断言公理 (G-37 PDF Physical Typography Dual-Audit Axiom)](#22-pdf-物理渲染字号终审双向硬断言公理-g-37-pdf-physical-typography-dual-audit-axiom)
   - [23. 标签首字物理垂直绝对对齐公理 (G-38 Label Text First-Character Laser Vertical Alignment Axiom)](#23-标签首字物理垂直绝对对齐公理-g-38-label-text-first-character-laser-vertical-alignment-axiom)
+  - [24. OPC 包与 [Content_Types].xml 媒体声明完备性公理 (G-39 Open Packaging Conventions Fidelity Axiom)](#24-opc-包与-content_typesxml-媒体声明完备性公理-g-39-open-packaging-conventions-fidelity-axiom)
+  - [25. Section 2 默认全量通栏绝对公理 (G-40 Default Full-Width Section 2 Axiom)](#25-section-2-默认全量通栏绝对公理-g-40-default-full-width-section-2-axiom)
 ### 18. 值格零标签前缀叠词公理 (G-33 Anti-Stuttering-Prefix Invariant Axiom)
 - **通俗解释**：表格左边如果已经写了标签名（比如“吸入：”、“致癌性：”），右边的值格里绝对不能一上来又重复一遍“吸入：”或“致癌性：”，否则在 Word 里看着就像结巴说话（“吸入：吸入：...”）。
 - **底层法则**：
@@ -204,7 +206,14 @@
 - **底层规矩**：
   1. **零 KeyError 容忍**：严禁仅将媒体文件塞入 `word/media/` 而忘记在 `[Content_Types].xml` 声明 Default 或 Override；
   2. **跨平台与第三方解析器兼容**：确保 python-docx、Apache POI、LibreOffice 以及各版本 Microsoft Office 打开时 100% 具备合法 MIME 声明，绝不弹出“文件损坏需要修复”的错误提示；
-  3. **自动化机检**：在双极双层审计 G-39 门禁中逐个解包核查 4 份 DOCX，确保媒体文件与内容类型声明 100% 闭环。
+  3. **自动化机检**：在双极双层审计 G-39 门禁中逐个解包核查 4 份 DOCX，确保媒体文件与内容类型声明 100% 闭环。
+
+### 25. Section 2 默认全量通栏绝对公理 (G-40 Default Full-Width Section 2 Axiom)
+- **通俗解释**：Section 2（危险性概述）无论任何化学品（单组分、多组分、危险品、非危险品），一律**默认且唯一采用通栏模态**！将整节收敛为 2 行极简拓扑（Row 0 章节标题 + Row 1 单单元格通栏，`gridSpan="2"`，总宽 `9795 dxa`），内部严格实施 5 级缩进与粗细状态机体系。彻底废除任何老旧标准 4 行分列或两栏回退分支。
+- **底层规矩（一票否决硬阻断）**：
+  1. **全场景默认通栏公理**：禁止任何型号特判（如严禁仅 PU-202A 走通栏），无论是危险品（PU-202A/B/C、EP-1702、PU-608 等）还是非危险品（PA-3223），一律强制 100% 走单单元格通栏引擎；
+  2. **绝对物理几何守恒**：整节严格为 2 行（Row 0 章节标题行 + Row 1 单单元格通栏），Row 1 底层必须显式声明 `<w:gridSpan w:val="2"/>` 且宽度恒为 `9795 dxa`；
+  3. **审计零容忍硬阻断**：机械审计套件彻底删除任何允许两栏放行的 `else` 分支，凡实测行数不为 2 或单元格数大于 1，直接判为致命违章并一票否决。
 
 ---
 
@@ -238,6 +247,7 @@
 
 ### Section 2: 危险性概述 (Hazards Identification)
 - **通俗定位**：告诉大家这个化学品有什么危险、怎么防范（骷髅头、感叹号、警告语）。
+- **法定架构不变量**：**默认全量通栏（G-40 铁律）**：整节绝对收敛为 2 行单单元格通栏，严禁出现分列多表格。
 - **专属核心规范**：
   1. **GHS 象形图单元格保护**：
      - 如果产品有 GHS 危险类别，象形图必须保留黑边红菱形图片，且必须在单元格中完美居中；
