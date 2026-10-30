@@ -1650,6 +1650,7 @@ export function writeStructuredToxicologyCellValue(cell, value, options = {}) {
     cell.node.appendChild(p);
   }
 
+  cell.paragraphs = directChildren(cell.node, 'p').map((p) => parseParagraph(p));
   refreshCellText(cell);
 }
 

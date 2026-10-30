@@ -1547,11 +1547,11 @@ function translateToxicologyValueToEnglish(cnText) {
 
   // STOT 与 附加信息
   t = t.replace(/可能造成呼吸道刺激。?/g, 'May cause respiratory irritation.');
-  t = t.replace(/饮酒精饮料会加剧毒性影响。?/g, 'Drinking alcoholic beverages can exacerbate toxic effects.\n');
+  t = t.replace(/饮酒精饮料会加剧毒性影响。?/g, 'Consumption of alcoholic beverages may aggravate toxic effects.\n');
   t = t.replace(/N[－-]甲基吡咯烷酮有经皮吸收危险。?/g, 'Risk of cutaneous absorption of N-Methyl-2-pyrrolidone (NMP).');
-  t = t.replace(/重复剂量中毒\s*[:：]\s*经口/g, 'Repeated dose toxicity: Oral');
+  t = t.replace(/重复剂量中毒\s*[:：]\s*经口/g, 'Repeated dose toxicity: Oral;');
   t = t.replace(/病理变化\s*[:：]\s*胃，睾丸，肝，肾，红血球异常减少。?/g, 'Pathological changes: stomach, testes, liver, kidneys, abnormal reduction of red blood cells.\n');
-  t = t.replace(/重复剂量中毒\s*[:：]\s*吸入/g, 'Repeated dose toxicity: Inhalation');
+  t = t.replace(/重复剂量中毒\s*[:：]\s*吸入/g, 'Repeated dose toxicity: Inhalation;');
   t = t.replace(/病理变化\s*[:：]\s*肾、肝影响，视网膜损伤。?/g, 'Pathological changes: kidney and liver effects, retinal damage.');
 
   t = t.replace(/；/g, '; ');
@@ -2138,7 +2138,13 @@ export async function buildBaseEnglishEngine({
         else if (/Reproductive toxicity/i.test(rText) && repCn) safeWrite(lastCell, translateToxicologyValueToEnglish(repCn));
         else if (/Specific target organ/i.test(rText) && stotCn) safeWrite(lastCell, translateToxicologyValueToEnglish(stotCn));
         else if (/Aspiration hazard/i.test(rText) && aspCn) safeWrite(lastCell, translateToxicologyValueToEnglish(aspCn));
-        else if (/Additional information/i.test(rText)) safeWrite(lastCell, addInfoCn ? translateToxicologyValueToEnglish(addInfoCn) : 'No data available.');
+        else if (/Additional information/i.test(rText)) {
+          if (addInfoCn) {
+            writeStructuredToxicologyCellValue(lastCell, translateToxicologyValueToEnglish(addInfoCn), { isEnglish: true });
+          } else {
+            safeWrite(lastCell, 'No data available.');
+          }
+        }
       }
 
       // 3. 动态精简：仅删除中文母版中确实不存在且英文模板中无实测值的空白行，严禁误删生殖毒性、STOT与附加信息

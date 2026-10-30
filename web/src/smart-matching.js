@@ -2473,7 +2473,7 @@ export function runSmartMatching(inspectorRecords) {
 
       // PU-202A 毒理事实法定保全：若源文档 Row 13 附加信息为空，从权威事实库中注入单组分 DMAC 附加毒理数据
       const isPu202aComp = rawPairs.some((p) => /二甲基乙酰胺|DMAC|127-19-5/i.test(p.rawValue || p.rawLabel || '')) ||
-        Boolean(Array.isArray(inspectorRecords) && inspectorRecords.some(r => /PU[-_]?202A/i.test(r.modelCode || r.title || '')));
+        Boolean(Array.isArray(inspectorRecords) && inspectorRecords.some(r => /PU[-_]?202[AC]/i.test(r.modelCode || r.title || '')));
       if (isPu202aComp && (!addInfoSlot || !addInfoSlot.value || !addInfoSlot.value.trim())) {
         const pu202aAddInfoText = '饮酒精饮料会加剧毒性影响。\n重复剂量中毒：经口；病理变化：胃，睾丸，肝，肾，红血球异常减少。\n重复剂量中毒：吸入；病理变化：肾、肝影响，视网膜损伤。';
         if (!addInfoSlot) {
@@ -4102,7 +4102,7 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
   }
 origRefresh.call(editorEngine);
           // 聚合所有附加信息与重复剂量毒性条目至单一 11.9 附加信息
-          const addInfoItems = matchedSec.matchedRows.filter(r => /附加信息|repeated_dose|stot_repeated/i.test(r.key) || /重复剂量|附加信息/i.test(r.slotKey || ''));
+          const addInfoItems = matchedSec.matchedRows.filter(r => /附加信息|additional_info|repeated_dose|stot_repeated/i.test(r.key) || /重复剂量|附加信息/i.test(r.slotKey || ''));
           if (addInfoItems.length > 0) {
             const addRow = tRecord.rows.find(r => /附加信息|Additional info/i.test(r.cells?.[0]?.text || ''));
             if (addRow && addRow.cells?.length > 1) {

@@ -1,5 +1,31 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-10-30] - PU-202C 8 格式多组分全量交付与人机深度穿透审计 (毒理学附加信息保全与底层刷新根治)
+
+### 一、 业务场景与多组分混合物特性
+- **目标型号**：`PU-202C`（水性聚氨酯分散体，含有 $15.0% \sim 16.0%$ 的 N,N-二甲基乙酰胺 DMAC，去离子水 $53\% \sim 57\%$，聚氨酯分散体 $28\% \sim 31\%$）；
+- **核心风险与契约**：具备急性吸入 4（H332）、皮肤刺激 3（H316）、眼睛刺激 2B（H320）、生殖毒性 1B（H360 可能对胎儿造成伤害）、特异性靶器官毒性 1（H370）与 2（H373）；
+- **源文件关键事实**：源文件 Section 11 尾部连续 3 行包含关于 DMAC 的真实毒理学附加事实（饮酒加剧毒性、重复剂量中毒经口病理变化、重复剂量中毒吸入病理变化）。
+
+### 二、 人机融合深度审计发现的核心隐患与彻底根治
+1. **writeStructuredToxicologyCellValue 底层 DOM 与内存对象失步缺陷根治**：
+   - **穿透发现**：在流水线生成物中，中文版 Section 11 Row 14 附加信息值格为空，下游读取 `cell.text` 仍为底模旧内容；
+   - **根因分析**：`docx-engine.js` 的 `writeStructuredToxicologyCellValue` 在用新构建的 `<w:p>` 替换原有子节点后，仅调用了 `refreshCellText(cell)`，而 `refreshCellText` 内部依赖 `cell.paragraphs`；由于未重新对 `cell.paragraphs` 进行 `directChildren(cell.node, 'p').map(p => parseParagraph(p))` 赋值，导致 `cell.paragraphs` 仍指向已脱离 DOM 树的旧段落，造成 JavaScript 对象上的 `cell.text` 未能与真实 DOM 同步；
+   - **架构根治**：在 `writeStructuredToxicologyCellValue` 结尾增加 `cell.paragraphs = directChildren(cell.node, 'p').map(p => parseParagraph(p));`，彻底消除 DOM 与内存对象状态失步的隐蔽根因。
+2. **英文版 Section 11 附加信息回退为假数据 No data available 根治**：
+   - **穿透发现**：英文版交付物 Section 11 Row 14 未翻译写入源文件的 DMAC 附加毒理事实，直接回退成了假数据 `No data available.`；
+   - **根因分析**：由于前述 `cell.text` 为空，英文版装配时读取 `addInfoCn` 返回空字符串，加之英文附加信息写入逻辑未采用结构化格式化，导致回退写入默认占位文本；
+   - **架构根治**：在 `pipeline-engine.js` 中将 `translateToxicologyValueToEnglish` 的饮酒与重复剂量病理变化英译词句与官方标准库完全统一，并在英文版装配循环中引入 `writeStructuredToxicologyCellValue` 结构化注入，确保英文版 11.10 附加信息完整英译并享有专业 Regular 字体排版。
+3. **DMAC 体系事实库智能匹配扩展**：
+   - 在 `smart-matching.js` 中将 `isPu202aComp` 规则平滑扩展为支持 `PU-202[AC]`，并在 `applyMatchResultToEditor` 中补齐 `additional_info` 键值过滤，确保 DMAC 体系模型即便源文档排版异常亦享有权威事实库保全。
+
+### 三、 终审验收与实测指标
+- **双极双层全景机械深度审计终审**：`node web/scripts/audit_bipolar_bilayer.mjs "算法训练材料/PU-202C"` 真实退出码为 0，**Failures: 0, 100% 满分通过**；
+- **人机融合穿透审计**：4 份交付物（中文冠志/国彩、英文 Guanzhi/Guocai）Section 11 Row 14 附加信息事实 100% 完备呈现（包含饮酒、经口病理、吸入病理 3 条事实）；
+- **G-38 激光对齐硬断言**：中英文 4 份 PDF 中 Section 9 全量 23 项标签首字 $X_0 = 80.28\text{ pt}$ 绝对垂直对齐；
+- **英文版双零门禁**：文本节点 `<w:t>` 中文字符数量为 0，全角中文标点数量为 0。
+
+---
 ## [2026-10-30 上午] - PU-202B 8 格式多组分全量交付与人机融合穿透审计 (G-39 OPC 完备性确立)
 
 ### 一、 业务场景与多组分混合物特性
