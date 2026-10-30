@@ -17,6 +17,26 @@ yarn-error.log*
 output/*
 !output/user_correct_2341.docx
 
+# Concrete deliverables & generated outputs (MSDS/TDS Word & PDF deliverables)
+*.pdf
+算法训练材料/
+识别结果/
+web/data/docs/
+* msds_CN *.docx
+* msds_EN *.docx
+* msds_CN *.doc
+* msds_EN *.doc
+* tds_CN *.docx
+* tds_EN *.docx
+* tds_CN *.doc
+* tds_EN *.doc
+
+# Protected master templates & fixtures (exempted from deliverable ignore rules)
+!web/public/templates/
+!web/public/templates/*.docx
+!覆写模块/内嵌模板/
+!覆写模块/内嵌模板/*.docx
+
 # Python caches & virtual environments
 **/__pycache__/
 *.py[cod]
@@ -30,15 +50,12 @@ rollback/*.zip
 _rollback/
 *.zip
 
-
 # Operating system & Editor files
 .DS_Store
 Thumbs.db
 desktop.ini
 .vscode/
 .idea/
-
-
 
 # 镜像构建用的原中文字体（微软专有字体，不进版本库；仅本机构建镜像时使用）
 # 同步方式：scripts/sync-build-fonts.ps1
@@ -49,4 +66,3 @@ docker/fonts/*
 # Temporary scratch scripts
 scratch/
 web/output_exact/
-
