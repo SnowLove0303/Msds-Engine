@@ -3979,22 +3979,38 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
               writeCellLabel(repRow.cells[0], `${repLabelSeq}  生殖毒性：`, true, editorEngine.roleStyles?.label);
               applyStandardHangingIndent(repRow.cells[0], '420', '420');
             } catch (e) {}
-            // 若底模中包含多列（如中间包含“生育力”占位），物理移除多余中间单元格，恢复规范 2 列结构
-            if (repRow.cells.length > 2) {
-              while (repRow.cells.length > 2) {
-                removeCellFromRow(repRow, 1);
+            // 若具备生育力/致畸性细分子项 (如 PU-202B)，严禁删除中间列，完美保全三列垂直合并结构！
+            if (repTeratoItem || repFertItem) {
+              // 保全三列结构：第一列生殖毒性 (vMerge=restart)，第二列生育力：，第三列值
+              if (repRow.cells.length >= 3) {
+                try { writeCellLabel(repRow.cells[1], '生育力：', true, editorEngine.roleStyles?.label); } catch (e) {}
+                const fertValCell = repRow.cells[repRow.cells.length - 1];
+                if (fertValCell && fertValCell.editable) {
+                  const fVal = repFertItem?.value || repGenItem?.value || '';
+                  try { writeCellValue(fertValCell, fVal, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
+                }
               }
-            }
-            normalizeRowGeometry(repRow);
-            const fertValCell = repRow.cells[repRow.cells.length - 1];
-            if (fertValCell && fertValCell.editable) {
-              const fVal = repFertItem?.value || repGenItem?.value || (hasOECDStudies ? '聚氨酯分散体\n无数据资料' : '');
-              try { writeCellValue(fertValCell, fVal, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
+            } else {
+              // 若底模中包含多列但该型号无细分项，物理移除多余中间单元格，恢复规范 2 列结构
+              if (repRow.cells.length > 2) {
+                while (repRow.cells.length > 2) {
+                  removeCellFromRow(repRow, 1);
+                }
+              }
+              normalizeRowGeometry(repRow);
+              const fertValCell = repRow.cells[repRow.cells.length - 1];
+              if (fertValCell && fertValCell.editable) {
+                const fVal = repGenItem?.value || (hasOECDStudies ? '聚氨酯分散体\n无数据资料' : '');
+                try { writeCellValue(fertValCell, fVal, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
+              }
             }
           }
 
-          const teratoRow = tRecord.rows.find((r) => r.cells.some((c) => /致畸形/i.test(c.text || '')));
+          const teratoRow = tRecord.rows.find((r) => r.cells.some((c) => /致畸/i.test(c.text || '')));
           if (teratoRow) {
+            if (repTeratoItem && teratoRow.cells.length >= 3) {
+              try { writeCellLabel(teratoRow.cells[1], '致畸性：', true, editorEngine.roleStyles?.label); } catch (e) {}
+            }
             const teratoValCell = teratoRow.cells[teratoRow.cells.length - 1];
             if (teratoValCell && teratoValCell.editable) {
               const tVal = repTeratoItem?.value || (hasOECDStudies ? '聚氨酯分散体\n无数据资料' : '');

@@ -2809,7 +2809,7 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
         const pNode = doc.createElementNS(W_NS, 'w:p');
         const pPr = doc.createElementNS(W_NS, 'w:pPr');
         const jc = doc.createElementNS(W_NS, 'w:jc');
-        jc.setAttributeNS(W_NS, 'w:val', 'center');
+        jc.setAttributeNS(W_NS, 'w:val', 'left');
         pPr.appendChild(jc);
         pNode.appendChild(pPr);
         transferDrawingNodesToParagraph(pItem.srcEngine, options.targetEngine || record.engine, pItem.drawingNodes, pNode);
@@ -2842,6 +2842,12 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
       // Section 11 组分间距公理：组件与组件之间严格且唯美地空一行 (before="240"=12pt)，杜绝软回车双重叠加空两行
       if (options.isSection11 && pIdx >= 2) {
         spacing.setAttributeNS(W_NS, 'w:before', '240');
+      }
+      // Section 2 模块间保留一个空行间隔公理 (before="240"=12pt)：在各主要标签要素与危险性说明、防范说明、其他危险起始段落前注入
+      if (options.isSection2) {
+        if (/^(?:(?:2\.\d+\s*)?(?:GHS\s*)?标签要素|Label elements|(?:2\.\d+\s*)?GHS Label Elements|危险性说明|Hazard statements|防范说明|Precautionary statements|(?:2\.\d+\s*)?(?:其他危害|其他危险)|(?:2\.\d+\s*)?Other\s*Hazards?)/i.test(trimmed)) {
+          spacing.setAttributeNS(W_NS, 'w:before', '240');
+        }
       }
       pPr.appendChild(spacing);
 
@@ -3990,5 +3996,159 @@ export class DraftStore {
     } catch (e) {
       console.warn('Failed to clear draft meta', e);
     }
+  }
+}
+
+/**
+ * 将表格的相邻两行重构为标准三列垂直合并结构 (如 11.7 生殖毒性的 生育力 与 致畸性)
+ * 底层 4 列网格拓扑：
+ * Row 1 (mainRow):
+ *   tc[0]: gridSpan=1, vMerge=restart, width=3519, 文本为 mainLabel (加粗)
+ *   tc[1]: gridSpan=1, width=1311, 文本为 sub1Label (加粗)
+ *   tc[2]: gridSpan=2, width=4951, 文本为 sub1Value (常规体)
+ * Row 2 (subRow):
+ *   tc[0]: gridSpan=1, vMerge=continue, width=3519, 内容为空 <w:p/>
+ *   tc[1]: gridSpan=1, width=1311, 文本为 sub2Label (加粗)
+ *   tc[2]: gridSpan=2, width=4951, 文本为 sub2Value (常规体)
+ */
+export function renderThreeColumnVMergeSubRows(record, mainRowIndex, subRowIndex, config = {}) {
+  if (!record || record.kind !== 'table') return;
+  const mainRow = record.rows[mainRowIndex];
+  const subRow = record.rows[subRowIndex];
+  if (!mainRow?.node || !subRow?.node) return;
+
+  const doc = mainRow.node.ownerDocument;
+  const isEn = Boolean(config.isEnglish);
+  const fontAscii = isEn ? 'Arial' : 'Times New Roman';
+  const fontEastAsia = isEn ? 'Arial' : '宋体';
+  const fontSize = isEn ? '19' : '24'; // 英文 9.5pt，中文 12pt
+
+  function createCell(width, gridSpan, vMergeVal) {
+    const tc = doc.createElementNS(W_NS, 'w:tc');
+    const tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+    const tcW = doc.createElementNS(W_NS, 'w:tcW');
+    tcW.setAttributeNS(W_NS, 'w:w', String(width));
+    tcW.setAttributeNS(W_NS, 'w:type', 'dxa');
+    tcPr.appendChild(tcW);
+
+    if (gridSpan > 1) {
+      const gs = doc.createElementNS(W_NS, 'w:gridSpan');
+      gs.setAttributeNS(W_NS, 'w:val', String(gridSpan));
+      tcPr.appendChild(gs);
+    }
+    if (vMergeVal) {
+      const vm = doc.createElementNS(W_NS, 'w:vMerge');
+      if (vMergeVal !== 'continue') {
+        vm.setAttributeNS(W_NS, 'w:val', vMergeVal);
+      }
+      tcPr.appendChild(vm);
+    }
+
+    const tcBorders = doc.createElementNS(W_NS, 'w:tcBorders');
+    ['top', 'left', 'bottom', 'right'].forEach(side => {
+      const b = doc.createElementNS(W_NS, `w:${side}`);
+      b.setAttributeNS(W_NS, 'w:val', 'dotted');
+      b.setAttributeNS(W_NS, 'w:sz', '4');
+      b.setAttributeNS(W_NS, 'w:space', '0');
+      b.setAttributeNS(W_NS, 'w:color', 'auto');
+      tcBorders.appendChild(b);
+    });
+    tcPr.appendChild(tcBorders);
+
+    const vAlign = doc.createElementNS(W_NS, 'w:vAlign');
+    vAlign.setAttributeNS(W_NS, 'w:val', 'center');
+    tcPr.appendChild(vAlign);
+
+    tc.appendChild(tcPr);
+    return tc;
+  }
+
+  function appendPara(tc, text, isBold = false, hanging = null) {
+    const p = doc.createElementNS(W_NS, 'w:p');
+    const pPr = doc.createElementNS(W_NS, 'w:pPr');
+    const spacing = doc.createElementNS(W_NS, 'w:spacing');
+    spacing.setAttributeNS(W_NS, 'w:line', '300');
+    spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
+    pPr.appendChild(spacing);
+
+    const jc = doc.createElementNS(W_NS, 'w:jc');
+    jc.setAttributeNS(W_NS, 'w:val', 'left');
+    pPr.appendChild(jc);
+
+    if (hanging) {
+      const ind = doc.createElementNS(W_NS, 'w:ind');
+      ind.setAttributeNS(W_NS, 'w:left', hanging.left || '420');
+      ind.setAttributeNS(W_NS, 'w:hanging', hanging.hanging || '420');
+      pPr.appendChild(ind);
+    }
+
+    p.appendChild(pPr);
+
+    if (text) {
+      const r = doc.createElementNS(W_NS, 'w:r');
+      const rPr = doc.createElementNS(W_NS, 'w:rPr');
+      const rFonts = doc.createElementNS(W_NS, 'w:rFonts');
+      rFonts.setAttributeNS(W_NS, 'w:ascii', fontAscii);
+      rFonts.setAttributeNS(W_NS, 'w:hAnsi', fontAscii);
+      rFonts.setAttributeNS(W_NS, 'w:eastAsia', fontEastAsia);
+      rPr.appendChild(rFonts);
+
+      if (isBold) {
+        rPr.appendChild(doc.createElementNS(W_NS, 'w:b'));
+      } else {
+        const b0 = doc.createElementNS(W_NS, 'w:b');
+        b0.setAttributeNS(W_NS, 'w:val', '0');
+        rPr.appendChild(b0);
+      }
+
+      const sz = doc.createElementNS(W_NS, 'w:sz');
+      sz.setAttributeNS(W_NS, 'w:val', fontSize);
+      rPr.appendChild(sz);
+      const szCs = doc.createElementNS(W_NS, 'w:szCs');
+      szCs.setAttributeNS(W_NS, 'w:val', fontSize);
+      rPr.appendChild(szCs);
+
+      r.appendChild(rPr);
+      const t = doc.createElementNS(W_NS, 'w:t');
+      t.textContent = text;
+      r.appendChild(t);
+      p.appendChild(r);
+    }
+    tc.appendChild(p);
+  }
+
+  // 清空 mainRow 旧单元格
+  Array.from(mainRow.node.getElementsByTagNameNS(W_NS, 'tc')).forEach(tc => mainRow.node.removeChild(tc));
+  // 清空 subRow 旧单元格
+  Array.from(subRow.node.getElementsByTagNameNS(W_NS, 'tc')).forEach(tc => subRow.node.removeChild(tc));
+
+  // 1. 构建 mainRow (3 列)
+  const mCell0 = createCell(3519, 1, 'restart');
+  appendPara(mCell0, config.mainLabel || (isEn ? '11.7  Reproductive toxicity:' : '11.7  生殖毒性：'), true, { left: '420', hanging: '420' });
+  mainRow.node.appendChild(mCell0);
+
+  const mCell1 = createCell(1311, 1, null);
+  appendPara(mCell1, config.sub1Label || (isEn ? 'Fertility:' : '生育力：'), true);
+  mainRow.node.appendChild(mCell1);
+
+  const mCell2 = createCell(4951, 2, null);
+  appendPara(mCell2, config.sub1Value || '', false);
+  mainRow.node.appendChild(mCell2);
+
+  // 2. 构建 subRow (3 列)
+  const sCell0 = createCell(3519, 1, 'continue');
+  appendPara(sCell0, '', false); // 空段落
+  subRow.node.appendChild(sCell0);
+
+  const sCell1 = createCell(1311, 1, null);
+  appendPara(sCell1, config.sub2Label || (isEn ? 'Teratogenicity:' : '致畸性：'), true);
+  subRow.node.appendChild(sCell1);
+
+  const sCell2 = createCell(4951, 2, null);
+  appendPara(sCell2, config.sub2Value || '', false);
+  subRow.node.appendChild(sCell2);
+
+  if (record.engine?.refresh) {
+    record.engine.refresh();
   }
 }

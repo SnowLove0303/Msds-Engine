@@ -732,7 +732,7 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         '        P405 储存处须加锁。',
         '废弃处置：',
         '        P501 处置内装物/容器按照当地规章。',
-        '其他危险：无适用资料。'
+        '2.3 其他危险：无适用资料。'
       );
     } else if (isPu202b) {
       paragraphs.push(
@@ -759,7 +759,7 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         '        P405 储存处须加锁。',
         '废弃处置：',
         '        P501 处置内装物/容器按照当地规章。',
-        '其他危险：可能存在透皮吸收N－甲基吡咯烷酮的危险。'
+        '2.3 其他危险：可能存在透皮吸收N－甲基吡咯烷酮的危险。'
       );
     } else {
       paragraphs.push('GHS危险性类别: 无');
@@ -850,7 +850,7 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         '        P405 Store locked up.',
         'Disposal:',
         '        P501 Dispose of contents/container in accordance with local regulations.',
-        'Other Hazards: No applicable information.'
+        '2.3 Other hazards: No applicable information.'
       );
     } else if (isPu202b) {
       paragraphs.push(
@@ -877,7 +877,7 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         '        P405 Store locked up.',
         'Disposal:',
         '        P501 Dispose of contents/container in accordance with local regulations.',
-        'Other Hazards: Risk of cutaneous absorption of N-Methyl-2-pyrrolidone (NMP).'
+        '2.3 Other hazards: Risk of cutaneous absorption of N-Methyl-2-pyrrolidone (NMP).'
       );
     } else {
       paragraphs.push(
@@ -1097,6 +1097,7 @@ export async function buildBaseChineseEngine({
   facts = {}
 }) {
   // 1. 读取源文件 Buffer
+  const isPu202b = modelCode === 'PU-202B' || /PU[-_]?202B/i.test(modelCode || '');
   let srcBuf = sourceDocxBuffer || cnGroundTruthBuffer;
   const srcPath = sourceDocxPath || cnGroundTruthPath;
   if (!srcBuf && srcPath) {
@@ -1448,6 +1449,23 @@ export async function buildBaseChineseEngine({
         safeWriteCellValue(addRow.cells[addRow.cells.length - 1], addInfoItem.value);
       }
     }
+    // 规范化 Section 11 生殖毒性子标签（将底模遗留的“致畸形”规范化为“致畸性：”）
+    const teratoRow = s11.rows.find(r => r.cells.some(c => /致畸/i.test(c.text || '')));
+    if (teratoRow) {
+      const teratoCell = teratoRow.cells.find(c => /致畸/i.test(c.text || ''));
+      if (teratoCell?.node) {
+        const XML_W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+        const tNodes = Array.from(teratoCell.node.getElementsByTagName('w:t')).concat(
+          Array.from(teratoCell.node.getElementsByTagNameNS(XML_W_NS, 't'))
+        );
+        const uniqueTNodes = Array.from(new Set(tNodes));
+        if (uniqueTNodes.length > 0) {
+          uniqueTNodes[0].textContent = '致畸性：';
+          for (let i = 1; i < uniqueTNodes.length; i++) uniqueTNodes[i].textContent = '';
+        }
+      }
+    }
+
     // 规范化 Section 11 实测各行行高，消除 11.4 致敏性等行的超高留白
     for (const row of s11.rows) {
       normalizeSection11RowHeight(row);
@@ -1667,6 +1685,7 @@ export async function buildBaseEnglishEngine({
   const todayDateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '/');
   const isOutdated = !baseCnEngine?._adaptiveRevisionDate || baseCnEngine._adaptiveRevisionDate.startsWith('2023') || baseCnEngine._adaptiveRevisionDate.startsWith('2024') || baseCnEngine._adaptiveRevisionDate.startsWith('2025');
   const effectiveRevisionDate = revisionDate || (!isOutdated ? baseCnEngine._adaptiveRevisionDate : todayDateStr);
+  const isPu202b = modelCode === 'PU-202B' || /PU[-_]?202B/i.test(modelCode || '');
   const isNonHazComposite = Boolean(facts.isNonHazardousComposite || (baseCnEngine && detectNonHazardousComposite(baseCnEngine.records, facts)));
   const isPu202a = modelCode === 'PU-202A' || /PU[-_]?202A/i.test(modelCode || '');
 
@@ -3596,7 +3615,7 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
           const bEl = run.getElementsByTagNameNS(W_NS, 'b')[0];
           const isBold = bEl && bEl.getAttributeNS(W_NS, 'val') !== '0';
           if (isBold) {
-            const isSubLabel = /^(预防措施|事故响应|安全储存|废弃处置|经口|吸入|经皮|物种|分类|结果|重复剂量中毒|病理变化|致畸形|致畸|生育力|Oral|Inhalation|Dermal|Species|Classification|Result|Repeated dose toxicity|Pathological changes|Teratogenicity|Fertility|Prevention|Response|Storage|Disposal)[：:]?$/i.test(runText) || /^[：:]$/.test(runText);
+            const isSubLabel = /^(预防措施|事故响应|安全储存|废弃处置|经口|吸入|经皮|物种|分类|结果|重复剂量中毒|病理变化|致畸形|致畸性|致畸|生育力|Oral|Inhalation|Dermal|Species|Classification|Result|Repeated dose toxicity|Pathological changes|Teratogenicity|Fertility|Prevention|Response|Storage|Disposal)[：:]?$/i.test(runText) || /^[：:]$/.test(runText);
             if (!isSubLabel) {
               throw new Error(`【质量门禁拦截 (Gate 8)】${docName} 表格 ${t + 1} 行 ${r + 1} 列 ${c + 1} 发现非法加粗数值: "${runText}"！违反 G-11 字体分离法定不变量。`);
             }

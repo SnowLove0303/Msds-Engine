@@ -1,5 +1,43 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-10-30 中午] - PU-202B Section 2 与 Section 11 用户深度介入审计 4 项缺陷彻底根治与垂直合并三列架构落地
+
+### 一、 用户深度介入审计指示背景
+在对 PU-202B 交付物进行人机深度介入审查时，用户精准指出 4 处关键排版与结构缺陷：
+1. **Section 2 象形图对齐**：象形图应靠左对齐，此前为居中；
+2. **Section 2 标签序号**：第 2.3 条缺失法定序号前缀（原仅为“其他危险/其他危害”）；
+3. **Section 2 模块间距**：各标签-内容模块间需要保留一个空行间隔，增强可读性；
+4. **Section 11 11.7 架构**：11.7 生殖毒性需重构为三列垂直合并拓扑（第一列“11.7 生殖毒性”垂直合并，第二列拓展为“生育力：”与“致畸性：”两行子标签，第三列对应两行值）。
+
+---
+
+### 二、 核心架构重构与 4 项缺陷彻底根治
+1. **Section 2 象形图居左对齐 (`jc="left"`)**：
+   - 在 `docx-engine.js` 的 `transferDrawingNodesToParagraph` 中将段落对齐显式设为 `jc="left"`，与后续警告词、危险性说明等文本左边缘严格对齐。
+2. **Section 2 标签序号补齐**：
+   - 在 `pipeline-engine.js` 中规范化中文版 `2.3  其他危险：` 与英文版 `2.3  Other hazards:`，消除序号缺失的违规排版。
+3. **Section 2 模块间空行保留 (`w:spacing w:before="240"`)**：
+   - 在 `docx-engine.js` 的 `renderFullWidthRow` 中，为 Section 2 内部后续各个主要模块（信号词、危险性说明、防范说明各组、其他危险等）的起始段落自动注入 `spacing.before = "240"`（12pt 行间距），在不增加多余空段落的前提下精确实现视觉空行隔离。
+4. **Section 11 11.7 三列垂直合并结构落地与底模规范化收敛**：
+   - **底模原生 4 列网格拓扑保全**：底模 Section 11 表格底层为 4 列网格（`tblGrid = 4 列`）。标准行为 2 列（Cell 0 跨 1 列 + Cell 1 跨 3 列）；三列行为 Row 11 与 Row 12（Cell 0 跨 1 列 + Cell 1 跨 2 列 + Cell 2 跨 1 列，`1 + 2 + 1 = 4`）；
+   - **智能匹配保护守卫**：在 `smart-matching.js` 中拦截对生殖毒性行的暴力降列删格行为，保全 Row 11/12 原生三列；
+   - **垂直合并与子标签规范化**：Row 11 Cell 0 设为 `11.7  生殖毒性：` (`vMerge="restart"`)，Cell 1 设为 `生育力：`，Cell 2 写入生育力毒理数据；Row 12 Cell 0 设为 `vMerge="continue"`，Cell 1 自动将底模历史遗留的 `致畸形` 规范化为标准 `致畸性：`，Cell 2 写入致畸毒理数据；
+   - **英文版 1:1 同构**：英文版生成对应三列拓扑（`11.7  Reproductive toxicity:` + `Fertility:` / `Teratogenicity:`）；
+   - **Gate 8 字体分离白名单同步放行**：在质量门禁 Gate 8 中将 `致畸性` 扩充纳入合法加粗子标签白名单，彻底消除误拦截。
+
+---
+
+### 三、 终审验收与实测指标 (Measured)
+- **人机融合深度穿透自测脚本 (`verify_deep_audit_pu202b.mjs`)**：
+  - 中英文 4 份 DOCX Section 2 象形图对齐 `jc="left"` 100% 验证通过；
+  - 中英文 4 份 DOCX Section 2 `2.3` 标签序号 100% 存在；
+  - 中英文 4 份 DOCX Section 2 `before="240"` 模块间空间隔（实测命中 4 处）100% 验证通过；
+  - 中英文 4 份 DOCX Section 11 Row 11 & 12 三列网格、`restart/continue` 垂直合并、`生育力：` / `Fertility:` 与 `致畸性：` / `Teratogenicity:` 100% 满分通过！
+- **双极双层全景机械深度审计**：`node web/scripts/audit_bipolar_bilayer.mjs "算法训练材料/PU-202B" "PU-202B"` 真实退出码为 0，**Failures: 0, 100% 满分通过**；
+- **G-38 激光垂线对齐**：4 份 PDF Section 9 23 项标签首字 X0 = 80.28 pt 绝对垂直对齐。
+
+---
+
 ## [2026-10-30] - PU-202C 8 格式多组分全量交付与人机深度穿透审计 (毒理学附加信息保全与底层刷新根治)
 
 ### 一、 业务场景与多组分混合物特性
