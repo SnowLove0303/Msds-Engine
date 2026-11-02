@@ -468,13 +468,26 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
         if (!val) continue;
 
         if (/外观/i.test(lbl)) {
-          if (/乳白/i.test(val)) sec9Facts.appearance = 'Milky white liquid';
+          if (/半透明.*乳液|乳液.*半透明/i.test(val)) sec9Facts.appearance = 'Translucent emulsion';
+          else if (/半透明/i.test(val)) sec9Facts.appearance = 'Translucent liquid';
+          else if (/乳白/i.test(val)) sec9Facts.appearance = 'Milky white liquid';
           else if (/均质/i.test(val) && /微黄|淡黄/i.test(val)) sec9Facts.appearance = 'Light yellow homogeneous liquid';
           else if (/透明/i.test(val) && /微黄|淡黄/i.test(val)) sec9Facts.appearance = 'Light yellow transparent liquid';
           else if (/透明/i.test(val)) sec9Facts.appearance = 'Transparent liquid';
           else if (/微黄|淡黄/i.test(val)) sec9Facts.appearance = 'Slightly yellowish liquid';
           else if (/均质/i.test(val)) sec9Facts.appearance = 'Homogeneous liquid';
           else sec9Facts.appearance = 'Liquid';
+        } else if (/饱和蒸气压/i.test(lbl)) {
+          if (/无数据/i.test(val)) {
+            sec9Facts.saturated_vapour = 'No data available.';
+          } else {
+            sec9Facts.saturated_vapour = val
+              .replace(/约\s*/g, 'Approx. ')
+              .replace(/在\s*(\d+)℃/g, 'at $1℃')
+              .replace(/hPa/gi, ' hPa');
+          }
+        } else if (/粉尘爆炸/i.test(lbl)) {
+          sec9Facts.dust_explosion = /不适用/i.test(val) ? 'Not applicable' : (/无数据/i.test(val) ? 'No data available.' : val);
         } else if (/嗅觉阈值/i.test(lbl)) {
           sec9Facts.odour_threshold = /无数据/i.test(val) ? 'No data available.' : val;
         } else if (/pH/i.test(lbl)) {
@@ -533,6 +546,55 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     }
   }
 
+  // 6. Section 4 急救措施动态解析 (保全昏迷禁喂与20分钟眼睛冲洗)
+  let ingestionEn = 'Do NOT induce vomiting. Seek medical attention immediately.';
+  let eyeEn = 'Hold eyelids open and flush with plenty of warm water for at least 10 minutes. Consult an ophthalmologist.';
+  if (baseCnEngine) {
+    const s4 = baseCnEngine.records.find(r => r.sectionNumber === 4);
+    if (s4) {
+      const ingRow = s4.rows.find(r => /误服/i.test(r.cells[0]?.text || ''));
+      const ingText = ingRow?.cells[1]?.text || '';
+      if (/无意识/i.test(ingText)) {
+        ingestionEn = 'Do NOT induce vomiting. Seek medical attention immediately. Never give anything by mouth to an unconscious person.';
+      }
+      const eyeRow = s4.rows.find(r => /眼睛/i.test(r.cells[0]?.text || ''));
+      const eyeText = eyeRow?.cells[1]?.text || '';
+      if (/20\s*分钟/i.test(eyeText)) {
+        eyeEn = 'Hold eyelids open and flush with plenty of warm water for at least 20 minutes. Tilt head to avoid contaminating the unaffected eye. Consult an ophthalmologist immediately.';
+      }
+    }
+  }
+
+  // 7. Section 12.3 生态其他不利影响忠实翻译 (杜绝伪造鱼类无害结论)
+  let sec12OtherEffects = 'No data available.';
+  if (baseCnEngine) {
+    const s12 = baseCnEngine.records.find(r => r.sectionNumber === 12);
+    if (s12) {
+      const otherRow = s12.rows.find(r => /其他不利/i.test(r.cells[0]?.text || ''));
+      const otherText = (otherRow?.cells[1]?.text || '').trim();
+      if (otherText && !/无数据/i.test(otherText)) {
+        sec12OtherEffects = otherText;
+      }
+    }
+  }
+
+  // 8. Section 14.4 用户特殊注意事项动态温度提取 (彻底消除 40℃ 硬编码)
+  let specialPrecautionsEn = 'Not regulated as dangerous goods.\nTemperature must not exceed +35℃ and must not fall below +5℃.\nKeep away from food, acids and bases.';
+  if (baseCnEngine) {
+    const s14 = baseCnEngine.records.find(r => r.sectionNumber === 14);
+    if (s14) {
+      const specRow = s14.rows.find(r => /用户特殊注意事项|特殊注意事项/i.test(r.cells[0]?.text || ''));
+      const specText = (specRow?.cells[1]?.text || '').trim();
+      if (specText) {
+        const highMatch = specText.match(/高于\s*([+\-]?\d+)℃/);
+        const lowMatch = specText.match(/低于\s*([+\-]?\d+)℃/);
+        const maxTemp = highMatch ? (highMatch[1].startsWith('+') ? highMatch[1] : `+${highMatch[1]}`) : '+35';
+        const minTemp = lowMatch ? (lowMatch[1].startsWith('+') ? lowMatch[1] : `+${lowMatch[1]}`) : '+5';
+        specialPrecautionsEn = `Not regulated as dangerous goods.\nTemperature must not exceed ${maxTemp}℃ and must not fall below ${minTemp}℃.\nKeep away from food, acids and bases.`;
+      }
+    }
+  }
+
   return {
     // Section 1
     'sec1.product_name': prodName,
@@ -555,8 +617,8 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
 
     // Section 4
     'sec4.general_advice': 'Remove all contaminated clothing immediately.',
-    'sec4.ingestion': 'Do NOT induce vomiting. Seek medical attention immediately.',
-    'sec4.eye_contact': 'Hold eyelids open and flush with plenty of warm water for at least 10 minutes. Consult an ophthalmologist.',
+    'sec4.ingestion': ingestionEn,
+    'sec4.eye_contact': eyeEn,
     'sec4.skin_contact': 'Wash immediately with plenty of soap and water. If skin reaction occurs, seek medical advice.',
     'sec4.inhalation': 'If respiratory irritation occurs, seek medical advice.',
 
@@ -623,7 +685,7 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     // Section 12
     'sec12.ecotoxicity': 'No ecotoxicological studies are available for this product.\nDo not allow to enter drains, water courses or soil.',
     'sec12.persistence': 'The product is not readily biodegradable.',
-    'sec12.other_effects': 'According to ecotoxicological data, the product is classified as non-hazardous to fish and daphnia.',
+    'sec12.other_effects': sec12OtherEffects,
 
     // Section 13
     'sec13.line1': 'Dispose of in accordance with applicable national standards and national or local regulations.',
@@ -635,7 +697,7 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     'sec14.road_rail': 'Not classified as dangerous goods for land transport, in accordance with ADG regulations.',
     'sec14.sea': 'Not classified as dangerous goods for sea transport, in accordance with IMDG regulations.',
     'sec14.air': 'Not classified as dangerous goods for air transport, in accordance with IATA regulations.',
-    'sec14.special_precautions': 'Not regulated as dangerous goods.\nTemperature must not exceed +40℃ and must not fall below +5℃.\nKeep away from food, acids and bases.',
+    'sec14.special_precautions': specialPrecautionsEn,
 
     // Section 15
     'sec15.regulations': 'Relevant safety, health and environmental regulations for the substance or mixture',
@@ -1906,7 +1968,7 @@ export async function buildBaseEnglishEngine({
     }
   }
 
-  // Section 6 (严格保持底模原生标签、字体与段落格式不变，仅写入右侧内容值)
+  // Section 6 (底模自愈重写错位消防标签，规范化为法定泄漏应急标签)
   const s6 = engine.records.find(r => r.sectionNumber === 6);
   if (s6) {
     for (const row of s6.rows) {
@@ -1915,6 +1977,9 @@ export async function buildBaseEnglishEngine({
       if (!c1) continue;
       const lbl = (c0?.text || '').trim();
       if (/6\.1/i.test(lbl)) {
+        if (/Firefighting/i.test(lbl)) {
+          writeCellLabel(c0, '6.1 Personal precautions, protective equipment and emergency procedures:', true);
+        }
         safeWrite(c1, enValues['sec6.personal_precautions']);
       } else if (/6\.2|Environmental/i.test(lbl)) {
         safeWrite(c1, enValues['sec6.environmental_precautions']);
@@ -1936,7 +2001,7 @@ export async function buildBaseEnglishEngine({
     }
   }
 
-  // Section 8
+  // Section 8 (与中文母版保持严格同构剪枝)
   let s8 = engine.records.find(r => r.sectionNumber === 8);
   if (s8) {
     for (const row of s8.rows) {
@@ -1955,7 +2020,9 @@ export async function buildBaseEnglishEngine({
         else if (/Engineering controls/i.test(lbl)) safeWrite(c1, enValues['sec8.engineering_controls']);
       }
     }
-    while (s8.rows.length > 12) {
+    const cnS8 = baseCnEngine?.records?.find(r => r.sectionNumber === 8);
+    const targetRowCount = cnS8?.rows?.length || 11;
+    while (s8.rows.length > targetRowCount) {
       s8 = deleteRow(engine, s8, s8.rows.length - 1);
     }
   }

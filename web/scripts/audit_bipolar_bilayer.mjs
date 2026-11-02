@@ -831,9 +831,46 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   const s13MethodJcEn = s13MethodCellEn?.getElementsByTagName('w:jc')[0]?.getAttribute('w:val');
   assert(s13MethodJcEn === 'left', `Section 13 (L-S13): 英文版废弃处置方法内容严格纯左对齐 (jc=left) (实测: ${s13MethodJcEn})`);
 
-  // L-S14: 运输信息 (非危险货物级联判定)
+  // L-S14: 运输信息 (非危险货物级联判定与中英文温控对齐)
   const s14Text = tblsCn[13].textContent;
   assert(/非危险货物|非危险品/.test(s14Text), 'Section 14 (L-S14): 非危险货物级联判定联动保全');
+  const s14EnText = tblsEn[13].textContent;
+  if (model === 'PU-608') {
+    assert(/35\s*℃/.test(s14EnText), 'Section 14 英文版 (L-S14-EN): 必须与源事实严格一致保留 +35℃ 仓储温控指标');
+    assert(!/40\s*℃/.test(s14EnText), 'Section 14 英文版 (L-S14-EN): 严禁擅自篡改放宽为 +40℃ 硬编码');
+  }
+
+  // L-S6-EN: 泄漏应急标签自愈断言
+  const s6EnText = tblsEn[5].textContent;
+  assert(/Personal precautions/i.test(s6EnText), 'Section 6 英文版 (L-S6-EN): 6.1 必须正确标注 Personal precautions 泄漏应急标签');
+  assert(!/Firefighting precautions/i.test(s6EnText), 'Section 6 英文版 (L-S6-EN): 6.1 严禁残留底模错位的消防标签');
+
+  // L-S12-EN: 生态不利影响忠实翻译断言 (反无害假声明)
+  const s12EnText = tblsEn[11].textContent;
+  if (model === 'PU-608') {
+    assert(/No data available/i.test(s12EnText), 'Section 12 英文版 (L-S12-EN): 12.3 必须忠实翻译无数据资料');
+    assert(!/non-hazardous to fish/i.test(s12EnText), 'Section 12 英文版 (L-S12-EN): 严禁伪造“对鱼类无害”定性声明');
+  }
+
+  // L-S9-EN: 理化性质无损英译断言
+  const s9EnText = tblsEn[8].textContent;
+  if (model === 'PU-608') {
+    assert(/Translucent emulsion/i.test(s9EnText), 'Section 9 英文版 (L-S9-EN): 外观必须准确英译为 Translucent emulsion');
+    assert(/130\s*hPa/i.test(s9EnText), 'Section 9 英文版 (L-S9-EN): 饱和蒸气压实测值 130 hPa 必须保全');
+    assert(/Not applicable/i.test(s9EnText), 'Section 9 英文版 (L-S9-EN): 粉尘爆炸级别必须准确英译为 Not applicable');
+  }
+
+  // L-S4-EN: 急救措施生命指示保全断言
+  const s4EnText = tblsEn[3].textContent;
+  if (model === 'PU-608') {
+    assert(/at least 20 minutes/i.test(s4EnText), 'Section 4 英文版 (L-S4-EN): 眼睛冲洗时间必须保全法定 20 分钟');
+    assert(/unconscious person/i.test(s4EnText), 'Section 4 英文版 (L-S4-EN): 误服必须保全昏迷禁喂关键指示');
+  }
+
+  // L-S8-EN: 接触控制中英文同构断言
+  const s8CnCount = tblsCn[7].getElementsByTagName('w:tr').length;
+  const s8EnCount = tblsEn[7].getElementsByTagName('w:tr').length;
+  assert(s8CnCount === s8EnCount, `Section 8 (L-S8-EN): 中英文表格行数必须严格对称同构 (中文: ${s8CnCount}行 vs 英文: ${s8EnCount}行)`);
 
   // L-S15: 法规信息 (中国核心法规列表)
   const s15Text = tblsCn[14].textContent;

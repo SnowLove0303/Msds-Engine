@@ -2223,8 +2223,8 @@ export function writeCellValue(cell, value, roleStyle = null) {
 
 export function writeCellLabel(cell, value, allowLabelEdit = false, roleStyle = null) {
   if (!allowLabelEdit) throw new DocxEngineError('标签默认锁定，请先开启“允许修改标签文本”。', 'LOCKED_LABEL');
-  if (cell?.record?.sectionNumber && ![2, 9, 10, 11, 12].includes(cell.record.sectionNumber)) {
-    throw new DocxEngineError('只有第2、9、10、11、12部分允许根据源文件微调特殊标签，其他章节标签完全锁定。', 'LABEL_MUTATION_FORBIDDEN');
+  if (cell?.record?.sectionNumber && ![2, 6, 9, 10, 11, 12].includes(cell.record.sectionNumber)) {
+    throw new DocxEngineError('只有第2、6、9、10、11、12部分允许根据源文件微调特殊标签，其他章节标签完全锁定。', 'LABEL_MUTATION_FORBIDDEN');
   }
   if (!cell?.labelNodes?.length) throw new DocxEngineError('该单元格没有可编辑的标签运行区。', 'NO_LABEL');
   let clean = String(value ?? '').trim();
@@ -4152,3 +4152,5 @@ export function renderThreeColumnVMergeSubRows(record, mainRowIndex, subRowIndex
     record.engine.refresh();
   }
 }
+
+export * from './universal-editor-primitives.js';

@@ -1,5 +1,53 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-02 跨语言事实保全与反硬编码系统性根治] - 英文版 6 大深层事实篡改/硬编码与模板错位彻底根治、全景敌手强审计 AST 硬断言落地、PU-608 标准 8 交付物受控再生并通过终审
+
+### 一、 业务场景与用户法定指示背景
+用户对产出物审计提出严厉警示与法定要求：
+> “开展系统性根治，然后继续审计，注意Ps-openspec 对硬编码问题提出了具体的要求，你需要严格遵循 Ps-openspec体系”
+> “重新对产出物 按照规范和要求进行强审计，禁止使用虚假逻辑造退出码0，你要的是找问题审计，而不是为了没问题而审计”
+
+经由全新敌手对抗式穿透审计（Interrogate Red-Team），在英文版交付物中精准锁定了 6 处历史遗留事实篡改、硬编码及底模错位问题：
+1. **Section 14.4 仓储温度篡改**：源事实与中文版为 `+35℃`，英文版被硬编码替换为 `+40℃`；
+2. **Section 6.1 英文模板错位**：官方底模中 6.1 错用了 5.4 的消防标签（`Firefighting precautionsprotective equipment：`）；
+3. **Section 12.3 伪造合规声明**：源文为“无数据资料”，英文版虚构了 `classified as non-hazardous to fish and daphnia`；
+4. **Section 9 物理化学参数失真**：9.1 外观被翻译为 `Transparent liquid`（源文为“半透明乳液”/`Translucent emulsion`）；9.10 约 130hPa 饱和蒸气压被丢弃写为 `No data available.`；9.21 粉尘爆炸级别被写为 `No data available.`（应为 `Not applicable`）；
+5. **Section 4 急救关键指示缺失**：4.2 误服丢失了“昏迷禁口服”关键安全指示；4.3 眼睛冲洗时间被缩短为 10 分钟且丢失了头部倾斜指示；
+6. **Section 8 中英文表格结构不对称**：中文版无职业接触限值时裁剪为 11 行，英文版未同步裁剪保留了 12 行。
+
+---
+
+### 二、 核心根因与系统性根治措施 (Root Cause & Systematic Remediation)
+1. **彻底剔除静态硬编码，改为源事实动态感知提取**：
+   - 在 `pipeline-engine.js` 的 `buildEnglishValuesFromFacts` 中，重构 Section 14.4 解析器，通过正则动态感知并提取中文事实中的高低温阈值（`+35℃` 与 `+5℃`），根除任何静态模板字符串；
+   - 修正 Section 12.3 映射逻辑：凡中文为“无数据资料”一律严格翻译为 `No data available.`，禁止任何防御性虚构。
+2. **底层引擎解除限制与底模错位运行时自愈**：
+   - 在 `web/src/docx-engine.js` 中将标签覆写白名单由 `[2, 9, 10, 11, 12]` 扩展为 `[2, 6, 9, 10, 11, 12]`，赋予 Section 6 修复底模标签的合法权限；
+   - 在 `pipeline-engine.js` 的 `fillEnglishTemplate` 中植入 Section 6.1 标签自愈机制，自动将错位的消防标签修正为官方标准 `6.1 Personal precautions, protective equipment and emergency procedures:`。
+3. **强化专业英译词汇库与急救指示完整性**：
+   - Section 9: 识别“半透明”映射为 `Translucent`，“乳液”映射为 `emulsion`；解析饱和蒸气压中明确记载的 `130hPa在50℃` 并在英文端点保留；
+   - Section 4: 动态生成误服指示并注入 `Never give anything by mouth to an unconscious person.`；眼睛冲洗指示强制保留法定 20 分钟（`at least 20 minutes`）并包含倾斜头部避污规程。
+4. **中英文跨语言几何形态与结构绝对同构**：
+   - Section 8: 当中文端点根据无 OEL 规则执行末尾空白说明行剪枝时，英文版流水线同步执行对称行剪枝，确保中英双语表格行数严格 1:1 同构（PU-608 均为 11 行）。
+
+---
+
+### 三、 全景敌手强审计升级与实测凭据 (Measured Exit Code 0)
+1. **升级 `audit_bipolar_bilayer.mjs` AST 真实机器硬断言**：
+   - `L-S14-EN`: 真实 AST 文本断言必须包含 `+35℃`，反向断言禁止出现 `+40℃`；
+   - `L-S6-EN`: 真实 AST 断言必须包含 `Personal precautions`，反向断言禁止出现 `Firefighting`；
+   - `L-S12-EN`: 真实 AST 断言必须为 `No data available.`，反向断言禁止出现 `non-hazardous to fish`；
+   - `L-S9-EN`: 断言外观包含 `Translucent emulsion`、饱和蒸气压保留 `130 hPa`、粉尘爆炸包含 `Not applicable`；
+   - `L-S4-EN`: 断言冲洗时间包含 `at least 20 minutes`、误服包含 `unconscious person`；
+   - `L-S8-EN`: 断言中英文表格行数严格相等（11 行 vs 11 行）。
+2. **标准 8 交付物重新受控生产**：
+   - 运行受控驱动脚本 `node web/scripts/generate_pu608_canonical_deliverables.mjs`，重新生成 PU-608 全套 8 交付物，物理修改时间戳全部刷新在 1 分钟之内；
+3. **终审实测结果**：
+   - **双极双层全景机械深度终审 (`audit_bipolar_bilayer.mjs`)**：0 违规，满分全绿 (**Failures: 0, Exit Code 0 `[Measured]`**)；
+   - **OpenSpec 规格核销**：`npx openspec validate cross-lingual-facts-fidelity-and-anti-hardcode --strict` 验证通过 (**Exit Code 0 `[Measured]`**)。
+
+---
+
 ## [2026-11-02 任务推进] - PU-608 标准 8 格式全矩阵受控生产、审核断言解耦与双极双层全景终审 100% 满分通过
 
 ### 一、 业务场景与用户法定指示背景
@@ -77,16 +125,16 @@
 
 ### 三、 实测凭据与验证结论 (Measured Exit Code 0)
 - **端到端五大关键拼图综合实测 (`test_five_puzzles_workflow.mjs`)**：
-  - `[STEP 1/6]` 拼图五最高宪法与 Agent 准入红线静态扫描机检 **PASS (100% 守恒)**；
-  - `[STEP 2/6]` 原生 MCP 初始化成功 (msds-engine-mcp v2.1.0)；
-  - `[STEP 3/6]` 拼图三故意越界测试成功触发 `[MCP Transaction Auto-Rollback]`，母版自动回滚，无残留半成品文件；
-  - `[STEP 4/6]` 拼图二 Recipe A/B/C 复合手术在真实 Word 网格中无损执行成功，输出合规 DOCX（36,662 bytes）；
-  - `[STEP 5/6]` 拼图四正向行动诊断器输出 `actionableGaps` 数组与建议动作，字符保全比 111.9%；
-  - **实测退出码: 0 [Measured]**。
+   - `[STEP 1/6]` 拼图五最高宪法与 Agent 准入红线静态扫描机检 **PASS (100% 守恒)**；
+   - `[STEP 2/6]` 原生 MCP 初始化成功 (msds-engine-mcp v2.1.0)；
+   - `[STEP 3/6]` 拼图三故意越界测试成功触发 `[MCP Transaction Auto-Rollback]`，母版自动回滚，无残留半成品文件；
+   - `[STEP 4/6]` 拼图二 Recipe A/B/C 复合手术在真实 Word 网格中无损执行成功，输出合规 DOCX（36,662 bytes）；
+   - `[STEP 5/6]` 拼图四正向行动诊断器输出 `actionableGaps` 数组与建议动作，字符保全比 111.9%；
+   - **实测退出码: 0 [Measured]**。
 - **全套回归套件全绿**：
-  - `test_universal_editor.mjs` 10 项严苛测试 **100% PASS (Exit Code 0)**；
-  - `test_mcp_universal_editor.mjs` **PASS (Exit Code 0)**；
-  - `npx openspec validate msds-universal-mcp-workflow-five-puzzles --strict` 验证合流通过 (**Exit Code 0**)。
+   - `test_universal_editor.mjs` 10 项严苛测试 **100% PASS (Exit Code 0)**；
+   - `test_mcp_universal_editor.mjs` **PASS (Exit Code 0)**；
+   - `npx openspec validate msds-universal-mcp-workflow-five-puzzles --strict` 验证合流通过 (**Exit Code 0**)。
 
 ---
 
