@@ -672,6 +672,177 @@ function normalizeSection11RowHeight(row) {
  * 构建非危复合模态 Section 2 通栏行 (Mode B)
  * 100% 忠实吸收 GHS 分类、S3 成盐豁免、信号词、危害说明、四大防范规程与下水道堵塞危害
  */
+
+// ==========================================
+// 通用 GHS 分类与 H/P 规程中英标准数据字典
+// ==========================================
+const GHS_CATEGORY_TRANS_MAP = {
+  '急性毒性（吸入），类别4（H332）': 'Acute toxicity, Inhalation (Category 4), H332',
+  '急性毒性（吸入），类别 4（H332）': 'Acute toxicity, Inhalation (Category 4), H332',
+  '皮肤腐蚀/刺激，类别3（H316）': 'Skin corrosion/irritation (Category 3), H316',
+  '皮肤腐蚀/刺激，类别 3（H316）': 'Skin corrosion/irritation (Category 3), H316',
+  '严重眼睛损伤/眼睛刺激性，类别2B（H320）': 'Serious eye damage/eye irritation (Category 2B), H320',
+  '严重眼睛损伤/眼睛刺激性，类别 2B（H320）': 'Serious eye damage/eye irritation (Category 2B), H320',
+  '生殖毒性物质，类别1B（H360）': 'Reproductive toxicity (Category 1B), H360',
+  '生殖毒性物质，类别 1B（H360）': 'Reproductive toxicity (Category 1B), H360',
+  '生殖毒性，类别1B（H360）': 'Reproductive toxicity (Category 1B), H360',
+  '生殖毒性，类别 1B（H360）': 'Reproductive toxicity (Category 1B), H360',
+  '特异性靶器官系统毒性 一次接触，类别1（H370）': 'Specific target organ toxicity - single exposure (Category 1), H370',
+  '特异性靶器官系统毒性 一次接触，类别 1（H370）': 'Specific target organ toxicity - single exposure (Category 1), H370',
+  '特异性靶器官系统毒性 反复接触，类别2（H373）': 'Specific target organ toxicity - repeated exposure (Category 2), H373',
+  '特异性靶器官系统毒性 反复接触，类别 2（H373）': 'Specific target organ toxicity - repeated exposure (Category 2), H373',
+  '易燃液体，类别3（H226）': 'Flammable liquid (Category 3), H226',
+  '易燃液体，类别 3（H226）': 'Flammable liquid (Category 3), H226',
+  '皮肤致敏，类别1B（H317）': 'Skin sensitization (Category 1B), H317',
+  '皮肤致敏，类别 1B（H317）': 'Skin sensitization (Category 1B), H317',
+  '对水环境有慢性危害，类别3（H412）': 'Chronic aquatic toxicity (Category 3), H412',
+  '对水环境有慢性危害，类别 3（H412）': 'Chronic aquatic toxicity (Category 3), H412',
+  '特异性靶器官系统毒性 一次接触，类别3（H335）': 'Specific target organ toxicity - single exposure (Category 3), H335',
+  '特异性靶器官系统毒性 一次接触，类别 3（H335）': 'Specific target organ toxicity - single exposure (Category 3), H335',
+};
+
+const GHS_H_TRANS_MAP = {
+  'H316': 'H316 Causes mild skin irritation.',
+  'H320': 'H320 Causes eye irritation.',
+  'H332': 'H332 Harmful if inhaled.',
+  'H360': 'H360 May damage fertility or the unborn child.',
+  'H370': 'H370 Causes damage to organs.',
+  'H373': 'H373 May cause damage to organs (Liver) through prolonged or repeated exposure.',
+  'H226': 'H226 Flammable liquid and vapour.',
+  'H317': 'H317 May cause an allergic skin reaction.',
+  'H335': 'H335 May cause respiratory irritation.',
+  'H412': 'H412 Harmful to aquatic life with long lasting effects.',
+};
+
+const GHS_P_TRANS_MAP = {
+  'P201': 'P201 Obtain special instructions before use.',
+  'P202': 'P202 Do not handle until all safety precautions have been read and understood.',
+  'P260': 'P260 Do not breathe dust/fume/gas/mist/vapours/spray.',
+  'P264': 'P264 Wash hands thoroughly after handling.',
+  'P270': 'P270 Do not eat, drink or smoke when using this product.',
+  'P271': 'P271 Use only outdoors or in a well-ventilated area.',
+  'P280': 'P280 Wear protective gloves/clothing/eye protection/face protection.',
+  'P304+P340': 'P304+P340 IF INHALED: Remove person to fresh air and keep comfortable for breathing.',
+  'P305+P351+P338': 'P305+P351+P338 IF IN EYES: Rinse cautiously with water for several minutes. Remove contact lenses, if present and easy to do. Continue rinsing.',
+  'P308+P313': 'P308+P313 IF exposed or concerned: Get medical advice/attention.',
+  'P337+P313': 'P337+P313 If eye irritation persists: Get medical advice/attention.',
+  'P370+P378': 'P370+P378 In case of fire: Use foam, dry powder or carbon dioxide to extinguish.',
+  'P405': 'P405 Store locked up.',
+  'P501': 'P501 Dispose of contents/container in accordance with local regulations.',
+};
+
+/**
+ * 从源文档 Section 2 提取真实结构化事实
+ */
+export function parseSection2FromSource(srcEngine) {
+  const srcS2 = srcEngine?.records?.find(r => r.sectionNumber === 2);
+  if (!srcS2) return null;
+  const rawParas = [];
+  for (let r = 1; r < srcS2.rows.length; r++) {
+    for (const cell of srcS2.rows[r].cells) {
+      for (const p of cell.paragraphs) {
+        const txt = p.runs.map(r => r.text).join('').trim();
+        if (txt) rawParas.push(txt);
+      }
+    }
+  }
+
+  const fullText = rawParas.join(' ');
+  const isNonHazardous = !fullText || /根据GHS不属于危害化学品|不属于危害化学品|不属于危险|未被分类/i.test(fullText);
+
+  let mode = '';
+  const categories = [];
+  let signalWord = '';
+  const hazardStatements = [];
+  const prevention = [];
+  const response = [];
+  const storage = [];
+  const disposal = [];
+  let otherHazards = '';
+
+  for (let i = 0; i < rawParas.length; i++) {
+    const p = rawParas[i];
+    if (/2\.1\s*GHS危险性类别/i.test(p) || /^物质或混合物分类/i.test(p)) {
+      mode = 'cat';
+      continue;
+    }
+    if (/2\.2\s*GHS标签要素/i.test(p) || /^标签要素/i.test(p)) {
+      mode = 'label';
+      continue;
+    }
+    if (/信号词[：:]\s*(危险|警告)/i.test(p)) {
+      signalWord = p.match(/信号词[：:]\s*(危险|警告)/i)[1];
+      continue;
+    }
+    if (/^危险性说明[：:]?$/i.test(p)) {
+      mode = 'h';
+      continue;
+    }
+    if (/^防范说明[：:]?$/i.test(p)) {
+      mode = 'p';
+      continue;
+    }
+    if (/^预防措施[：:]?$/i.test(p)) {
+      mode = 'p_prev';
+      continue;
+    }
+    if (/^事故响应[：:]?$/i.test(p)) {
+      mode = 'p_resp';
+      continue;
+    }
+    if (/^安全储存[：:]?$|^安全存储[：:]?$/i.test(p)) {
+      mode = 'p_store';
+      continue;
+    }
+    if (/^废弃处置[：:]?$/i.test(p)) {
+      mode = 'p_disp';
+      continue;
+    }
+    if (/2\.3\s*其他危险|其他危险/i.test(p)) {
+      otherHazards = p.startsWith('2.3') ? p : `2.3 ${p}`;
+      mode = 'other';
+      continue;
+    }
+
+    if (mode === 'cat') {
+      if (!/GHS标签要素|象形图/i.test(p)) categories.push(p);
+    } else if (mode === 'h') {
+      if (/^H\d+/i.test(p)) hazardStatements.push(p);
+      else if (hazardStatements.length > 0 && !/防范说明/.test(p)) {
+        hazardStatements[hazardStatements.length - 1] += p;
+      }
+    } else if (mode === 'p_prev') {
+      if (/^P\d+/i.test(p)) prevention.push(p);
+      else if (prevention.length > 0) prevention[prevention.length - 1] += p;
+    } else if (mode === 'p_resp') {
+      if (/^P\d+/i.test(p)) response.push(p);
+      else if (response.length > 0) response[response.length - 1] += p;
+    } else if (mode === 'p_store') {
+      if (/^P\d+/i.test(p)) storage.push(p);
+      else if (storage.length > 0) storage[storage.length - 1] += p;
+    } else if (mode === 'p_disp') {
+      if (/^P\d+/i.test(p)) disposal.push(p);
+      else if (disposal.length > 0) disposal[disposal.length - 1] += p;
+    } else if (mode === 'other') {
+      if (otherHazards) otherHazards += ' ' + p;
+      else otherHazards = p;
+    }
+  }
+
+  return {
+    rawParas,
+    isNonHazardous,
+    categories,
+    signalWord,
+    hazardStatements,
+    prevention,
+    response,
+    storage,
+    disposal,
+    otherHazards
+  };
+}
+
 export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
   let s2 = engine.records.find((r) => r.sectionNumber === 2);
   if (!s2) return;
@@ -684,20 +855,17 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
     s2 = addRowAfter(engine, s2, s2.rows.length - 1);
   }
 
-  // 2. 组装段落内容 (自适应兼容 PU-202[AC] DMAC 危险品、PU-202B NMP 危险品与 PA-3223 非危通栏)
-  const isPu202Dmac = facts.modelCode === 'PU-202A' || facts.modelCode === 'PU-202C' || /PU[-_]?202[AC]/i.test(facts.modelCode || '');
-  const isPu202b = facts.modelCode === 'PU-202B' || /PU[-_]?202B/i.test(facts.modelCode || '');
+  // 2. 从源引擎中精准解析真实 Section 2 结构
+  const parsed = parseSection2FromSource(facts.srcEngine);
+  const isNonHazardous = !parsed || parsed.isNonHazardous || (!parsed.categories.length && !parsed.hazardStatements.length);
+
   const paragraphs = [];
   if (!isEnglish) {
-    if (isPu202Dmac) {
+    // 中文通栏组装
+    if (!isNonHazardous && parsed) {
       paragraphs.push(
         '2.1 GHS危险性类别：',
-        '急性毒性（吸入），类别4（H332）',
-        '皮肤腐蚀/刺激，类别3（H316）',
-        '严重眼睛损伤/眼睛刺激性，类别2B（H320）',
-        '生殖毒性物质，类别1B（H360）',
-        '特异性靶器官系统毒性 一次接触，类别1（H370）',
-        '特异性靶器官系统毒性 反复接触，类别2（H373）',
+        ...parsed.categories,
         '2.2 GHS标签要素：',
         'GHS象形图：'
       );
@@ -705,80 +873,25 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         paragraphs.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine });
       }
       paragraphs.push(
-        '信号词：危险',
+        `信号词：${parsed.signalWord || '危险'}`,
         '危险性说明：',
-        'H316造成轻微皮肤刺激。',
-        'H320造成眼睛刺激。',
-        'H332吸入有害。',
-        'H360可能对生育能力或胎儿造成伤害。',
-        'H370可能对器官的伤害。',
-        'H373长期或重复暴露可能会对器官造成伤害（肝）。',
+        ...parsed.hazardStatements,
         '防范说明：',
         '预防措施：',
-        '        P201 在使用前获取特别指示。',
-        '        P202 在阅读并了解所有安全预防措施之前，切勿操作与处置。',
-        '        P260 不要吸入粉尘/烟/气体/气雾/蒸气/喷雾。',
-        '        P264 操作后彻底清洗双手。',
-        '        P270 使用本产品时不要进食、饮水或吸烟。',
-        '        P271 只能在室外或通风良好处使用。',
-        '        P280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。',
+        ...parsed.prevention.map(p => p.startsWith('        ') ? p : '        ' + p),
         '事故响应：',
-        '        P304+P340 如误吸入：将人转移到空气新鲜处，保持呼吸舒适体位。',
-        '        P305+P351+P338 如果进入眼睛：用水小心地冲洗几分钟。如简便易行，摘除隐形眼镜，继续冲洗。',
-        '        P308+P313 如果接触到或有疑虑：求医/就诊。',
-        '        P337+P313 如眼刺激持续不退：求医/就诊。',
-        '        P370+P378 火灾时：使用泡沫，干粉灭火器或二氧化碳灭火。',
+        ...parsed.response.map(p => p.startsWith('        ') ? p : '        ' + p),
         '安全储存：',
-        '        P405 储存处须加锁。',
+        ...parsed.storage.map(p => p.startsWith('        ') ? p : '        ' + p),
         '废弃处置：',
-        '        P501 处置内装物/容器按照当地规章。',
-        '2.3 其他危险：无适用资料。'
-      );
-    } else if (isPu202b) {
-      paragraphs.push(
-        '2.1 GHS危险性类别：',
-        '生殖毒性物质，类别1B（H360）',
-        '2.2 GHS标签要素：',
-        'GHS象形图：'
-      );
-      if (facts.drawingNodes && facts.drawingNodes.length > 0) {
-        paragraphs.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine });
-      }
-      paragraphs.push(
-        '信号词：危险',
-        '危险性说明：',
-        'H360可能对胎儿造成伤害。',
-        '防范说明：',
-        '预防措施：',
-        '        P201 在使用前获取特别指示。',
-        '        P202 在阅读并了解所有安全预防措施之前，切勿操作与处置。',
-        '        P280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。',
-        '事故响应：',
-        '        P308+P313 如接触到或有疑虑：求医/就诊。',
-        '安全储存：',
-        '        P405 储存处须加锁。',
-        '废弃处置：',
-        '        P501 处置内装物/容器按照当地规章。',
-        '2.3 其他危险：可能存在透皮吸收N－甲基吡咯烷酮的危险。'
+        ...parsed.disposal.map(p => p.startsWith('        ') ? p : '        ' + p),
+        parsed.otherHazards || '2.3 其他危险：无适用资料。'
       );
     } else {
+      // 真实非危通栏组装
       paragraphs.push('GHS危险性类别: 无');
       if (facts.section3ExemptionNotes) {
         paragraphs.push(...facts.section3ExemptionNotes.split(/\r?\n/).filter(Boolean));
-      } else {
-        paragraphs.push(
-          '羟基丙烯酸酯聚合物GHS危险性分类：不适用；',
-          '标签要素：',
-          '请注意以下物质：',
-          'N,N-二甲基乙醇胺，中和剂，已键合为盐，质量浓度小于2.0%，特定阈值浓度≥5%',
-          'GHS分类：',
-          '易燃液体3 H226；',
-          '急性毒性4 吸入性 H332；',
-          '急性毒性4 经皮H312；',
-          '皮肤腐蚀1B H314；',
-          '特异性靶器官系统毒性（一次接触）3 H335；',
-          '特异性靶器官系统毒性（一次接触）3 H335；'
-        );
       }
       paragraphs.push(
         '象形图：无',
@@ -797,8 +910,7 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         '        泄露：收集泄漏物。',
         '        灭火：火灾时，使用干粉、泡沫、二氧化碳灭火。',
         '安全存储：',
-        '    请置于避光、阴凉干燥处存放，存储温度应保持在5-35℃，避免霜冻，保持产品',
-        '装完整。每次取用之后立即密封，打开包装后尽快使用完毕。',
+        '    请置于避光、阴凉干燥处存放，存储温度应保持在5-35℃，避免霜冻，保持产品装完整。每次取用之后立即密封，打开包装后尽快使用完毕。',
         '废弃处置：',
         '    使用后的空桶未经无害化处理前，不得存储食物及其他物品，以免对人体、环境造成危害；包装物的回收、利用、处置应符合国家及当地相关法律、法规规定，因包装物处置不当造成的危害及损失，由处置方承担。',
         '物理化学危险：对水体、土壤可造成一定的污染。',
@@ -807,107 +919,83 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       );
     }
   } else {
-    if (isPu202Dmac) {
+    // 英文通栏组装 (100% 数据驱动动态英译)
+    if (!isNonHazardous && parsed) {
+      paragraphs.push('2.1 Classification of the substance or mixture:');
+      for (const cat of parsed.categories) {
+        paragraphs.push(GHS_CATEGORY_TRANS_MAP[cat] || cat);
+      }
       paragraphs.push(
-        '2.1 Classification of the substance or mixture:',
-        'Acute toxicity, Inhalation (Category 4), H332',
-        'Skin corrosion/irritation (Category 3), H316',
-        'Serious eye damage/eye irritation (Category 2B), H320',
-        'Reproductive toxicity (Category 1B), H360',
-        'Specific target organ toxicity - single exposure (Category 1), H370',
-        'Specific target organ toxicity - repeated exposure (Category 2), H373',
         '2.2 GHS Label Elements:',
         'GHS pictograms:'
       );
       if (facts.drawingNodes && facts.drawingNodes.length > 0) {
         paragraphs.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine });
       }
-      paragraphs.push(
-        'Signal word: Danger',
-        'Hazard statements:',
-        'H316 Causes mild skin irritation.',
-        'H320 Causes eye irritation.',
-        'H332 Harmful if inhaled.',
-        'H360 May damage fertility or the unborn child.',
-        'H370 Causes damage to organs.',
-        'H373 May cause damage to organs (Liver) through prolonged or repeated exposure.',
-        'Precautionary statements:',
-        'Prevention:',
-        '        P201 Obtain special instructions before use.',
-        '        P202 Do not handle until all safety precautions have been read and understood.',
-        '        P260 Do not breathe dust/fume/gas/mist/vapours/spray.',
-        '        P264 Wash hands thoroughly after handling.',
-        '        P270 Do not eat, drink or smoke when using this product.',
-        '        P271 Use only outdoors or in a well-ventilated area.',
-        '        P280 Wear protective gloves/clothing/eye protection/face protection.',
-        'Response:',
-        '        P304+P340 IF INHALED: Remove person to fresh air and keep comfortable for breathing.',
-        '        P305+P351+P338 IF IN EYES: Rinse cautiously with water for several minutes. Remove contact lenses, if present and easy to do. Continue rinsing.',
-        '        P308+P313 IF exposed or concerned: Get medical advice/attention.',
-        '        P337+P313 If eye irritation persists: Get medical advice/attention.',
-        '        P370+P378 In case of fire: Use foam, dry powder or carbon dioxide to extinguish.',
-        'Storage:',
-        '        P405 Store locked up.',
-        'Disposal:',
-        '        P501 Dispose of contents/container in accordance with local regulations.',
-        '2.3 Other hazards: No applicable information.'
-      );
-    } else if (isPu202b) {
-      paragraphs.push(
-        '2.1 Classification of the substance or mixture:',
-        'Reproductive toxicity (Category 1B), H360',
-        '2.2 GHS Label Elements:',
-        'GHS pictograms:'
-      );
-      if (facts.drawingNodes && facts.drawingNodes.length > 0) {
-        paragraphs.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine });
+      const enSignal = parsed.signalWord === '危险' ? 'Danger' : (parsed.signalWord === '警告' ? 'Warning' : 'Danger');
+      paragraphs.push(`Signal word: ${enSignal}`);
+      paragraphs.push('Hazard statements:');
+      for (const h of parsed.hazardStatements) {
+        const codeMatch = h.match(/^(H\d+)/);
+        const code = codeMatch ? codeMatch[1] : '';
+        paragraphs.push(GHS_H_TRANS_MAP[code] || h);
       }
       paragraphs.push(
-        'Signal word: Danger',
-        'Hazard statements:',
-        'H360 May damage fertility or the unborn child.',
         'Precautionary statements:',
-        'Prevention:',
-        '        P201 Obtain special instructions before use.',
-        '        P202 Do not handle until all safety precautions have been read and understood.',
-        '        P280 Wear protective gloves/clothing/eye protection/face protection.',
-        'Response:',
-        '        P308+P313 IF exposed or concerned: Get medical advice/attention.',
-        'Storage:',
-        '        P405 Store locked up.',
-        'Disposal:',
-        '        P501 Dispose of contents/container in accordance with local regulations.',
-        '2.3 Other hazards: Risk of cutaneous absorption of N-Methyl-2-pyrrolidone (NMP).'
+        'Prevention:'
       );
+      for (const p of parsed.prevention) {
+        const codeMatch = p.match(/^(P\d+(?:\+P\d+)*)/);
+        const code = codeMatch ? codeMatch[1] : '';
+        paragraphs.push('        ' + (GHS_P_TRANS_MAP[code] || p));
+      }
+      paragraphs.push('Response:');
+      for (const p of parsed.response) {
+        const codeMatch = p.match(/^(P\d+(?:\+P\d+)*)/);
+        const code = codeMatch ? codeMatch[1] : '';
+        paragraphs.push('        ' + (GHS_P_TRANS_MAP[code] || p));
+      }
+      paragraphs.push('Storage:');
+      for (const p of parsed.storage) {
+        const codeMatch = p.match(/^(P\d+(?:\+P\d+)*)/);
+        const code = codeMatch ? codeMatch[1] : '';
+        paragraphs.push('        ' + (GHS_P_TRANS_MAP[code] || p));
+      }
+      paragraphs.push('Disposal:');
+      for (const p of parsed.disposal) {
+        const codeMatch = p.match(/^(P\d+(?:\+P\d+)*)/);
+        const code = codeMatch ? codeMatch[1] : '';
+        paragraphs.push('        ' + (GHS_P_TRANS_MAP[code] || p));
+      }
+      let enOther = '2.3 Other hazards: No applicable information.';
+      if (/N[－-]甲基吡咯烷酮/i.test(parsed.otherHazards)) {
+        enOther = '2.3 Other hazards: Risk of cutaneous absorption of N-Methyl-2-pyrrolidone (NMP).';
+      } else if (/N,N[－-]二甲基乙酰胺/i.test(parsed.otherHazards)) {
+        enOther = '2.3 Other hazards: Risk of cutaneous absorption of N,N-Dimethylacetamide (DMAC).';
+      }
+      paragraphs.push(enOther);
     } else {
+      // 英文真实非危通栏
+      paragraphs.push('GHS hazard classification: Not classified as a hazardous chemical according to GHS.');
+      if (facts.section3ExemptionNotes) {
+        paragraphs.push(...facts.section3ExemptionNotes.split(/\r?\n/).filter(Boolean));
+      }
       paragraphs.push(
-        'GHS hazard classification: Not classified as a hazardous chemical according to GHS.',
-        'Hydroxy acrylic polymer GHS classification: Not applicable;',
-        'Label elements:',
-        'Please note the following substance:',
-        'N,N-Dimethylethanolamine, neutralizing agent, bonded as salt, mass concentration < 2.0%, specific concentration limit >= 5%',
-        'GHS classification:',
-        'Flammable liquid (Category 3), H226;',
-        'Acute toxicity, Inhalation (Category 4), H332;',
-        'Acute toxicity, Dermal (Category 4), H312;',
-        'Skin corrosion (Category 1B), H314;',
-        'Specific target organ toxicity - single exposure (Category 3), H335;',
-        'Specific target organ toxicity - single exposure (Category 3), H335;',
-        'GHS pictograms: None',
+        'Pictograms: None',
         'Signal word: Warning',
         'Hazard statements: No known significant effects or critical hazards.',
         'Precautionary statements:',
         'Prevention:',
-        'Wear protective gloves, eye protection and protective clothing during operation.',
-        'Wash contact areas thoroughly after handling.',
-        'Do not eat, drink or smoke when using this product.',
-        'Use only outdoors or in a well-ventilated area.',
+        '        Wear necessary protective equipment (gloves, goggles, work clothing, etc.) during operation.',
+        '        Wash contacted body parts thoroughly after handling.',
+        '        Do not eat, drink or smoke in the workplace.',
+        'Operate outdoors or in a well-ventilated area.',
         'Response:',
-        'Inhalation: If inhaled, get medical advice/attention if you feel unwell.',
-        'Skin and eye contact: Wash thoroughly with soap and water. If irritation persists, seek medical attention.',
-        'Ingestion: Rinse mouth immediately. Do NOT induce vomiting. Immediately seek medical advice/attention.',
-        'Spillage: Collect spillage.',
-        'Fire: In case of fire, use dry powder, foam, or carbon dioxide for extinction.',
+        '        Inhalation: If inhaled and feeling unwell, seek medical attention.',
+        '        Skin/Eye contact: Wash with soap and clean water. If discomfort persists, seek medical attention.',
+        '        Ingestion: Rinse mouth immediately. Do NOT induce vomiting. Seek immediate medical treatment.',
+        '        Spill: Collect spillage.',
+        '        Fire: In case of fire, use dry powder, foam, or carbon dioxide for extinction.',
         'Storage:',
         'Store in a cool, dry, well-ventilated place away from light. Maintain storage temperature between 5-35 deg C. Protect from freezing and keep packaging intact. Keep container tightly closed after use and consume promptly once opened.',
         'Disposal:',
@@ -930,10 +1018,6 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
 }
 
 /**
- * 构建 Section 11 三级责任隔离通栏拓扑
- * [免责通栏] -> [原料前言通栏] -> [原料端点通栏]
- */
-/**
  * Section 11 双范式动态路由判定算法 (对齐 OpenSpec handcraft-typography-and-s11-dual-paradigm)
  * @param {object|Array} section11FactsOrRecords
  * @returns {'PARADIGM_1_FULL_WIDTH_MERGED'|'PARADIGM_2_STANDARD_SLOTS'}
@@ -945,7 +1029,6 @@ export function detectSection11Paradigm(section11FactsOrRecords) {
     return 'PARADIGM_1_FULL_WIDTH_MERGED';
   }
 
-  // 提取文本，安全支持 Record 对象、数组或纯文本，杜绝循环引用
   let rawText = '';
   if (typeof section11FactsOrRecords === 'string') {
     rawText = section11FactsOrRecords;
@@ -967,12 +1050,9 @@ export function detectSection11Paradigm(section11FactsOrRecords) {
   }
 
   const componentMatches = new Set();
-  
-  // 1. CAS 号提取
   const casMatches = rawText.match(/\b\d{2,7}-\d{2}-\d\b/g) || [];
   casMatches.forEach(c => componentMatches.add(c));
 
-  // 2. 常见化学组分关键词识别
   const knownComponentKeywords = [
     '分散体', '丙二醇丁醚', '二乙二醇丁醚', '聚合物', '溶剂', '添加剂'
   ];
@@ -980,7 +1060,6 @@ export function detectSection11Paradigm(section11FactsOrRecords) {
     if (rawText.includes(kw)) componentMatches.add(kw);
   });
 
-  // 判定阈值：>= 2 个不同化学组分试验数据，走范式一；否则走范式二
   if (componentMatches.size >= 2) {
     return 'PARADIGM_1_FULL_WIDTH_MERGED';
   }
@@ -999,81 +1078,52 @@ export function buildThreeTierSection11(engine, facts = {}, isEnglish = false) {
     s11 = addRowAfter(engine, s11, s11.rows.length - 1);
   }
 
-  const isPu202a = facts.modelCode === 'PU-202A' || /PU[-_]?202A/i.test(facts.modelCode || '');
+  const srcS11 = facts.srcEngine?.records?.find((r) => r.sectionNumber === 11);
+  const srcPreamble = (srcS11?.rows[2]?.cells[0]?.text || '').trim();
 
   const disclaimerText = !isEnglish
     ? '该产品无可用的毒理学研究。'
     : 'No toxicological studies are available on the product.';
   renderFullWidthRow(s11, 1, disclaimerText, { isEnglish, isSection11: true, boldSubheaders: false, totalWidth: 9781 });
 
-  const preambleText = !isEnglish
-    ? (isPu202a ? '以下是N,N－二甲基乙酰胺毒理学数据：' : '下面是这些成分的毒理学数据。')
-    : (isPu202a ? 'The following is toxicological data for N,N-Dimethylacetamide:' : 'The following is toxicological data for these ingredients.');
-  renderFullWidthRow(s11, 2, preambleText, { isEnglish, isSection11: true, leftIndentTwips: 34, boldSubheaders: false, totalWidth: 9781 });
-
-  let detailParagraphs = [];
-  if (isPu202a) {
-    if (!isEnglish) {
-      detailParagraphs = [
-        'N,N-二甲基乙酰胺：\n' +
-        '急性毒性：\n' +
-        '经口：半数致死剂量（LD50）/大鼠：3,000－6,000mg/kg\n' +
-        '吸入：半数致死浓度（LC50）/1h/大鼠 雌性：8.81mg/l（此值仅用于有可吸入的颗粒形成的情况。）\n' +
-        '主要皮肤刺激性：物种：兔子；分类：刺激皮肤；结果：轻度的皮肤刺激\n' +
-        '主要粘膜刺激性：物种：兔子；分类：刺激眼睛；结果：轻度的眼睛刺激\n' +
-        '致敏性：物种：豚鼠；分类：不是皮肤过敏物质；结果：未引起实验室动物过敏；物种：人类；分类：不是皮肤过敏物质；结果：对志愿者做的皮肤接触试验证明没有过敏特性\n' +
-        '致突变性：在细菌细胞培养中没有引起基因损害。在哺乳类细胞培养中没有引起基因损害。有证据认为此物质不会在动物中引起基因损伤。\n' +
-        '致癌性：在动物试验中未见致癌影响。\n' +
-        '生殖毒性：动物试验表明无生殖毒性。动物实验表明在低于那些引起母体中毒的量时，对胚胎有影响。降低了胚胎胎儿的成活力，胎儿发育缓慢（变异），胎儿畸形。\n' +
-        '特异性靶器官系统毒性（一次接触/反复接触）：无数据资料。\n' +
-        '吸入危险：无数据资料。\n' +
-        '附加信息：饮酒精饮料会加剧毒性影响。\n' +
-        '重复剂量中毒：经口；病理变化：胃，睾丸，肝，肾，红血球异常减少。\n' +
-        '重复剂量中毒：吸入；病理变化：肾、肝影响，视网膜损伤。'
-      ];
-    } else {
-      detailParagraphs = [
-        'N,N-Dimethylacetamide:\n' +
-        'Acute toxicity:\n' +
-        'Oral: Median lethal dose (LD50) / rat: 3,000 - 6,000 mg/kg;\n' +
-        'Inhalation: Median lethal concentration (LC50) / 1h / rat female: 8.81 mg/l (This value is only for cases where inhalable particles are formed);\n' +
-        'Primary skin irritation: Species: rabbit; Classification: skin irritation; Result: mild skin irritation;\n' +
-        'Primary mucous membrane irritation: Species: rabbit; Classification: eye irritation; Result: mild eye irritation;\n' +
-        'Sensitization: Species: guinea pig; Classification: not a skin sensitizer; Result: did not cause sensitization in laboratory animals; Species: human; Classification: not a skin sensitizer; Result: skin contact tests on volunteers demonstrated no sensitizing properties;\n' +
-        'Mutagenicity: Did not cause genetic damage in bacterial cell cultures. Did not cause genetic damage in mammalian cell cultures. Evidence indicates this substance does not cause genetic damage in animals;\n' +
-        'Carcinogenicity: No carcinogenic effects observed in animal studies;\n' +
-        'Reproductive toxicity: Animal studies show no reproductive toxicity. Animal studies indicate effects on embryos at doses below those causing maternal toxicity. Decreased embryo-fetal viability, retarded fetal development (variations), fetal malformations;\n' +
-        'Specific target organ toxicity (single / repeated exposure): No data available;\n' +
-        'Aspiration hazard: No data available;\n' +
-        'Additional information: Consumption of alcoholic beverages may aggravate toxic effects;\n' +
-        'Repeated dose toxicity: Oral; Pathological changes: stomach, testes, liver, kidney, abnormal decrease in red blood cells;\n' +
-        'Repeated dose toxicity: Inhalation; Pathological changes: kidney and liver effects, retinal damage.'
-      ];
-    }
-  } else {
-    if (!isEnglish) {
-      detailParagraphs = [
-        '羟基聚丙烯酸酯分散体：\n毒性：无资料；',
-        '刺激性：无资料',
-        '丙二醇丁醚：\n毒性：经皮（鼠）LD50：＞2000 mg/kg\n      吸入（鼠）LD50：＞1997.718 mg/l/8hE\n      经口（鼠）LD50：＞2000 mg/kg\n刺激性：无资料',
-        '二乙二醇丁醚：\n毒性：经皮（鼠）LD50：＞2000 mg/kg\n      经口（鼠）LD50：=4500 mg/kg\n刺激性：无资料',
-      ];
-    } else {
-      detailParagraphs = [
-        'Hydroxy polyacrylate dispersion:\nToxicity: No data available;',
-        'Irritation: No data available.',
-        'Propylene glycol butyl ether:\nToxicity: Dermal (Rat)   LD50: > 2000 mg/kg\n        Inhalation (Rat) LD50: > 1997.718 mg/l/8hE\n        Oral (Rat)     LD50: > 2000 mg/kg\nIrritation: No data available.',
-        '2-(2-Butoxyethoxy)ethanol:\nToxicity: Dermal (Rat)   LD50: > 2000 mg/kg\n        Oral (Rat)     LD50: = 4500 mg/kg\nIrritation: No data available.',
-      ];
+  let preambleText = !isEnglish
+    ? (srcPreamble || '下面是这些成分的毒理学数据。')
+    : 'The following is toxicological data for these ingredients:';
+  if (isEnglish && srcPreamble) {
+    const compMatch = srcPreamble.match(/以[下为](?:是)?(.*?)毒理学数据/i);
+    if (compMatch) {
+      let comp = compMatch[1].trim();
+      if (/N,N[－-]二甲基乙酰胺|DMAC/i.test(comp)) comp = 'N,N-Dimethylacetamide';
+      else if (/N[－-]甲基吡咯烷酮|NMP/i.test(comp)) comp = 'N-Methyl-2-pyrrolidone (NMP)';
+      else if (/N[－-]乙基吡咯烷酮|NEP/i.test(comp)) comp = '1-Ethylpyrrolidin-2-one (NEP)';
+      preambleText = `The following is toxicological data for ${comp}:`;
     }
   }
+  renderFullWidthRow(s11, 2, preambleText, { isEnglish, isSection11: true, leftIndentTwips: 34, boldSubheaders: false, totalWidth: 9781 });
+
+  let detailParagraphs = facts.detailParagraphs || [];
+  if (!detailParagraphs.length && srcS11) {
+    // 从源文件 Section 11 中动态聚合端点
+    const lines = [];
+    for (let r = 3; r < srcS11.rows.length; r++) {
+      const row = srcS11.rows[r];
+      const lbl = (row.cells[0]?.text || '').trim();
+      const val = (row.cells[row.cells.length - 1]?.text || '').trim();
+      if (lbl && val) {
+        if (!isEnglish) {
+          lines.push(`${lbl} ${val}`);
+        } else {
+          lines.push(`${lbl} ${translateToxicologyValueToEnglish(val)}`);
+        }
+      }
+    }
+    if (lines.length) detailParagraphs = [lines.join('\n')];
+  }
+
   renderFullWidthRow(s11, 3, detailParagraphs, { isEnglish, isSection11: true, leftIndentTwips: 34, boldSubheaders: false, totalWidth: 9781 });
   engine.refresh();
 }
 
-/**
- * 清除 Section 12 顶层重复免责行，保留标准结构 (12.1~12.3)
- */
 export function cleanSection12Preambles(engine, isEnglish = false) {
   let s12 = engine.records.find((r) => r.sectionNumber === 12);
   if (!s12) return;
@@ -1097,7 +1147,7 @@ export async function buildBaseChineseEngine({
   facts = {}
 }) {
   // 1. 读取源文件 Buffer
-  const isPu202b = modelCode === 'PU-202B' || /PU[-_]?202B/i.test(modelCode || '');
+  // const isPu202b 已被通用数据驱动机制彻底替代
   let srcBuf = sourceDocxBuffer || cnGroundTruthBuffer;
   const srcPath = sourceDocxPath || cnGroundTruthPath;
   if (!srcBuf && srcPath) {
@@ -1216,7 +1266,7 @@ export async function buildBaseChineseEngine({
   // 9. 规范化 Section 2：全场景默认全量通栏 (G-40 强制默认全量通栏绝对公理)
   let s2 = engine.records.find(r => r.sectionNumber === 2);
   const isNonHazComposite = Boolean(matchResult.facts?.isNonHazardousComposite || detectNonHazardousComposite(srcEngine.records, facts));
-  const isPu202a = modelCode === 'PU-202A' || /PU[-_]?202A/i.test(modelCode || '');
+  // isPu202a 已被通用数据驱动机制彻底替代
   if (s2) {
     const picItem = matchResult.matchedSections?.find(s => s.sectionNumber === 2)?.matchedRows?.find(r => r.key === 'pictogram');
     const drawingNodes = picItem?.drawingNodes || (picItem?.drawingNode ? [picItem.drawingNode] : null);
@@ -1230,12 +1280,12 @@ export async function buildBaseChineseEngine({
   }
 
   // 9.5 Section 11 & Section 12 双范式动态分流处理 (Ps-openspec 2.0: 多组分走通栏，单组分如 PU-202A 走原版分列表格)
-  const isMultiComponent = modelCode === 'PA-3223' || (!isPu202a && Boolean(facts.isMultiComponentComposite || isNonHazComposite));
+  const isMultiComponent = modelCode === 'PA-3223' || Boolean(facts.isMultiComponentComposite || isNonHazComposite);
   const s11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || srcEngine?.records?.find(r => r.sectionNumber === 11) || null);
   if (s11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
     buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || '' }, false);
     cleanSection12Preambles(engine, false);
-  } else if (isNonHazComposite || isPu202a) {
+  } else if (isNonHazComposite) {
     cleanSection12Preambles(engine, false);
   }
 
@@ -1252,221 +1302,213 @@ export async function buildBaseChineseEngine({
     }
   }
 
-  // 11. 规范化 Section 11：剪枝所有无值纯空行与未测端点，若为纯声明型严格收敛为 2 行 (通栏复合模态跳过，由 buildThreeTierSection11 专管)
+  // 11. 规范化 Section 11：单组分插槽表格高精排版 (严格源事实驱动，通用排版，绝无针对型号硬编码假数据)
   let s11 = engine.records.find(r => r.sectionNumber === 11);
-  if (s11 && isPu202a) {
-    // PU-202A 单组分原版分列表格高精排版专治 (15 行严格同构规范 L-S11)
-    // 1. 清除任何在 Row 2 之后残留的单列空白行或未识别行
-    for (let rIdx = s11.rows.length - 1; rIdx >= 3; rIdx--) {
-      if (s11.rows[rIdx].cells.length === 1 && !(s11.rows[rIdx].cells[0]?.text || '').trim()) {
-        s11 = deleteRow(engine, s11, rIdx);
-      }
-    }
-    // 2. 确保 Row 2 前言行原生字号与缩进保障
-    if (s11.rows.length > 2 && s11.rows[2].cells.length === 1) {
-      formatSection11PreambleRow(s11.rows[2], '以下是N,N－二甲基乙酰胺毒理学数据：', false);
-    }
-
-    // 3. 急性毒性三项必齐硬保全 (经口、吸入、经皮) (G-34 公理)
-    let oralRow = s11.rows.find(r => /经口/i.test(r.cells.map(c => c.text).join(' ')));
-    if (oralRow) {
-      const vCell = oralRow.cells[oralRow.cells.length - 1];
-      writeStructuredToxicologyCellValue(vCell, '半数致死剂量（LD50）/大鼠：3,000－6,000mg/kg', { isEnglish: false });
-    }
-
-    let inhRow = s11.rows.find(r => /吸入/i.test(r.cells.map(c => c.text).join(' ')) && !/危险|危害/i.test(r.cells.map(c => c.text).join(' ')));
-    if (inhRow) {
-      const vCell = inhRow.cells[inhRow.cells.length - 1];
-      writeStructuredToxicologyCellValue(vCell, '半数致死浓度（LC50）/1h/大鼠 雌性：8.81mg/l（此值仅用于有可吸入的颗粒形成的情况。）\n半数致死浓度（LC50）/4h/大鼠 雌性：2.2mg/l', { isEnglish: false });
-    }
-
-    let dermRow = s11.rows.find(r => /经皮/i.test(r.cells.map(c => c.text).join(' ')));
-    if (!dermRow && inhRow) {
-      const inhIdx = s11.rows.indexOf(inhRow);
-      s11 = addRowAfter(engine, s11, inhIdx);
-      dermRow = s11.rows[inhIdx + 1];
-      if (dermRow && dermRow.cells.length >= 2) {
-        writeCellLabel(dermRow.cells[0], '经皮：', true);
-        applyStandardHangingIndent(dermRow.cells[0], '420', '420');
-      }
-    }
-    if (dermRow) {
-      const vCell = dermRow.cells[dermRow.cells.length - 1];
-      writeStructuredToxicologyCellValue(vCell, '半数致死剂量（LD50）/豚鼠：＜940mg/kg', { isEnglish: false });
-    }
-
-    // 4. 对齐 11.2 标签术语：严格优先匹配源文件“主要皮肤刺激性:”，杜绝“原发性皮肤刺激” (L-S11)
-    const skinRow = s11.rows.find(r => /原发性皮肤刺激|主要皮肤刺激/i.test(r.cells[0]?.text || ''));
-    if (skinRow && skinRow.cells.length > 1) {
-      writeCellLabel(skinRow.cells[0], '11.2  主要皮肤刺激性：', true);
-      applyStandardHangingIndent(skinRow.cells[0], '420', '420');
-      writeStructuredToxicologyCellValue(skinRow.cells[skinRow.cells.length - 1], '物种：兔子\n分类：刺激皮肤\n结果：轻度的皮肤刺激', { isEnglish: false });
-    }
-
-    // 5. 11.3 主要粘膜刺激性
-    const eyeRow = s11.rows.find(r => /主要粘膜刺激|主要眼睛刺激|原发性粘膜刺激|眼睛刺激/i.test(r.cells[0]?.text || ''));
-    if (eyeRow && eyeRow.cells.length > 1) {
-      writeCellLabel(eyeRow.cells[0], '11.3  主要粘膜刺激性：', true);
-      applyStandardHangingIndent(eyeRow.cells[0], '420', '420');
-      writeStructuredToxicologyCellValue(eyeRow.cells[eyeRow.cells.length - 1], '物种：兔子\n分类：刺激眼睛\n结果：轻度的眼睛刺激', { isEnglish: false });
-    }
-
-    // 6. 11.4 致敏性
-    const sensRow = s11.rows.find(r => /致敏性|呼吸道或皮肤过敏/i.test(r.cells[0]?.text || ''));
-    if (sensRow && sensRow.cells.length > 1) {
-      writeCellLabel(sensRow.cells[0], '11.4  致敏性：', true);
-      applyStandardHangingIndent(sensRow.cells[0], '420', '420');
-      writeStructuredToxicologyCellValue(sensRow.cells[sensRow.cells.length - 1], '物种：豚鼠\n分类：不是皮肤过敏物质\n结果：未引起实验室动物过敏\n物种：人类\n分类：不是皮肤过敏物质\n结果：对志愿者做的皮肤接触试验证明没有过敏特性', { isEnglish: false });
-    }
-
-    // 7. 11.5 致突变性
-    const mutRow = s11.rows.find(r => /致突变性|遗传毒性/i.test(r.cells[0]?.text || ''));
-    if (mutRow && mutRow.cells.length > 1) {
-      writeCellLabel(mutRow.cells[0], '11.5  致突变性：', true);
-      applyStandardHangingIndent(mutRow.cells[0], '420', '420');
-      writeStructuredToxicologyCellValue(mutRow.cells[mutRow.cells.length - 1], '在细菌细胞培养中没有引起基因损害。在哺乳类细胞培养中没有引起基因损害。有证据认为此物质不会在动物中引起基因损伤。', { isEnglish: false });
-    }
-
-    // 8. 11.6 致癌性 (剥离致癌性：标签叠词)
-    const carcRow = s11.rows.find(r => /致癌性/i.test(r.cells[0]?.text || ''));
-    if (carcRow && carcRow.cells.length > 1) {
-      writeCellLabel(carcRow.cells[0], '11.6  致癌性：', true);
-      applyStandardHangingIndent(carcRow.cells[0], '420', '420');
-      writeStructuredToxicologyCellValue(carcRow.cells[carcRow.cells.length - 1], '在动物试验中未见致癌影响。', { isEnglish: false });
-    }
-
-    // 9. 11.7 生殖毒性
-    const repRow = s11.rows.find(r => /生殖毒性/i.test(r.cells[0]?.text || ''));
-    if (repRow && repRow.cells.length > 1) {
-      writeCellLabel(repRow.cells[0], '11.7  生殖毒性：', true);
-      applyStandardHangingIndent(repRow.cells[0], '420', '420');
-      writeStructuredToxicologyCellValue(repRow.cells[repRow.cells.length - 1], '动物试验表明无生殖毒性。动物实验表明在低于那些引起母体中毒的量时，对胚胎有影响。降低了胚胎胎儿的成活力，胎儿发育缓慢（变异），胎儿畸形。', { isEnglish: false });
-    }
-
-    // 10. 11.8 特异性靶器官系统毒性 (剥离特异性靶器官系统毒性...：标签叠词)
-    const stotRow = s11.rows.find(r => /特异性靶器官/i.test(r.cells[0]?.text || ''));
-    if (stotRow && stotRow.cells.length > 1) {
-      writeCellLabel(stotRow.cells[0], '11.8  特异性靶器官系统毒性（一次接触/反复接触）：', true);
-      applyStandardHangingIndent(stotRow.cells[0], '420', '420');
-      writeStructuredToxicologyCellValue(stotRow.cells[stotRow.cells.length - 1], '无数据资料。', { isEnglish: false });
-    }
-
-    // 11. 11.9 吸入危险
-    const aspRow = s11.rows.find(r => /吸入危险|吸入危害/i.test(r.cells[0]?.text || ''));
-    if (aspRow && aspRow.cells.length > 1) {
-      writeCellLabel(aspRow.cells[0], '11.9  吸入危险：', true);
-      applyStandardHangingIndent(aspRow.cells[0], '420', '420');
-      writeStructuredToxicologyCellValue(aspRow.cells[aspRow.cells.length - 1], '无数据资料。', { isEnglish: false });
-    }
-
-    // 12. 11.10 附加信息
-    const addRow = s11.rows.find(r => /附加信息/i.test(r.cells?.[0]?.text || ''));
-    if (addRow && addRow.cells?.length > 1) {
-      writeCellLabel(addRow.cells[0], '11.10 附加信息：', true);
-      applyStandardHangingIndent(addRow.cells[0], '420', '420');
-      const pu202aAddInfo = '饮酒精饮料会加剧毒性影响。\n重复剂量中毒：经口；病理变化：胃，睾丸，肝，肾，红血球异常减少。\n重复剂量中毒：吸入；病理变化：肾、肝影响，视网膜损伤。';
-      writeStructuredToxicologyCellValue(addRow.cells[addRow.cells.length - 1], pu202aAddInfo, { isEnglish: false });
-    }
-
-    // 13. 清理多余空行或合并行，确保总行数严格恒等于 15 行 (L-S11 15行同构)
-    for (let rIdx = s11.rows.length - 1; rIdx >= 3; rIdx--) {
-      const rowTxt = s11.rows[rIdx].cells.map(c => c.text || '').join('').trim();
-      if (!rowTxt || /根据现有数据，二乙二醇/i.test(rowTxt)) {
-        s11 = deleteRow(engine, s11, rIdx);
-      }
-    }
-    while (s11.rows.length > 15) {
-      const emptyIdx = s11.rows.findIndex((r, idx) => idx >= 3 && !(r.cells[r.cells.length - 1]?.text || '').trim());
-      if (emptyIdx !== -1) {
-        s11 = deleteRow(engine, s11, emptyIdx);
-      } else {
-        break;
-      }
-    }
-
-    // 14. 彻底二次清洗所有值列首部的标签叠词 (G-33 零标签前缀叠词公理)
-    for (let rIdx = 3; rIdx < s11.rows.length; rIdx++) {
-      const vCell = s11.rows[rIdx].cells[s11.rows[rIdx].cells.length - 1];
-      if (vCell && vCell.text) {
-        let txt = vCell.text.trim();
-        const cleaned = txt.replace(/^(?:(?:11\.\d+\s*)?(?:毒理学效应|毒理学研究|毒性资料|急性毒性[，, ]*(?:经口|吸入|经皮)?|主要皮肤刺激性|原发性(?:皮肤|粘膜)刺激|皮肤刺激|主要眼睛刺激性|主要粘膜刺激性|眼睛刺激|粘膜刺激|亚急性[，, ]*亚慢性和延迟毒性|致敏性|呼吸道或皮肤过敏|皮肤致敏性|致突变性|生殖细胞突变性|致癌性|生殖毒性|特异性靶器官系统毒性(?:（一次接触[\/／]反复接触）)?|STOT评估-一次性接触|吸入危害|吸入危险|附加信息|其它信息|其他信息|经口|吸入|经皮)[:：\s]*)+/i, '').trim();
-        if (cleaned !== txt && cleaned.length > 0) {
-          writeStructuredToxicologyCellValue(vCell, cleaned, { isEnglish: false });
-        }
-      }
-    }
-
-    renumberRecord(s11, '11');
-    for (const row of s11.rows) {
-      normalizeSection11RowHeight(row);
-    }
-  } else if (s11 && !isNonHazComposite && s11Paradigm !== 'PARADIGM_1_FULL_WIDTH_MERGED') {
+  if (s11 && s11Paradigm !== 'PARADIGM_1_FULL_WIDTH_MERGED' && !isNonHazComposite) {
+    const srcS11 = srcEngine?.records?.find(r => r.sectionNumber === 11);
     const hasPreambleOnly = s11.rows.length >= 2 && /无可用的毒理学研究/i.test(s11.rows[1].cells[0]?.text || '') &&
       !s11.rows.slice(2).some(row => row.cells.slice(1).some(c => {
         const t = (c.text || '').trim();
         return t.length > 0 && !/无数据资料/i.test(t);
       }));
+
     if (hasPreambleOnly) {
       while (s11.rows.length > 2) {
         s11 = deleteRow(engine, s11, s11.rows.length - 1);
       }
     } else {
-      for (let i = s11.rows.length - 1; i >= 2; i--) {
-        const row = s11.rows[i];
-        const labelText = (row.cells[0]?.text || '').trim();
-        // 法定保护行：特异性靶器官系统毒性、生殖毒性、吸入危险、附加信息与说明行即便为“无数据资料”亦属法定声明，严禁物理删除
-        if (/特异性靶器官|生殖毒性|附加信息/i.test(labelText)) {
-          continue;
-        }
-        if (/吸入危险|吸入危害/i.test(labelText)) {
-          continue;
-        }
-        if (row.cells.length === 1) {
-          continue;
-        }
-        const lastCell = row.cells[row.cells.length - 1];
-        const lastText = (lastCell?.text || '').trim();
-        const hasVal = lastText.length > 0 && !/无数据资料|AA|BB|CC/i.test(lastText);
-        if (!hasVal) {
-          s11 = deleteRow(engine, s11, i);
+      // 1. 前言行动态解析注入与排版
+      const srcPreamble = (srcS11?.rows[2]?.cells[0]?.text || '').trim();
+      const preambleText = srcPreamble.includes('毒理学数据') ? srcPreamble : '下面是这些成分的毒理学数据。';
+      if (s11.rows.length > 2 && s11.rows[2].cells.length === 1) {
+        formatSection11PreambleRow(s11.rows[2], preambleText, false);
+      }
+
+      // 2. 清除任何在 Row 2 之后残留的单列空白行或未识别行
+      for (let rIdx = s11.rows.length - 1; rIdx >= 3; rIdx--) {
+        if (s11.rows[rIdx].cells.length === 1 && !(s11.rows[rIdx].cells[0]?.text || '').trim()) {
+          s11 = deleteRow(engine, s11, rIdx);
         }
       }
-      renumberRecord(s11, '11');
-      // 优先遵照源文件对齐皮肤刺激性法律标签 (如源文件为“主要皮肤刺激性:”)
+
+      // 3. 急性毒性三项必齐硬保全 (经口、吸入、经皮) (G-34 公理) - 严格保留源事实，仅格式化排版
+      let oralRow = s11.rows.find(r => /经口/i.test(r.cells.map(c => c.text).join(' ')));
+      if (oralRow) {
+        const vCell = oralRow.cells[oralRow.cells.length - 1];
+        const val = vCell?.text?.trim() || '';
+        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
+      }
+
+      let inhRow = s11.rows.find(r => /吸入/i.test(r.cells.map(c => c.text).join(' ')) && !/危险|危害/i.test(r.cells.map(c => c.text).join(' ')));
+      if (inhRow) {
+        const vCell = inhRow.cells[inhRow.cells.length - 1];
+        const val = vCell?.text?.trim() || '';
+        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
+      }
+
+      let dermRow = s11.rows.find(r => /经皮/i.test(r.cells.map(c => c.text).join(' ')));
+      if (!dermRow && inhRow) {
+        const inhIdx = s11.rows.indexOf(inhRow);
+        s11 = addRowAfter(engine, s11, inhIdx);
+        dermRow = s11.rows[inhIdx + 1];
+        if (dermRow && dermRow.cells.length >= 2) {
+          writeCellLabel(dermRow.cells[0], '经皮：', true);
+          applyStandardHangingIndent(dermRow.cells[0], '420', '420');
+        }
+      }
+      if (dermRow) {
+        const vCell = dermRow.cells[dermRow.cells.length - 1];
+        let val = vCell?.text?.trim() || '';
+        if (!val && srcS11) {
+          const srcDerm = srcS11.rows.find(r => /经皮/i.test(r.cells.map(c => c.text).join(' ')));
+          if (srcDerm) val = (srcDerm.cells[srcDerm.cells.length - 1]?.text || '').trim();
+        }
+        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
+      }
+
+      // 4. 对齐 11.2 标签术语：严格优先匹配源文件“主要皮肤刺激性:”，杜绝“原发性皮肤刺激” (L-S11)
       const skinRow = s11.rows.find(r => /原发性皮肤刺激|主要皮肤刺激/i.test(r.cells[0]?.text || ''));
-      if (skinRow) {
-        const hasMajorSkinInSource = matchResult?.matchedSections?.find(s => s.sectionNumber === 11)?.sourceRecord?.rows?.some(r => /主要皮肤刺激/i.test(r.cells.map(c => c.text).join('')));
-        if (hasMajorSkinInSource) {
-          writeCellLabel(skinRow.cells[0], '11.2  主要皮肤刺激性:', true);
-        }
+      if (skinRow && skinRow.cells.length > 1) {
+        writeCellLabel(skinRow.cells[0], '11.2  主要皮肤刺激性：', true);
+        applyStandardHangingIndent(skinRow.cells[0], '420', '420');
+        const vCell = skinRow.cells[skinRow.cells.length - 1];
+        const val = vCell?.text?.trim() || '';
+        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
       }
-    }
-    // 确保 Section 11 附加信息完整注入
-    const addInfoItem = matchResult?.matchedSections?.find(s => s.sectionNumber === 11)?.matchedRows?.find(r => r.key === 'additional_info');
-    if (addInfoItem && addInfoItem.value) {
+
+      // 5. 11.3 主要粘膜刺激性
+      const eyeRow = s11.rows.find(r => /主要粘膜刺激|主要眼睛刺激|原发性粘膜刺激|眼睛刺激/i.test(r.cells[0]?.text || ''));
+      if (eyeRow && eyeRow.cells.length > 1) {
+        writeCellLabel(eyeRow.cells[0], '11.3  主要粘膜刺激性：', true);
+        applyStandardHangingIndent(eyeRow.cells[0], '420', '420');
+        const vCell = eyeRow.cells[eyeRow.cells.length - 1];
+        const val = vCell?.text?.trim() || '';
+        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
+      }
+
+      // 6. 11.4 致敏性
+      const sensRow = s11.rows.find(r => /致敏性|呼吸道或皮肤过敏/i.test(r.cells[0]?.text || ''));
+      if (sensRow && sensRow.cells.length > 1) {
+        writeCellLabel(sensRow.cells[0], '11.4  致敏性：', true);
+        applyStandardHangingIndent(sensRow.cells[0], '420', '420');
+        const vCell = sensRow.cells[sensRow.cells.length - 1];
+        const val = vCell?.text?.trim() || '';
+        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
+      }
+
+      // 7. 11.5 致突变性
+      const mutRow = s11.rows.find(r => /致突变性|遗传毒性/i.test(r.cells[0]?.text || ''));
+      if (mutRow && mutRow.cells.length > 1) {
+        writeCellLabel(mutRow.cells[0], '11.5  致突变性：', true);
+        applyStandardHangingIndent(mutRow.cells[0], '420', '420');
+        const vCell = mutRow.cells[mutRow.cells.length - 1];
+        const val = vCell?.text?.trim() || '';
+        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
+      }
+
+      // 8. 11.6 致癌性
+      const carcRow = s11.rows.find(r => /致癌性/i.test(r.cells[0]?.text || ''));
+      if (carcRow && carcRow.cells.length > 1) {
+        writeCellLabel(carcRow.cells[0], '11.6  致癌性：', true);
+        applyStandardHangingIndent(carcRow.cells[0], '420', '420');
+        const vCell = carcRow.cells[carcRow.cells.length - 1];
+        const val = vCell?.text?.trim() || '';
+        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
+      }
+
+      // 9. 11.7 生殖毒性与致畸性
+      const repRow = s11.rows.find(r => /生殖毒性/i.test(r.cells[0]?.text || ''));
+      if (repRow && repRow.cells.length > 1) {
+        writeCellLabel(repRow.cells[0], '11.7  生殖毒性：', true);
+        applyStandardHangingIndent(repRow.cells[0], '420', '420');
+        const vCell = repRow.cells[repRow.cells.length - 1];
+        const val = vCell?.text?.trim() || '';
+        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
+      }
+
+      const teratoRow = s11.rows.find(r => r.cells.some(c => /致畸/i.test(c.text || '')));
+      if (teratoRow && teratoRow !== repRow) {
+        const teratoCell = teratoRow.cells.find(c => /致畸/i.test(c.text || ''));
+        if (teratoCell?.node) {
+          const XML_W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+          const tNodes = Array.from(teratoCell.node.getElementsByTagName('w:t')).concat(
+            Array.from(teratoCell.node.getElementsByTagNameNS(XML_W_NS, 't'))
+          );
+          const uniqueTNodes = Array.from(new Set(tNodes));
+          if (uniqueTNodes.length > 0) {
+            uniqueTNodes[0].textContent = '致畸性：';
+            for (let i = 1; i < uniqueTNodes.length; i++) uniqueTNodes[i].textContent = '';
+          }
+        }
+        const vCell = teratoRow.cells[teratoRow.cells.length - 1];
+        const val = vCell?.text?.trim() || '';
+        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
+      }
+
+      // 10. 11.8 特异性靶器官系统毒性
+      const stotRow = s11.rows.find(r => /特异性靶器官/i.test(r.cells[0]?.text || ''));
+      if (stotRow && stotRow.cells.length > 1) {
+        writeCellLabel(stotRow.cells[0], '11.8  特异性靶器官系统毒性（一次接触/反复接触）：', true);
+        applyStandardHangingIndent(stotRow.cells[0], '420', '420');
+        const vCell = stotRow.cells[stotRow.cells.length - 1];
+        const val = vCell?.text?.trim() || '';
+        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
+      }
+
+      // 11. 11.9 吸入危险
+      const aspRow = s11.rows.find(r => /吸入危险|吸入危害/i.test(r.cells[0]?.text || ''));
+      if (aspRow && aspRow.cells.length > 1) {
+        writeCellLabel(aspRow.cells[0], '11.9  吸入危险：', true);
+        applyStandardHangingIndent(aspRow.cells[0], '420', '420');
+        const vCell = aspRow.cells[aspRow.cells.length - 1];
+        const val = vCell?.text?.trim() || '';
+        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
+      }
+
+      // 12. 11.10 附加信息
       const addRow = s11.rows.find(r => /附加信息/i.test(r.cells?.[0]?.text || ''));
       if (addRow && addRow.cells?.length > 1) {
-        safeWriteCellValue(addRow.cells[addRow.cells.length - 1], addInfoItem.value);
+        writeCellLabel(addRow.cells[0], '11.10 附加信息：', true);
+        applyStandardHangingIndent(addRow.cells[0], '420', '420');
+        const vCell = addRow.cells[addRow.cells.length - 1];
+        let val = vCell?.text?.trim() || '';
+        if (!val && matchResult) {
+          const addInfoItem = matchResult?.matchedSections?.find(s => s.sectionNumber === 11)?.matchedRows?.find(r => r.key === 'additional_info');
+          if (addInfoItem?.value) val = addInfoItem.value.trim();
+        }
+        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
       }
-    }
-    // 规范化 Section 11 生殖毒性子标签（将底模遗留的“致畸形”规范化为“致畸性：”）
-    const teratoRow = s11.rows.find(r => r.cells.some(c => /致畸/i.test(c.text || '')));
-    if (teratoRow) {
-      const teratoCell = teratoRow.cells.find(c => /致畸/i.test(c.text || ''));
-      if (teratoCell?.node) {
-        const XML_W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-        const tNodes = Array.from(teratoCell.node.getElementsByTagName('w:t')).concat(
-          Array.from(teratoCell.node.getElementsByTagNameNS(XML_W_NS, 't'))
-        );
-        const uniqueTNodes = Array.from(new Set(tNodes));
-        if (uniqueTNodes.length > 0) {
-          uniqueTNodes[0].textContent = '致畸性：';
-          for (let i = 1; i < uniqueTNodes.length; i++) uniqueTNodes[i].textContent = '';
+
+      // 13. 清理多余空行或合并行，确保总行数收敛为法定插槽规范
+      for (let rIdx = s11.rows.length - 1; rIdx >= 3; rIdx--) {
+        const rowTxt = s11.rows[rIdx].cells.map(c => c.text || '').join('').trim();
+        if (!rowTxt || /根据现有数据，二乙二醇/i.test(rowTxt)) {
+          s11 = deleteRow(engine, s11, rIdx);
+        }
+      }
+      while (s11.rows.length > 16) {
+        const emptyIdx = s11.rows.findIndex((r, idx) => idx >= 3 && !(r.cells[r.cells.length - 1]?.text || '').trim());
+        if (emptyIdx !== -1) {
+          s11 = deleteRow(engine, s11, emptyIdx);
+        } else {
+          break;
+        }
+      }
+
+      // 14. 彻底二次清洗所有值列首部的标签叠词 (G-33 零标签前缀叠词公理)
+      for (let rIdx = 3; rIdx < s11.rows.length; rIdx++) {
+        const vCell = s11.rows[rIdx].cells[s11.rows[rIdx].cells.length - 1];
+        if (vCell && vCell.text) {
+          let txt = vCell.text.trim();
+          const cleaned = txt.replace(/^(?:(?:11.d+s*)?(?:毒理学效应|毒理学研究|毒性资料|急性毒性[，, ]*(?:经口|吸入|经皮)?|主要皮肤刺激性|原发性(?:皮肤|粘膜)刺激|皮肤刺激|主要眼睛刺激性|主要粘膜刺激性|眼睛刺激|粘膜刺激|亚急性[，, ]*亚慢性和延迟毒性|致敏性|呼吸道或皮肤过敏|皮肤致敏性|致突变性|生殖细胞突变性|致癌性|生殖毒性|特异性靶器官系统毒性(?:（一次接触[/／]反复接触）)?|STOT评估-一次性接触|吸入危害|吸入危险|附加信息|其它信息|其他信息|经口|吸入|经皮)[:：s]*)+/i, '').trim();
+          if (cleaned !== txt && cleaned.length > 0) {
+            writeStructuredToxicologyCellValue(vCell, cleaned, { isEnglish: false });
+          }
         }
       }
     }
 
-    // 规范化 Section 11 实测各行行高，消除 11.4 致敏性等行的超高留白
+    renumberRecord(s11, '11');
     for (const row of s11.rows) {
       normalizeSection11RowHeight(row);
     }
@@ -1538,11 +1580,13 @@ export async function buildBaseChineseEngine({
 /**
  * 毒理学描述与实测数据动态英译引擎 (彻底废除硬编码假数据)
  */
-function translateToxicologyValueToEnglish(cnText) {
+function translateToxicologyValueToEnglish(cnText, endpoint = '') {
   if (!cnText || typeof cnText !== 'string') return '';
   let t = cnText.trim();
   if (!t) return '';
   if (/^无数据(?:资料)?[。.]?$/i.test(t)) return 'No data available.';
+
+  const isDermal = endpoint === 'dermal' || /经皮/i.test(t);
 
   // 剔除前缀重复的中文标签
   t = t.replace(/^(?:(?:11\.\d+\s*)?(?:急性毒性|经口|吸入|经皮|主要皮肤刺激性|原发性皮肤刺激|主要粘膜刺激性|主要眼睛刺激性|致敏性|致突变性|致癌性|生殖毒性|特异性靶器官系统毒性(?:（一次接触[\/／]反复接触）)?|吸入危险|吸入危害|附加信息)[：:]\s*)+/i, '');
@@ -1552,7 +1596,11 @@ function translateToxicologyValueToEnglish(cnText) {
   t = t.replace(/以下[为是]N,N[－-]二甲基乙酰胺毒理学数据[：:]/g, 'The following are toxicological data for N,N-Dimethylacetamide (DMAC):');
 
   // 急性毒性经口/吸入/经皮实测值翻译
-  t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*[/／]\s*大鼠\s*[:：]\s*/g, 'LD50 / Oral / Rat: ');
+  if (isDermal) {
+    t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*[/／]\s*大鼠\s*[:：]\s*/g, 'LD50 / Dermal / Rat: ');
+  } else {
+    t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*[/／]\s*大鼠\s*[:：]\s*/g, 'LD50 / Oral / Rat: ');
+  }
   t = t.replace(/半数致死浓度\s*[（(]\s*LC50\s*[）)]\s*[/／]\s*1h\s*[/／]\s*大鼠(?:\s*雌性)?\s*[:：]\s*/g, 'LC50 / Inhalation / 1h / Rat: ');
   t = t.replace(/半数致死浓度\s*[（(]\s*LC50\s*[）)]\s*[/／]\s*4h\s*[/／]\s*大鼠(?:\s*雌性)?\s*[:：]\s*/g, 'LC50 / Inhalation / 4h / Rat: ');
   t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*[/／]\s*豚鼠\s*[:：]\s*/g, 'LD50 / Dermal / Guinea pig: ');
@@ -1685,9 +1733,9 @@ export async function buildBaseEnglishEngine({
   const todayDateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '/');
   const isOutdated = !baseCnEngine?._adaptiveRevisionDate || baseCnEngine._adaptiveRevisionDate.startsWith('2023') || baseCnEngine._adaptiveRevisionDate.startsWith('2024') || baseCnEngine._adaptiveRevisionDate.startsWith('2025');
   const effectiveRevisionDate = revisionDate || (!isOutdated ? baseCnEngine._adaptiveRevisionDate : todayDateStr);
-  const isPu202b = modelCode === 'PU-202B' || /PU[-_]?202B/i.test(modelCode || '');
+  // const isPu202b 已被通用数据驱动机制彻底替代
   const isNonHazComposite = Boolean(facts.isNonHazardousComposite || (baseCnEngine && detectNonHazardousComposite(baseCnEngine.records, facts)));
-  const isPu202a = modelCode === 'PU-202A' || /PU[-_]?202A/i.test(modelCode || '');
+  // isPu202a 已被通用数据驱动机制彻底替代
 
   updateHeaderFooterData(engine, {
     model: modelCode,
@@ -1742,7 +1790,7 @@ export async function buildBaseEnglishEngine({
   // Section 2: 危险性概述 (G-40 强制默认全量通栏绝对公理)
   let s2 = engine.records.find(r => r.sectionNumber === 2);
   if (s2) {
-    const isPu202a = modelCode === 'PU-202A' || /PU[-_]?202A/i.test(modelCode || '');
+    // isPu202a 已被通用数据驱动机制彻底替代
     const isNonHazComposite = Boolean(facts.isNonHazardousComposite || (baseCnEngine && detectNonHazardousComposite(baseCnEngine.records, facts)));
     const cnPicCell = baseCnEngine?.records?.find(r => r.sectionNumber === 2)?.rows[1]?.cells[0];
     const drawingNodes = facts.drawingNodes || Array.from(cnPicCell?.node?.getElementsByTagNameNS('*', 'drawing') || []);
@@ -1753,7 +1801,7 @@ export async function buildBaseEnglishEngine({
       srcEngine: baseCnEngine || facts.srcEngine,
       section3ExemptionNotes: enValues['sec3.exemption_notes'] || extractSection3ExemptionNotes(baseCnEngine.records.find(r => r.sectionNumber === 3))
     }, true);
-    const isMultiComponent = modelCode === 'PA-3223' || (!isPu202a && Boolean(facts.isMultiComponentComposite || isNonHazComposite));
+    const isMultiComponent = modelCode === 'PA-3223' || Boolean(facts.isMultiComponentComposite || isNonHazComposite);
     const enS11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || null);
     if (enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
       buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || '' }, true);
@@ -2018,7 +2066,7 @@ export async function buildBaseEnglishEngine({
 
   // Section 11 【核心重构：彻底废除硬编码假数据与粗暴删行，基于中文母版实测端点动态英译装配】
   let s11 = engine.records.find(r => r.sectionNumber === 11);
-  const isMultiComponent = modelCode === 'PA-3223' || (!isPu202a && Boolean(facts.isMultiComponentComposite || isNonHazComposite));
+  const isMultiComponent = modelCode === 'PA-3223' || Boolean(facts.isMultiComponentComposite || isNonHazComposite);
   const enS11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || null);
   if (s11 && (isMultiComponent || enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED')) {
     // Mode B 通栏复合豁免模态：已由 buildThreeTierSection11 全权接管，跳过传统单端点映射以防中文污染
@@ -2092,9 +2140,9 @@ export async function buildBaseEnglishEngine({
         const lastCell = row.cells[row.cells.length - 1];
         if (!lastCell) continue;
 
-        if (/Oral/i.test(rText) && oralCn) safeWrite(lastCell, translateToxicologyValueToEnglish(oralCn));
-        else if (/Inhalation/i.test(rText) && inhalCn) safeWrite(lastCell, translateToxicologyValueToEnglish(inhalCn));
-        else if (/Dermal/i.test(rText) && dermCn) safeWrite(lastCell, translateToxicologyValueToEnglish(dermCn));
+        if (/Oral/i.test(rText) && oralCn) safeWrite(lastCell, translateToxicologyValueToEnglish(oralCn, 'oral'));
+        else if (/Inhalation/i.test(rText) && inhalCn) safeWrite(lastCell, translateToxicologyValueToEnglish(inhalCn, 'inhalation'));
+        else if (/Dermal/i.test(rText) && dermCn) safeWrite(lastCell, translateToxicologyValueToEnglish(dermCn, 'dermal'));
         else if (/Primary skin irritation/i.test(rText) && skinIrrCn) safeWrite(lastCell, translateToxicologyValueToEnglish(skinIrrCn));
         else if (/Primary eye irritation/i.test(rText) && eyeIrrCn) safeWrite(lastCell, translateToxicologyValueToEnglish(eyeIrrCn));
         else if (/Sensitization/i.test(rText) && sensCn) safeWrite(lastCell, translateToxicologyValueToEnglish(sensCn));
@@ -2163,138 +2211,13 @@ export async function buildBaseEnglishEngine({
       }
     }
 
-    if (isPu202a) {
-      // 0. 确保 Row 1 免责行字号符合 G-35 (9.5pt sz="19", 无微缩进)
-      if (s11.rows[1]) {
-        formatSection11PreambleRow(s11.rows[1], 'No toxicological studies were available for this product.', true, 0);
+    // 通用英文 Section 11 标准排版与悬挂缩进保全 (基于中文母版实测事实数据驱动)
+    for (let rIdx = 3; rIdx < s11.rows.length; rIdx++) {
+      const c0 = s11.rows[rIdx]?.cells[0];
+      if (c0) {
+        applyStandardHangingIndent(c0, '420', '420');
       }
-
-      // 1. 确保 Row 2 前言行
-      if (s11.rows.length > 2 && s11.rows[2].cells.length === 1) {
-        formatSection11PreambleRow(s11.rows[2], 'The following is toxicological data for N,N-Dimethylacetamide:', true);
-      }
-
-      // 2. 急性毒性三项必齐硬保全 (Oral, Inhalation 1h & 4h, Dermal) (G-34 公理)
-      let oralRow = s11.rows.find(r => /Oral/i.test(r.cells.map(c => c.text).join(' ')));
-      if (oralRow) {
-        const vCell = oralRow.cells[oralRow.cells.length - 1];
-        writeStructuredToxicologyCellValue(vCell, 'Median lethal dose (LD50) / rat: 3,000 - 6,000 mg/kg', { isEnglish: true });
-      }
-
-      let inhRow = s11.rows.find(r => /Inhalation/i.test(r.cells.map(c => c.text).join(' ')) && !/hazard/i.test(r.cells.map(c => c.text).join(' ')));
-      if (inhRow) {
-        const vCell = inhRow.cells[inhRow.cells.length - 1];
-        writeStructuredToxicologyCellValue(vCell, 'Median lethal concentration (LC50) / 1h / rat female: 8.81 mg/l (This value is only for cases where inhalable particles are formed.)\nMedian lethal concentration (LC50) / 4h / rat female: 2.2 mg/l', { isEnglish: true });
-      }
-
-      let dermRow = s11.rows.find(r => /Dermal/i.test(r.cells.map(c => c.text).join(' ')));
-      if (!dermRow && inhRow) {
-        const inhIdx = s11.rows.indexOf(inhRow);
-        s11 = addRowAfter(engine, s11, inhIdx);
-        dermRow = s11.rows[inhIdx + 1];
-        if (dermRow && dermRow.cells.length >= 2) {
-          writeCellLabel(dermRow.cells[0], 'Dermal:', true);
-          applyStandardHangingIndent(dermRow.cells[0], '420', '420');
-        }
-      }
-      if (dermRow) {
-        const vCell = dermRow.cells[dermRow.cells.length - 1];
-        writeStructuredToxicologyCellValue(vCell, 'Median lethal dose (LD50) / guinea pig: < 940 mg/kg', { isEnglish: true });
-      }
-
-      // 3. 11.2 Primary skin irritation
-      const skinRow = s11.rows.find(r => /Primary skin irritation/i.test(r.cells[0]?.text || ''));
-      if (skinRow && skinRow.cells.length > 1) {
-        writeCellLabel(skinRow.cells[0], '11.2  Primary skin irritation:', true);
-        applyStandardHangingIndent(skinRow.cells[0], '420', '420');
-        writeStructuredToxicologyCellValue(skinRow.cells[skinRow.cells.length - 1], 'Species: Rabbit\nClassification: Irritating to skin\nResult: Mild skin irritation', { isEnglish: true });
-      }
-
-      // 4. 11.3 Primary eye irritation
-      const eyeRow = s11.rows.find(r => /Primary eye irritation/i.test(r.cells[0]?.text || ''));
-      if (eyeRow && eyeRow.cells.length > 1) {
-        writeCellLabel(eyeRow.cells[0], '11.3  Primary eye irritation:', true);
-        applyStandardHangingIndent(eyeRow.cells[0], '420', '420');
-        writeStructuredToxicologyCellValue(eyeRow.cells[eyeRow.cells.length - 1], 'Species: Rabbit\nClassification: Irritating to eyes\nResult: Mild eye irritation', { isEnglish: true });
-      }
-
-      // 5. 11.4 Sensitization
-      const sensRow = s11.rows.find(r => /Sensitization/i.test(r.cells[0]?.text || ''));
-      if (sensRow && sensRow.cells.length > 1) {
-        writeCellLabel(sensRow.cells[0], '11.4  Sensitization:', true);
-        applyStandardHangingIndent(sensRow.cells[0], '420', '420');
-        writeStructuredToxicologyCellValue(sensRow.cells[sensRow.cells.length - 1], 'Species: Guinea pig\nClassification: Not a skin sensitizer\nResult: Did not cause sensitization in laboratory animals\nSpecies: Human\nClassification: Not a skin sensitizer\nResult: Patch test on human volunteers demonstrated no sensitizing properties', { isEnglish: true });
-      }
-
-      // 6. 11.5 Mutagenicity
-      const mutRow = s11.rows.find(r => /Mutagenicity/i.test(r.cells[0]?.text || ''));
-      if (mutRow && mutRow.cells.length > 1) {
-        writeCellLabel(mutRow.cells[0], '11.5  Mutagenicity:', true);
-        applyStandardHangingIndent(mutRow.cells[0], '420', '420');
-        writeStructuredToxicologyCellValue(mutRow.cells[mutRow.cells.length - 1], 'Did not cause genetic damage in bacterial cell cultures. Did not cause genetic damage in mammalian cell cultures. Evidence indicates this substance does not cause genetic damage in animals.', { isEnglish: true });
-      }
-
-      // 7. 11.6 Carcinogenicity
-      const carcRow = s11.rows.find(r => /Carcinogenicity/i.test(r.cells[0]?.text || ''));
-      if (carcRow && carcRow.cells.length > 1) {
-        writeCellLabel(carcRow.cells[0], '11.6  Carcinogenicity:', true);
-        applyStandardHangingIndent(carcRow.cells[0], '420', '420');
-        writeStructuredToxicologyCellValue(carcRow.cells[carcRow.cells.length - 1], 'No carcinogenic effects observed in animal studies.', { isEnglish: true });
-      }
-
-      // 8. 11.7 Reproductive toxicity
-      const repRow = s11.rows.find(r => /Reproductive toxicity/i.test(r.cells[0]?.text || ''));
-      if (repRow && repRow.cells.length > 1) {
-        writeCellLabel(repRow.cells[0], '11.7  Reproductive toxicity:', true);
-        applyStandardHangingIndent(repRow.cells[0], '420', '420');
-        writeStructuredToxicologyCellValue(repRow.cells[repRow.cells.length - 1], 'Animal studies show no reproductive toxicity. Animal studies indicate effects on embryos at doses below those causing maternal toxicity. Decreased embryo-fetal viability, retarded fetal development (variations), fetal malformations.', { isEnglish: true });
-      }
-
-      // 9. 11.8 Specific target organ toxicity
-      const stotRow = s11.rows.find(r => /Specific target organ/i.test(r.cells[0]?.text || ''));
-      if (stotRow && stotRow.cells.length > 1) {
-        writeCellLabel(stotRow.cells[0], '11.8  Specific target organ toxicity (single / repeated exposure):', true);
-        applyStandardHangingIndent(stotRow.cells[0], '420', '420');
-        writeStructuredToxicologyCellValue(stotRow.cells[stotRow.cells.length - 1], 'No data available.', { isEnglish: true });
-      }
-
-      // 10. 11.9 Aspiration hazard
-      const aspRow = s11.rows.find(r => /Aspiration hazard/i.test(r.cells[0]?.text || ''));
-      if (aspRow && aspRow.cells.length > 1) {
-        writeCellLabel(aspRow.cells[0], '11.9  Aspiration hazard:', true);
-        applyStandardHangingIndent(aspRow.cells[0], '420', '420');
-        writeStructuredToxicologyCellValue(aspRow.cells[aspRow.cells.length - 1], 'No data available.', { isEnglish: true });
-      }
-
-      // 11. 11.10 Additional information
-      const addRow = s11.rows.find(r => /Additional information/i.test(r.cells[0]?.text || ''));
-      if (addRow && addRow.cells.length > 1) {
-        writeCellLabel(addRow.cells[0], '11.10 Additional information:', true);
-        applyStandardHangingIndent(addRow.cells[0], '420', '420');
-        const enAddInfo = 'Consumption of alcoholic beverages may aggravate toxic effects.\nRepeated dose toxicity: Oral; Pathological changes: stomach, testes, liver, kidneys, abnormal reduction of red blood cells.\nRepeated dose toxicity: Inhalation; Pathological changes: kidney and liver effects, retinal damage.';
-        writeStructuredToxicologyCellValue(addRow.cells[addRow.cells.length - 1], enAddInfo, { isEnglish: true });
-      }
-
-      // 12. 确保总行数严格恒等于 15 行
-      for (let rIdx = s11.rows.length - 1; rIdx >= 3; rIdx--) {
-        const rowTxt = s11.rows[rIdx].cells.map(c => c.text || '').join('').trim();
-        if (!rowTxt || /According to available data, diethylene glycol/i.test(rowTxt)) {
-          s11 = deleteRow(engine, s11, rIdx);
-        }
-      }
-      while (s11.rows.length > 15) {
-        const emptyIdx = s11.rows.findIndex((r, idx) => idx >= 3 && !(r.cells[r.cells.length - 1]?.text || '').trim());
-        if (emptyIdx !== -1) {
-          s11 = deleteRow(engine, s11, emptyIdx);
-        } else {
-          break;
-        }
-      }
-
-      renumberRecord(s11, '11');
-      for (const row of s11.rows) {
-        normalizeSection11RowHeight(row);
-      }
+      normalizeSection11RowHeight(s11.rows[rIdx]);
     }
   }
 

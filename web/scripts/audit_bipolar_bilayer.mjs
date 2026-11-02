@@ -789,9 +789,25 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   } else {
     const s11CnTrCount = s11Cn.getElementsByTagName('w:tr').length;
     assert(s11CnTrCount >= 12, `Section 11 (L-S11): 标准分列表格端点插槽完备 (实测行数: ${s11CnTrCount})`);
-    assert(/急性毒性|刺激性|毒性/i.test(s11Cn.textContent), 'Section 11 (L-S11): 毒理学测试数据保全');
+    if (model === 'PU-608') {
+      assert(/4,150|4150/.test(s11Cn.textContent), 'Section 11 (L-S11): PU-608 经口急性毒性实测值 4,150mg/kg 保全');
+      assert(/造成皮肤刺激/.test(s11Cn.textContent), 'Section 11 (L-S11): PU-608 皮肤刺激实测事实“造成皮肤刺激”保全');
+      assert(/严重的眼睛刺激/.test(s11Cn.textContent), 'Section 11 (L-S11): PU-608 眼睛刺激实测事实“严重的眼睛刺激”保全');
+      assert(/经皮吸收危险/.test(s11Cn.textContent), 'Section 11 (L-S11): PU-608 附加信息“经皮吸收危险”保全');
+    } else if (model === 'PU-202A') {
+      assert(/3,000|3000/.test(s11Cn.textContent), 'Section 11 (L-S11): PU-202A 经口急性毒性实测值 3,000－6,000mg/kg 保全');
+      assert(/＜940|<940/.test(s11Cn.textContent), 'Section 11 (L-S11): PU-202A 经皮急性毒性实测值 ＜940mg/kg 保全');
+      assert(/饮酒精饮料会加剧毒性影响/.test(s11Cn.textContent), 'Section 11 (L-S11): PU-202A 附加信息“饮酒精饮料会加剧毒性影响”保全');
+    } else {
+      assert(/急性毒性/i.test(s11Cn.textContent) && /\d+/.test(s11Cn.textContent), 'Section 11 (L-S11): 毒理学测试数据保全且包含真实测试数值');
+    }
     const s11EnTrCount = tblsEn[10].getElementsByTagName('w:tr').length;
     assert(s11EnTrCount >= 12, `Section 11 英文版端点插槽完备 (实测行数: ${s11EnTrCount})`);
+    if (model === 'PU-608') {
+      assert(/4,150|4150/.test(tblsEn[10].textContent), 'Section 11 英文版: PU-608 经口急性毒性实测值 4,150mg/kg 英译保全');
+      assert(/Causes skin irritation/i.test(tblsEn[10].textContent), 'Section 11 英文版: PU-608 皮肤刺激英译保全');
+      assert(/Causes serious eye irritation/i.test(tblsEn[10].textContent), 'Section 11 英文版: PU-608 眼睛刺激英译保全');
+    }
   }
 
   // L-S12: 生态学信息 (说明行与生态指标)

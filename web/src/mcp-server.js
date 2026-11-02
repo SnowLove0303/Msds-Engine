@@ -348,7 +348,7 @@ async function handleToolCall(name, args) {
         isIdenticalLength: isIdentical
       });
 
-      // 智能行动差距诊断 (Actionable Gap Analysis)
+      // 智能行动差距与事实真伪诊断 (Actionable Gap & Factual Inconsistency Analysis)
       if (sText.length > 50 && oText.length < 20) {
         actionableGaps.push({
           sectionNumber: s,
@@ -363,6 +363,32 @@ async function handleToolCall(name, args) {
           detail: `第 3 节组分行数不匹配: 源文件 ${sSec?.rowsCount || 0} 行 vs 产出物 ${oSec?.rowsCount || 0} 行`,
           suggestedAction: '执行 Recipe B (insertRow/deleteRow) 动态平衡组分行数'
         });
+      }
+
+      if (s === 11) {
+        // 毒理学实测关键数值保全校验
+        const srcNumbers = Array.from(sText.matchAll(/\d+(?:[.,]\d+)?(?:mg\/[kl]g?)?/gi)).map(m => m[0]);
+        const missingNumbers = srcNumbers.filter(num => !oText.includes(num));
+        if (missingNumbers.length > 0) {
+          actionableGaps.push({
+            sectionNumber: 11,
+            type: 'FACTUAL_INCONSISTENCY',
+            detail: `第 11 节关键实测数值丢失或被篡改: 缺失 [${missingNumbers.slice(0, 5).join(', ')}]`,
+            suggestedAction: '检查 Section 11 排版逻辑，确保真实数值来自 applyMatchResultToEditor 提取的源数据而非写死常量'
+          });
+        }
+        // 关键定性事实校验
+        const criticalKeywords = ['造成皮肤刺激', '轻度的皮肤刺激', '严重的眼睛刺激', '轻度的眼睛刺激', '经皮吸收危险', '饮酒精饮料会加剧毒性影响'];
+        for (const kw of criticalKeywords) {
+          if (sText.includes(kw) && !oText.includes(kw)) {
+            actionableGaps.push({
+              sectionNumber: 11,
+              type: 'FACTUAL_INCONSISTENCY',
+              detail: `第 11 节关键定性结论“${kw}”在产出文档中缺失`,
+              suggestedAction: '严禁硬编码常量覆盖源文件真实定性结论'
+            });
+          }
+        }
       }
     }
 
