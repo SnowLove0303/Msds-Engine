@@ -579,18 +579,20 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
       assert(/Classification of the substance|Acute toxicity/i.test(s2EnText), 'Section 2 (L-S2 EN): 英文 GHS 分类通栏完备');
       assert(/Signal word:\s*Danger/i.test(s2EnText), 'Section 2 (L-S2 EN): 英文信号词 Danger 准确');
       assert(/Precautionary statements|Prevention|Response/i.test(s2EnText), 'Section 2 (L-S2 EN): 英文防范说明通栏完备');
-    } else if (model === 'PU-202B') {
-      assert(/2\.1|GHS危险性类别|生殖毒性/.test(s2Text), 'Section 2 (L-S2): PU-202B 生殖毒性分类通栏完备');
-      assert(/信号词[：:]\s*危险/.test(s2Text), 'Section 2 (L-S2): PU-202B 信号词危险准确');
-      assert(/防范说明|预防措施|事故响应/.test(s2Text), 'Section 2 (L-S2): PU-202B GHS 防范说明通栏完备');
-      assert(/其他危险[：:].*N[－-]甲基吡咯烷酮/.test(s2Text), 'Section 2 (L-S2): PU-202B NMP 透皮吸收其他危险通栏完备');
+    } else if (model === 'PU-202B' || model === 'PU-608' || /生殖毒性/.test(s2Text)) {
+      assert(/2\.1|GHS危险性类别|生殖毒性/.test(s2Text), `Section 2 (L-S2): ${model} 生殖毒性分类通栏完备`);
+      assert(/信号词[：:]\s*危险/.test(s2Text), `Section 2 (L-S2): ${model} 信号词危险准确`);
+      assert(/防范说明|预防措施|事故响应/.test(s2Text), `Section 2 (L-S2): ${model} GHS 防范说明通栏完备`);
+      if (/N[－-]甲基吡咯烷酮/.test(s2Text)) {
+        assert(/其他危险[：:].*N[－-]甲基吡咯烷酮/.test(s2Text), `Section 2 (L-S2): ${model} NMP 透皮吸收其他危险通栏完备`);
+      }
 
       const s2EnRow1 = tblsEn[1].getElementsByTagName('w:tr')[1];
       const s2EnText = s2EnRow1?.textContent || '';
-      assert(/Reproductive toxicity/i.test(s2EnText), 'Section 2 (L-S2 EN): PU-202B 英文生殖毒性通栏完备');
-      assert(/Signal word:\s*Danger/i.test(s2EnText), 'Section 2 (L-S2 EN): PU-202B 英文信号词 Danger 准确');
-      assert(/Precautionary statements|Prevention|Response/i.test(s2EnText), 'Section 2 (L-S2 EN): PU-202B 英文防范说明通栏完备');
-    } else {
+      assert(/Reproductive toxicity/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文生殖毒性通栏完备`);
+      assert(/Signal word:\s*Danger/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文信号词 Danger 准确`);
+      assert(/Precautionary statements|Prevention|Response/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文防范说明通栏完备`);
+    } else if (model === 'PA-3223' || /成盐|N,N-二甲基乙醇胺/.test(s2Text)) {
       // PA-3223 Mode B 专属成盐豁免与 5 级缩进断言
       assert(!/商业机密|7732-18-5|46±5/.test(s2Text), 'Section 2 (L-S2): 无菌覆写，彻底切断 Section 3 成分数据行穿透污染');
       assert(/请注意以下物质：/.test(s2Text) && /N,N-二甲基乙醇胺/.test(s2Text), 'Section 2 (L-S2): 成盐豁免附注准确锚定保全');

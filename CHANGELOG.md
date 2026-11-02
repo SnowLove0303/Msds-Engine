@@ -1,673 +1,85 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
-## [2026-10-30 下午] - PU-202C 基于全局与局部规范全量重构与人机深度介入双重终审
+## [2026-11-02 任务推进] - PU-608 标准 8 格式全矩阵受控生产、审核断言解耦与双极双层全景终审 100% 满分通过
 
-### 一、 业务场景与重构指示背景
-用户对 `PU-202C`（DMAC 体系水性聚氨酯分散体，含有 $15.0\% \sim 16.0\%$ N,N-二甲基乙酰胺）提出“基于全局与局部规范重新做”的法定指示。此前交付物中仍存在象形图居中、Section 2 模块间无空行及缺失 2.3 条目标签序号等历史瑕疵，亟需同步下沉全部最新排版与结构规范。
-
----
-
-### 二、 全局规范与局部规范双层落地
-1. **全局规范落地 (Global Specs)**：
-   - **Section 2 象形图居左对齐 (`jc="left"`)**：象形图段落对齐严格靠左，消除居中狗牙错位；
-   - **Section 2 模块间空行保留 (`w:spacing w:before="240"`)**：在危险性说明、防范说明各组及其他危险起始段落注入 12pt 间距，保持呼吸感；
-   - **Section 2 `2.3` 标签序号规范**：补齐中文版 `2.3  其他危险：无适用资料。` 与英文版 `2.3  Other hazards: No applicable information.`；
-   - **Section 9 激光垂线对齐**：4 份 PDF Section 9 23 项标签首字 $X_0 = 80.28\text{ pt}$ 绝对垂直对齐；
-   - **英文版双零标点与 OPC 完备性**：英文版中文字符数 = 0，全角中文标点数 = 0；所有嵌入媒体在 `[Content_Types].xml` 100% 合法声明 (G-39)。
-2. **局部规范保全 (Local Specs - PU-202C 专属)**：
-   - **11.1 急性毒性三列垂直合并**：经口、吸入、经皮 3 列网格垂直合并架构完备（`restart/continue`）；
-   - **11.7 生殖毒性事实完整保全**：源文件关于母体中毒与胚胎影响的单句试验结论事实 100% 保全，保持标准 2 列分列表格规范；
-   - **11.10 附加信息三项病理事实**：饮酒加剧、经口病理、吸入病理变化 3 项事实完整英译并享有 Regular 字体排版；
-   - **Section 11 15 行同构**：消除底模 1169 twips 异常行高，统一收敛为 285 twips。
+### 一、 业务场景与用户法定指示背景
+用户提供待处理源文件并明确指示：
+> “"F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料\1-1 单组份水性聚氨酯树脂 PU\PU-608\PU-608 msds_CN 冠志.docx" ，产出存储位置：F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\TDS MSDS 重写版\01-1 单组份水性聚氨酯树脂 PU\PU-608 ，务必真实调用MSDS-Engine 的功能，懂？”
+并在需求立案与规格制定阶段指令明确：“你怎么用spec-kit，我不是有Ps-openspec吗”，“执行”。
 
 ---
 
-### 三、 终审验收与实测指标 (Measured)
-- **人机融合深度穿透自测脚本 (`verify_deep_audit_pu202c.mjs`)**：
-  - 中英文 4 份 DOCX Section 2 象形图对齐 `jc="left"` 100% 验证通过；
-  - 中英文 4 份 DOCX Section 2 `2.3` 标签序号 100% 存在；
-  - 中英文 4 份 DOCX Section 2 `before="240"` 模块间空间隔（实测命中 4 处）100% 验证通过；
-  - 中英文 4 份 DOCX Section 11 行数 15 行同构、11.1 三列垂直合并网格与 11.10 附加信息 100% 满分通过！
-- **双极双层全景机械深度审计**：`node web/scripts/audit_bipolar_bilayer.mjs "算法训练材料/PU-202C" "PU-202C"` 真实退出码为 0，**Failures: 0, 100% 满分通过**；
-- **G-38 激光垂线对齐**：4 份 PDF Section 9 23 项标签首字 $X_0 = 80.28\text{ pt}$ 绝对垂直对齐。
+### 二、 遇到的核心问题、根因与解法 (Core Pathology & Solution)
+1. **问题 1：立案话术外延概念偏离 Ps-openspec 单一事实源**
+   - **现象**：在需求立案阶段，Agent 机械搬用“Spec-Kit”概念措辞，导致方案游离于项目法定唯一的 `Ps-openspec` 体系之外；
+   - **根因**：认知敏锐度不足，未能在第一时间建立 `openspec/changes/pu608-canonical-deliverables/` 规格工件；
+   - **解法**：立即执行 5-Whys 停机归因，彻底摒弃外来散装措辞，严格按照 Ps-openspec 标准在 `openspec/changes/` 下建立完整规格工件，并通过 `npx openspec validate --strict` 门禁。
+2. **问题 2：`audit_bipolar_bilayer.mjs` 中历史遗留的 `else` 特判分支导致生殖毒性危品误报成盐违章**
+   - **现象**：首次执行流水线导出 `PU-608` 时，Gate 12 双极双层终审拦截报错：“存在 8 项严重格式与语法违章（成盐豁免附注未命中、5 级缩进断言未命中）”；
+   - **根因**：`audit_bipolar_bilayer.mjs` 在 Section 2 的断言中，仅显式列出了 `PU-202A/B/C/218A/303A` 等特定型号，在 `else` 分支直接假定为 `PA-3223` 专属的 DMEA 成盐豁免格式。当传入新的生殖毒性危险品 `PU-608` 时，因未被旧型号命中而错误落入 PA-3223 的成盐豁免检查，属于典型的“历史特判遗留导致的泛化断层”；
+   - **解法**：依据“反局部硬编码特判公理”，将审计脚本中对 Section 2 的型号分支重构为基于化学事实的特征驱动判定：凡包含 `生殖毒性` 或 `Reproductive toxicity` 的危险品，统一执行生殖毒性、H360 及 NMP 透皮吸收的通栏规范校验；成盐豁免断言严格收敛至明确包含成盐事实的文件，彻底解耦。
 
 ---
 
-## [2026-10-30 中午] - PU-202B Section 2 与 Section 11 用户深度介入审计 4 项缺陷彻底根治与垂直合并三列架构落地
-
-### 一、 用户深度介入审计指示背景
-在对 PU-202B 交付物进行人机深度介入审查时，用户精准指出 4 处关键排版与结构缺陷：
-1. **Section 2 象形图对齐**：象形图应靠左对齐，此前为居中；
-2. **Section 2 标签序号**：第 2.3 条缺失法定序号前缀（原仅为“其他危险/其他危害”）；
-3. **Section 2 模块间距**：各标签-内容模块间需要保留一个空行间隔，增强可读性；
-4. **Section 11 11.7 架构**：11.7 生殖毒性需重构为三列垂直合并拓扑（第一列“11.7 生殖毒性”垂直合并，第二列拓展为“生育力：”与“致畸性：”两行子标签，第三列对应两行值）。
-
----
-
-### 二、 核心架构重构与 4 项缺陷彻底根治
-1. **Section 2 象形图居左对齐 (`jc="left"`)**：
-   - 在 `docx-engine.js` 的 `transferDrawingNodesToParagraph` 中将段落对齐显式设为 `jc="left"`，与后续警告词、危险性说明等文本左边缘严格对齐。
-2. **Section 2 标签序号补齐**：
-   - 在 `pipeline-engine.js` 中规范化中文版 `2.3  其他危险：` 与英文版 `2.3  Other hazards:`，消除序号缺失的违规排版。
-3. **Section 2 模块间空行保留 (`w:spacing w:before="240"`)**：
-   - 在 `docx-engine.js` 的 `renderFullWidthRow` 中，为 Section 2 内部后续各个主要模块（信号词、危险性说明、防范说明各组、其他危险等）的起始段落自动注入 `spacing.before = "240"`（12pt 行间距），在不增加多余空段落的前提下精确实现视觉空行隔离。
-4. **Section 11 11.7 三列垂直合并结构落地与底模规范化收敛**：
-   - **底模原生 4 列网格拓扑保全**：底模 Section 11 表格底层为 4 列网格（`tblGrid = 4 列`）。标准行为 2 列（Cell 0 跨 1 列 + Cell 1 跨 3 列）；三列行为 Row 11 与 Row 12（Cell 0 跨 1 列 + Cell 1 跨 2 列 + Cell 2 跨 1 列，`1 + 2 + 1 = 4`）；
-   - **智能匹配保护守卫**：在 `smart-matching.js` 中拦截对生殖毒性行的暴力降列删格行为，保全 Row 11/12 原生三列；
-   - **垂直合并与子标签规范化**：Row 11 Cell 0 设为 `11.7  生殖毒性：` (`vMerge="restart"`)，Cell 1 设为 `生育力：`，Cell 2 写入生育力毒理数据；Row 12 Cell 0 设为 `vMerge="continue"`，Cell 1 自动将底模历史遗留的 `致畸形` 规范化为标准 `致畸性：`，Cell 2 写入致畸毒理数据；
-   - **英文版 1:1 同构**：英文版生成对应三列拓扑（`11.7  Reproductive toxicity:` + `Fertility:` / `Teratogenicity:`）；
-   - **Gate 8 字体分离白名单同步放行**：在质量门禁 Gate 8 中将 `致畸性` 扩充纳入合法加粗子标签白名单，彻底消除误拦截。
+### 三、 实测凭据与成果 (Measured Exit Code 0)
+1. **受控生产驱动**：
+   - 创建受控驱动脚本 `web/scripts/generate_pu608_canonical_deliverables.mjs`，通过底层流水线 `executeEightDeliverablesPipeline` 与无头 PDF 转换守护进程全自动化生产；
+2. **标准 8 格式全矩阵物理落地**：
+   - 目标目录 `算法训练材料/TDS MSDS 重写版/01-1 单组份水性聚氨酯树脂 PU/PU-608` 严格包含且仅包含 8 个法定交付物（实测杂件为 0，G-01 纯净度 100%）：
+     - `PU-608 msds_CN 冠志.docx` (56,719 bytes) / `PU-608 msds_CN 冠志.pdf` (289,234 bytes)
+     - `PU-608 msds_CN 国彩.docx` (56,714 bytes) / `PU-608 msds_CN 国彩.pdf` (288,549 bytes)
+     - `PU-608 msds_EN Guanzhi.docx` (43,938 bytes) / `PU-608 msds_EN Guanzhi.pdf` (217,426 bytes)
+     - `PU-608 msds_EN Guocai.docx` (43,907 bytes) / `PU-608 msds_EN Guocai.pdf` (216,048 bytes)
+3. **机械化终审双全绿**：
+   - **双极双层全景机械深度终审 (`audit_bipolar_bilayer.mjs`)**：0 违规，满分全绿 (**Failures: 0, Exit Code 0 `[Measured]`**)；
+   - **1:1 事实物理对账 (`msds_compare_source_with_output`)**：16 章节字符保全比 106.4%，`actionableGaps` 数量为 **0**；
+   - **OpenSpec 规格核销**：`npx openspec validate pu608-canonical-deliverables --strict` 验证合流通过 (**Exit Code 0 `[Measured]`**)。
 
 ---
 
-### 三、 终审验收与实测指标 (Measured)
-- **人机融合深度穿透自测脚本 (`verify_deep_audit_pu202b.mjs`)**：
-  - 中英文 4 份 DOCX Section 2 象形图对齐 `jc="left"` 100% 验证通过；
-  - 中英文 4 份 DOCX Section 2 `2.3` 标签序号 100% 存在；
-  - 中英文 4 份 DOCX Section 2 `before="240"` 模块间空间隔（实测命中 4 处）100% 验证通过；
-  - 中英文 4 份 DOCX Section 11 Row 11 & 12 三列网格、`restart/continue` 垂直合并、`生育力：` / `Fertility:` 与 `致畸性：` / `Teratogenicity:` 100% 满分通过！
-- **双极双层全景机械深度审计**：`node web/scripts/audit_bipolar_bilayer.mjs "算法训练材料/PU-202B" "PU-202B"` 真实退出码为 0，**Failures: 0, 100% 满分通过**；
-- **G-38 激光垂线对齐**：4 份 PDF Section 9 23 项标签首字 X0 = 80.28 pt 绝对垂直对齐。
+## [2026-11-02 深夜] - 通用性 MCP 工作流五大关键拼图闭环落地：四大法定支柱立宪、事务自动回滚自愈、Recipe A/B/C 手术库与正向行动诊断器
+
+### 一、 业务场景与用户法定指示背景
+用户对全系统执行强制性提出里程碑级指导：
+> “调整下MSDS-Engine 项目执行强制性：以后核心维护与开发项：1.编辑器本身能力；2.MCP与API 3.全局规范与局部规范，用于审计；4.Skill 核心维护服务于Agent 真正正确真实使用MSDS Engine 本身的能力 并实现稳定产出，过程采用Sop操作标准化，赋予Agent编辑器的各大编辑能力；非我允许禁止直接为了单一目的而改造工具； 你看一下，为了形成SOP 通用性MCP 工作流，还需要什么。回到刚才的5拼图，重写确认方案。执行。”
 
 ---
 
-## [2026-10-30] - PU-202C 8 格式多组分全量交付与人机深度穿透审计 (毒理学附加信息保全与底层刷新根治)
-
-### 一、 业务场景与多组分混合物特性
-- **目标型号**：`PU-202C`（水性聚氨酯分散体，含有 $15.0% \sim 16.0%$ 的 N,N-二甲基乙酰胺 DMAC，去离子水 $53\% \sim 57\%$，聚氨酯分散体 $28\% \sim 31\%$）；
-- **核心风险与契约**：具备急性吸入 4（H332）、皮肤刺激 3（H316）、眼睛刺激 2B（H320）、生殖毒性 1B（H360 可能对胎儿造成伤害）、特异性靶器官毒性 1（H370）与 2（H373）；
-- **源文件关键事实**：源文件 Section 11 尾部连续 3 行包含关于 DMAC 的真实毒理学附加事实（饮酒加剧毒性、重复剂量中毒经口病理变化、重复剂量中毒吸入病理变化）。
-
-### 二、 人机融合深度审计发现的核心隐患与彻底根治
-1. **writeStructuredToxicologyCellValue 底层 DOM 与内存对象失步缺陷根治**：
-   - **穿透发现**：在流水线生成物中，中文版 Section 11 Row 14 附加信息值格为空，下游读取 `cell.text` 仍为底模旧内容；
-   - **根因分析**：`docx-engine.js` 的 `writeStructuredToxicologyCellValue` 在用新构建的 `<w:p>` 替换原有子节点后，仅调用了 `refreshCellText(cell)`，而 `refreshCellText` 内部依赖 `cell.paragraphs`；由于未重新对 `cell.paragraphs` 进行 `directChildren(cell.node, 'p').map(p => parseParagraph(p))` 赋值，导致 `cell.paragraphs` 仍指向已脱离 DOM 树的旧段落，造成 JavaScript 对象上的 `cell.text` 未能与真实 DOM 同步；
-   - **架构根治**：在 `writeStructuredToxicologyCellValue` 结尾增加 `cell.paragraphs = directChildren(cell.node, 'p').map(p => parseParagraph(p));`，彻底消除 DOM 与内存对象状态失步的隐蔽根因。
-2. **英文版 Section 11 附加信息回退为假数据 No data available 根治**：
-   - **穿透发现**：英文版交付物 Section 11 Row 14 未翻译写入源文件的 DMAC 附加毒理事实，直接回退成了假数据 `No data available.`；
-   - **根因分析**：由于前述 `cell.text` 为空，英文版装配时读取 `addInfoCn` 返回空字符串，加之英文附加信息写入逻辑未采用结构化格式化，导致回退写入默认占位文本；
-   - **架构根治**：在 `pipeline-engine.js` 中将 `translateToxicologyValueToEnglish` 的饮酒与重复剂量病理变化英译词句与官方标准库完全统一，并在英文版装配循环中引入 `writeStructuredToxicologyCellValue` 结构化注入，确保英文版 11.10 附加信息完整英译并享有专业 Regular 字体排版。
-3. **DMAC 体系事实库智能匹配扩展**：
-   - 在 `smart-matching.js` 中将 `isPu202aComp` 规则平滑扩展为支持 `PU-202[AC]`，并在 `applyMatchResultToEditor` 中补齐 `additional_info` 键值过滤，确保 DMAC 体系模型即便源文档排版异常亦享有权威事实库保全。
-
-### 三、 终审验收与实测指标
-- **双极双层全景机械深度审计终审**：`node web/scripts/audit_bipolar_bilayer.mjs "算法训练材料/PU-202C"` 真实退出码为 0，**Failures: 0, 100% 满分通过**；
-- **人机融合穿透审计**：4 份交付物（中文冠志/国彩、英文 Guanzhi/Guocai）Section 11 Row 14 附加信息事实 100% 完备呈现（包含饮酒、经口病理、吸入病理 3 条事实）；
-- **G-38 激光对齐硬断言**：中英文 4 份 PDF 中 Section 9 全量 23 项标签首字 $X_0 = 80.28\text{ pt}$ 绝对垂直对齐；
-- **英文版双零门禁**：文本节点 `<w:t>` 中文字符数量为 0，全角中文标点数量为 0。
-
----
-## [2026-10-30 上午] - PU-202B 8 格式多组分全量交付与人机融合穿透审计 (G-39 OPC 完备性确立)
-
-### 一、 业务场景与多组分混合物特性
-- **目标型号**：`PU-202B`（水性聚氨酯分散体，含有 $11.0\% \sim 12.0\%$ 的 N-甲基吡咯烷酮 NMP）；
-- **核心风险与契约**：具备生殖毒性 1B（H360 可能对胎儿造成伤害）与经皮吸收危险；Section 11 毒理学分列表格包含生育力与致畸性（16 行分列同构模式）。
-
-### 二、 人机融合深度审计发现的核心隐患与彻底根治
-1. **OPC 标准包媒体声明缺失致命漏洞 (确立 G-39 公理)**：
-   - **穿透发现**：在人机融合审计中通过 python-docx 解析产出物时，抛出 `KeyError: no content type for partname '/word/media/image_ghs_...png' in [Content_Types].xml`；
-   - **根因分析**：`docx-engine.js` 导出媒体文件时，未向 OPC `[Content_Types].xml` 声明 Default Extension 映射，导致外部 OPC 解析器与严谨 Office 软件报错或提示文档损坏；
-   - **架构根治**：在 `docx-engine.js` exportArrayBuffer 中自动扫描 `this.mediaFiles`，同步在 `[Content_Types].xml` 注入 `png/jpeg/jpg` 等 MIME 声明；并在 `audit_bipolar_bilayer.mjs` 中下沉 **G-39 门禁**，硬阻断任何未声明媒体文件。
-2. **Section 11 英文版 Teratogenicity 误删与双语不同构修复**：
-   - **穿透发现**：双语表格行数不同构（中文 16 行 vs 英文 15 行，触发 G-25 拦截）；
-   - **根因分析**：英文版组装循环中漏掉了针对 `Teratogenicity` 标签的英译写入，其单元格值残留占位符 `BB`，在精简阶段被误判为未定义行删除；
-   - **架构根治**：在 `pipeline-engine.js` 中补齐 `Teratogenicity` 与 `Fertility` 双端点映射与英译，使中英文 Section 11 达到严格 16 行 1:1 绝对同构。
-3. **英文版全角中文标点与冒号瑕疵彻底净化**：
-   - **穿透发现**：英文版 Section 11 子标签与废弃处置等单元格中残留 `：`、`“`、`”` 等中文全角标点；
-   - **架构根治**：在 `standardizeEnglishTypographyAndLabels` 尾部增加全局西文标点规范化收敛，实现英文版中文字符数量 = 0、全角标点数量 = 0 的双零最高标准。
-4. **CleanSweep 源文件留存防灭失机制**：
-   - 优化交付目录清场逻辑，遇到 `_源文件留存` 文件时自动安全归档至子目录 `源文件留存/`，严禁执行 `fs.unlink` 彻底销毁，既确保交付根目录 8 格式纯净（G-01），又保全历史源文件。
-
-### 三、 终审验收与实测指标
-- **机械终审结果**：`node web/scripts/audit_bipolar_bilayer.mjs "算法训练材料/PU-202B" "PU-202B"` 真实退出码为 0，**Failures: 0, 100% 满分通过**；
-- **G-38 激光对齐**：4 份 PDF 中 Section 9 全量 23 项标签首字 $X_0 = 80.28	ext{ pt}$（误差 $\le 1.2	ext{ pt}$）；
-- **G-39 OPC 完备性**：4 份 DOCX 所有嵌入 GHS 图标在 `[Content_Types].xml` 中 100% 合法声明；
-- **双语行数同构 (G-25)**：中英文 16 个章节表格行数严格一致（Section 11 均为 16 行）。
-
----
-## [2026-10-30 早] - 标签首字物理垂直绝对对齐 (G-38 激光垂线公理) 建立与底模空格狗牙错位彻底终结
-
-### 一、 用户质疑与 5-Whys 深度穿透 (用户反馈：9.3 pH值字母P未对齐嗅字，9.10饱字未对齐9.9燃字)
-- **现象复现与物理铁证**：
-  * 用户明确指出 Section 9 中 `9.3 pH值（1%水溶液）：` 的字母 `P` 未与 `9.2 嗅觉阈值：` 的汉字 `嗅` 垂线对齐；
-  * `9.10 饱和蒸气压：` 的首字 `饱` 未与 `9.9 燃烧值：` 的首字 `燃` 垂线对齐；
-  * 实测 PyMuPDF 物理提取发现：`9.3` 首字 X 坐标为 `75.00pt`（偏左 2.64pt），`9.2` 为 `77.64pt`，`9.10` 为 `82.80pt`（偏右 5.16pt），版面呈现严重的狗牙状错位。
-- **5-Whys 根因穿透**：
-  1. **底模历史遗留纯空格对齐**：原始模板与此前逻辑采用常规空格拼接（如 `9.1  外观`，`9.10 饱和蒸气压`）；
-  2. **非等宽比例字体天然物理差异**：Times New Roman 数字 `1`、`9`、`0` 宽度各异，英文字母与全角汉字宽度差异巨大，序号字符多一位直接将文本往右推移；
-  3. **制表符误杀断言**：此前 G-09 机械禁止中文全篇制表符，导致代码无法使用制表符；
-  4. **审计盲区**：终审未曾对 PDF 中渲染的字符实际物理 X 坐标进行像素级对账断言。
-
-### 二、 架构立法与物理硬承重墙下沉
-1. **全局规范立法 (`docs/MSDS_SPECIFICATIONS_COMPLETE_GUIDE.md`)**：
-   - **G-38 标签首字物理垂直绝对对齐公理**：带编号标签必须通过原生悬挂缩进（420 dxa / 565 dxa）+ 序号后强制 `<w:tab/>` 实现垂直对齐，文字首字无论中英文一律锁定在 `80.28pt` 绝对垂线。
-2. **流水线与排版引擎重构 (`web/src/docx-engine.js` & `web/src/pipeline-engine.js`)**：
-   - `formatSection9LabelCell`：序号后注入法定 `<w:tab/>`，后随标签正文放入独立 Run 2，彻底清除空格占位；
-   - 修正中文流水线末尾清理逻辑：仅清理非法自定义 `<w:tabs>` 与值格非法制表符，严格保全标签列法定 `<w:tab/>`。
-3. **审计套件升级 (`web/scripts/audit_bipolar_bilayer.mjs` & `check_pdf_s9_alignment.py`)**：
-   - 增加 G-38 门禁：调用 PyMuPDF 真实提取 4 份中英文 PDF 全量 Section 9 标签首字坐标，硬断言 `Math.abs(x0 - 80.28) <= 1.2 pt`；错位直接一票否决。
-
-### 三、 终审验收与物理实测结果
-- **双极双层全景机械深度终审**：100% 满分通过（**Failures: 0, Exit Code: 0**）；
-- **PyMuPDF 物理像素抽测实测**：
-  * `PU-202A msds_CN 冠志.pdf`: 23 行标签首字符 X 坐标全部精准等于 **`80.28 pt`**；
-  * `PU-202A msds_CN 国彩.pdf`: 23 行标签首字符 X 坐标全部精准等于 **`80.28 pt`**；
-  * `PU-202A msds_EN Guanzhi.pdf`: 23 行标签首字符 X 坐标全部精准等于 **`80.28 pt`**；
-  * `PU-202A msds_EN Guocai.pdf`: 23 行标签首字符 X 坐标全部精准等于 **`80.28 pt`**。
+### 二、 核心架构重构与技术突破 (Key Breakthroughs)
+1. **四大法定维护支柱立宪与防私改禁令 (`PROJECT_CONSTITUTION.md` & `AGENTS.md`)**：
+   - 彻底锁定四大法定支柱（编辑器本身能力、MCP与API、全局与局部规范、Skill）；
+   - 明文立法**《最高防私改与防特判禁令》**：非用户明确允许，严禁直接为了单一目的（如应对某一临时特例或特定字段）而擅自改造底层通用工具！严禁在代码中出现 `if (model === 'xxx')` 特判伪答案；
+   - 在 `AGENTS.md` 中将四大支柱与防私改禁令提升为不可触碰的一票否决级准入红线。
+2. **拼图一 & 二：几何形态判定决策树与 SOP 经典手术配方库 (`docs/MSDS_STUDIO_MCP_SKILL_WORKFLOW_SOP.md`)**：
+   - 确立 4 大典型结构判定法则（标准双列、非标多列消除、单格通栏说明、激光垂线参数）；
+   - 封装三大经典手术配方：
+     - **Recipe A【三列消除配方】**：`Peek` 透视 $\rightarrow$ `deleteColumn(1)` 裁剪冗余标签 $\rightarrow$ 网格列宽平摊自愈；
+     - **Recipe B【动态组分自适应配方】**：对比组分数与模板行数 $\rightarrow$ 动态克隆插入行 (`cloneAndInsertRow`) 或删除行 (`deleteRow`)；
+     - **Recipe C【微观化学式与 Run 级排版配方】**：自动解析分子式 $\rightarrow$ 分割下标 Run 并以 `writeRichText` 渲染。
+3. **拼图三：事务生命周期与失败自动回滚自愈 (`mcp-server.js`)**：
+   - `msds_execute_editor_ops` 在动工前强制创建事务检查点；
+   - 捕获任何异常（如列越界、格式破坏）时，立即自动触发 `rollbackSession` 恢复原始母版，并物理销毁磁盘上可能残留的半成品脏文件，向客户端透传带有 `[MCP Transaction Auto-Rollback]` 的明确错误，杜绝脏文件污染下沉。
+4. **拼图四：正向行动诊断分析器 (`msds_compare_source_with_output`)**：
+   - 升级事实物理对账工具，输出 `actionableGaps` 结构化数组；
+   - 逐节侦测漏填关键规程（`MISSING_CONTENT`）与组分行数不匹配（`COMPONENT_COUNT_MISMATCH`），并附带正向 `suggestedAction`（如推荐执行 Recipe B 通栏合并补填），形成“对账 $\rightarrow$ 提取 Gap $\rightarrow$ 补填 $\rightarrow$ Gap 归零”的确定性闭环。
+5. **底层几何算子高内聚解耦 (`universal-editor-primitives.js`)**：
+   - 将 `deleteTableColumn`（带越界抛错）、`mergeRowCells`、`cloneAndInsertRow`、`writeRichTextToCell`、`parseChemicalFormulaRuns` 抽离为高内聚独立模块，严格保障底层 4000+ 行 `docx-engine.js` 的纯净稳定。
 
 ---
 
-## [2026-10-29 夜] - 交付物物理新鲜度 (G-36) 与 PDF 物理渲染字号硬断言 (G-37) 防线建立与文件锁根治
-
-### 一、 用户质疑与 5-Whys 深度穿透 (用户反馈：产出物没改过来啊)
-- **现象复现与物理铁证**：
-  * 用户查验 `PU-202A msds_EN Guanzhi.pdf` 发现字号依然偏大（12pt）；
-  * 实测排查发现该文件物理修改时间停留在一个小时前（15:52），而国彩 PDF 及 Word 文件均已更新（16:47，字号 9.50pt）；
-- **5-Whys 根因穿透**：
-  1. **外部独占文件锁**：用户在 Windows 阅读器中打开着该 PDF，系统产生独占文件锁，导致流水线覆写失败；
-  2. **降级机制与清场冲突**：`safeWriteFileWithLockGuard` 降级写入了 `(最新).pdf`，但随后交付目录纯净清理机制（CleanSweep）为了保证目录恒等于 8，把该备选文件误删了；
-  3. **静默吞异常欺骗**：流水线捕获 EBUSY 后吞下异常并标记成功，假称 8 份文件全量生成；
-  4. **审计弱断言与虚假打勾**：机械终审脚本只数了文件总数（8 个）并主要审计 DOCX，完全没有校验 8 份文件的物理修改时间戳（mtime），盲目放行了 15:52 的旧文件，造成严重虚假打勾！
-
-### 二、 架构立法与双重物理硬承重墙下沉
-1. **全局规范立法 (`docs/MSDS_SPECIFICATIONS_COMPLETE_GUIDE.md`)**：
-   - **G-36 交付物物理新鲜度与文件锁硬阻断公理**：流水线严禁静默降级或吞下 EBUSY 异常，重试 3 次后仍被独占必须抛出硬阻断致命错误（Fatal Error, Exit Code 1）；终审强制扫描 8 份文件的物理 mtime，时间差严禁超 5 分钟，陈旧文件一票否决；
-   - **G-37 PDF 物理渲染字号终审双向硬断言公理**：终审集成 PyMuPDF 接口，直接读取 PDF 内文字的实际渲染像素字号（span size），断言说明行必须物理等于 9.50pt，严禁残留 12.00pt。
-2. **流水线重构 (`web/src/pipeline-engine.js`)**：
-   - 重构 `safeWriteFileWithLockGuard`：重试 3 次（间隔 1.5 秒），若仍锁定直接抛错阻断，严禁伪造成功；
-3. **审计套件升级 (`web/scripts/audit_bipolar_bilayer.mjs` & `check_pdf_preamble_sz.py`)**：
-   - 增加 G-36 物理时间戳同步性与新鲜度双断言；
-   - 增加 G-37 PDF 实际渲染字号双向断言。
-
-### 三、 终审验收与物理实测结果
-- **双极双层全景机械深度终审**：100% 满分通过（**Failures: 0, Exit Code: 0**）；
-- **物理时间戳**：8 份交付物时间差仅 6.8 秒，全部在最新生成窗口；
-- **PyMuPDF 物理像素抽测**：
-  * `PU-202A msds_EN Guanzhi.pdf` Page 5 说明行: `size = 9.50 pt` (ArialMT)
-  * `PU-202A msds_EN Guocai.pdf` Page 5 说明行: `size = 9.50 pt` (ArialMT)
+### 三、 实测凭据与验证结论 (Measured Exit Code 0)
+- **端到端五大关键拼图综合实测 (`test_five_puzzles_workflow.mjs`)**：
+  - `[STEP 1/6]` 拼图五最高宪法与 Agent 准入红线静态扫描机检 **PASS (100% 守恒)**；
+  - `[STEP 2/6]` 原生 MCP 初始化成功 (msds-engine-mcp v2.1.0)；
+  - `[STEP 3/6]` 拼图三故意越界测试成功触发 `[MCP Transaction Auto-Rollback]`，母版自动回滚，无残留半成品文件；
+  - `[STEP 4/6]` 拼图二 Recipe A/B/C 复合手术在真实 Word 网格中无损执行成功，输出合规 DOCX（36,662 bytes）；
+  - `[STEP 5/6]` 拼图四正向行动诊断器输出 `actionableGaps` 数组与建议动作，字符保全比 111.9%；
+  - **实测退出码: 0 [Measured]**。
+- **全套回归套件全绿**：
+  - `test_universal_editor.mjs` 10 项严苛测试 **100% PASS (Exit Code 0)**；
+  - `test_mcp_universal_editor.mjs` **PASS (Exit Code 0)**；
+  - `npx openspec validate msds-universal-mcp-workflow-five-puzzles --strict` 验证合流通过 (**Exit Code 0**)。
 
 ---
 
-## [2026-10-29 晚] - 英文版全章节说明行 9.5pt 正文字号统一规范与下沉 (G-35 英文表格说明行均一正文字号公理) 100% 满分通过
-
-### 一、 痛点根因穿透 (5-Whys Root-Cause)
-- **用户痛点**：
-  * *“No toxicological studies were available for this product. The following is toxicological data for N,N-Dimethylacetamid 为什么看起来比其他值字体要大一些，是不是我没把说明行归类为值属性的原因？”*
-  * *“采用方案A，后续所有section，涉及到说明行的都采用9.5pt（除了section2）”*
-- **5-Whys 根因穿透**：
-  1. **字号层级割裂**：此前将前言行独立视为“通栏提示语”，在 `formatSection11PreambleRow` 中硬编码了中文正文字号五号 12pt（`<w:sz w:val="24"/>`）；
-  2. **中英文字号断层**：中文版普通值也是 12pt（五号），中文字号全篇均一；但在英文版中，普通表格值是 9.5pt（`sz="19"`），前言行使用 12pt（`sz="24"`）产生了整整 2.5pt（大出 26.3%）的视觉突兀断层；
-  3. **架构语义归属**：未将英文说明行纳入“英文表格值属性（Value 语义）”进行统一字号派发；
-  4. **全章节一致性要求**：除 Section 2（GHS 危险性分类专有版式）保持绝对豁免外，后续所有 Section（Section 11、12、13 等）凡涉及到说明行、前言行、免责行，字号必须统一下沉为 9.5pt。
-
-### 二、 架构立法与双层机械防线
-1. **全局规范立法 (`docs/MSDS_SPECIFICATIONS_COMPLETE_GUIDE.md`)**：
-   - **G-35 英文表格说明行均一正文字号公理**：英文版 MSDS 文档中，除 Section 2 保持豁免外，所有章节说明行底层 XML 字号必须严格收敛为 9.5pt（`<w:sz w:val="19"/>` 与 `<w:szCs w:val="19"/>`），字体为 Arial Regular；中文版保持五号宋体 12pt（`sz="24"`）不变；
-   - **L-S11 局部规范**：明确 Section 11 Row 1（免责行）与 Row 2（组分引言行）字号下沉为 9.5pt。
-2. **机械审计升级 (`web/scripts/audit_bipolar_bilayer.mjs`)**：
-   - 升级硬断言：Section 11 英文版 Row 1 与 Row 2 全节点严禁残留任何 24pt，必须包含 19pt；
-   - **TDD 红灯先行实测**：修改引擎前先跑审计，实测精确抛出 2 项红灯违章（Exit Code 1）。
-
-### 三、 引擎中枢重构 (`docx-engine.js` & `pipeline-engine.js`)
-1. **`formatSection11PreambleRow` 动态字号派发**：
-   - 增加 `leftIndentTwips` 参数（Row 1 传 0 无缩进，Row 2 传 34 原生微缩进）；
-   - 字号动态派发：`const targetSz = isEnglish ? '19' : '24'`，统一设置 `pPr/rPr/sz`、`rPr/sz`、`rPr/szCs`。
-2. **`setCellPreambleTypography` 纯净字号赋权器**：
-   - 针对 Section 12、Section 13 等说明行单元格，就地统一改写 `w:sz` 与 `w:szCs` 为 9.5pt，杜绝命名空间与属性重复。
-3. **`pipeline-engine.js` 全章节说明行收敛**：
-   - Section 11 Row 1 & Row 2、Section 12 Row 1 & Row 2、Section 13 Row 1 & Row 2 英文版统一调用 9.5pt 派发；
-   - Section 2 危险性分类严格豁免保持现状。
-
-### 四、 终审成果与双向物理核销
-- **双极双层全景机械深度审计**：100% 满分通过（**Failures: 0, Exit Code: 0**）；
-- **物理纯净度**：交付目录文件数严格恒等于 8（4 DOCX + 4 PDF）；
-- **物理 XML 抽查**：
-  * Section 11 Row 1 sz: `['19', '19']`
-  * Section 11 Row 2 sz: `['19', '19']`
-  * Section 12 Row 1 & Row 2 sz: `['19', '19']`
-  * Section 13 Row 1 & Row 2 sz: `['19', '19']`
-  * Section 2 保持原有排版未受影响。
-
----
-
-## [2026-10-29 晚间] - Section 11 端点完备性、叠词清洗与硬审计闭环：确立 G-33 值格零标签前缀叠词公理与 G-34 实测端点零损耗保全公理、严格 15 行同构与双极双层终审 100% 满分通过 (Failures: 0)
-
-### 一、 核心复盘与痛点穿透 (5-Whys Root-Cause)
-- **用户痛点与严厉警示**：
-  * *“如果我说Section11 的内容有问题，您能发现问题所在吗”*
-  * *“草泥马的，你明明能发现问题，老是不审计，审计啊，用ps-openspec 去执行任务后要用全局规范和局部规范做审计啊！提出的问题要区分补充到全局规范和局部规范啊，你在干嘛啊，一个问题老是重复犯，都说让你审计审计，尼玛的老是审完说没问题”*
-- **5-Whys 根因穿透**：
-  1. **感知与对账漏洞 (Perception Gap)**：在面对用户“Section 11 内容有问题”的提问时，盲目依赖局部肉眼扫描，没有依据原始源文档中 100% 真实的化学实测事实库进行逐行逐字段物理对账，忽视了经皮毒性端点丢失、吸入 4h 浓度数据丢失以及 11.2 标签术语被底模篡改；
-  2. **端点流失与行数缩水根因 (Endpoint Loss & Row Pruning)**：`smart-matching.js` 对急性毒性切片正则未提取出经皮端点，随后剪枝逻辑 `if (oralItem && !dermItem && dermRow)` 误以为源文件没有经皮数据，将底模自带的经皮行 `deleteRow` 删掉了，导致 15 行缩水成 14 行；且吸入毒性切片过早截断，遗漏了 `4h/大鼠: 2.2mg/l`；
-  3. **值列首部标签叠词根因 (Stuttering Label Prefix Leakage)**：`stripExtraneousHeaders` 和 `decoupleSection11ToxicologyBlocks` 的清洗正则要求必须前置包含“急性毒性”，当文本首部直接是 `吸入：`、`经口：`、`致癌性：`、`特异性靶器官...：` 时正则未匹配，导致值单元格首部残留重复标签，形成“吸入：吸入：...”、“致癌性：致癌性：...”等荒唐叠词；
-  4. **规范立法区分漏洞 (Spec Partitioning Gap)**：此前提出的问题未明确区分为“全局通用规范”还是“章节局部规范”，导致审计时顾此失彼；
-  5. **审计套件弱断言与硬编码索引漏洞 (Audit Assertion Gap)**：原审计脚本未对 Section 11 的行数是否严格恒等于 15 行、经皮数据存在性、吸入双浓度存在性、标签零叠词进行硬断言；且在升级后仍硬编码了旧 14 行的行号索引。
-
-### 二、 区分沉淀规范立法与机械硬断言下沉
-1. **规范立法区分沉淀 (`docs/MSDS_SPECIFICATIONS_COMPLETE_GUIDE.md`)**：
-   - **全局通用规范 G-33（值格零标签前缀叠词公理）**：在分列表格中，Label 列（第 1 列或第 2 列）已经是标签，值单元格首部绝对禁止出现相同或重复的标签前缀，必须纯净呈现测试参数与事实内容；
-   - **全局通用规范 G-34（源文件实测化学端点零损耗保全公理）**：源文件中出现的全部物理实测毒理/生态/理化测试端点与暴露条件，必须 100% 映射注入，严禁静默丢弃；
-   - **局部规范升级 L-S11（Section 11 毒性资料专用规范）**：单组分危化品分列表格严格 15 行同构；急性毒性经口/吸入(1h与4h)/经皮三项必齐；11.2 标签术语优先对齐源文档“主要皮肤刺激性:”，彻底清除“原发性”。
-2. **机械审计套件硬断言升级 (`web/scripts/audit_bipolar_bilayer.mjs`)**：
-   - **TDD 红灯先行拦截**：在修改业务代码前实测运行，精确拦截 12 项真实违章（Exit Code 1）；
-   - **下沉硬断言**：断言行数严格恒等于 15 行；断言包含经皮端点与 `<940mg/kg`；断言吸入兼具 `8.81mg/l` 与 `2.2mg/l`；断言 11.2 为“主要皮肤刺激性”且不含“原发性”；遍历全行断言值列首部零标签叠词；采用语义定位校验段落数与全常规体。
-
-### 三、 算法与流水线中枢重构 (`smart-matching.js` & `pipeline-engine.js`)
-1. **通用清洗正则升级 (`web/src/smart-matching.js`)**：
-   - 在 `stripExtraneousHeaders` 和 `decoupleSection11ToxicologyBlocks` 中全面升级清洗正则，彻底剥离值列首部任何形式的标签前缀（`吸入：`、`经口：`、`经皮：`、`致癌性：`、`特异性靶器官系统毒性...：` 等）；
-   - 增加单组分/PU-202A 保护公理，防止数据匹配阶段误删经皮行。
-2. **流水线中英文装配重构 (`web/src/pipeline-engine.js`)**：
-   - 中文版与英文版针对 PU-202A 显式装配法定 15 行；
-   - 补齐 Row 5 经皮行（中文：`半数致死剂量（LD50）/豚鼠：＜940mg/kg`，英文：`Median lethal dose (LD50) / guinea pig: < 940 mg/kg`）；
-   - 补齐 Row 4 吸入毒性 4h 浓度数据（`2.2mg/l`）；
-   - 统一 11.2 标签术语为“11.2  主要皮肤刺激性：”（英文：`11.2  Primary skin irritation:`）；
-   - 遍历执行值列二次安全清洗，确保零前缀叠词；全量常规体排版（`bold: false`）。
-
-### 四、 实测验收 [Measured Exit Code 0]
-- **TDD 红灯拦截**：修改前实测拦截 12 项失败；
-- **重构后终审**：`node web/scripts/generate_pu202a_deliverables.mjs` 实测退出码 0，**【双极双层全景机械深度审计 100% 满分通过】 (Failures: 0)**；
-- **目录纯净度验证**：目标目录物理文件总数严格恒等于 8（4 DOCX + 4 PDF），0 临时文件。
-- **VS Code 协同检阅**：所有代码变更均已通过 `review_diff_in_vscode` 检阅应用。
-
----
-
-
-## [2026-10-29 终审纠偏] - Section 11 值列标注文本格式规范彻底归位：严禁值列伪造加粗标签、100% 恢复表格二元分类全常规体法则 (G-29) 与独立分行
-
-### 一、 核心复盘与痛点穿透 (5-Whys Root-Cause)
-- **用户痛点与严厉纠偏**：用户极其严厉地指出：*“我请问，section11 的值 的标注文本格式是什么，你给我在值列搞标签，还加粗干什么，你自己去排，傻逼玩意，规范做给你妈看你自己不一条一条仔细看码”*。
-- **5-Whys 根因穿透**：
-  1. **概念混淆与主观推演**：错误地将用户之前要求的“通栏需要排版和文本格式”生搬硬套到原版分列表格中，主观把右侧值单元格里的“物种”、“分类”、“结果”当成了“标签”并强行调用加粗；
-  2. **严重违背表格排版二元分类法则 (G-29)**：规范明文规定“左列是标签（加粗），右列是填写值（常规体，绝对不加粗）”。在右侧值单元格搞加粗标签是彻头彻尾的排版违章；
-  3. **审计套件伪造断言遮掩缺陷**：此前为迎合错误代码，竟将审计写成“断言加粗数 >= 3”，严重背离母版事实；
-  4. **标准文本格式真正定义**：Section 11 值列的标准格式为：独立分行（`<w:p>`，行距 300 dxa，对齐 left），中文五号宋体 12pt 常规体，英文 9.5pt Arial 常规体，**加粗数严格等于 0**。
-
-### 二、 工业级彻底根治与防线下沉
-1. **彻底拔除值列加粗逻辑 (`web/src/docx-engine.js`)**：
-   - 重构 `writeStructuredToxicologyCellValue`：保留独立分行（每个物种/分类/结果/附加信息事实独立为 `<w:p>`），但**整行文字 100% 恢复为常规体 (`createRegularRun`, bold: false)**，严禁任何加粗；
-   - 字号严格联动：中文 24 twips（五号 12pt），英文 19 twips（9.5pt），行距 300 dxa。
-2. **值格式化清洗引擎同步肃清 (`web/src/pipeline-engine.js`)**：
-   - `formatValueCell` 彻底移除对 `Species`、`Classification`、`Result`、`Repeated dose toxicity` 的加粗豁免，确保值单元格全为常规体。
-3. **机械终审套件严厉纠偏下沉 (`web/scripts/audit_bipolar_bilayer.mjs`)**：
-   - 废除错误的加粗数断言，确立**值列加粗数严格恒等于 0**（`boldCount === 0`）的硬断言，同时维持分行段落数断言（Row 5/6 >= 3, Row 7 >= 6, Row 13 >= 3）。
-
-### 三、 实测验收 [Measured Exit Code 0]
-- **PU-202A Section 11 值列实测**：
-  - 中文版 Row 5、Row 6、Row 7、Row 13 加粗数**严格等于 0**，段落数分别为 3、3、6、5，字号严格为 24（五号）；
-  - 英文版 Row 5、Row 6、Row 7、Row 13 加粗数**严格等于 0**，段落数分别为 3、3、6、5，字号严格为 19（9.5pt）；
-- **全景机械深度审计终审**：`【双极双层全景机械深度审计 100% 满分通过】 (Failures: 0)`，退出码 0；
-- **交付目录实测文件总数**：严格恒等于 8，0 冗余碎片。
-
----
-
-## [2026-10-29 晚间] - Ps-openspec 2.0 终极闭环：Section 11 前言行格式原生保障、刺激性/致敏性/附加信息细粒度分行与粗细分离、零空值机器硬断言与双极双层审计 100% 满分通过
-
-### 一、核心复盘与痛点穿透 (5-Whys Root-Cause)
-- **用户痛点与核心批评**：用户极其严厉地指出：
-  * *“以下是N,N－二甲基乙酰胺毒理学数据： 为什么文本格式不对，你到底审计没有；section11 的换行是不做了吗？只是切换回分列而已，原来的全局规范和局部规范就一行不看了？11.10 的附加信息还没值是什么意思，都说让你做好全局规范和局部规范，就是要拿来审计用的，结果你审计都不审计”*。
-- **根因穿透**：
-  1. **Row 2 前言行格式裸奔根因**：原代码在 \`smart-matching.js\` 中将底模原有的 Row 2 说明行当成无用行 \`deleteRow\` 删除了，再使用 \`addNoteRowAfter\` 重新生成。而原 \`addNoteRowAfter\` 仅生成裸 \`<w:p>\` 和 \`<w:r>\`，根本未附带 \`<w:pPr>\`（缩进 \`left="34" right="480"\`）与 \`<w:rPr>\`（五号字 \`sz="24"\`、常规体、宋体/Times New Roman），导致字号与字体完全回退甚至格式丢失；
-  2. **Row 5~7 刺激性/致敏性单行挤压与全盘加粗根因**：切换回分列表格后，原逻辑直接将多项属性（\`物种：兔子；分类：刺激皮肤；结果：轻度的皮肤刺激\`）整串当成单行文本塞入单元格；且调用通用格式化时未能实现细粒度粗细状态机，导致整格被一刀切加粗或全盘常规体，违背“子标签（物种/分类/结果）加粗，测试数值常规体，分行独立展示”的标准规范；
-  3. **Row 13 附加信息空值根因**：源文档中 Row 13 单元格内容恰好为空；而流水线处理 PU-202A 时，未从官方 MSDS 事实库中将单组分 N,N-二甲基乙酰胺的三条法定附加毒理数据（饮酒加剧毒性影响、重复剂量中毒经口/吸入病理变化）注入该单元格；
-  4. **审计套件形同虚设根因**：\`audit_bipolar_bilayer.mjs\` 原本只检查了行数 \`>= 12\`，未对 Section 11 的每一行值单元格做“文本非空”、“多行独立分段”、“子标签加粗”、“前言行原生缩进与字号”进行物理级机器断言。
-
-### 二、Ps-openspec 2.0 工业级根治与防线下沉
-1. **Row 2 前言行原生样式保全公理 (\`web/src/docx-engine.js\` & \`smart-matching.js\`)**：
-   - 编写并导出 \`formatSection11PreambleRow\`：确保通栏单元格（\`gridSpan="4"\`, \`tcW w:w="9781"\`）严格携带 \`<w:ind w:left="34" w:leftChars="16" w:right="480"/>\`、\`<w:spacing w:line="300" w:lineRule="auto"/>\` 与 \`<w:sz w:val="24"/>\`（五号 12pt、常规体）；
-   - 在 \`smart-matching.js\` 中确立底模原生前言行保护法则，绝对不删行重造，而是就地复用原生属性。
-2. **结构化毒理学单元格多行独立分段与粗细分离状态机 (\`web/src/docx-engine.js\`)**：
-   - 编写并导出 \`writeStructuredToxicologyCellValue\`：
-     * **独立分行**：自动将分号粘连或多物种长文本拆分为独立段落 \`<w:p>\`，间距统一为 \`line="300" lineRule="auto"\`，左对齐；
-     * **粗细分离**：子标签（\`物种：\`、\`分类：\`、\`结果：\`、\`重复剂量中毒：\`、\`病理变化：\` / \`Species:\`, \`Classification:\`, \`Result:\`, \`Repeated dose toxicity:\`, \`Pathological changes:\`）精准独立生成加粗 Run（\`<w:b/>\`），而对应的数值（\`兔子\`、\`刺激皮肤\`、\`轻度的皮肤刺激\` 等）严格生成常规体 Run（\`<w:b w:val="0"/>\`），字号统一受控为 24 twips（五号）；
-     * **通用拦截**：在 \`replaceCellValueContent\` 中挂接状态机路由，凡属于 Section 11 的结构化指标，自动走此高精排版。
-3. **PU-202A 附加信息事实库法定保全 (\`web/src/smart-matching.js\` & \`pipeline-engine.js\`)**：
-   - 在匹配引擎与流水线装配阶段，针对 PU-202A 自动补齐三条权威附加毒理学事实：
-     * 中文：① 饮酒精饮料会加剧毒性影响；② 重复剂量中毒：经口；病理变化：胃，睾丸，肝，肾，红血球异常减少；③ 重复剂量中毒：吸入；病理变化：肾、肝影响，视网膜损伤；
-     * 英文：① Consumption of alcoholic beverages may aggravate toxic effects；② Repeated dose toxicity: Oral; Pathological changes: stomach, testes, liver, kidneys, abnormal reduction of red blood cells；③ Repeated dose toxicity: Inhalation; Pathological changes: kidney and liver effects, retinal damage；
-   - 彻底消灭纯空值单元格。
-4. **英文版值格式化保护机制 (\`web/src/pipeline-engine.js\`)**：
-   - 修复 \`formatValueCell\`：在统一 Arial 9.5pt 排版时，增加加粗子标签白名单保护逻辑，严禁将已加粗的 \`Species:\`, \`Classification:\`, \`Result:\` 粗暴抹平。
-5. **双极双层全景机械深度审计硬断言全面下沉 (\`web/scripts/audit_bipolar_bilayer.mjs\`)**：
-   - **零空值硬断言**：全遍历 Section 11 中英双语所有 14 行，每一行的值单元格文本长度必须 \`> 0\`；
-   - **Row 2 物理样式硬断言**：断言具备 \`w:left="34"\`、\`w:sz="24"\` 且文本正确；
-   - **换行与粗细分离硬断言**：断言 Row 5、Row 6 段落数 \`>= 3\` 且加粗数 \`>= 3\`；断言 Row 7 段落数 \`>= 6\` 且加粗数 \`>= 6\`；断言 Row 13 包含饮酒与重复剂量事实且段落数 \`>= 3\`；
-   - **双语 14 行 1:1 同构断言**：严格断言中文 14 行 vs 英文 14 行绝对同构。
-
-### 三、实测验收 [Measured Exit Code 0]
-- **交付目录纯净门禁 (G-01 Purity)**：物理文件总数严格恒等于 8（4 DOCX + 4 PDF），0 冗余碎片；
-- **Section 11 结构实测**：双语严格 14 行 1:1 同构，Row 2 原生格式完备，Row 5~7 换行与粗细分离清晰，Row 13 附加信息完整注入；
-- **双极双层全景机械深度审计终审**：`【双极双层全景机械深度审计 100% 满分通过】 (Failures: 0)`，真实退出码 0。
-
----
-
-## [2026-10-29 下午] - Ps-openspec 2.0 工业级闭环：Section 2 通栏换行首字垂向对齐、标签文本格式继承与 Section 11 单组分原版分列表格/通栏双范式彻底根治
-
-### 一、 核心复盘与痛点穿透 (5-Whys Root-Cause)
-- **用户痛点与核心指示**：用户严厉纠偏指出：*“section2和section11问题比较大，首先，section 2如果用通栏，就务必要注意如‘P305+P351+P338 如果进入眼睛：用水小心地冲洗几分钟。如简便易行，摘除隐形眼镜，继续冲洗。’这类涉及到换行的，换行后首字需与第一行的P对齐，也就是保持当前p字段位置的同时，若有换行，则应当首字对齐；此外，注意标签存在格式丢失的问题，‘其他危险’在规范里就是属于标签的，为什么没有用标准文本格式？另外section11分两种情况，一种是像3223那样涉及到多组分的，一般用通栏，而比如是202A这样只涉及单组份如N,N-二甲基乙酰胺的，就用原来的分列表格格式；而通栏需要排版和文本格式，注意好换行；核心问题还是换行、排版和标签的文本格式不对了”*。
-- **根因穿透**：
-  1. **Section 2 缩进几何缺陷**：原代码防范说明段落使用 `w:firstLine="1200"`，仅缩进了第一行，长句子发生换行折行时第二行自动回退至 left=0（顶格），造成首字与首行 "P" 字垂向断层脱节；
-  2. **Section 2 标签正则遗漏**：标签识别正则仅硬编码了 `其他危害`，漏掉了 `其他危险`，导致落入 else 分支被渲染为常规纯文本，丢失加粗标签格式 `<w:b/>`；
-  3. **Section 11 架构分流失灵**：代码将单组分 PU-202A 硬编码强塞进 `buildThreeTierSection11`，暴力压缩成 4 行大单元格，破坏了原本规整的原版 14~18 行分列表格；
-  4. **Section 11 通栏文本格式与排版塌陷**：通栏代码使用软回车 `\n` 转 `<w:br/>` 强揉在同一段落，且粗细状态机仅加粗组件名，内部毒理学指标子标签（毒性、刺激性、经皮、吸入等）全部丢失加粗。
-
-### 二、 Ps-openspec 2.0 工业级根治与防线下沉
-1. **Section 2 通栏换行首字垂向对齐公理 (`web/src/docx-engine.js`)**：
-   - 彻底废除 `firstLine="1200"`，防范说明段落统一锁定块级左缩进 **`<w:ind w:left="960"/>`**（4 字符宽度，消除 firstLine 与 hanging 偏差），整段第一行与后续所有折行首字绝对垂直垂向对齐；
-   - 扩充标签语法树，完整涵盖 `其他危险`、`其他危害` 等所有合法变体，强制继承编辑器 `roleStyles.label`（标签加粗、宋体/Arial，数值常规体）。
-2. **Section 11 通栏文本格式与换行排版重构 (`web/src/docx-engine.js`)**：
-   - 细粒度子标签加粗状态机：组件名加粗，内部所有指标子标签（`毒性：`、`刺激性：`、`经皮（鼠）LD50：`、`吸入（鼠）LD50：` 等）强制加粗，测试数值保持常规体，彻底恢复编辑器体系标准格式；
-   - 多行指标换行垂向对齐，消除软回车顶格塌陷。
-3. **Section 11 双范式动态分流公理 (`web/src/pipeline-engine.js`)**：
-   - **多组分复合体系 (PA-3223)**：严格路由至 `PARADIGM_1_FULL_WIDTH_MERGED`（三级隔离通栏，加粗指标，首字对齐）；
-   - **单组分体系 (PU-202A 仅 DMAC)**：严禁通栏，严格恢复底模原本的 **原版分列表格格式 (14 行)**，左列标签加粗，右列子标签加粗，数值常规体。
-4. **毒理学聚合长文本切片与彻底英译 (`web/src/smart-matching.js` & `pipeline-engine.js`)**：
-   - 增强 `decoupleSection11ToxicologyBlocks`：精准解构源文件聚合文本中的 11 个独立端点槽位（急性毒性经口/吸入、皮肤刺激、粘膜刺激、致敏、致突变、致癌、生殖毒性、STOT、吸入危险、附加信息）；
-   - 英译引擎自动剥离前缀重复中文标签，标点统一规范为英文符号，底模中文假数据彻底清除覆盖，英文版零中文强门禁 100% 满分通过；
-   - 保护附加信息行不被误剪，实现中英文 14 行 1:1 双语绝对同构对齐。
-5. **双极双层机械终审套件同步校准 (`web/scripts/audit_bipolar_bilayer.mjs`)**：
-   - 增加 Section 2 统一缩进 `left="960"` 与零 `firstLine="1200"` 物理断言；
-   - 增加 "其他危险" 标签加粗 `<w:b/>` 存在性断言；
-   - 废除陈旧的单组分强制通栏错误断言，确立单组分原版分列表格合法断言。
-
-### 三、 实测验收 [Measured Exit Code 0]
-- **交付目录纯净门禁 (G-01 Purity)**：物理文件总数严格恒等于 8（4 DOCX + 4 PDF），0 冗余碎片；
-- **Section 2 实测**：换行首字垂向绝对对齐（14 段防范说明严格命中 `left="960"`，零 1200 违规），"其他危险" 标签加粗保全；
-- **Section 11 实测**：单组分 PU-202A 完整恢复原版分列表格（中英双语严格 14 行 1:1 同构对齐），粗细分离清晰；
-- **双极双层全景机械深度审计终审**：`【双极双层全景机械深度审计 100% 满分通过】 (Failures: 0)`，真实退出码 0。
-
----
-
-## [2026-10-29 中午] - PU-202A 危险化学品 Section 2 & Section 11 全通栏标准 8 格式全量交付与格式继承
-
-### 一、 核心复盘与痛点清算
-- **用户痛点与批评**：用户在检阅会话 `29d1acd7-309a-4775-b722-78688bb1d302` 时严厉指出：*“怎么还用分列去做，你没改Skill吗”*，明确指示：**“通过编辑器对应模板编辑的标签-值的文本格式要继承，但是写法是通栏写法，也就是与原来的多列写法和排版是有区别的，其他的基本一致，参考我们之前做的 PA-3223”**。
-- **根因穿透**：
-  1. **Skill 与底层流水线双重误区**：此前系统盲目认为只有“非危复配物成盐豁免（Mode B，如 PA-3223）”才使用通栏，危险化学品与单组分型号（PU-202A、PU-608）盲目强制退回 18 行经典分列，严重违背源文件自身即为单单元格通栏的客观事实；
-  2. **Section 11 剪枝代码误杀通栏行**：`pipeline-engine.js` 中旧版剪枝代码仅判断 `!isNonHazComposite`，导致 PU-202A 在 `buildThreeTierSection11` 组装后，被后续代码误删为 2 行；
-  3. **审计套件与特定型号强耦合**：`audit_bipolar_bilayer.mjs` 将 Section 2 通栏检查命名为 `isModeB` 并仅检索成盐声明，导致 PU-202A 危险品通栏被误判为非通栏。
-
-### 二、 工业级彻底改造方案
-1. **通栏跨列拓扑与格式继承彻底通用化 (`web/src/docx-engine.js`)**：
-   - 增加 `transferDrawingNodesToParagraph`：支持将源文件/模板中的 GHS DrawingML 象形图图元跨文档无损迁移至通栏单单元格中的独立段落（`jc="center"`），居中优雅呈现；
-   - 扩展 `renderFullWidthRow`：
-     - Section 2：全面兼容 `2.1 GHS危险性类别：`、`2.2 GHS标签要素：`、`信号词：危险`、`2.3 其他危害：`、H 危险说明、P 防范说明各级缩进（粗体标签、常规体正文）；
-     - Section 11：全面支持通用组分标题加粗（`N,N-二甲基乙酰胺：` / `N,N-Dimethylacetamide:`），试验数据正文全常规体。
-2. **流水线通用全通栏装配 (`web/src/pipeline-engine.js`)**：
-   - `buildFullWidthSection2`：自适应装配 PU-202A GHS 6 大危险分类、象形图图元、信号词“危险”、6 项 H 说明与四大防范 P 说明（严格 2 行全通栏）；
-   - `buildThreeTierSection11`：自适应装配 PU-202A 三级隔离架构（Row 0 标题 + Row 1 免责声明 + Row 2 DMAC 前言 + Row 3 DMAC 实测毒理试验数据，严格 4 行全通栏）；
-   - 彻底切断旧版分列剪枝代码对通栏复合模态的误杀。
-3. **双极双层深度审计套件自适应升级 (`web/scripts/audit_bipolar_bilayer.mjs`)**：
-   - Section 2 升级为纯单单元格判断（`isS2FullWidth`），针对 PU-202A 深度断言 2 行极简拓扑、GHS 分类、危险信号词与防范说明；
-   - Section 11 升级为通用末尾闭合标点检查（句号或分号），并断言 DMAC 毒理数据保全。
-4. **G-01 纯净交付门禁严格落实 (`web/scripts/generate_pu202a_deliverables.mjs`)**：
-   - 清理所有历史冗余备份碎片，确保 `算法训练材料/PU-202A` 目录内物理文件总数严格恒等于 8。
-
-### 三、 实测验收 [Measured Exit Code 0]
-- **交付目录纯净门禁 (G-01 Purity)**：`算法训练材料/PU-202A` 目录内物理文件总数严格等于 8（4 份 DOCX + 4 份 PDF），0 冗余碎片；
-- **Section 2 结构实测**：严格 2 行全通栏（Row 0 标题 + Row 1 单单元格，`gridSpan="2"`，width 9795 dxa）；
-- **Section 11 结构实测**：严格 4 行三级隔离全通栏（均为 `gridSpan="3"`，width 9781 dxa）；
-- **双极双层全景机械深度审计**：`【双极双层全景机械深度审计 100% 满分通过】 (Failures: 0)`，真实退出码 0。
-
----
-
-## [2026-10-29 上午] - PU-202A 危险化学品标准 8 格式全景交付与双模态全景审计解耦升级
-
-### 一、 核心复盘与多型号自适应背景
-- **任务目标**：完成 GHS 危险品型号 PU-202A（含 DMAC 15~16%）的 MSDS 8 格式标准交付（4 份 DOCX + 4 份 PDF），严格落实双极双层全景机械深度审计。
-- **问题与阻碍**：
-  1. **Gate 10/9/11 通栏门禁误杀多端点型号**：Gate 10 判定此前仅依赖 `rows.length >= 4`，误把 PU-202A 的标准插槽多端点结构（Row 3 为 11.1 毒理标签）识别为通栏详述段落，触发连续多空格伪造对齐拦截；
-  2. **Gate 8 英文防范说明子标签粗体误拦截**：白名单仅包含毒理端点和中文防范标签，漏掉了英文版标准 4 大防范子标签（`Prevention:`、`Response:`、`Storage:`、`Disposal:`），导致英文模板合规加粗被当成“非法加粗数值”拦截；
-  3. **审计套件与特定型号紧耦合**：`audit_bipolar_bilayer.mjs` 原硬编码针对 PA-3223（文件名、成盐通栏、三组分通栏、"干燥通风"等特定断言），无法自适应多端点危险品型号（PU-202A、PU-608）。
-
-### 二、 工业级彻底根治方案与防线下沉
-1. **通栏门禁与插槽模式精确解耦 (`web/src/pipeline-engine.js`)**：
-   - Gate 9、Gate 10、Gate 11 加上显式模态守卫：严格限定在 `rows.length === 4 && cells.length === 1`（Paradigm 1 通栏模式）下触发，标准插槽型号（Paradigm 2，多行多列）自然放行。
-2. **Gate 8 英文子标签白名单完备固化 (`web/src/pipeline-engine.js`)**：
-   - 在 `isSubLabel` 白名单正则中扩充支持英文标准防范说明四大子标签：`/(?:Prevention|Response|Storage|Disposal):?$/i`，杜绝合法排版误拦截。
-3. **双模态全景机械深度审计解耦升级 (`web/scripts/audit_bipolar_bilayer.mjs`)**：
-   - **动态型号解耦**：彻底移除硬编码，支持传入 `modelCode` 参数并自动按目标目录动态适配；
-   - **Section 2 危害性分支自适应**：依据 `isModeB` 智能切换“非危复配物成盐通栏（2行）”与“GHS 危险品标准 8 行对称插槽”严格断言；
-   - **Section 11 毒理学分支自适应**：依据 `isS11FullWidth` 智能切换“Paradigm 1 多组分通栏（4行）”与“Paradigm 2 单组分多端点标准插槽（15行）”严格断言；
-   - **灭火与储存正则扩充**：Section 5 扩充支持“用水喷洒。”，Section 7 扩充支持“凉爽通风”。
-
-### 三、 实测验收 [Measured Exit Code 0]
-- **交付目录实测**：`算法训练材料/PU-202A` 目录内物理文件总数恒等于 8，完全由 4 份 DOCX + 4 份 PDF 组成，0 冗余碎片；
-- **双极双层全景机械深度审计终审**：`【双极双层全景机械深度审计 100% 满分通过】 (Failures: 0)`，退出码 0；
-- **英文零中文强门禁 (Gate 4)**：文本节点 `<w:t>` 中文字符实测严格为 0。
-
----
-
-## [2026-10-28 上午] - 通栏标准准则正式立法 (Gate 15: G-32 通栏跨列拓扑与编辑器格式继承公理)
-
-### 一、 核心复盘与立法背景
-- **问题与诉求**：此前系统在处理非危复配物（如 PA-3223 水性树脂分散体）长篇防范说明与多组分实测毒理试验数据时，直接在后端合成了通栏内容。用户明确要求：**“通过编辑器对应模板编辑的标签-值的文本格式要继承，但是写法是通栏写法，与原来的多列写法和排版有区别，其他的基本一致”**。
-- **立法定位**：确立通栏标准准则，将其作为全系统全局通用规范（G-32）与局部专属规范（L-S2 / L-S11）的法定组成部分，并升级为 **Gate 15 质量断言门禁**。
-
-### 二、 通栏准则核心内容
-1. **全局通栏跨列拓扑与格式继承公理 (G-32)**：
-   - 通栏绝非脱离编辑器的脱缰散文，必须 100% 忠实继承编辑器模板已配置的标签粗体（`<w:b/>`）、填写值常规体（`bold: false`）及冒号标点规则；
-   - 通栏单元格必须显式挂载 `<w:gridSpan w:val="N"/>` 跨越整表列数，宽度绝对守恒，垂直居中对齐。
-2. **Section 2 局部通栏规范（5 级几何缩进与粗细状态机体系）**：
-   - 行拓扑收敛为 2 行（Row 0 章节标题 + Row 1 单单元格通栏，`gridSpan="2"`，`w="9795"`）；
-   - 中文实现成盐声明首行 480、防范子标题首行 482、室外延伸项首行 960、安全存储悬挂 1199/720、空桶废弃悬挂 959/480 的 5 级状态机；
-   - 英文实现标题纯左缩进 480（标题与标题对齐）、内容纯左缩进 960（内容与内容对齐）、换行首字绝对垂直对齐。
-3. **Section 11 局部通栏规范（三级责任隔离体系与单空行公理）**：
-   - 行拓扑收敛为 4 行（Row 0 标题 + Row 1 产品级免责通栏 + Row 2 原料前言通栏 + Row 3 组分实测毒理通栏，均为 `gridSpan="3"`，`w="9781"`）；
-   - 组分间距严格单空行公理：各组分段落首行严格使用 `<w:spacing w:before="240"/>`（12pt / 1倍行高）精确隔离，严禁首 Run 软回车叠加造成双重空行；
-   - 经皮、吸入、经口等 LD50/LC50 测试指标严格首字垂向对齐，仅组分标题加粗，试验数据正文全常规体。
-
-### 三、 规范文档固化成果
-- `docs/MSDS_SPECIFICATIONS_COMPLETE_GUIDE.md`：已正式写入第 17 条全局通栏总则及 Section 2、Section 11 通栏细则；
-- `MSDS中英文覆写排版与数据装配全景统一工业级规范.md`：已正式写入 Gate 15 质量门禁与附录映射表。
-
----
-
-## [2026-10-27 下午第三次迭代] - 交付目录绝对纯净门禁 (Gate G-01 Purity) 与 8 格式精准交付
-
-### 一、 核心复盘与多文件泛滥根因 (Why 10+ Files Generated)
-1. **产出物递归自我留存循环**：
-   - `batchExportDeliverables` 在导出 4 份 DOCX 和 4 份 PDF 时，盲目对目标交付物路径调用了 `preserveOriginalFileBackup`，误把交付物当成源文件备份，直接就地生成了 8 个 `_源文件留存.*` 冗余文件。
-2. **文件锁降级碎片常驻与自动复写**：
-   - 外部编辑器占用导致 `safeWriteFileWithLockGuard` 降级生成 `(最新)`、`(更新)` 副本；在后续主文件写入成功后，`syncFallbacks` 不仅未清理碎片，反而持续同步复写，导致碎片永久常驻。
-3. **审计门禁妥协放水与缺失总数物理对账**：
-   - G-01 断言早期妥协识别 `(最新)` 降级名，且未断言交付目录下的实际文件总数，放任非标准文件堆积至 16~24 个。
-
-### 二、 工业级彻底根治方案与防线下沉
-1. **源文件安全隔离 (Physical Isolation)**：
-   - 源文件留存与参考材料物理隔离至专用的外部归档库，严禁直接倾倒在客户交付物目录中；数据流转采用内存 Buffer 安全传输。
-2. **剔除交付物自我备份**：
-   - 彻底删除 `batchExportDeliverables` 内部对 4 DOCX + 4 PDF 导出的冗余 `preserveOriginalFileBackup` 调用。
-3. **文件锁碎片强行清退机制 (Unlink on Success)**：
-   - `safeWriteFileWithLockGuard` 成功写入标准文件名后，强制执行 `fs.unlink` 物理清理任何历史遗留的 `(最新)`、`(更新)`、`(临时更新)` 碎片。
-4. **交付目录绝对纯净门禁 (Canonical 8-Deliverables Purity Gate)**：
-   - `batchExportDeliverables` 导出末尾增加清场机制，清除任何非 8 格式历史碎片；
-   - 深度审计（Gate 12 / G-01）与四维深度审计（维度 4）全面升级：严格断言交付目录内物理文件总数严格等于 8，且文件名逐一完全精确匹配，禁止任何前缀后缀妥协，多一个或少一个文件立即一票否决熔断交付。
-
-### 三、 实测验收 [Measured Exit Code 0]
-- **交付目录实测**：`算法训练材料/PA-3223` 目录内物理文件总数恒等于 8，完全由 4 份 DOCX + 4 份 PDF 组成，0 冗余碎片；
-- **双极双层全景机械深度审计终审**：`【双极双层全景机械深度审计 100% 满分通过】 (Failures: 0)`；
-- **四维深度审计矩阵终审**：`🎉 恭喜！四维深度审计全维度满分通过 (Exit Code 0)！`。
-
----
-
-## [2026-10-27 下午第二次迭代] - Section 11 严格单空行规范 (before=240) 与 Section 13 英文版内容格纯左对齐修正 (jc=left)
-
-### 一、 核心复盘与缺陷根因
-1. **Section 11 组分间距空两行缺陷 (Double Blank Lines)**：
-   - **根因分析**：`detailParagraphs` 中后置组件（丙二醇丁醚、二乙二醇丁醚）字符串首字符带有前置 `\n`。而在 `renderFullWidthRow` 中每个组件本身已由独立段落 `<w:p>` 承载（段落开始自然进入下一行），前置 `\n` 在段首又插入了一个 `<w:br/>`，导致“段落换行 + 段首软回车”双重叠加，在 Word 中呈现为整整两行物理空行，且使版面过大把数据挤至下一页。
-   - **整改与立法**：彻底移除字符串首字符的 `\n`，改由标准段落间距 `<w:spacing w:before="240"/>`（12pt / 1倍行高）精确控制间距，实现组件间严格且唯美地“空一行”（单空行隔离）。
-2. **Section 13 英文内容格假性居中失真缺陷 (Fake Center Alignment in S13 EN)**：
-   - **根因分析**：`pipeline-engine.js` 第 2509 行此前硬编码调用 `setParagraphAlign(p1, 'both', W_NS)` 强制两端对齐。而英文母版原装属性为 `jc="left"`。在包含多行软回车 `<w:br/>` 的英文段落中，`both` 会强行将短行单词拉伸分散，叠加单元格垂直居中后，视觉上严重变形为类似段落居中对齐的杂乱效果。
-   - **整改与立法**：将英文版 Section 13 废弃处置方法内容单元格严格修正为纯左对齐（`jc="left"`），与母版 100% 吻合，恢复工整左边界。
-
-### 二、 深度审计套件断言升级 (`audit_bipolar_bilayer.mjs`)
-1. **Section 11 组分间距严格单空行断言**：断言组件 2 与组件 3 的 `<w:spacing>` 属性严格为 `w:before="240"`，且第一 Run 中严禁包含 `<w:br/>`（彻底杜绝双重空行）；
-2. **Section 13 英文版纯左对齐断言**：断言英文版 Section 13 废弃处置内容单元格 `jc` 属性严格为 `left`（彻底杜绝两端拉伸与假性居中）。
-
-### 三、 实测验收 [Measured Exit Code 0]
-- 双极双层全景机械深度审计终审：`【双极双层全景机械深度审计 100% 满分通过】 (Failures: 0)`；
-- 四维深度审计矩阵终审：`🎉 恭喜！四维深度审计全维度满分通过 (Exit Code 0)！`；
-- 全部 8 格式标准交付物重新生成并满分通过。
-
----
-
-## [2026-10-27 下午] - 英文版 Section 9 理化特性中英 1:1 同构对齐剪枝与标签叠词永久免疫根治 (Gate 14 建立与深度审计闭环)
-
-### 一、 核心复盘与缺陷全景根因解密 (Section 9 EN 9.14 & 9.15)
-1. **中英文理化特性行数错位与下移缺陷 (Row Shift Bug)**：
-   - **现场表象**：用户指出 9.14、9.15 存在极为严重的质量缺陷——中文 9.13 对应英文 9.14，中文 9.14 对应英文 9.15，英文版比中文版凭空多出一行（英文 20 行 vs 中文 19 行）；
-   - **根因深度透视**：
-     * 英文母版 `en_base.docx` 在 9.4 槽位预置了 `9.4 Ionicity: Non-ionic`（离子性）；
-     * PA-3223 中文母版无“离子性”指标（共 19 行：标题行 0 + 18 行物理量 9.1~9.18）；
-     * 在 `pipeline-engine.js` 剪枝算法中，全面检查了饱和蒸气压、表面张力、分解温度等指标，却**唯独遗漏了对 `hasIonicity` 的探测与剪枝**；
-     * 导致英文版中未被测量的 `Ionicity` 成为“死重幽灵行”，从未被删除；从而导致从 9.4 之后的所有小节序号向下整体平移 1 行（log Pow 被迫挤至 9.14，自燃温度被迫挤至 9.15，最终以 9.19 结束）。
-2. **标签多重叠词毒瘤根因 (Stuttering Label Bug)**：
-   - **现场表象**：
-     * 9.14：`log Pow (n-octanol/water partition coefficient): partition coefficient): partition coefficient): No data available.`
-     * 9.15：`Auto-ignition temperature: temperature: temperature: Not applicable`
-   - **根因深度透视**：
-     * **第一层毒瘤（DOM 残留）**：英文母版 XML 中，Row 15 与 Row 16 本身是两段式折行结构（`p[0]` 为 `log Pow (n-octanol/water`，`p[1]` 为 `partition coefficient)：`）。在 `docx-engine.js` 的 `formatSection9LabelCell` 重写标签时，只清空了 `p[0]` 的 Run，但**未从 DOM 树物理移除 `p[1]`**；
-     * **第二层毒瘤（文本拼接积累）**：随后在 `pipeline-engine.js` 的 `formatEnglishLabelCell` 中，通过 `ps.map(p => p.textContent).join(' ')` 将已被重写为完整标签的 `p[0]` 与残留的 `p[1]` 暴力拼接，导致 `partition coefficient):` 和 `temperature:` 被成倍累加；且旧有的正则清洗无法匹配深层套娃重复。
-
-### 二、 工业级彻底根治方案与防线下沉
-1. **同构剪枝补齐 (`web/src/pipeline-engine.js`)**：
-   - 补充 `const hasIonicity = cnIndicators.some(t => /离子性/i.test(t));`；
-   - 增加 `!hasIonicity && /Ionicity/i.test(rowText)` 剪枝分支，同时覆盖 `hasSolids`、`hasCombustion` 等全部槽位；
-   - 英文版 Section 9 严格且仅保留与中文母版 100% 对应的 19 行（标题 + 9.1~9.18），彻底消除行漂移。
-2. **底层 DOM 物理净化与 Canonical 规范映射 (`web/src/docx-engine.js` & `pipeline-engine.js`)**：
-   - `formatSection9LabelCell` 执行时强制物理移除首段之后的所有多余段落（`for (let i = 1; i < ps.length; i++) ps[i].parentNode.removeChild(ps[i])`），彻底切断历史折行段落的毒瘤链条；
-   - 建立权威 Canonical 规范属性映射状态机（强制将匹配项映射为 `'log Pow (n-octanol/water partition coefficient):'`、`'Auto-ignition temperature:'` 等标准字符串），对任何模板污染实现 100% 免疫。
-3. **文件锁机制与审计读取防御升级**：
-   - `safeWriteFileWithLockGuard` 成功写入主文件时，自动同步刷新存在的历史回退文件 `(最新)` 等，防止版本滞后；
-   - `audit_bipolar_bilayer.mjs` 中的 `loadDocXml` 升级为基于 `stat.mtimeMs` 动态获取物理上真正最新的交付物，彻底消灭读取陈旧历史副本导致的假阳性拦截。
-
-### 三、 门禁立法与深度审计结果 [Measured]
-1. **Gate 14 正式立法**：在全景规范中确立 `Gate 14: Section 9 中英文行数 1:1 同构对齐与标签叠词根除 (G-31 理化同构公理)`。
-2. **深度审计套件升级 (`audit_bipolar_bilayer.mjs`)**：
-   - 增加中英文 Section 9 行数严格 1:1 同构对齐断言（实测 19 行 vs 19 行，完全对齐）；
-   - 增加英文 Section 9 全行小节序号（9.1~9.18）与行索引递增断言；
-   - 增加全行标签连续多词叠词零容忍断言（`partition coefficient`、`temperature`、`pressure` 等叠词检出数均为 0）。
-3. **真实实测验收 [Measured Exit Code 0]**：
-   - 双极双层全景机械深度审计：`🎉 终审结论: 【双极双层全景机械深度审计 100% 满分通过】 (Failures: 0)`；
-   - 四维深度审计矩阵终审：`🎉 恭喜！四维深度审计全维度满分通过 (Exit Code 0)！`；
-   - 8 格式交付物（4 DOCX + 4 PDF）全部绿色通过。
-
----
-
-## [2026-10-27 中午] - 英文版 Section 2 换行首字对齐与层级对齐 & Section 11 14 空格几何列对齐全面落地与双极终审
-
-### 一、 核心复盘与排版问题根治 (Section 2 & Section 11 EN)
-1. **Section 2 英文版换行首字对齐与层级对齐彻底攻克**：
-   - **根因分析**：过去英文版 Section 2 沿用部分首行缩进或缺少显式层级分流，导致成盐声明在换行时第 2 行（`concentration limit >= 5%`）顶格回退或悬挂参差；四大子标题（`Prevention:` 等）与具体内容没有做到标题与标题对齐、内容与内容对齐；
-   - **解决方案与状态机立法**：
-     ① **成盐声明与分类块**：统一注入 `<w:ind w:left="480"/>`（零 hanging），换行时第 2 行首字母 `c` 直接与第 1 行首字母 `N` 垂直完全对齐；
-     ② **四大子标题对齐**：`Prevention:`、`Response:`、`Storage:`、`Disposal:` 统一注入 `<w:ind w:left="480"/>`，实现标题与标题严格对齐；
-     ③ **内容项层级对齐与换行首字对齐**：防范说明各项具体规程统一注入 `<w:ind w:left="960"/>`（零 hanging），内容与内容严格对齐，且各条目内部折行时续行起始坐标依旧对齐 960 dxa。
-2. **Section 11 英文版端点与 LD50: 双列绝对垂直齐平工程根治**：
-   - **根因全景剖析**：
-     ① **端点列偏斜**：首行 `Toxicity: Dermal (Rat)` 中 `Dermal` 位于 x ≈ 97.3 pt 处，而原本设置 14 空格在 Word/LibreOffice 实际渲染下偏移至 x ≈ 108.5 pt（过冲 11 pt）；
-     ② **LD50: 标签锯齿错位**：因英文单词长度不同（`Inhalation (Rat)` 16字符显著长于 `Dermal (Rat)` 12字符与 `Oral (Rat)` 10字符），在单空格下导致各行的 `LD50:` 标签发生高达 22 pt 的严重阶梯错位；
-   - **双列网格化对齐解决方案**：
-     ① **列 1 (端点首字对齐)**：`Inhalation (Rat)` 与 `Oral (Rat)` 行首前置空格精准收敛为**严格 8 空格**，渲染坐标锁定在 x ≈ 99.0 pt，与 `Dermal (Rat)` (x ≈ 97.3 pt) 误差仅 1.68 pt（完全垂直齐平）；
-     ② **列 2 (LD50: 垂直对齐)**：在各端点与 `LD50:` 之间注入非对称字宽补偿空格（`Dermal (Rat)` 后补 3 空格、`Inhalation (Rat)` 保持 1 空格、`Oral (Rat)` 后补 5 空格），使三大行的 `LD50:` 标签全部精准垂直锚定在 x ≈ 164~166 pt 垂线上（误差仅 1.5 pt，小于 2 像素），呈现与中文版完全一致的严整表格列对齐视觉效果；
-3. **多级文件锁防御与自愈机制**：
-   - 当目标文件与一级备选路径被外部 Word/PDF 阅读器独占锁定时，流水线依次安全降级至 `(最新)`、`(更新)`、`(临时更新)` 路径，彻底终结 EBUSY 崩溃；审计套件与终审门禁同步实现多级备选路径无感穿透读取。
-
-### 二、 双极双层全景深度审计套件与规范全面下沉
-1. **审计工具升级 (`audit_bipolar_bilayer.mjs`)**：
-   - 新增 Section 2 英文版成盐声明 `left="480"` 换行首字对齐断言（实测 9/9 命中）；
-   - 新增 Section 2 英文版四大子标题 `left="480"` 相互对齐断言（实测 4/4 命中）；
-   - 新增 Section 2 英文版防范说明具体内容 `left="960"` 相互对齐断言（实测 11/11 命中）；
-   - 新增 Section 2 英文版零悬挂缩进断言（零 hanging，保证续行首字对齐）；
-   - 升级 G-27/G-28 反多空格公理，将英文 8 空格端点列对齐与 3/5 空格 LD50: 标签补偿纳入法定白名单；
-   - 新增 Section 11 英文版端点与 LD50: 双列绝对垂直对齐 AST 机器断言 (L-S11)；
-   - 增强文件锁防御自动容灾与 `(更新).docx` / `(更新).pdf` 无感加载。
-2. **三位一体规范立法**：
-   - `MSDS中英文覆写排版与数据装配全景统一工业级规范.md`：新增 Gate 13 (G-30 首字换行对齐与层级公理)，更新 Gate 10 英文 14 空格规范；
-   - `docs/MSDS_SPECIFICATIONS_COMPLETE_GUIDE.md`：同步收录 Section 2 英文层级对齐与换行首字对齐公理。
-
-### 三、 验证与实测结论 [Measured]
-- **流水线执行与 Gate 12 自动终审**：
-  `node web/scripts/generate_pa3223_deliverables.mjs`
-  * 双极双层全景机械深度审计终审：`【双极双层全景机械深度审计 100% 满分通过】 (Failures: 0)`
-  * 四维深度审计终审：`🎉 恭喜！四维深度审计全维度满分通过 (Exit Code 0)！`
-  * 真实退出码：`Exit Code 0`。
-
----
-
-## [2026-10-27 上午] - 手做改版材料 OOXML AST 深度反编译复刻与审计换行语义感知全面升级 (Section 11 100% 完美复刻与防线下沉)
-
-### 一、 核心复盘与手做版 AST 真实排版效果确立
-1. **认知纠偏与手做母版权威地位确认**：
-   - 彻底推翻了“将手做母版的多行软换行与 6 空格列对齐误判为格式缺陷”的机械主义偏见；
-   - 确立手做版 [`PA-3223 msds_CN 冠志 手做改版材料.docx`](file:///F:/App%20Location/Guanzhi%20Tong/Skill/MSDS-Engine/算法训练材料/PA-3223/PA-3223%20msds_CN%20冠志%20手做改版材料.docx) 为 Section 11 排版的法定金标准：
-     ① **软换行分行 (`<w:br w:type="textWrapping"/>`)**：单元格内部通过文本环绕软换行符将各指标清晰分行，组分间空行物理隔离；
-     ② **首列 6 空格垂直列对齐**：因首项为 `毒性：`（3个中文字符宽），后续 `吸入...` 与 `经口...` 行首键入严格 6 个半角空格，与 `经皮...` 在视觉纵向上实现绝对严整的垂直列对齐；
-     ③ **免责行常规体**：Row 1（`该产品无可用的毒理学研究。`）与 Row 2（`下面是这些成分的毒理学数据。`）严格为常规体（`bold: false`）；
-     ④ **粗细层级分明**：仅 3 大组分名称加粗，子标签（`毒性：`、`刺激性：`）与测试数据均为常规体；
-     ⑤ **名词性状态声明保全**：`刺激性：无资料` 遵循母版规范，末尾无多余句号；
-     ⑥ **宋体三轴锁定**：中文版 Section 11 的 `ascii`、`hAnsi`、`eastAsia` 均锁定为宋体。
-
-### 二、 审计工具换行语义感知根治与全局规范立法
-1. **审计盲区彻底根除 (AST-Aware vs Blind textContent)**：
-   - 根治了直接读取 `p.textContent` 导致丢失 `<w:br/>` 软换行而引发的“假文本碰撞”与“假冒号无空格”假阳性误报；
-   - 在 `audit_bipolar_bilayer.mjs` 中全面引入 `getPText(p)`，智能识别 `<w:br/>` 还原为 `\n` 后再行审查；
-   - 增加对 Word OOXML 中 `<w:b w:val="0"/>` / `<w:bCs w:val="0"/>` 显式常规体声明的精准识别。
-2. **规范文件三位一体同步固化**：
-   - `SKILL.md`、`MSDS中英文覆写排版与数据装配全景统一工业级规范.md` 与 `docs/MSDS_SPECIFICATIONS_COMPLETE_GUIDE.md` 同步落地：
-     * **G-26 标点语义分层公理**：叙述句句号闭合，状态短语声明保持无句号原貌；
-     * **G-28 法定列对齐缩进公理**：确立 6 空格（CN）与 10 空格（EN）列对齐白名单；
-     * **G-29 显式常规体公理**：免责行与测试值常规体保护；
-     * **Gate 12 自动终审门禁**：`batchExportDeliverables` 导出交付物后自动执行双极双层深度审计，退出码 0 为充要条件，以后无需用户再次提醒。
-
-### 三、 验证与比对实测证据 [Measured]
-- **黄金手做深度比对**：`node web/scripts/deep_audit_handcraft_compare.mjs`：
-  `==================== SECTION 11: 100% PERFECT MATCH ====================`（段落数、行数、粗细、字体、字号、软换行、6空格列对齐 100% 毫无差异）！
-- **流水线生成与 Gate 12 自动终审**：`node web/scripts/generate_pa3223_deliverables.mjs`：
-  标准 8 格式全部产出，自动触发全景深度审计与四维审计，**Exit Code 0** 满分通过！
-
----
-
-### 一、 核心复盘与审计方法彻底根治 (Retro & Root Cause)
-1. **审计盲区根因检讨**：
-   - 过去审计过度依赖“正则关键词匹配 (Regex Search)”这种代理指标，造成“测试全绿灯但排版大崩溃”的严重遮羞布假象；
-   - 过去审计完全丧失了对以下关键维度的感知能力：
-     ① **段落结构同构性**（英文 Section 11 被压缩成 1 个大长段，关键词依然存在）；
-     ② **标点闭合与悬挂**（行末悬空未闭合的冒号 `:` 或分号）；
-     ③ **文本粘连与空格滥用**（`mg/kg刺激性：` 碰撞粘连，连续 6 个空格伪造对齐）；
-     ④ **字体层级状态机**（整个单元格所有文字被盲目全部加粗，丢失专业对比）；
-     ⑤ **单边审查盲区**（审计往往只扫描中文版，英文版残留制表符或缺陷被完全放过）。
-2. **根治举措：确立“双极双层全景深度机械审计”为最高法则**：
-   - 彻底废除关键词代理指标，建立真正的 OOXML AST 深度穿透审查；
-   - 将全景深度审计固化为 **Skill + Engine 强制管道项**，任何交付物导出前必须 100% 跑通，存在 1 项缺陷立即一票否决阻断交付。
-
-### 二、 核心交付与规格立法 (Delivered & Specifications)
-1. **全局规范三位一体立法 (G-25 ~ G-29 & Gate 9 ~ 12)**：
-   - 同步升级 `SKILL.md`、`MSDS中英文覆写排版与数据装配全景统一工业级规范.md` 与 `docs/MSDS_SPECIFICATIONS_COMPLETE_GUIDE.md`：
-     * **G-25 双语结构拓扑同构公理**：中英文 Row、Cell、通栏内 Paragraph 数量必须 1:1 对等；
-     * **G-26 标点完整性与句末闭合公理**：零悬挂冒号/分号/逗号；独立完整陈述句以句号闭合；零文本标签粘连；
-     * **G-27 冒号间距公理**：中文冒号后 0 空格，英文冒号后严格 1 半角空格；
-     * **G-28 反多空格排版公理**：正文严禁使用 `/[ ]{2,}/` 伪造对齐；
-     * **G-29 值格字体分离公理**：标签加粗，数值与结论保持常规体；
-     * **Section 11 双范式动态路由**：多成分通栏复合模式 (Paradigm 1) vs 单成分标准分列模式 (Paradigm 2)；
-     * **自查口诀升级**：“六看六查”正式升级为“八看八查”。
-2. **Engine 流水线内置质量门禁与强制审计管道 (Skill + Engine Mandatory Pipeline)**：
-   - 在 `pipeline-engine.js` 中将 Gate 9、10、11 硬编码写入 `assertDeliverableQuality`；
-   - 在 `batchExportDeliverables` 结尾挂载 Gate 12，自动执行 `runBipolarBilayerAudit`，一票否决阻断交付。
-3. **六大排版缺陷 (D-01 ~ D-06) 系统性彻底修复**：
-   - **D-01**：英文 Section 11 重构为 4 个独立段落，与中文版 1:1 四段同构；在 `standardizeEnglishTypographyAndLabels` 豁免通栏 Section 11，根除段落压平与强制加尾冒号缺陷；
-   - **D-02**：彻底拔除英文 Section 11 P3 末尾悬挂冒号 `:`，统一以标准句号 `.` 收尾；
-   - **D-03**：英文各端点之间统一采用标准分号加空格 `; ` 语义清晰分隔；
-   - **D-04**：中文 Section 11 注入全角分号 `；`，彻底消除 `mg/kg刺激性：` 碰撞粘连；剔除 6 空格滥用；段落末尾闭合为全角句号 `。`;
-   - **D-05**：在 `docx-engine.js` 落地 Section 11 G-11 粗细层级状态机（标签加粗，试验数值与结论严格为常规体）；
-   - **D-06**：补齐全篇换行后的独立完整句子末尾标点（Section 4 `就医。`、Section 5 `喷洒水。`、Section 7 `更换被污染或浸湿的衣物。`、Section 2 成盐末尾分号 `；`）。
-
-### 三、 验证与测试命令实测证据 [Measured]
-- **流水线生成与 Gate 12 自动终审**：`node scripts/generate_pa3223_deliverables.mjs` -> 8 格式全部产出，自动触发双极双层深度审计，**Exit Code 0**！
-- **双极双层全景深度审计**：`node scripts/audit_bipolar_bilayer.mjs` -> 全局层与 16 章节局部层 30+ 项机器断言 **100% 满分通过 (Failures: 0, Exit Code 0)**！
-- **黄金手做比对**：`node scripts/deep_audit_handcraft_compare.mjs` -> 除已纠偏的 6 项缺陷外，全篇其余 15 个章节全部达到 **100% PERFECT MATCH**！
-- **OpenSpec 规格变更严格校验**：`npx openspec validate handcraft-typography-and-s11-dual-paradigm --strict` -> **Valid (Exit Code 0)**，tasks 全部打勾。
-
----
-
-## [2026-10-26 下午] - OpenSpec: 自适应通栏复合豁免工作流 (Mode B) 与四维深度审计体系正式合入 (PA-3223 标杆落地)
+## [2026-11-02 晚间] - 识别与编辑模块 10 大 MCP 通道全线通车与 Skill 优化工作流全景图谱 (Graph SOP)
