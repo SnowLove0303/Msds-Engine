@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
+import { audit16SectionsBilingualFidelity } from '../scripts/audit_16_sections_bilingual_fidelity.mjs';
 
 /**
  * MSDS-Engine 前置审计目标规划引擎 (Audit-Driven by Design / ADD)
@@ -144,6 +145,18 @@ export async function verifyAuditContract(targetDir, contract) {
         `G-40 避免末页纯空门禁: ${pdfFile} 最后一页必须包含主体内容，实测主体块数: ${bodyBlocksCount}`);
     } catch (e) {
       // 容灾忽略非关键执行环境异常
+    }
+  }
+
+  // 4. G-41 ~ G-46 中英文 16 章节 1:1 双向物理对账门禁 (Universal 16-Section Bilingual Fidelity Gate)
+  const cnDocx = path.join(targetDir, `${model} msds_CN 冠志.docx`);
+  const enDocx = path.join(targetDir, `${model} msds_EN Guanzhi.docx`);
+  if (fs.existsSync(cnDocx) && fs.existsSync(enDocx)) {
+    try {
+      const biRes = await audit16SectionsBilingualFidelity(cnDocx, enDocx);
+      assert(biRes.success, `G-41~G-46 中英文 16 章节 1:1 逐句逐槽位双向物理对账终审门禁 (Passes: ${biRes.passes}/${biRes.totalAssertions})`, biRes.failures);
+    } catch (e) {
+      assert(false, `G-41~G-46 双语对账终审门禁执行异常: ${e.message}`);
     }
   }
 

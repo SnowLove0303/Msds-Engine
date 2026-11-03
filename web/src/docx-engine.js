@@ -1116,6 +1116,13 @@ export function updateHeaderFooterData(engine, patch = {}) {
                   pPr = doc.createElementNS(W_NS, 'w:pPr');
                   p.insertBefore(pPr, p.firstChild);
                 }
+                // 必须彻底清除任何残留的 w:ind（如 w:firstLine="8730"），避免无头 PDF 引擎右边界截断首字符！
+                const oldInd = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
+                if (oldInd) {
+                  pPr.removeChild(oldInd);
+                  modified = true;
+                }
+
                 let jc = pPr.getElementsByTagNameNS(W_NS, 'w:jc')[0];
                 if (!jc) {
                   jc = doc.createElementNS(W_NS, 'w:jc');
@@ -2110,10 +2117,10 @@ export function transferDrawingToCell(srcEngine, targetEngine, srcDrawingNodes, 
 
     const rel = srcEng.relationshipMap?.get(embedId) || 'media/image1.png';
     let targetPath = rel.startsWith('word/') ? rel : `word/${rel.replace(/^\//, '')}`;
-    const imgBytes = srcEng.mediaFiles?.get(targetPath);
+    const imgBytes = overrideImageBytes || srcEng.mediaFiles?.get(targetPath);
     if (!imgBytes) continue;
 
-    const ext = targetPath.split('.').pop() || 'png';
+    const ext = overrideExt || targetPath.split('.').pop() || 'png';
     const relsText = tgtEng.relsText || '';
     const rIdNums = [...relsText.matchAll(/Id=["']rId(\d+)["']/g)].map((m) => parseInt(m[1], 10));
     const maxRId = Math.max(0, ...rIdNums);
@@ -2158,7 +2165,7 @@ export function transferDrawingToCell(srcEngine, targetEngine, srcDrawingNodes, 
   return count > 0;
 }
 
-export function transferDrawingNodesToParagraph(srcEngine, targetEngine, srcDrawingNodes, targetParagraph) {
+export function transferDrawingNodesToParagraph(srcEngine, targetEngine, srcDrawingNodes, targetParagraph, overrideImageBytes = null, overrideExt = null) {
   if (!srcDrawingNodes || !targetParagraph) return false;
   const nodes = Array.isArray(srcDrawingNodes) ? srcDrawingNodes : [srcDrawingNodes];
   if (nodes.length === 0) return false;
@@ -2176,10 +2183,10 @@ export function transferDrawingNodesToParagraph(srcEngine, targetEngine, srcDraw
 
     const rel = srcEng.relationshipMap?.get(embedId) || 'media/image1.png';
     let targetPath = rel.startsWith('word/') ? rel : `word/${rel.replace(/^\//, '')}`;
-    const imgBytes = srcEng.mediaFiles?.get(targetPath);
+    const imgBytes = overrideImageBytes || srcEng.mediaFiles?.get(targetPath);
     if (!imgBytes) continue;
 
-    const ext = targetPath.split('.').pop() || 'png';
+    const ext = overrideExt || targetPath.split('.').pop() || 'png';
     const relsText = tgtEng.relsText || '';
     const rIdNums = [...relsText.matchAll(/Id=["']rId(\d+)["']/g)].map((m) => parseInt(m[1], 10));
     const maxRId = Math.max(0, ...rIdNums);
@@ -2529,6 +2536,8 @@ export function formatSection9LabelCell(cell, numberStr, labelText, isEnglish = 
       cleanLabel = 'Auto-ignition temperature:';
     } else if (/Ignition temp/i.test(cleanLabel)) {
       cleanLabel = 'Ignition temperature:';
+    } else if (/Hazardous decomposition/i.test(cleanLabel)) {
+      cleanLabel = 'Hazardous decomposition products:';
     } else if (/Decomposition/i.test(cleanLabel)) {
       cleanLabel = 'Decomposition temperature:';
     } else if (/Saturated vapour/i.test(cleanLabel)) {
@@ -2877,7 +2886,7 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
         jc.setAttributeNS(W_NS, 'w:val', 'left');
         pPr.appendChild(jc);
         pNode.appendChild(pPr);
-        transferDrawingNodesToParagraph(pItem.srcEngine, options.targetEngine || record.engine, pItem.drawingNodes, pNode);
+        transferDrawingNodesToParagraph(pItem.srcEngine, options.targetEngine || record.engine, pItem.drawingNodes, pNode, pItem.overrideImageBytes, pItem.overrideExt);
         tcNode.appendChild(pNode);
         continue;
       }

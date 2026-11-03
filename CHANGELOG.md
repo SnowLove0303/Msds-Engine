@@ -1,5 +1,39 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-03 16 章节全量中英文 1:1 双向物理对账与五大防退化公理落地] - 彻底根除翻译倒挂、行序错位、模板残留、外生虚构与文字截断，沉淀全局通用规范与 G-41~G-46 终审门禁
+
+### 一、 业务场景与用户法定指示背景
+在针对 OS-9547 PGDA80 的外部逐句核对报告进行深度复核后，用户下达最高法定指示：
+> “执行修复，并沉淀通用规范和审计以防止后续16个section再次出现翻译问题，懂？以后必须对翻译结果做一一对照审计；其他问题也是，要沉淀出关于类似问题的通用规范和审计，懂？”
+
+针对用户指示，系统不仅全量修复了已发现的具体缺陷，更在系统宪法、引擎底层、前置规划与自动化终审中**永久沉淀出通用规范与 16 章节 1:1 对照审计套件**。
+
+---
+
+### 二、 核心修复与通用规范沉淀 (Universal Fixes & Specifications)
+1. **中英文全 16 章节 1:1 逐句逐槽位物理对账公理 (1:1 Physical Slot Mapping Axiom)**：
+   - 英文版在每一个 Section（特别是 Section 9、Section 10、Section 11、Section 12、Section 14）中的行数、子序号（9.1~9.N, 10.1~10.6, 11.1~11.N 等）必须严格服从中文母版顺序；
+   - 彻底修复 Section 9 序号与行顺序倒挂问题：重构 `buildBaseEnglishEngine`，以中文母版 Section 9 行顺序为基准对英文行进行 1:1 严格对齐重排，并注入全量定性修饰语（`(closed cup)`、`at 25 °C`、`(solids, gases)`、`Dispersible and emulsifiable in water`）；
+   - CAS 28182-81-2 在 Section 3 及全篇统一命名为 `Hexamethylene diisocyanate homopolymer`。
+2. **零外生模板虚构与污染硬门禁 (Zero Extraneous Template Fabrication Invariant)**：
+   - Section 14.4 用户特殊注意事项：彻底清除旧模板中硬编码的 `Temperature must not exceed +35℃...` 与 `Keep away from food...`。若中文母版未明文包含温度或食品酸碱要求，英文版统一输出 `Not regulated as dangerous goods.`，严禁凭空捏造；
+   - Section 2 危害性分类：中文母版为非危品时，英文版严禁残留旧模板的 H412 或溶剂数据；
+   - Section 12.1 生态毒理：剔除语法错误措辞 `water courses`，统一定名为地道合规表述 `Do not discharge into drains, wastewater, or soil.`。
+3. **多语言媒体资产纯度公理 (Multilingual Asset Purity Axiom)**：
+   - 根治英文版复用中文光栅位图问题：从 PU-3011 提取纯正矢量转制 GHS 象形图标（7,450 字节纯 PNG），通过 `transferDrawingNodesToParagraph` 的 `overrideImageBytes` 与 `overrideExt` 通道注入英文交付物，彻底剔除带有中文“警告”字样的 5,493 字节位图。
+4. **版面几何与页眉页脚安全边界不变量 (Header/Footer Margin & Boundary Safety Invariant)**：
+   - 根除无头 PDF 转换首字符被截断根因：查明基准底模与生成逻辑在 `footer1.xml` 单元格 1 注入了 `w:firstLine="8730"` 畸形超宽缩进（单元格总宽仅 4984 dxa，导致右对齐文本向右溢出边距）。在 `docx-engine.js` 的 `updateHeaderFooterData` 中增加物理清除 `oldInd` 逻辑，并净化底模，彻底恢复 PDF 中“修订日期：...”与“Revision Date: ...”的首字完整显示。
+5. **分解产物与粘膜刺激标签精准映射**：
+   - Section 10.2 标签坍塌根治：在 `docx-engine.js` 与 `pipeline-engine.js` 中将 `/Hazardous decomposition/i` 判定独立提取，严防被 `/Decomposition/i` 误重写为 `Decomposition temperature:`；
+   - Section 11.3 粘膜刺激标签修正：当中文母版出现“主要粘膜刺激性”时，英文标签精准映射为 `11.3 Primary mucosal irritation:`，严禁错标为眼刺激。
+6. **法规时效性正向演进公理 (Statutory Modernity Evolution Axiom)**：
+   - 明确 Section 15 法规基线：现行有效法定法规为《危险化学品安全管理条例》（国务院令第 591 号，已于 2011 年废止 344 号令）及《化学品分类和标签规范》（GB 30000 系列，已于 2013-2014 年替代废止 GB 20576 系列）。系统坚定执行现行有效法规，严防倒退回历史废止标准。
+7. **自动化 16 章节双语对账终审套件 (`audit_16_sections_bilingual_fidelity.mjs`) 与 G-41~G-46 门禁**：
+   - 开发并部署独立的 16 章节全量中英文 1:1 双向物理对账审计脚本，覆盖 94 项逐槽位绝对断言；
+   - 将 G-41（媒体纯度）、G-42（页脚几何安全）、G-43~G-46（16 章节 1:1 双向物理对账）正式纳入 `audit-planner.js` 与全量生成流水线，未达退出码 0 直接熔断。
+
+---
+
 ## [2026-11-03 审计强制性拉升至最高级别] - 确立【两阶双轨机械确定性 + Agent 敌手认知自审计双重最高门禁】体系与“预设有错去发现错误”的自审工程哲学
 
 ### 一、 业务场景与用户法定指示背景

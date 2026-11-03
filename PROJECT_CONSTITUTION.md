@@ -106,3 +106,33 @@ flowchart TD
   2. **协议纯净性保障**：在进程顶层拦截所有外部日志输出并重定向至 `stderr`，保证 `stdout` 传输纯净的标准 JSON-RPC 报文，彻底杜绝解析崩溃。
 - **不可触碰承重墙**：
   - MCP 工具必须始终提供详尽的输入参数校验与错误堆栈透传，严禁静默吞掉底层异常。
+
+---
+
+## 三、 16 章节全量中英文一一对照法定规范与五大防退化公理 (16-Section Bilingual Fidelity Axioms)
+
+为彻底阻断后续 16 个 Section 再次出现翻译倒挂、行序错乱、模板残留、外生虚构与文字截断问题，全系统设立五大最高法定公理与自动化核销门禁（G-41~G-46）：
+
+### 1. 逐槽位/逐行 1:1 绝对对账公理 (1:1 Physical Slot Mapping Axiom)
+- **槽位数量与顺序绝对对称**：英文版在每一个 Section（特别是 Section 9、Section 10、Section 11、Section 12、Section 14）中的行数、子序号（9.1~9.N, 10.1~10.6, 11.1~11.N 等）必须严格服从中文母版顺序。严禁出现英文行数多于或少于中文母版、或序号跳跃/颠倒的情况。
+- **定性与修饰语完整性**：所有定性修饰词（如闭杯 `(closed cup)`、状态 `(solids, gases)`、温度条件 `at 25 °C`、水溶性 `Dispersible and emulsifiable in water`）必须完整如实体现，严禁擅自丢弃修饰语或简化。
+- **专业化学术语统一命名**：CAS 28182-81-2 在 Section 3 及全篇必须统一命名为 `Hexamethylene diisocyanate homopolymer`（均聚物），严禁随意降级为 bare polymer。
+
+### 2. 零外生模板虚构与污染硬门禁 (Zero Extraneous Template Fabrication Invariant)
+- **母版无则绝不编造**：严禁从历史死模板中带入未在中文母版中出现的任何条件语句、特殊规定或溶剂数据：
+  - Section 14.4 用户特殊注意事项：若中文母版未明文包含温度范围、远离食品或酸碱隔离要求，英文版一律仅输出 `Not regulated as dangerous goods.`，严禁硬编码外生 `Temperature must not exceed +35℃...`；
+  - Section 2 危害性分类：中文母版为非危险品时，英文版严禁残留旧模板的 H412、H315 或溶剂数据；
+  - Section 12.1 生态毒理：严禁使用语病及外生表述（如 `water courses`），统一采用合规语法 `Do not discharge into drains, wastewater, or soil.`。
+
+### 3. 多语言媒体资产纯度公理 (Multilingual Asset Purity Axiom)
+- **英文交付物零中文光栅像素**：英文 MSDS 中的一切象形图、插图（如 Section 2 GHS 菱形标）必须使用纯净的多语言图形资产（纯图形无中文光栅字样，如 7450 bytes 纯净 PNG），绝对严禁直接复用带有中文硬编码文字（如带有“警告”二字、5493 bytes）的光栅位图。
+
+### 4. 版面几何与页眉页脚安全边界不变量 (Header/Footer Margin & Boundary Safety Invariant)
+- **防越界安全排版**：页眉页脚单元格内严禁注入超出单元格宽度（如 `w:firstLine="8730"` 超过单元格宽度 4984 dxa）的负向或异常缩进。在更新页脚数据时，必须彻底物理剥离单元格 1 内残留的 `w:ind`，杜绝右对齐文字（如“修订日期：...”与“Revision Date: ...”）在转 PDF 时首字被无头引擎截断。
+
+### 5. 法规时效性正向演进公理 (Statutory Modernity Evolution Axiom)
+- **现行有效法定法规唯一权威**：针对 Section 15 等法规条款，必须严格采用现行有效法定法规（如国令第 591 号替代已废止的 344 号，GB 30000 系列替代已废止的 GB 20576 系列），严禁盲目倒退回历史废止法规。
+
+### 6. 终审强制覆盖门禁 (G-41 ~ G-46)
+- 系统在每次全量产出交付物时，必须强制加载 `audit_16_sections_bilingual_fidelity.mjs` 对 16 章节进行逐句逐槽位 1:1 双向物理对账核销，未通过者真实退出码严禁为 0，直接阻断发布。
+
