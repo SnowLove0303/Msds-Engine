@@ -183,4 +183,5 @@ $$\text{某节结构受损或需重来} \xrightarrow{} \text{提交 restoreSecti
 2. **中英绝对纯净**：英文 DOCX 与 PDF 中文字符数严格为 0 (`assertZeroChinese`)；
 3. **物理时间戳对齐**：8 份产物文件生成修改时间差 $\le 300\text{s}$；
 4. **对账 Gaps 归零**：`actionableGaps.length === 0`，字符保全比达标；
-5. **机检真实退出码 0**：`msds_audit_deliverables` 返回 `passed: true`。
+5. **避免末页纯空门禁 (G-40)**：严禁交付物出现仅有页眉页脚、无任何主体内容的孤儿空白末页；底座强制执行 `suppressTrailingDocumentParagraph` 将末尾空段落压制为 1pt 微观精确行高（20 twips），避免因 Word/WPS 默认段高跨页；
+6. **机检真实退出码 0**：`msds_audit_deliverables` 返回 `passed: true`。

@@ -22,6 +22,7 @@ import {
   renderFullWidthRow,
   formatSection9LabelCell,
   suppressOversizedRowHeights,
+  suppressTrailingDocumentParagraph,
   enableCrossPageBreaksForAllSections,
   healAllTableTopologies,
   stampDocumentIdentity,
@@ -536,6 +537,7 @@ export function applyCompanyPreset(session, presetKey) {
  */
 export async function saveSession(session, outputPath) {
   suppressOversizedRowHeights(session.engine);
+  suppressTrailingDocumentParagraph(session.engine);
   enableCrossPageBreaksForAllSections(session.engine);
   healAllTableTopologies(session.engine.documentXml);
 

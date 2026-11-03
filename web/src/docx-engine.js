@@ -1277,6 +1277,8 @@ export async function loadDocx(source, sourceName = 'document.docx') {
       return this;
     },
     async exportArrayBuffer() {
+      suppressOversizedRowHeights(this);
+      suppressTrailingDocumentParagraph(this);
       enableCrossPageBreaksForAllSections(this);
       const output = await JSZip.loadAsync(this.originalBytes);
       output.file('word/document.xml', serializer().serializeToString(this.documentXml));
@@ -2000,6 +2002,64 @@ export function suppressOversizedRowHeights(engine) {
       if (!text || text.length < 30) {
         node.setAttributeNS(W_NS, 'w:val', '24');
       }
+    }
+  }
+}
+
+
+/**
+ * 消除文档末尾空段落导致的孤儿空白末页 (G-40 避免末页纯空门禁)
+ * 在 Word/OpenXML 规范中，表格末尾必须紧跟一个段落。若该空段落采用常规字号或默认行距，
+ * 在表格恰好占满前一页时将溢出至下一页，导致产出物末页出现“仅有页眉页脚、无任何主体内容”的空白页。
+ * 本函数定位文档末尾所有位于 sectPr 前且无文本内容的段落，
+ * 将其字号压制为 1pt (sz=2)，行距设为严格 20 twips (1pt exact)，段前段后为 0，彻底根除末页空白页。
+ */
+export function suppressTrailingDocumentParagraph(engine) {
+  if (!engine?.documentXml) return;
+  const body = engine.documentXml.getElementsByTagNameNS(W_NS, 'body')?.[0]
+    || engine.documentXml.getElementsByTagName('body')?.[0];
+  if (!body) return;
+
+  const children = Array.from(body.childNodes || []).filter(n => n.nodeType === 1);
+  if (children.length === 0) return;
+
+  for (let i = children.length - 1; i >= 0; i--) {
+    const node = children[i];
+    const localName = node.localName || node.nodeName.split(':').pop();
+    if (localName === 'sectPr') continue;
+    if (localName === 'p') {
+      const text = (node.textContent || '').trim();
+      const drawings = node.getElementsByTagNameNS ? node.getElementsByTagNameNS(W_NS, 'drawing') : [];
+      if (!text && drawings.length === 0) {
+        let pPr = node.getElementsByTagNameNS ? node.getElementsByTagNameNS(W_NS, 'pPr')?.[0] : null;
+        if (!pPr) {
+          pPr = engine.documentXml.createElementNS(W_NS, 'w:pPr');
+          node.insertBefore(pPr, node.firstChild);
+        }
+        const existingSpacings = Array.from(pPr.getElementsByTagNameNS ? pPr.getElementsByTagNameNS(W_NS, 'spacing') : []);
+        existingSpacings.forEach(s => pPr.removeChild(s));
+
+        const spacing = engine.documentXml.createElementNS(W_NS, 'w:spacing');
+        spacing.setAttributeNS(W_NS, 'w:before', '0');
+        spacing.setAttributeNS(W_NS, 'w:after', '0');
+        spacing.setAttributeNS(W_NS, 'w:line', '20');
+        spacing.setAttributeNS(W_NS, 'w:lineRule', 'exact');
+        pPr.appendChild(spacing);
+
+        let rPr = pPr.getElementsByTagNameNS ? pPr.getElementsByTagNameNS(W_NS, 'rPr')?.[0] : null;
+        if (!rPr) {
+          rPr = engine.documentXml.createElementNS(W_NS, 'w:rPr');
+          pPr.appendChild(rPr);
+        }
+        const sz = engine.documentXml.createElementNS(W_NS, 'w:sz');
+        sz.setAttributeNS(W_NS, 'w:val', '2');
+        rPr.appendChild(sz);
+        const szCs = engine.documentXml.createElementNS(W_NS, 'w:szCs');
+        szCs.setAttributeNS(W_NS, 'w:val', '2');
+        rPr.appendChild(szCs);
+      }
+    } else {
+      break;
     }
   }
 }
