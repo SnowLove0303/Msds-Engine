@@ -209,7 +209,12 @@ sequenceDiagram
     Audit-->>MCP: 8 份文件就绪
     MCP-->>Agent: 导出结果清单
 
+    Note over Agent, MCP: 阶段五：正向行动诊断与两阶双轨终审最高门禁
     Agent->>MCP: msds_audit_deliverables(targetDir, modelCode)
-    MCP->>Audit: 执行 Gate-8 终审断言
-    Audit-->>MCP: 审计全绿通过 (Exit Code 0)
+    MCP->>Audit: 执行双极双层机械终审硬阻断 (audit_bipolar_bilayer)
+    Audit-->>MCP: 机械审计全绿通过 (Exit Code 0, 准入钥匙 1)
+
+    Note over Agent: 阶段六：Agent 敌手认知深度自审计 (准出钥匙 2)
+    Agent->>Agent: 预设有错，深入物理 OOXML 与 PDF 逐项反向挑刺 (节标题顶格加粗、内外边框虚实、格式服从原文、TDS覆写)
+    Agent->>Agent: 出具《Agent 敌手自审计反向挑刺清单》，双钥匙齐备方可交付
 ```
