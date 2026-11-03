@@ -1746,6 +1746,11 @@ export function formatSection11PreambleRow(row, text, isEnglish = false, leftInd
   p.appendChild(r);
 
   tc.appendChild(p);
+  if (row.cells && row.cells.length > 0) {
+    row.cells[0].text = text;
+    row.cells[0].node = tc;
+    row.cells.length = 1;
+  }
 }
 
 /**
@@ -4212,6 +4217,98 @@ export function renderThreeColumnVMergeSubRows(record, mainRowIndex, subRowIndex
 
   if (record.engine?.refresh) {
     record.engine.refresh();
+  }
+}
+
+
+/**
+ * 全局表格边框规范强化 (各 section 表格外框实线，内框统一虚线)
+ * @param {Object} record - 表格 record
+ */
+export function enforceTableStandardBorders(record) {
+  if (!record || record.kind !== 'table' || !record.node) return;
+  const doc = record.node.ownerDocument;
+  if (!doc) return;
+
+  // 1. 设置表格级 tblBorders
+  let tblPr = firstChild(record.node, 'tblPr');
+  if (!tblPr) {
+    tblPr = doc.createElementNS(W_NS, 'w:tblPr');
+    record.node.insertBefore(tblPr, record.node.firstChild);
+  }
+  let tblBorders = firstChild(tblPr, 'tblBorders');
+  if (!tblBorders) {
+    tblBorders = doc.createElementNS(W_NS, 'w:tblBorders');
+    tblPr.appendChild(tblBorders);
+  } else {
+    while (tblBorders.firstChild) tblBorders.removeChild(tblBorders.firstChild);
+  }
+  const borderDefs = [
+    { name: 'top', val: 'single', sz: '4' },
+    { name: 'left', val: 'single', sz: '4' },
+    { name: 'bottom', val: 'single', sz: '4' },
+    { name: 'right', val: 'single', sz: '4' },
+    { name: 'insideH', val: 'dotted', sz: '4' },
+    { name: 'insideV', val: 'dotted', sz: '4' }
+  ];
+  for (const b of borderDefs) {
+    const el = doc.createElementNS(W_NS, `w:${b.name}`);
+    el.setAttributeNS(W_NS, 'w:val', b.val);
+    el.setAttributeNS(W_NS, 'w:sz', b.sz);
+    el.setAttributeNS(W_NS, 'w:space', '0');
+    el.setAttributeNS(W_NS, 'w:color', 'auto');
+    tblBorders.appendChild(el);
+  }
+
+  // 2. 逐行逐单元格设置 tcBorders
+  const rows = record.rows || [];
+  const numRows = rows.length;
+  for (let rIdx = 0; rIdx < numRows; rIdx++) {
+    const row = rows[rIdx];
+    const isFirstRow = (rIdx === 0);
+    const isLastRow = (rIdx === numRows - 1);
+    const numCells = row.cells?.length || 0;
+
+    for (let cIdx = 0; cIdx < numCells; cIdx++) {
+      const cell = row.cells[cIdx];
+      if (!cell || !cell.node) continue;
+
+      let tcPr = firstChild(cell.node, 'tcPr');
+      if (!tcPr) {
+        tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+        cell.node.insertBefore(tcPr, cell.node.firstChild);
+      }
+      let tcBorders = firstChild(tcPr, 'tcBorders');
+      if (!tcBorders) {
+        tcBorders = doc.createElementNS(W_NS, 'w:tcBorders');
+        tcPr.appendChild(tcBorders);
+      } else {
+        while (tcBorders.firstChild) tcBorders.removeChild(tcBorders.firstChild);
+      }
+
+      const topVal = isFirstRow ? 'single' : 'dotted';
+      const bottomVal = isLastRow ? 'single' : 'dotted';
+      const isLeft = (cIdx === 0);
+      const isRight = (cIdx === numCells - 1);
+      const leftVal = isLeft ? 'single' : 'dotted';
+      const rightVal = isRight ? 'single' : 'dotted';
+
+      const cellBorders = [
+        { name: 'top', val: topVal },
+        { name: 'bottom', val: bottomVal },
+        { name: 'left', val: leftVal },
+        { name: 'right', val: rightVal }
+      ];
+
+      for (const cb of cellBorders) {
+        const el = doc.createElementNS(W_NS, `w:${cb.name}`);
+        el.setAttributeNS(W_NS, 'w:val', cb.val);
+        el.setAttributeNS(W_NS, 'w:sz', '4');
+        el.setAttributeNS(W_NS, 'w:space', '0');
+        el.setAttributeNS(W_NS, 'w:color', 'auto');
+        tcBorders.appendChild(el);
+      }
+    }
   }
 }
 
