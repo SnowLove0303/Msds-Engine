@@ -15,6 +15,9 @@ import {
   createWorkSession,
   saveSession,
   clearTemplateValues,
+  clearSectionValuesInSession,
+  restoreSectionInSession,
+  applyCompanyPreset,
   writeCellValueToSession,
   writeRichTextToSession,
   writeFullWidthSection,
@@ -192,6 +195,9 @@ const TOOLS = [
                 type: 'string',
                 enum: [
                   'clearTemplate',
+                  'clearSectionValues',
+                  'restoreSection',
+                  'applyPreset',
                   'writeCell',
                   'writeRichText',
                   'writeFullWidth',
@@ -216,7 +222,8 @@ const TOOLS = [
               content: { type: 'string' },
               chemicalFormula: { type: 'string' },
               runs: { type: 'array' },
-              checkpointId: { type: 'string' }
+              checkpointId: { type: 'string' },
+              presetKey: { type: 'string' }
             },
             required: ['op']
           }
@@ -445,6 +452,12 @@ async function handleToolCall(name, args) {
       for (const op of args.operations || []) {
         if (op.op === 'clearTemplate') {
           clearTemplateValues(session);
+        } else if (op.op === 'clearSectionValues') {
+          clearSectionValuesInSession(session, { sectionNumber: op.sectionNumber });
+        } else if (op.op === 'restoreSection') {
+          await restoreSectionInSession(session, { sectionNumber: op.sectionNumber });
+        } else if (op.op === 'applyPreset') {
+          applyCompanyPreset(session, op.presetKey);
         } else if (op.op === 'writeCell') {
           writeCellValueToSession(session, {
             sectionNumber: op.sectionNumber,

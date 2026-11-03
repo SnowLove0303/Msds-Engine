@@ -1,228 +1,186 @@
 ---
 name: msds-studio
-description: "MSDS Studio 智能化文档处理工作台与 Agent API 调用规范：覆盖源文件结构化识别、智能匹配装配、模板清空防污染控制（清空模板/恢复模板/特殊清空）、专业化英译剪枝、实体多预设派生与标准 8 格式（4 DOCX + 4 PDF）批量导出全流程 SOP。"
+description: "MSDS Studio 工业级确认交互式文档处理工作台与 Agent 调用规范：【识别感知 + 通用编辑器原语 + Agent 语义大脑】三大主干体系，覆盖人机双确认门禁、12阶实时进度播报、格式服从原文公理、底模值格前置清零机制、大模型逐句专业英译、万能几何手术配方 (删列/增行/删行/合并通栏/化学式/激光对齐)、双实体预设隔离派生、无头高保真 DOCX 转 PDF 引擎、1:1事实物理对账与标准8格式闭环终审 SOP。"
 ---
 
-# MSDS Studio 功能调用与使用规范指南 (MSDS Studio Skill)
+# MSDS Studio 功能调用与使用规范指南 (MSDS Studio Skill v4.0)
 
-本技能为各类 AI Agent 与研发人员提供调用 **MSDS Studio** 核心引擎、执行全自动或半自动人机协同 MSDS 生产的标准契约与作业指南。全面覆盖 Web UI 工作台交互、Headless REST API 管道驱动、模板清空防残留治理、16 章节差异核对审查及标准 8 格式闭环交付。
+本技能为各类 AI Agent 与研发人员提供调用 **MSDS Studio** 核心引擎、执行全自动或人机协同 MSDS 生产的**最高法定作业契约与 SOP 指南**。  
+全面确立**【识别感知 + 通用编辑器原语 + Agent 语义大脑】**核心作业体系，规范人机协同双确认门禁、12 阶全透明状态播报、万能几何手术配方库（Recipe A~G）、格式服从原文公理、前置值格清零、大模型上下文语义英译、双实体预设隔离派生、无头高保真 DOCX 转 PDF 转换、1:1 事实物理对账与标准 8 格式闭环终审。
 
 ---
 
-## 🛑 唯一法定作业路径：严禁绕开 MSDS Studio 直改文档 (Exclusive Route Guardrail)
+## 🛑 最高法定准入约束与五大核心原则 (Supreme Invariants)
 
 > [!CAUTION]
-> **绝对禁令：严禁任何 Agent 绕开 MSDS Studio 引擎直接编写 ad-hoc 脚本（如调用 python-docx、原生 XML 修改或文件写入）直接操作 DOCX/PDF 文件！**  
-> 一切 MSDS 的识别、装配、修改、翻译、预设覆盖与 8 格式导出，**必须且仅能通过 MSDS Studio API（如 `POST /api/msds/pipeline/generate-eight`）或官方流水线脚本（`node run_pipeline.mjs`）执行**。脱离 Studio 引擎私自修改的文档无法触发 5 大质量门禁，底层 XML 几何必定损坏，一律视为非法产物并一票否决！
+> **绝对禁令：严禁任何 Agent 绕开 MSDS-Engine 底座直接编写 ad-hoc 脚本（如调用 python-docx、原生 XML 修改或文件写入）直接操作 DOCX/PDF 文件！**  
+> **非用户明确允许，严禁为了单一型号或临时特例擅自改造通用引擎！** 严禁在代码中编写 `if (model === 'xxx')` 特判分支；一切业务产出物必须通过 MSDS-Engine 原生 MCP 工具链与编辑器万能原语受控生成！
+
+### 五大核心工程原则
+
+1. **核心架构归正：【识别感知 + 通用编辑器原语 + Agent 语义大脑】**：
+   - 彻底废止对机械黑盒匹配脚本（如 `smart-matching.js`）的强依赖与过度包装；
+   - 确立工作流主干为：`msds_recognize_source` 零损耗化学事实感知 $\rightarrow$ Agent 语义大脑决策 $\rightarrow$ 直接调用 MSDS Studio 编辑器万能原语操控；
+   - 熟练运用编辑器的全景能力：**预设编辑** (`applyPreset`)、**恢复本节** (`restoreSection`)、**清空本节填写值** (`clearSectionValues`)、**清空全模板值** (`clearTemplate`)、**删列** (`deleteColumn`)、**克隆增行** (`insertRow`)、**删行** (`deleteRow`)、**合并通栏** (`mergeCells`)、**富文本与化学式下标** (`writeRichText`) 及 **激光垂线对齐** (`formatLaserTabs`)。
+
+2. **格式服从于原文公理 (Format Follows Source Content Axiom)**：
+   - “基于模板的格式与基于源文件的内容做匹配，格式服从于原文”；
+   - 若源文件某一节**仅有叙述性说明行**（例如“该产品无可用的毒理学研究”或非危险品免责声明），直接匹配到模板中对应的说明行/导言行插槽，沿用模板既定的字体（宋体/Times New Roman/Arial）、字号（9.5pt/10.5pt）与行距格式排版；其余无关的空白端点行直接清空或剔除，绝不可强塞无关假端点；
+   - 若源文件包含细分结构化端点（如急性毒性 LC50/LD50），则对应填入结构化值格插槽；
+   - 绝对杜绝“为了迁就模板结构而凭空捏造端点”或“为了塞入内容而强行破坏模板几何规范”。
+
+3. **英文官方底模“历史脏数据”法定清零机制 (Pre-write Value Clearing Invariant)**：
+   - 官方底模（尤其英文模板）内可能存在历史样例残留（如二乙二醇单丁醚、3306 mg/kg 等示范数据）；
+   - 解决此问题的唯一合法方式是：**在写入新数据前，调用编辑器的 `clearSectionValues` 或 `clearTemplate` 功能**，先将所有待编辑值格彻底清空，确保底模处于 100% 纯净的空白插槽状态，再由 Agent 写入真实数据，杜绝一切脏数据污染。
+
+4. **Agent 大模型逐句专业语义英译与词典辅助校验 (LLM Contextual Translation Invariant)**：
+   - 严禁依赖脆弱的数百行机械正则字符串替换；
+   - 充分发挥 Agent 作为前沿大模型的化学和毒理学专业语义理解优势，对源文档内容进行**逐句专业英译**，确保行文地道、术语符合 GHS/OECD 国际标准（如区分 vapour/gas、严格翻译致敏性、致突变性结论等）；
+   - 标准双语映射库（`translation-map.json` / `bilingual-mapping-set.js`）专职作为**一致性辅助校验字典**，用于审查英译结果是否符合既定标准术语，形成“大模型语义翻译 + 规则字典校验”的双重保障。
+
+5. **通用型 MSDS Studio 与彻底铲除特判 (Strict Anti-Overfitting Invariant)**：
+   - MSDS Studio 是工业级通用文档处理工作台，必须保持 100% 通用性；
+   - 严禁针对特定产品型号（如 `PU-202A`、`PA-4780`、`PU-218A` 等）在代码或规则中编写 `if (model === 'xxx')` 特判分支；
+   - 所有排版与结构决策必须完全基于通用的数据形态（是否危化品、组分数量 $N$、列数、文本是否包含化学式、是否只有叙述性说明等）进行通用逻辑分流。
 
 ---
 
-## 🧭 一、 系统架构与双模访问体系
+## 🧭 一、 核心 MCP 工具矩阵速查表 (The 10 MCP Tools)
 
-MSDS Studio 支持两种对等操作模式，底层共享统一的数据与业务规则引擎：
+Agent 必须且仅能通过以下 10 大标准 MCP 工具操控 MSDS-Engine：
 
-```text
-┌────────────────────────────────────────────────────────────────────────┐
-│                              MSDS Studio                               │
-├──────────────────────────────────┬─────────────────────────────────────┤
-│      Web 交互工作台 (Vite)        │       Agent REST API (无头服务)      │
-│  - http://127.0.0.1:5173         │  - http://127.0.0.1:5174/api/msds   │
-│  - DOCX 结构化识别工作台         │  - (或通过 5173 反代 /api/msds)     │
-│  - 智能匹配与无值剪枝工作台      │  - POST /api/msds/import            │
-│  - 模板安全编辑器 (清空/重置/改标)│  - POST /api/msds/match             │
-│  - 逐项审阅抽屉与批注面板        │  - POST /api/msds/pipeline/*        │
-│  - 统一交付物导出中心            │  - GET  /api/msds/pipeline/status   │
-├──────────────────────────────────┴─────────────────────────────────────┤
-│                               核心引擎层                               │
-│  - pipeline-engine.js   : 四阶流水线驱动 (CN装配/EN英译/预设派生/8格式导出)│
-│  - smart-matching.js    : 16 章节插槽映射、语义归一与无值物理剪枝      │
-│  - docx-engine.js       : 底层 OOXML 解析、写入、清空、重塑与防污染控制  │
-│  - annotation-engine.js : 6 维语义锚点与审阅数据流                     │
-│  - pdf-converter.js     : 高保真 PDF 渲染转换与交付物校验              │
-├────────────────────────────────────────────────────────────────────────┤
-│                         官方基准底模 (绝对只读)                        │
-│  - 正式模板_MSDS_CN_冠志.docx (SHA-256 锁定)                           │
-│  - 正式模板_MSDS_EN_冠志.docx (SHA-256 锁定)                           │
-└────────────────────────────────────────────────────────────────────────┘
+| 工具名称 | 功能定位 | 核心输入参数 | 核心输出指标 |
+| :--- | :--- | :--- | :--- |
+| `msds_recognize_source` | 全文 16 章节源文件事实无损识别 | `sourceFilePath` | `sections`, `modelCode`, `ghs`, `components` |
+| `msds_extract_section_facts` | 章节级细粒度语义与几何下钻 | `sourceFilePath`, `sectionNumber` | `semantic`, `layoutType`, `rowsCount` |
+| `msds_compare_source_with_output` | 1:1 事实物理对账与正向行动 Gap 诊断 | `sourceFilePath`, `outputFilePath` | `fidelityRatio`, `actionableGaps[]` |
+| `msds_register_template` | 动态上传与注册外部自定义模板 | `templateFilePath`, `templateKey`, `language` | `templateKey`, `schema.sections` |
+| `msds_get_template_schema` | 查询已注册模板的 16 章节拓扑结构 | `templateKey` | `sections[].tblGrid`, `colWidths`, `rowCount` |
+| `msds_peek_cell_or_row` | 触觉透视指定单元格/行的属性与文本 | `templateKey`, `sectionNumber`, `rowIndex` | `cellsCount`, `cellsText`, `gridSpan` |
+| `msds_execute_editor_ops` | 执行万能原子操作序列生成 DOCX（自带事务自动回滚） | `templateKey`, `outputPath`, `operations[]` | `outputPath`, `sizeBytes`, `operationsApplied` |
+| `msds_plan_audit_targets` | 编制 ADD 终审断言契约与 8 产物清单 | `modelCode`, `sourceFacts` | `targets.global.expectedFiles`, `rules` |
+| `msds_batch_export_eight` | 实体多预设派生与 4+4 交付物批量导出 | `modelCode`, `sourceFilePath`, `targetDir` | `generatedFiles[]`, `pdfStatuses[]` |
+| `msds_audit_deliverables` | 依据 ADD 契约对产出交付物执行终审门禁 | `targetDir`, `modelCode` | `passed`, `errors[]`, `metrics` |
+
+---
+
+## 🛠️ 二、 编辑器核心原语操作清单 (`msds_execute_editor_ops`)
+
+在调用 `msds_execute_editor_ops` 时，`operations` 数组支持以下原子指令：
+
+| 原子指令 (`op`) | 参数说明 | 功能与规范 |
+| :--- | :--- | :--- |
+| `clearSectionValues` | `sectionNumber` | **清空本节填写值**：保留所有标签列与网格几何，将指定章节的值单元格全部置空，防旧数据污染 |
+| `clearTemplate` | （可选 `keepSections`） | **清空全模板填写值**：将模板所有章节的值格彻底清空，还原为纯净空白插槽母版 |
+| `restoreSection` | `sectionNumber` | **恢复本节**：从基准底模中独立单节恢复，撤销当前节所有破坏性操作，不影响其他章节 |
+| `applyPreset` | `presetKey` (`Guocai_zh`/`Guocai_en`等) | **预设编辑**：一键注入企业名称、税号、地址、应急联系电话与传真，双向防串号隔离 |
+| `writeCell` | `sectionNumber`, `rowIndex`, `cellIndex`, `text` | **写入单元格**：向指定行列写入普通文本，自动匹配中英文法定字号与字体 |
+| `writeRichText` | `sectionNumber`, `rowIndex`, `cellIndex`, `runs` / `chemicalFormula` | **富文本/化学式写入**：支持下标、上标、粗体、多字体 Run 级精细排版 |
+| `writeFullWidth` | `sectionNumber`, `content` | **通栏写入**：将指定节首行/单行合并通栏并写入长段说明，首字左对齐 |
+| `deleteColumn` | `sectionNumber`, `colIndex` | **删列**：从网格中物理剔除指定列（如非标三列消除），宽度自动补偿平摊守恒 9795 dxa |
+| `insertRow` | `sectionNumber`, `targetRowIndex`, `cloneFromRowIndex` | **克隆增行**：深拷贝目标行样式、底色、边框并清空文字后安全插入 |
+| `deleteRow` | `sectionNumber`, `rowIndex` | **删行**：物理删除多余空白行或不需要的端点行 |
+| `mergeCells` | `sectionNumber`, `rowIndex`, `colStart`, `colSpan` | **横向合并**：合并行内相邻单元格并重新计算 gridSpan 与总宽度 |
+| `formatLaserTabs` | （固定作用于 Section 9） | **激光垂线对齐**：为 Section 9 全部参数行注入 80.28pt 垂线对齐制表符（G-38） |
+| `checkpoint` / `rollback`| `checkpointId` | **事务检查点与回滚**：支持多步安全事务撤销，发生异常自动安全自愈 |
+
+---
+
+## 🤝 三、 人机协同双交互确认门禁 (Dual Human-in-the-Loop Gates)
+
+为保障生产意图、语言范围、实体主体与模板选择 100% 符合用户要求，Agent 动工前必须严格经过两道交互确认门禁：
+
+```mermaid
+flowchart TD
+    classDef gateStyle fill:#ffd,stroke:#333,stroke-width:2px;
+    classDef actionStyle fill:#eef,stroke:#333,stroke-width:1px;
+
+    Task["🚀 收到 MSDS 生产/修改任务"] --> Step0["查询当前可用官方/自定义模板、实体预设与翻译词典"]
+    Step0 --> Gate1["🚨【法定门禁 1: 交付矩阵与模板确认门禁】\n呈报: 可用模板候选、双实体主体(冠志/国彩)、交付矩阵(标准8格式/特定单品)\n👉 严格等待用户指令确认选用模板与交付范围"]:::gateStyle
+    
+    Gate1 -->|用户确认意图| Step1["执行事实感知、触觉透视、大模型英译预判与手术配方编排"]
+    Step1 --> Gate2["🚨【法定门禁 2: 方案、英译与调用报文确认门禁】\n呈报: 几何判定、格式服从原文策略、关键专业英译对照、报文预览与双清单\n👉 严格等待用户明确回复'执行'或'同意'"]:::gateStyle
+    
+    Gate2 -->|用户授权动工| Exec["进入 12 阶实时透明化全流程执行"]:::actionStyle
+```
+
+1. **门禁 1（交付矩阵与模板确认门禁）**：
+   - Agent 检索当前模板库后，必须主动向用户呈报：“检测到源文件为 [型号]；请确认本次交付范围：是导出标准 8 格式全矩阵（4 DOCX + 4 PDF：冠志/国彩 × 中/英），还是仅生成特定单品？请确认使用官方标准母版还是您上传的新自定义模板？是否需要指定特定修订日期？”；严格等待用户确认后方可继续。
+2. **门禁 2（方案、英译与调用报文确认门禁）**：
+   - 提取事实并透视模板后，向用户呈报：① 几何结构判定与格式服从原文方案（如纯说明行匹配）；② 拟采用的手术配方（如采用 Recipe D 清空值格、Recipe A 删列、Recipe B 增行）；③ **关键专业合规英译对照预览**（GHS 英文分类、Warning 语句、英文推荐用途）；④ `msds_execute_editor_ops` 报文预览；⑤ 【双清单】（拟变范围清单 + 保持现状承诺清单）；严格等待用户回复“执行/同意”方可动刀。
+
+---
+
+## 📢 四、 执行期 12 阶段透明化状态播报范式 (The 12-Phase Status Broadcast)
+
+获得授权动工后，Agent **绝对禁止长时间黑盒静默**，必须根据底层真实执行进度，实时向用户输出标准状态播报：
+
+| 阶段编号 | 实时播报文本 (Real-time Broadcast) | 底层 MCP 真实调用与工程动作 |
+| :--- | :--- | :--- |
+| **Phase 1** | `📡 [MSDS-Studio] 正在建立 MSDS-Engine 原生 MCP 通信通道...` | 检查 Stdio 连接，确认 10 大工具就绪 |
+| **Phase 2** | `🔍 [识别感知] 正在调用识别模块解析源文件，下钻 16 章节核心化学事实...` | 调用 `msds_recognize_source` 提取全局事实，调用 `msds_extract_section_facts` 细粒度下钻 |
+| **Phase 3** | `📋 [模板契约] 正在加载目标模板，执行前置清空值格，确保插槽纯净...` | 加载模板，针对待编辑章节执行 `clearSectionValues`，消除历史脏数据残留 |
+| **Phase 4** | `🔎 [触觉透视] 正在触觉透视模板结构与字段，执行格式服从原文判定...` | 调用 `msds_peek_cell_or_row` 检查，定性为纯说明行/两列结构/非标三列/通栏 |
+| **Phase 5** | `📐 [规范编排] 正在编排万能手术配方与大模型专业英译内容...` | 编排 Recipe A~G 配方序列，大模型上下文翻译，调用 `msds_plan_audit_targets` |
+| **Phase 6** | `✍️ [中文装配] 正在事务性写入编辑器，执行几何重塑与微观富文本渲染...` | 调用 `msds_execute_editor_ops`（内置事务保护）生成中文正式母版 |
+| **Phase 7** | `🌐 [专业英译] 正在驱动大模型逐句英译写入英文底模，执行词典双重校验...` | 大模型逐句专业英译写入已清空底模，结合映射词典双向核验，执行 `assertZeroChinese` |
+| **Phase 8** | `🏢 [实体派生] 正在应用广州冠志与英德国彩双主体预设派生...` | 注入企业法定名称、统一社会信用代码、地址、应急联系电话与传真，双向防污染隔离 |
+| **Phase 9** | `⚖️ [事实对账] 正在核验写入规范性，执行源文件 vs 产出物 1:1 事实物理对账...` | 调用 `msds_compare_source_with_output`，核验 `actionableGaps`，若有缺漏针对性补填 |
+| **Phase 10** | `📄 [批量导出] 正在批量持久化导出 4 份标准中英双语双主体 DOCX 正式文件...` | 落地 `冠志 msds_CN.docx`、`国彩 msds_CN.docx`、`冠志 msds_EN.docx`、`国彩 msds_EN.docx` |
+| **Phase 11** | `🖨️ [PDF 转换] 正在启动无头高保真渲染引擎执行 DOCX 转 PDF 并做版面预检...` | 驱动无头转换守护进程生成 4 份高清 PDF，预检导言区 9.5pt（G-37）与激光垂线 80.28pt（G-38） |
+| **Phase 12** | `🛡️ [全景终审] 正在依据全局与局部规范执行 Gate-8 终审机检与双向核销...` | 调用 `msds_audit_deliverables`，校验 8 格式数量、时间戳对齐、字体纯度与排版，退出码 0 归档 |
+
+---
+
+## 🌳 五、 几何形态与格式匹配决策树 (Layout & Format Decision Tree)
+
+面对任意传入的源文件事实与目标模板，Agent SHALL 遵循以下通用决策模型：
+
+```mermaid
+flowchart TD
+    Peek["1. 触觉透视 (msds_peek_cell_or_row) 与事实感知"] --> Classify{"2. 内容与几何形态分类判定"}
+    
+    Classify -->|源文件仅有说明行/免责声明| Narrative["形态 0: 格式服从原文纯说明行 (Narrative Preamble)\n- 动作: 匹配模板说明行插槽，沿用模板排版格式\n- 规范: clearSectionValues 清空其余端点行，绝不强塞无关端点"]
+    Classify -->|列数=2 且为标准键值对| TwoCol["形态 A: 标准双列结构 (Standard 2-Column)\n- 动作: writeCell 或 writeRichText\n- 规范: 左标签、右取值，保持既有列宽"]
+    Classify -->|列数>=3 且包含冗余标签列| MultiCol["形态 B: 非标多列结构 (Non-Standard 3-Column)\n- 动作: 执行 Recipe A (三列消除 deleteColumn)\n- 规范: 裁剪冗余标签，自动平摊宽度守恒 9795 dxa"]
+    Classify -->|大段免责声明/规程| FullWidth["形态 C: 通栏说明结构 (Full-Width Banner)\n- 动作: 执行 Recipe B/合并通栏 (mergeCells + writeFullWidth)\n- 规范: 首字严格左对齐，清除冗余空行"]
+    Classify -->|Section 9 等理化参数| LaserTab["形态 D: 激光垂线对齐结构 (Vertical Laser Alignment)\n- 动作: formatLaserTabs\n- 规范: 冒号固定 80.28pt 坐标，公差 <= 1.2pt"]
 ```
 
 ---
 
-## 🎯 二、 核心 REST API 契约全景
+## 📚 六、 SOP 经典手术配方库 (Recipe Playbook)
 
-统一响应采用 JSON Envelope 规范：`{ "success": true, "sessionId": "...", "data": ... }`。
+Agent 在执行复杂编辑时，SHALL 直接组合引用以下标准化配方：
 
-### 1. 服务端口与探活预检
-* **核心 API 端点**：`http://127.0.0.1:5174/api/msds`（独立 Node 守护进程 `web/src/api-server.mjs`）
-* **Web 端反代端点**：`http://127.0.0.1:5173/api/msds`（由 Vite 开发服务器代理转发至 5174）
-* **服务探活**：`GET /api/msds/health`
-  * 响应：`{ "status": "ok", "service": "msds-studio-api" }`
-  * **充要条件**：执行任何生产前必须先确认返回 `status === "ok"`。
+### 配方 A【三列转两列消除配方】 (Recipe A: Three-to-Two Column Elimination)
+$$\text{透视发现列数=3} \xrightarrow{} \text{deleteColumn(1)} \xrightarrow{\text{底座平摊列宽守恒}} \text{透视复查列数=2}$$
 
-### 2. 端到端一键生产核心接口 (`generate-eight`)
-* **接口**：`POST /api/msds/pipeline/generate-eight`
-* **职责**：原子化串联五阶流水线：“Clean Slate 模板前置清空 -> 源文件中文母版装配 -> 英文模板 1:1 同构剪枝与专业英译 -> 广州冠志与英德国彩双实体预设派生 -> 批量生成 4 份 DOCX (内置安全文件锁自愈防崩溃) -> 驱动 PDF 渲染守护服务 -> 触发 5 大硬性门禁全检”。
-* **请求体规范 (JSON Payload)**：
-  ```json
-  {
-    "model": "PU-608",
-    "cnGroundTruthPath": "D:\\冠志\\TDS MSDS\\1-1 单组份水性聚氨酯树脂 PU\\PU-608\\PU-608 msds_CN 冠志.docx",
-    "targetDir": "F:\\App Location\\Guanzhi Tong\\Skill\\MSDS-Engine\\算法训练材料\\PU-608",
-    "revisionDate": "2023/09/27"
-  }
-  ```
-* **参数详解**：
-  * `model` (*string, 必填*)：产品标准型号（如 `PU-608`、`BL-8129A`）；
-  * `cnGroundTruthPath` (*string, 必填*)：客户或实验室提供的源 DOCX 文件绝对路径；
-  * `targetDir` (*string, 必填*)：标准 8 格式最终产出物的落盘目录绝对路径；
-  * `revisionDate` (*string, 可选*)：修订日期（格式 `YYYY/MM/DD` 或 `YYYY年MM月DD日`），默认自适应提取源文件真实日期。
-* **成功响应 (HTTP 200)**：
-  ```json
-  {
-    "success": true,
-    "model": "PU-608",
-    "deliveredFiles": [
-      "PU-608 msds_CN 冠志.docx",
-      "PU-608 msds_CN 冠志.pdf",
-      "PU-608 msds_CN 国彩.docx",
-      "PU-608 msds_CN 国彩.pdf",
-      "PU-608 msds_EN Guanzhi.docx",
-      "PU-608 msds_EN Guanzhi.pdf",
-      "PU-608 msds_EN Guocai.docx",
-      "PU-608 msds_EN Guocai.pdf"
-    ],
-    "qualityAudit": {
-      "allPassed": true,
-      "gate1_indent": "PASS",
-      "gate2_topology": "PASS",
-      "gate3_preambles": "PASS",
-      "gate4_zero_chinese": "PASS",
-      "gate5_header_footer": "PASS"
-    }
-  }
-  ```
+### 配方 B【动态组分自适应增减行配方】 (Recipe B: Dynamic Row Balancing)
+$$\text{源组分数 } N \text{ 与模板可用行 } M \text{ 比较} \xrightarrow{} \begin{cases} N > M: \text{循环 insertRow 插入 } (N-M) \text{ 行} \\ N < M: \text{循环 deleteRow 移除 } (M-N) \text{ 空白行} \end{cases} \xrightarrow{} \text{逐行填入数据}$$
+
+### 配方 C【微观化学式与 Run 级排版配方】 (Recipe C: Chemical Run-Level Formatting)
+$$\text{识别文本分子式 (如 } \text{H}_2\text{SO}_4 \text{)} \xrightarrow{} \text{调用 parseChemicalFormulaRuns 切分} \xrightarrow{} \text{调用 writeRichText 注入下标 Run}$$
+
+### 配方 D【底模前置值格清零配方】 (Recipe D: Pre-write Value Clearing)
+$$\text{加载底模} \xrightarrow{} \text{提交 clearSectionValues 或 clearTemplate} \xrightarrow{\text{保留标签与网格，清空所有历史残留}} \text{获得纯净空白插槽母版}$$
+
+### 配方 E【格式服从原文自适应配方】 (Recipe E: Format Follows Content Matching)
+$$\text{感知源事实} \xrightarrow{} \begin{cases} \text{仅有纯说明行}: \text{写入模板说明行槽位} \rightarrow \text{清空其余端点行} \\ \text{具备细分端点}: \text{按结构化端点逐行匹配填入} \end{cases}$$
+
+### 配方 F【大模型逐句专业语义英译与词典校验配方】 (Recipe F: LLM Translation with Dictionary Guard)
+$$\text{中文事实} \xrightarrow{\text{Agent 大模型专业毒理/化学上下文翻译}} \text{地道专业英文句子} \xrightarrow{\text{对照 translation-map 校验术语一致性}} \text{写入英文已清空底模}$$
+
+### 配方 G【单节安全重置配方】 (Recipe G: Isolated Section Restoration)
+$$\text{某节结构受损或需重来} \xrightarrow{} \text{提交 restoreSection(sectionNumber)} \xrightarrow{\text{单节从基准底模还原}} \text{其余已编辑章节 100% 完好保持}$$
 
 ---
 
-## 🧹 三、 模板清空与防污染控制规范 (Clean-Slate Invariant)
+## 🛡️ 七、 终审归档充要指标 (Completion Invariants)
 
-在 MSDS 生产中，模板遗留文本（如示例化学品名、残留 CAS 号）穿透到新产品文档是最高级别质量事故。MSDS Studio 强制执行以下三层清空防线：
-
-1. **结构化槽位白名单清空**：
-   - 提取源文件真实数据前，先将只读底模中的 16 章节槽位全部置空（保留空行与表格骨架）；
-   - 严禁直接在包含示例内容的旧模板上执行“查找替换”；
-2. **通栏行无菌覆写（Zero Contamination Override）**：
-   - Section 2（默认全量通栏）、Section 11（组分毒理数据通栏）重建时，先清空该行所有既有 `<w:tc>` 单元格节点，再单原子注入全新的单单元格通栏行；
-   - 严禁复用包含 `<w:vMerge w:val="continue"/>` 的占位单元格；
-3. **附注提取防击穿过滤（Exemption Notes Quarantine）**：
-   - Section 2 提取非危险豁免声明附注（如“成盐后无危害”说明）时，必须通过 CAS 号正则（`\d+-\d+-\d+`）与百分比过滤，绝对禁止贪婪抓取属于 Section 3 的成分数据行。
-
----
-
-## 🧪 四、 核心业务数据流与映射规则
-
-1. **Section 1 产品与企业信息**：
-   - 依据目标实体预设（广州冠志 / 英德国彩）自动派生企业名称、地址、应急联系电话及邮编；
-2. **Section 3 成分居中对齐定理**：
-   - 物质名称、CAS 号、质量百分比三列单元格内容，全量强制居中对齐（`<w:jc w:val="center"/>`）；
-3. **Section 2 与 Section 11 通栏标准写法与格式继承总则 (G-32 通栏公理)**：
-   - **核心法定要求**：通过编辑器对应模板编辑的“标签-值”的文本格式（标签粗体、值常规体、冒号间距、字体字号）必须 100% 忠实继承，但在最终排版呈现上必须采用**通栏写法（Full-Width GridSpan）**，打破原有多列割裂排版：
-     * **Section 2 危险性概述通栏写法**：整节收敛为 2 行（Row 0 章节标题 + Row 1 单单元格通栏 `gridSpan="2"`，宽度 `9795 dxa`）。无论是危险化学品（如 PU-202A 象形图、H/P规程）还是非危复配物（如 PA-3223 成盐豁免声明），一律在通栏内按法定顺序继承 10 个维度的标签（粗体）与值（常规体），落实 5 级缩进状态机与英文垂向首字对齐；
-     * **Section 11 毒理学信息通栏三级责任隔离写法**：统一采用 4 行三级责任隔离拓扑（Row 0 标题 + Row 1 产品级免责通栏 + Row 2 原料前言通栏 + Row 3 组分实测毒理通栏，均为 `gridSpan="3"`，宽度 `9781 dxa`）。无论是多组分（如 PA-3223）还是单组分（如 PU-202A DMAC / PU-608 NMP），试验数据均在 Row 3 通栏单元格中规范呈现；
-     * **组分严格单空行公理**：组分段落首行使用 `<w:spacing w:before="240"/>`（12pt / 1倍行高）精确隔离，严禁首 Run 软回车引发双重空行；
-     * **毒理指标垂向对齐**：经皮、吸入、经口 LD50/LC50 测试指标严格首字垂向一字排开对齐，仅组分标题加粗，试验数据正文全常规体。
-4. **Section 14 运输信息联动判定**：
-   - 若 Section 2 判定为非危险化学品，Section 14 必须级联联动标记为“非危险货物/非限制性货物”。
-
----
-
-## 📦 五、 8 格式导出与完整执行 SOP
-
-每次生产必须交付标准的 8 个文件，并在目标目录下不得遗留任何临时中间文件或备份文件：
-- `[型号] msds_CN 冠志.docx` + `.pdf`
-- `[型号] msds_CN 国彩.docx` + `.pdf`
-- `[型号] msds_EN Guanzhi.docx` + `.pdf`
-- `[型号] msds_EN Guocai.docx` + `.pdf`
-
----
-
-## 📐 七、 中英文“序号 + 标签”排版不变量与方案 A 英文工业标准规范 (Typography Invariants)
-
-在 MSDS Studio 中，中英文排版体系与“序号 + 标签”必须严格执行以下法定不变量：
-
-### 7.1 中英文排版规范对照基准
-1. **统一悬挂缩进几何（Hanging Indent 几何定理）**：
-   - 凡包含二级序号（如 `1.1`、`2.1`、`9.1`、`11.2` 等）的标签单元格，段落属性 `<w:pPr>` 必须且唯一设置：
-     `<w:ind w:left="420" w:hanging="420"/>`（左缩进 420 dxa，首行悬挂缩进 420 dxa）；
-   - 标签换行时第二行文字与首行文字绝对垂直对齐，绝不回缩到序号下方。
-2. **绝对零制表符禁令（No `<w:tabs>` / No `\t`）**：
-   - 全文档表格内彻底清除 `<w:tabs>` 与 `<w:tab/>`，禁止任何制表位注入，根除跨 Word/WPS 版本文字排版跳变崩塌。
-3. **序号与标签连接符（双半角空格规范）**：
-   - 序号与标签正文之间统一采用**两个半角空格（`"  "`）**分隔（如 `1.1  化学品中文名称：`、`1.1  Product identifier:`）；
-   - 严禁使用全角空格，严禁单空格或制表符。
-4. **标点合规法则**：
-   - 中文版标签末尾统一采用**全角中文冒号（`：`）**；
-   - 英文版全量清洗为**半角英文冒号（`:`）**，严禁英文版残留任何全角冒号。
-5. **英文方案 A 工业合规字体体系 (Arial 9.5pt)**：
-   - **大标题 (Row 0)**：Arial 11pt Bold (`w:sz="22"`)；
-   - **标签 (Label) / 单列子标题**：Arial 9.5pt Bold (`w:sz="19"`)；
-   - **内容值 (Value) / 说明行 / 法规项 / 免责声明**：Arial 9.5pt Regular (`w:sz="19"`)；
-   - **页眉页脚**：Arial 9pt Regular (`w:sz="18"`)；
-   - **底模伪断行自愈**：单元格内多段人工硬回车拆分的标签，在装配收敛时自动合并为标准单一原生段落。
-
----
-
-## 🛡️ 八、 "SKILL + 机械" 双极、"全局 + 局部" 双层全景深度审计强制契约 (Bipolar Bilayer Deep Audit Mandate)
-
-> [!IMPORTANT]
-> **法定强制项 (Mandatory Pipeline Gate)**：  
-> 后续所有产品型号（无论是全自动批量导出还是半自动交互产出），在产出交付物后，**必须且无条件触发一次完整的“全局通用规范 + 16 章节局部专属”双极双层全景深度审计**！  
-> 任何未跑通全景审计或存在任何一项违规（Failures > 0）的产出物，**绝对禁止流向交付或标记完成，流水线必须以 Exit Code 1 阻断拦截**！
-
-```text
-┌────────────────────────────────────────────────────────────────────────┐
-│             MSDS Studio 双极双层全景深度审计架构 (Bipolar Bilayer)     │
-├──────────────────────────────────┬─────────────────────────────────────┤
-│         【极 1: SKILL 业务宪法极】 │         【极 2: 机械 AST 断言极】   │
-│  - msds-studio / 完整规范指南    │  - 纯真实 OOXML 解析 (JSZip+DOM)    │
-│  - 16 章节业务法定义务与契约     │  - 零容忍硬断言 (退出码 0 为充要条件)│
-├──────────────────────────────────┴─────────────────────────────────────┤
-│                         【层 1: 全局通用规范层】                        │
-│  G-01: 8 格式交付物闭环守恒 (4 DOCX + 4 PDF，0 额外冗余文件)           │
-│  G-02: 全文绝对零制表符纯度 (0 个 <w:tabs>, 0 个 <w:tab/>)             │
-│  G-03: 英文版绝对零中文残留 (仅断言渲染文本节点 <w:t>，不受字体标签干扰)│
-│  G-04: 跨实体白名单差异准则 (除 S1 供应商与页眉外，S2~S16 技术内容 100% 相同) │
-│  G-05: 基础排版几何与字体规范 (中文宋体 12pt/9.5pt，英文 Arial 11/9.5pt)│
-│  G-25: 中英文结构同构公理 (表格行数、单元格数、段落数必须 1:1 镜像同构) │
-│  G-26: 标点语义分层与闭环公理 (叙述性完整句子末尾必须有句号；名词性状态声明保持无句号原貌；严禁悬空冒号；软换行不误判为粘连) │
-│  G-27: 冒号空格紧凑性公理 (中文标签冒号后严禁画蛇添足加空格；英文冒号后统一带 1 个半角空格)│
-│  G-28: 反多空格与法定列对齐缩进公理 (正文严禁乱敲多空格；Section 11 允许且要求法定 6 空格(CN)与 10 空格(EN)垂直列对齐)│
-│  G-29: G-11 粗细层级与显式常规体深检 (识别 <w:b w:val="0"/> 为常规体；免责行常规体；仅组分名加粗，子标签与测试数据常规体) │
-│  G-32: 通栏跨列拓扑与格式继承公理 (S2与S11统一通栏写法，继承编辑器标签-值格式，网格跨列守恒，严禁多列倒退) │
-├────────────────────────────────────────────────────────────────────────┤
-│                     【层 2: 16 章节专属局部规范层】                     │
-│  L-S1 : 物料型号与实体供应商信息唯一性绑定                             │
-│  L-S2 : 危险性概述通栏行 35 段逐行拓扑，5 级缩进几何 (480/482/960/悬挂720/悬挂480)，成盐豁免保全，杜绝成分行穿透污染 │
-│  L-S3 : 成分/组成信息三列拓扑，数据行单元格全量居中 (jc=center)         │
-│  L-S4 : 急救措施四维接触途径清晰分流，独立完整句子末尾必须补齐句号 ("。") │
-│  L-S5 : 消防措施灭火介质与特别危险性界定，独立完整句子末尾必须补齐句号 ("。")│
-│  L-S6 : 泄漏应急处理人员防护/环境防护/收容清除三大闭环                  │
-│  L-S7 : 操作处置与储存安全操作防范与安全储存条件守恒，规程句子末尾必须补齐句号 ("。")│
-│  L-S8 : 接触控制与个体防护装备 (PPE) 标准分流规范                      │
-│  L-S9 : 理化特性法定 19 槽位完备性，420dxa 悬挂缩进，杜绝叠词          │
-│  L-S10: 稳定性和反应性六大固定条目完备性保全                           │
-│  L-S11: 毒理学信息通栏三级责任隔离写法，Row1&2常规体，Row3通栏组分数据，组分单空行(before="240")，<w:br/>软换行，法定垂直列对齐，宋体三轴受控，状态项无多余句号 │
-│  L-S12: 生态学信息说明引导行与水生生物毒性指标保全                     │
-│  L-S13: 废弃处置方法标签居中对齐 (jc=center)，处置原则内容两端对齐 (jc=both) │
-│  L-S14: 运输信息与 S2 危险性判定级联联动 (非危险货物自动判定)          │
-│  L-S15: 法规信息中国核心法规列表完备聚合                               │
-│  L-S16: 免责指导声明法定保全，彻底剥离与 S1 供应商地址的历史冲突        │
-└────────────────────────────────────────────────────────────────────────┘
-```
-
-### 8.1 机械执行与验证命令
-任何任务或交付前，必须在 `web` 目录下执行全景机械审计并获得真实退出码 0：
-```powershell
-cd "F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\web"
-node scripts/audit_bipolar_bilayer.mjs
-```
+任务必须满足以下指标方可关单交付：
+1. **交付物数量严格守恒**：全量 8 格式交付物（4 DOCX + 4 PDF：冠志/国彩 × 中/英）完整存在于目标目录，无任何多余临时垃圾文件；
+2. **中英绝对纯净**：英文 DOCX 与 PDF 中文字符数严格为 0 (`assertZeroChinese`)；
+3. **物理时间戳对齐**：8 份产物文件生成修改时间差 $\le 300\text{s}$；
+4. **对账 Gaps 归零**：`actionableGaps.length === 0`，字符保全比达标；
+5. **机检真实退出码 0**：`msds_audit_deliverables` 返回 `passed: true`。

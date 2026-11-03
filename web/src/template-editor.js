@@ -12,6 +12,7 @@ import {
   loadDocx,
   writeCellValue,
   clearSectionValues,
+  restoreSectionToTemplate,
   deleteRow as deleteDocxRow,
   deleteTableColumn,
   mergeRowCells,
@@ -197,6 +198,8 @@ export async function inspectTemplateSchema(templateKey = 'CN_Guanzhi') {
     availableChannels: [
       'createWorkSession',
       'clearTemplateValues',
+      'clearSectionValues',
+      'restoreSection',
       'writeCellValue',
       'writeRichText',
       'writeFullWidthSection',
@@ -394,6 +397,34 @@ export function clearTemplateValues(session, options = {}) {
     session.modifiedSections.add(record.sectionNumber);
   }
   return { success: true, clearedSections: Array.from(session.modifiedSections) };
+}
+
+/**
+ * 清空指定章节的填写值 (Clear Section Values)
+ * 保留所有标签列与几何拓扑，仅将该章节所有值单元格彻底清零
+ */
+export function clearSectionValuesInSession(session, { sectionNumber }) {
+  const record = (session.engine.records || []).find(r => r.sectionNumber === sectionNumber);
+  if (!record) throw new Error(`Section ${sectionNumber} not found in session document`);
+  clearSectionValues(record);
+  session.modifiedSections.add(sectionNumber);
+  return { success: true, sectionNumber };
+}
+
+/**
+ * 恢复指定章节至模板原始状态 (Restore Section To Template)
+ * 从基准模板中单节还原，绝不破坏或污染其他已编辑章节
+ */
+export async function restoreSectionInSession(session, { sectionNumber }) {
+  const tplInfo = TEMPLATE_LIBRARY[session.templateKey] || TEMPLATE_LIBRARY.CN_Guanzhi;
+  if (!fs.existsSync(tplInfo.templatePath)) {
+    throw new Error(`Template file not found: ${tplInfo.templatePath}`);
+  }
+  const baselineBuf = fs.readFileSync(tplInfo.templatePath);
+  const baselineEngine = await loadDocx(baselineBuf, path.basename(tplInfo.templatePath));
+  restoreSectionToTemplate(session.engine, baselineEngine, sectionNumber);
+  session.modifiedSections.delete(sectionNumber);
+  return { success: true, sectionNumber };
 }
 
 /**
