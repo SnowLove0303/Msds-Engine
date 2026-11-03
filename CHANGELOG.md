@@ -18,11 +18,13 @@
    - 并在 `audit_bipolar_bilayer.mjs` 中新增物理级 XML 边框硬断言（`insideH === 'dotted'`, `insideV === 'dotted'`, 非末行 `bottom === 'dotted'`），构建不可穿透的机器防御墙。
 2. **工作流审计套件拉升为强制级别硬阻断门禁 (Mandatory Hard Blocker Gate)**：
    - 在 `SKILL.md` 工作流 SOP 中立法：`runBipolarBilayerAudit` 与 `verifyAuditContract` (G-01 ~ G-40) 成为强制级别门禁，任何单项失败直接阻断交付并抛出异常，真实退出码 0 为充要准入条件。
-3. **Section 2.1 排版缩进统一与防范说明 OCR 错别字根除**：
-   - 根治分类项排版锯齿：修复了 `renderFullWidthRow` 中 GHS 危害分类正则遗漏“皮肤致敏/水环境”导致部分分类行顶格（0 dxa）、部分分类行缩进（480 dxa）的锯齿不齐病态；泛化正则为匹配 `类别`、`Category`、`(Hxxx)`、`致敏` 等全部 GHS 关键字，确保全量分类行严格统一获得 `w:firstLine="480"` 缩进与标准常规字重；
+3. **Section 2 节标题层级保护与 2.1 GHS 危险性类别加粗顶格根治**：
+   - 根治 2.1 节标题被正文规则误伤缺陷：因分类正则匹配了 `类别`，导致节标题行 `2.1 GHS危险性类别：` 结尾的“类别：”错误触发了分类正文判定，被剥离加粗且被施加了 `firstLine="480"` 首行缩进；
+   - 建立节标题绝对隔离保护层：在 `docx-engine.js` 中新增 `isSection2Header` 判定，严格将 `2.1 GHS危险性类别：`、`2.2 GHS标签要素：`、`2.3 其他危险：` 等节标题与下属分类正文物理隔离——节标题行严格加粗 (`bold: true`) 且顶格排版 (无 `firstLine` 缩进)，下属数据分类条目严格首行缩进 480 dxa 且保持常规体 (`bold: false`)；
    - 清理 P 语句硬编码：剔除 `pipeline-engine.js` 中手动拼接的 8 空格字符串前缀，交由 `w:left="960"` 标准样式进行层级分段排版；
    - 修复 OCR 识别瑕疵：“宇防护服”纠正为“穿防护服”，“P403+.P233”纠正为“P403+P233”，“废物外理厂”纠正为“废物处理厂”；
-   - 英文版标签要素补齐：必须列在标签上的有害成分标注为 `Hazardous components which must be listed on the label: Hydrophilic aliphatic polyisocyanate based on HDI`。
+   - 英文版标签要素补齐：必须列在标签上的有害成分标注为 `Hazardous components which must be listed on the label: Hydrophilic aliphatic polyisocyanate based on HDI`；
+   - 审计脚本硬阻断升级：在 `audit_bipolar_bilayer.mjs` 中新增针对 `2.1 GHS危险性类别：` 节标题加粗 (`<w:b/>`) 与顶格零缩进 (`fl=0`) 的机器硬断言，杜绝假审计与层级倒挂。
 4. **Section 9 TDS 权威事实指标精准注入与序号自增同步**：
    - 从 TDS 中提取最新实测指标并注入：固含量 `80±2%`（严格拒绝泛化“约80%”）、粘度 `300±100 mPa·s`、密度 `约 1.12 g/cm³`、NCO `17.8±0.5%`、外观 `无色至淡黄色透明粘稠液体`；
    - 英文版理化特性严格 1:1 动态装配 `NCO content`，并在排版标准化后自动调用 `renumberRecord`，确保 9.1 ~ 9.16 序号严密自增无缝对齐。

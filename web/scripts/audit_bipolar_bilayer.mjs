@@ -603,12 +603,30 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
       }
       if (model === 'OS-9547 PGDA80') {
         const s2Ps = Array.from(s2Row1.getElementsByTagName('w:p'));
-        const catPs = s2Ps.filter(p => /类别\s*\d|\(H\d+\)/.test(p.textContent || ''));
+        
+        // 关键门禁：2.1 GHS危险性类别：节标题必须加粗且顶格 (无 firstLine 缩进)
+        const p21 = s2Ps.find(p => /2\.1\s*GHS危险性类别/i.test(p.textContent || ''));
+        assert(p21, `Section 2 (L-S2): OS-9547 必须包含 "2.1 GHS危险性类别：" 节标题`);
+        const p21Bold = p21.getElementsByTagName('w:b').length > 0;
+        assert(p21Bold, `Section 2 (L-S2): "2.1 GHS危险性类别：" 节标题必须加粗 (<w:b/> 存在)`);
+        const p21Ind = p21.getElementsByTagName('w:ind')[0];
+        const p21Fl = p21Ind?.getAttribute('w:firstLine');
+        assert(!p21Fl || p21Fl === '0', `Section 2 (L-S2): "2.1 GHS危险性类别：" 节标题严禁首行缩进，必须顶格对齐 (实测 fl: ${p21Fl})`);
+
+        // 关键门禁：2.2 GHS标签要素：节标题必须加粗且顶格
+        const p22 = s2Ps.find(p => /2\.2\s*GHS标签要素/i.test(p.textContent || ''));
+        assert(p22, `Section 2 (L-S2): OS-9547 必须包含 "2.2 GHS标签要素：" 节标题`);
+        const p22Bold = p22.getElementsByTagName('w:b').length > 0;
+        assert(p22Bold, `Section 2 (L-S2): "2.2 GHS标签要素：" 节标题必须加粗 (<w:b/> 存在)`);
+
+        const catPs = s2Ps.filter(p => !/2\.1|2\.2|2\.3/.test(p.textContent || '') && /类别\s*\d|\(H\d+\)/.test(p.textContent || ''));
         assert(catPs.length >= 4, `Section 2 (L-S2): OS-9547 必须包含至少 4 项危险性分类 (实测: ${catPs.length})`);
         for (const p of catPs) {
           const ind = p.getElementsByTagName('w:ind')[0];
           const fl = ind?.getAttribute('w:firstLine');
           assert(fl === '480', `Section 2 (L-S2): 分类条目必须统一首行缩进 480 dxa (实测: "${p.textContent.trim().slice(0, 20)}" fl=${fl})`);
+          const isBold = p.getElementsByTagName('w:b').length > 0;
+          assert(!isBold, `Section 2 (L-S2): 分类条目正文必须为常规体，严禁加粗 (实测: "${p.textContent.trim().slice(0, 20)}")`);
         }
       }
 

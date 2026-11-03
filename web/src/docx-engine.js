@@ -2919,44 +2919,48 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
 
       // Section 2 专属 5 级缩进几何状态机 (完全对齐 PA-3223 与 PU-202A 通栏规范)
       if (options.isSection2) {
-        if (options.isEnglish) {
-          // 英文版 Section 2 专属：标题与标题对齐 (left="480")，内容与内容对齐 (left="960")，换行首字对齐 (无 hanging)
-          if (/^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable|Acute toxicity|Skin|Serious eye|Eye irritation|Reproductive|Specific target|Sensitisation|Sensitization|Aquatic|Hazardous to the aquatic)/i.test(trimmed) || /(?:Category|\(H\d+[A-Za-z]?\))/i.test(trimmed)) {
-            const ind = doc.createElementNS(W_NS, 'w:ind');
-            ind.setAttributeNS(W_NS, 'w:left', '480');
-            pPr.appendChild(ind);
-          } else if (/^(?:Prevention|Response|Storage|Disposal)[：:]/i.test(trimmed)) {
-            const ind = doc.createElementNS(W_NS, 'w:ind');
-            ind.setAttributeNS(W_NS, 'w:left', '480');
-            pPr.appendChild(ind);
-          } else if (/^P\d{3}/i.test(trimmed) || /^(?:Wear protective|Wash contact|Do not eat|Use only outdoors|If inhaled|Skin and eye|Ingestion|Spillage|Fire|Store in a cool|Empty containers)/i.test(trimmed)) {
-            const ind = doc.createElementNS(W_NS, 'w:ind');
-            ind.setAttributeNS(W_NS, 'w:left', '960');
-            pPr.appendChild(ind);
-          } else if (/^H\d{3}/i.test(trimmed)) {
-            const ind = doc.createElementNS(W_NS, 'w:ind');
-            ind.setAttributeNS(W_NS, 'w:left', '480');
-            pPr.appendChild(ind);
-          }
-        } else {
-          // 中文版 Section 2 专属 5 级缩进几何状态机 (完全对齐 PA-3223 与 PU-202A 通栏规范)
-          if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃|急性毒性|皮肤|严重眼睛|生殖毒性|特异性靶器官|对水环境|致敏)/i.test(trimmed) || /(?:类别|\(H\d+[A-Za-z]?\))/i.test(trimmed)) {
-            const ind = doc.createElementNS(W_NS, 'w:ind');
-            ind.setAttributeNS(W_NS, 'w:firstLine', '480');
-            ind.setAttributeNS(W_NS, 'w:right', '480');
-            pPr.appendChild(ind);
-          } else if (/^(?:预防措施|事故响应|安全存储|安全储存|废弃处置)[：:]/i.test(trimmed)) {
-            const ind = doc.createElementNS(W_NS, 'w:ind');
-            ind.setAttributeNS(W_NS, 'w:left', '480');
-            pPr.appendChild(ind);
-          } else if (/^H\d{3}/i.test(trimmed)) {
-            const ind = doc.createElementNS(W_NS, 'w:ind');
-            ind.setAttributeNS(W_NS, 'w:left', '480');
-            pPr.appendChild(ind);
-          } else if (/^P\d{3}/i.test(trimmed) || /^(?:操作时穿戴|操作后彻底清洗|作业场所不得|在室外或通风良好处操作|吸入[：:]|眼睛|食入[：:]|泄露[：:]|灭火[：:]|请置于避光|装完整|使用后的空桶)/i.test(trimmed)) {
-            const ind = doc.createElementNS(W_NS, 'w:ind');
-            ind.setAttributeNS(W_NS, 'w:left', '960');
-            pPr.appendChild(ind);
+        // 关键防御：严格识别节标题行 (2.1 GHS危险性类别、2.2 GHS标签要素、2.3 其他危险等)，节标题绝不应用正文缩进！
+        const isSection2Header = /^(?:(?:2\.\d+\s*)?(?:GHS危险性类别|GHS\s*分类|物质或混合物的分类|GHS hazard classification|Classification of the substance or mixture|GHS\s*标签要素|Label elements|GHS Label Elements|其他危险|其他危害|Other\s*Hazards?)|2\.\d+)/i.test(trimmed);
+        if (!isSection2Header) {
+          if (options.isEnglish) {
+            // 英文版 Section 2 专属：标题与标题对齐 (left="480")，内容与内容对齐 (left="960")，换行首字对齐 (无 hanging)
+            if (/^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable|Acute toxicity|Skin|Serious eye|Eye irritation|Reproductive|Specific target|Sensitisation|Sensitization|Aquatic|Hazardous to the aquatic)/i.test(trimmed) || /(?:Category|\(H\d+[A-Za-z]?\))/i.test(trimmed)) {
+              const ind = doc.createElementNS(W_NS, 'w:ind');
+              ind.setAttributeNS(W_NS, 'w:left', '480');
+              pPr.appendChild(ind);
+            } else if (/^(?:Prevention|Response|Storage|Disposal)[：:]/i.test(trimmed)) {
+              const ind = doc.createElementNS(W_NS, 'w:ind');
+              ind.setAttributeNS(W_NS, 'w:left', '480');
+              pPr.appendChild(ind);
+            } else if (/^P\d{3}/i.test(trimmed) || /^(?:Wear protective|Wash contact|Do not eat|Use only outdoors|If inhaled|Skin and eye|Ingestion|Spillage|Fire|Store in a cool|Empty containers)/i.test(trimmed)) {
+              const ind = doc.createElementNS(W_NS, 'w:ind');
+              ind.setAttributeNS(W_NS, 'w:left', '960');
+              pPr.appendChild(ind);
+            } else if (/^H\d{3}/i.test(trimmed)) {
+              const ind = doc.createElementNS(W_NS, 'w:ind');
+              ind.setAttributeNS(W_NS, 'w:left', '480');
+              pPr.appendChild(ind);
+            }
+          } else {
+            // 中文版 Section 2 专属 5 级缩进几何状态机 (完全对齐 PA-3223 与 PU-202A 通栏规范)
+            if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃|急性毒性|皮肤|严重眼睛|生殖毒性|特异性靶器官|对水环境|致敏)/i.test(trimmed) || /(?:类别|\(H\d+[A-Za-z]?\))/i.test(trimmed)) {
+              const ind = doc.createElementNS(W_NS, 'w:ind');
+              ind.setAttributeNS(W_NS, 'w:firstLine', '480');
+              ind.setAttributeNS(W_NS, 'w:right', '480');
+              pPr.appendChild(ind);
+            } else if (/^(?:预防措施|事故响应|安全存储|安全储存|废弃处置)[：:]/i.test(trimmed)) {
+              const ind = doc.createElementNS(W_NS, 'w:ind');
+              ind.setAttributeNS(W_NS, 'w:left', '480');
+              pPr.appendChild(ind);
+            } else if (/^H\d{3}/i.test(trimmed)) {
+              const ind = doc.createElementNS(W_NS, 'w:ind');
+              ind.setAttributeNS(W_NS, 'w:left', '480');
+              pPr.appendChild(ind);
+            } else if (/^P\d{3}/i.test(trimmed) || /^(?:操作时穿戴|操作后彻底清洗|作业场所不得|在室外或通风良好处操作|吸入[：:]|眼睛|食入[：:]|泄露[：:]|灭火[：:]|请置于避光|装完整|使用后的空桶)/i.test(trimmed)) {
+              const ind = doc.createElementNS(W_NS, 'w:ind');
+              ind.setAttributeNS(W_NS, 'w:left', '960');
+              pPr.appendChild(ind);
+            }
           }
         }
       } else if (options.isSection11 && options.leftIndentTwips) {
@@ -2970,14 +2974,35 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
       // Section 2 细粒度加粗状态机 (精准分离标签加粗与常规体正文)
       let runSpecs = [];
       if (options.isSection2) {
-        if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃|急性毒性|皮肤|严重眼睛|生殖毒性|特异性靶器官|对水环境|致敏)/i.test(trimmed) ||
-            /^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable|Acute toxicity|Skin|Serious eye|Eye irritation|Reproductive|Specific target|Sensitisation|Sensitization|Aquatic|Hazardous to the aquatic)/i.test(trimmed) ||
-            /(?:类别|Category|\(H\d+[A-Za-z]?\))/i.test(trimmed) ||
-            /^H\d{3}/i.test(trimmed) || /^P\d{3}/i.test(trimmed)) {
-          runSpecs = [{ text: pText, bold: false }];
+        // 关键防御：优先匹配键值对行与节标题行，确保 2.1 GHS危险性类别、2.2 GHS标签要素、2.3 其他危险等加粗，值常规体
+        const kvMatch = pText.match(/^(\s*(?:(?:2\.\d+\s*)?(?:GHS危险性类别|GHS hazard classification|物质或混合物的分类|Classification of the substance or mixture)|羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification|(?:2\.\d+\s*)?(?:GHS\s*)?标签要素|Label elements|(?:2\.\d+\s*)?GHS Label Elements|象形图|GHS\s*象形图|GHS pictograms|警告词|信号词|Signal word|危险性说明|Hazard statements|防范说明|Precautionary statements|物理化学危险|Physical and chemical hazards|健康危害|Health hazards|环境危害|Environmental hazards|(?:2\.\d+\s*)?(?:其他危害|其他危险)|(?:2\.\d+\s*)?Other\s*Hazards?))([:：]?)\s*(.*)$/i);
+        if (kvMatch) {
+          const label = kvMatch[1];
+          const colon = kvMatch[2] || '';
+          const val = kvMatch[3];
+          if (!val && (label.includes('标签要素') || label.includes('Label elements') || label.includes('危险性类别') || label.includes('Classification') || label.includes('危险性说明') || label.includes('Hazard statements') || label.includes('象形图') || label.includes('pictograms'))) {
+            runSpecs = [{ text: label + colon, bold: true }];
+          } else if (label.includes('GHS危险性类别') && !options.isEnglish) {
+            runSpecs = [{ text: label + colon, bold: true }];
+            if (val.trim()) {
+              runSpecs.push({ text: ' ', bold: false }, { text: val.trim(), bold: false });
+            }
+          } else {
+            runSpecs = [{ text: label + colon, bold: true }];
+            if (val) {
+              const separator = options.isEnglish ? ' ' : '';
+              runSpecs.push({ text: separator + val.trim(), bold: false });
+            }
+          }
         } else if (/^(?:预防措施|事故响应|安全存储|安全储存|废弃处置)[：:]/i.test(trimmed) ||
-                   /^(?:Prevention|Response|Storage|Disposal)[：:]/i.test(trimmed)) {
+                   /^(?:Prevention|Response|Storage|Disposal)[：:]/i.test(trimmed) ||
+                   /^(?:防范说明)[:：]?$/i.test(trimmed) || /^(?:Precautionary statements)[:：]?$/i.test(trimmed)) {
           runSpecs = [{ text: pText, bold: true }];
+        } else if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃|急性毒性|皮肤|严重眼睛|生殖毒性|特异性靶器官|对水环境|致敏)/i.test(trimmed) ||
+                   /^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable|Acute toxicity|Skin|Serious eye|Eye irritation|Reproductive|Specific target|Sensitisation|Sensitization|Aquatic|Hazardous to the aquatic)/i.test(trimmed) ||
+                   /(?:类别|Category|\(H\d+[A-Za-z]?\))/i.test(trimmed) ||
+                   /^H\d{3}/i.test(trimmed) || /^P\d{3}/i.test(trimmed)) {
+          runSpecs = [{ text: pText, bold: false }];
         } else if (/^(?:操作时穿戴|操作后彻底清洗|作业场所不得|在室外或通风良好处操作|吸入[：:]|眼睛|食入[：:]|泄露[：:]|灭火[：:]|请置于避光|装完整|使用后的空桶)/i.test(trimmed) ||
                    /^(?:Wear protective|Wash contact|Do not eat|Use only outdoors|If inhaled|Skin and eye|Rinse mouth|In case of spillage|In case of fire|Store in a cool|Empty containers)/i.test(trimmed)) {
           // 保留条目前单空格微偏移
@@ -2996,29 +3021,8 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
           } else {
             runSpecs = [{ text: pText, bold: false }];
           }
-        } else if (/^(?:防范说明)[:：]?$/i.test(trimmed) || /^(?:Precautionary statements)[:：]?$/i.test(trimmed)) {
-          runSpecs = [{ text: pText, bold: true }];
         } else {
-          // 键值对行：标签加粗，值常规体 (全面兼容 2.1~2.3 编号与未加编号标签)
-          const kvMatch = pText.match(/^(\s*(?:(?:2\.\d+\s*)?(?:GHS危险性类别|GHS hazard classification|物质或混合物的分类|Classification of the substance or mixture)|羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification|(?:2\.\d+\s*)?(?:GHS\s*)?标签要素|Label elements|(?:2\.\d+\s*)?GHS Label Elements|象形图|GHS\s*象形图|GHS pictograms|警告词|信号词|Signal word|危险性说明|Hazard statements|防范说明|Precautionary statements|物理化学危险|Physical and chemical hazards|健康危害|Health hazards|环境危害|Environmental hazards|(?:2\.\d+\s*)?(?:其他危害|其他危险)|(?:2\.\d+\s*)?Other\s*Hazards?))([:：]?)\s*(.*)$/i);
-          if (kvMatch) {
-            const label = kvMatch[1];
-            const colon = kvMatch[2] || '';
-            const val = kvMatch[3];
-            if (!val && (label.includes('标签要素') || label.includes('Label elements') || label.includes('危险性类别') || label.includes('Classification') || label.includes('危险性说明') || label.includes('Hazard statements') || label.includes('象形图') || label.includes('pictograms'))) {
-              runSpecs = [{ text: label + colon, bold: true }];
-            } else if (label.includes('GHS危险性类别') && !options.isEnglish) {
-              runSpecs = [{ text: label + colon, bold: true }, { text: ' ', bold: false }, { text: val.trim(), bold: false }];
-            } else {
-              runSpecs = [{ text: label + colon, bold: true }];
-              if (val) {
-                const separator = options.isEnglish ? ' ' : '';
-                runSpecs.push({ text: separator + val.trim(), bold: false });
-              }
-            }
-          } else {
-            runSpecs = [{ text: pText, bold: false }];
-          }
+          runSpecs = [{ text: pText, bold: false }];
         }
       } else if (options.isSection11) {
         // Section 11 专属 G-11 粗细层级状态机：继承编辑器体系，组件标题与各项指标子标签强制加粗，数值常规体
