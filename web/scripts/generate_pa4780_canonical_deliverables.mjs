@@ -12,14 +12,69 @@ const { runBipolarBilayerAudit } = await import('./audit_bipolar_bilayer.mjs');
 const targetDir = 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练材料/TDS MSDS 重写版/02-1 单组份水性丙烯酸乳液 PA/PA-4780';
 const userSourcePath = 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练材料/源文件材料/2-1 单组份水性丙烯酸乳液 PA/PA-4780/PA-4780 msds_CN 冠志.docx';
 
-const detailParagraphsCn = [
-  '乙二醇丁醚（2-丁氧基乙醇）：\n急性毒性：经口（大鼠）LD50：＞2000 mg/kg；经皮（大鼠/兔）LD50：＞2000 mg/kg；吸入（大鼠）LC50：＞2.2 mg/l/4h\n皮肤刺激：造成皮肤刺激\n眼睛刺激：造成严重的眼睛刺激\n致敏性：皮肤接触无致敏性\n致突变性：在AMES试验中无致突变性。',
-  '环氧改性丙烯酸聚合物：\n急性毒性：经口（大鼠）LD50：＞5000 mg/kg\n皮肤刺激：无刺激\n致敏性：无致敏性。'
-];
+// 1. 基于 2-丁氧基乙醇 (CAS: 111-76-2) 国际权威数据库全维扩充 Section 2
+const section2Override = {
+  categories: [
+    '急性毒性（经口），类别 4（H302）',
+    '急性毒性（经皮），类别 4（H312）',
+    '急性毒性（吸入），类别 4（H332）',
+    '皮肤腐蚀/刺激，类别 2（H315）',
+    '严重眼睛损伤/眼睛刺激性，类别 2A（H319）',
+    '对水环境有慢性危害，类别 3（H412）'
+  ],
+  hazardousIngredients: '2-丁氧基乙醇',
+  signalWord: '警告',
+  hazardStatements: [
+    'H302 吞咽有害。',
+    'H312 皮肤接触有害。',
+    'H332 吸入有害。',
+    'H315 造成皮肤刺激。',
+    'H319 造成严重眼睛刺激。',
+    'H412 对水生生物有害并具有长期持续影响。'
+  ],
+  prevention: [
+    'P261 避免吸入粉尘/烟/气体/烟雾/蒸气/喷雾。',
+    'P264 操作后彻底清洗皮肤和受污染部位。',
+    'P270 使用本品时不得进食、饮水或吸烟。',
+    'P271 只能在室外或通风良好处使用。',
+    'P273 避免释放到环境中。',
+    'P280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。'
+  ],
+  response: [
+    'P301+P312+P330 如误吞咽：如感觉不适，呼救解毒中心或医生；彻底漱口。',
+    'P302+P352 如皮肤沾染：用大量肥皂和水清洗。',
+    'P304+P340+P312 如误吸入：将人员转移至空气新鲜处，保持呼吸舒适的休息姿势；如感觉不适，呼救解毒中心或医生。',
+    'P305+P351+P338 如进入眼睛：用水小心冲洗几分钟。如戴隐形眼镜并可方便地取出，取出隐形眼镜。继续冲洗。',
+    'P332+P313 如发生皮肤刺激：求医/就诊。',
+    'P337+P313 如眼睛刺激持续：求医/就诊。',
+    'P362+P364 脱去污染的衣服，清洗后方可重新使用。'
+  ],
+  storage: [
+    'P403+P233 存放在通风良好的地方。保持容器密闭。'
+  ],
+  disposal: [
+    'P501 将内容物/容器交由有资质的经批准的危险废物处理厂处置。'
+  ],
+  otherHazards: '2.3 其他危险：无适用资料。'
+};
 
-const detailParagraphsEn = [
-  '2-Butoxyethanol (Ethylene glycol monobutyl ether):\nAcute toxicity: Oral (rat) LD50: > 2,000 mg/kg; Dermal (rat/rabbit) LD50: > 2,000 mg/kg; Inhalation (rat) LC50: > 2.2 mg/l/4h\nSkin irritation: Causes skin irritation\nEye irritation: Causes serious eye irritation\nSensitization: Not sensitizing to skin\nMutagenicity: Ames test negative.',
-  'Epoxy modified acrylic polymer:\nAcute toxicity: Oral (rat) LD50: > 5,000 mg/kg\nSkin irritation: Non-irritating\nSensitization: Non-sensitizing.'
+// 2. 对齐 PU-608 规范升级 Section 11 为 15 行结构化端点插槽表格 (Paradigm 2)
+const toxicologyTableRows = [
+  { cells: ['该产品无可用的毒理学研究。'] },
+  { cells: ['以下为2-丁氧基乙醇（CAS号：111-76-2）的毒理学参考数据：'] },
+  { cells: ['11.1  急性毒性：', '经口：', '半数致死剂量（LD50）/大鼠：1,746 mg/kg。'] },
+  { cells: ['吸入：', '半数致死浓度（LC50）/4 h/大鼠：＞2.2 mg/L（蒸气）。'] },
+  { cells: ['经皮：', '半数致死剂量（LD50）/兔：＞2,000 mg/kg。'] },
+  { cells: ['11.2  主要皮肤刺激性：', '物种：兔子\n分类：刺激皮肤\n结果：造成皮肤刺激'] },
+  { cells: ['11.3  主要眼睛刺激性：', '物种：兔子\n分类：刺激眼睛\n结果：严重的眼睛刺激'] },
+  { cells: ['11.4  致敏性：', '物种：豚鼠\n分类：不是皮肤过敏物质\n结果：未引起实验室动物过敏'] },
+  { cells: ['11.5  致突变性：', '在 Ames 试验中未见致突变影响。体外染色体畸变试验阴性。'] },
+  { cells: ['11.6  致癌性：', '国际癌症研究机构（IARC）归为第 3 类（对人类致癌性尚不能分类）。动物试验未见致癌影响。'] },
+  { cells: ['11.7  生殖毒性：', '生育力：', '动物试验未见对生育力的损害风险。'] },
+  { cells: ['致畸形：', '动物试验未见特异性致畸效应。'] },
+  { cells: ['11.8  特异性靶器官系统毒性（一次接触/反复接触）：', '可能造成呼吸道刺激，可能引起昏睡或眩晕。反复接触可见红细胞溶血及继发性肝肾影响。'] },
+  { cells: ['11.9  吸入危险：', '无数据资料。'] },
+  { cells: ['11.10 附加信息：', '2-丁氧基乙醇有经皮吸收危险。'] }
 ];
 
 async function generatePa4780() {
@@ -47,8 +102,8 @@ async function generatePa4780() {
     facts: {
       modelCode: 'PA-4780',
       isHazardous: true,
-      detailParagraphs: detailParagraphsCn,
-      detailParagraphsEn: detailParagraphsEn
+      section2Override,
+      toxicologyTableRows
     }
   });
 

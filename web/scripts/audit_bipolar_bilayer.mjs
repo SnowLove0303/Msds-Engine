@@ -595,7 +595,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
     } else if (model === 'PA-4780' || /对水环境有慢性危害|H412/.test(s2Text)) {
       assert(/对水环境有慢性危害|H412/.test(s2Text), `Section 2 (L-S2): ${model} 水环境慢性危害分类保全`);
       assert(/H412/.test(s2Text) && /对水生生物有害并具有长期持续影响/.test(s2Text), `Section 2 (L-S2): ${model} H412 危害说明保全`);
-      assert(/P273/.test(s2Text) && /禁止排入环境/.test(s2Text), `Section 2 (L-S2): ${model} P273 预防措施保全`);
+      assert(/P273/.test(s2Text) && /(?:禁止排入环境|避免释放到环境)/.test(s2Text), `Section 2 (L-S2): ${model} P273 预防措施保全`);
       assert(/P501/.test(s2Text) && /处置/.test(s2Text), `Section 2 (L-S2): ${model} P501 废弃处置保全`);
       assert(/2-丁氧基乙醇/.test(s2Text), `Section 2 (L-S2): ${model} 标签有害成分 2-丁氧基乙醇保全`);
 
@@ -817,6 +817,11 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
       assert(/造成皮肤刺激/.test(s11Cn.textContent), 'Section 11 (L-S11): PU-608 皮肤刺激实测事实“造成皮肤刺激”保全');
       assert(/严重的眼睛刺激/.test(s11Cn.textContent), 'Section 11 (L-S11): PU-608 眼睛刺激实测事实“严重的眼睛刺激”保全');
       assert(/经皮吸收危险/.test(s11Cn.textContent), 'Section 11 (L-S11): PU-608 附加信息“经皮吸收危险”保全');
+    } else if (model === 'PA-4780') {
+      assert(/1,746|1746/.test(s11Cn.textContent), 'Section 11 (L-S11): PA-4780 经口急性毒性实测值 1,746 mg/kg 保全');
+      assert(/造成皮肤刺激/.test(s11Cn.textContent), 'Section 11 (L-S11): PA-4780 皮肤刺激实测事实“造成皮肤刺激”保全');
+      assert(/严重的眼睛刺激/.test(s11Cn.textContent), 'Section 11 (L-S11): PA-4780 眼睛刺激实测事实“严重的眼睛刺激”保全');
+      assert(/经皮吸收危险/.test(s11Cn.textContent), 'Section 11 (L-S11): PA-4780 附加信息“经皮吸收危险”保全');
     } else if (model === 'PU-202A') {
       assert(/3,000|3000/.test(s11Cn.textContent), 'Section 11 (L-S11): PU-202A 经口急性毒性实测值 3,000－6,000mg/kg 保全');
       assert(/＜940|<940/.test(s11Cn.textContent), 'Section 11 (L-S11): PU-202A 经皮急性毒性实测值 ＜940mg/kg 保全');
@@ -830,6 +835,11 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
       assert(/4,150|4150/.test(tblsEn[10].textContent), 'Section 11 英文版: PU-608 经口急性毒性实测值 4,150mg/kg 英译保全');
       assert(/Causes skin irritation/i.test(tblsEn[10].textContent), 'Section 11 英文版: PU-608 皮肤刺激英译保全');
       assert(/Causes serious eye irritation/i.test(tblsEn[10].textContent), 'Section 11 英文版: PU-608 眼睛刺激英译保全');
+    } else if (model === 'PA-4780') {
+      assert(/1,746|1746/.test(tblsEn[10].textContent), 'Section 11 英文版: PA-4780 经口急性毒性实测值 1,746 mg/kg 英译保全');
+      assert(/Causes skin irritation/i.test(tblsEn[10].textContent), 'Section 11 英文版: PA-4780 皮肤刺激英译保全');
+      assert(/Causes serious eye irritation/i.test(tblsEn[10].textContent), 'Section 11 英文版: PA-4780 眼睛刺激英译保全');
+      assert(/Risk of cutaneous absorption/i.test(tblsEn[10].textContent), 'Section 11 英文版: PA-4780 附加信息经皮吸收危险英译保全');
     }
   }
 
