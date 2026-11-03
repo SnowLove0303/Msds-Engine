@@ -523,6 +523,7 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
           sec9Facts.density = val.replace(/约\s*/g, 'Approx. ').replace(/g\/cm3/gi, ' g/cm³');
         } else if (/水溶性/i.test(lbl)) {
           if (/混溶|互溶|完全/i.test(val)) sec9Facts.solubility = 'Miscible';
+          else if (/分散|乳化/i.test(val)) sec9Facts.solubility = 'Dispersible in water';
           else sec9Facts.solubility = val;
         } else if (/表面张力/i.test(lbl)) {
           sec9Facts.surface_tension = /无数据/i.test(val) ? 'No data available.' : val;
@@ -535,7 +536,22 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
         } else if (/动力粘度|粘度/i.test(lbl)) {
           sec9Facts.viscosity = val.replace(/＜/g, '< ').replace(/＞/g, '> ');
         } else if (/固体含量|固含/i.test(lbl)) {
-          sec9Facts.solids = val;
+          sec9Facts.solids = val.replace(/约\s*/g, 'Approx. ');
+        }
+      }
+    }
+    if (facts.viscosityOverride) {
+      sec9Facts.viscosity = facts.viscosityOverride;
+    }
+    if (facts.section9Overrides) {
+      for (const [pattern, val] of Object.entries(facts.section9Overrides)) {
+        if (/粘度|动力粘度/i.test(pattern)) sec9Facts.viscosity = val;
+        else if (/固体含量|固含/i.test(pattern)) sec9Facts.solids = val;
+        else if (/密度/i.test(pattern)) sec9Facts.density = val.replace(/约\s*/g, 'Approx. ');
+        else if (/外观/i.test(pattern)) {
+          if (/无色.*微黄|微黄.*透明/i.test(val)) sec9Facts.appearance = 'Colorless to slightly yellow transparent liquid';
+          else if (/无色.*淡黄|淡黄.*粘稠/i.test(val)) sec9Facts.appearance = 'Colorless to light yellow transparent viscous liquid';
+          else sec9Facts.appearance = val;
         }
       }
     }
@@ -749,6 +765,39 @@ function normalizeSection11RowHeight(row) {
 // ==========================================
 // 通用 GHS 分类与 H/P 规程中英标准数据字典
 // ==========================================
+export const GHS_H_TO_CATEGORY_EN = {
+  'H332': 'Acute toxicity, Inhalation (Category 4), H332',
+  'H317': 'Skin sensitization (Category 1B), H317',
+  'H335': 'Specific target organ toxicity - single exposure (Category 3), H335',
+  'H412': 'Chronic aquatic toxicity (Category 3), H412',
+  'H302': 'Acute toxicity, Oral (Category 4), H302',
+  'H312': 'Acute toxicity, Dermal (Category 4), H312',
+  'H315': 'Skin corrosion/irritation (Category 2), H315',
+  'H316': 'Skin corrosion/irritation (Category 3), H316',
+  'H319': 'Serious eye damage/eye irritation (Category 2A), H319',
+  'H320': 'Serious eye damage/eye irritation (Category 2B), H320',
+  'H360': 'Reproductive toxicity (Category 1B), H360',
+  'H370': 'Specific target organ toxicity - single exposure (Category 1), H370',
+  'H373': 'Specific target organ toxicity - repeated exposure (Category 2), H373',
+  'H226': 'Flammable liquid (Category 3), H226'
+};
+
+export function translateGhsCategory(cat) {
+  if (!cat) return '';
+  const trimmed = cat.trim();
+  if (GHS_CATEGORY_TRANS_MAP[trimmed]) return GHS_CATEGORY_TRANS_MAP[trimmed];
+  const hMatch = trimmed.match(/H\d{3}[A-Za-z]?/i);
+  if (hMatch) {
+    const code = hMatch[0].toUpperCase();
+    if (GHS_H_TO_CATEGORY_EN[code]) return GHS_H_TO_CATEGORY_EN[code];
+  }
+  if (/急性毒性.*吸入/i.test(trimmed)) return 'Acute toxicity, Inhalation (Category 4), H332';
+  if (/皮肤致敏/i.test(trimmed)) return 'Skin sensitization (Category 1B), H317';
+  if (/靶器官.*一次/i.test(trimmed)) return 'Specific target organ toxicity - single exposure (Category 3), H335';
+  if (/慢性.*水/i.test(trimmed)) return 'Chronic aquatic toxicity (Category 3), H412';
+  return trimmed;
+}
+
 const GHS_CATEGORY_TRANS_MAP = {
   '急性毒性（吸入），类别4（H332）': 'Acute toxicity, Inhalation (Category 4), H332',
   '急性毒性（吸入），类别 4（H332）': 'Acute toxicity, Inhalation (Category 4), H332',
@@ -832,7 +881,26 @@ const GHS_P_TRANS_MAP = {
   'P332+P313': 'P332+P313 If skin irritation occurs: Get medical advice/attention.',
   'P362+P364': 'P362+P364 Take off contaminated clothing and wash it before reuse.',
   'P403+P233': 'P403+P233 Store in a well-ventilated place. Keep container tightly closed.',
+  'P403': 'P403 Store in a well-ventilated place.',
+  'P233': 'P233 Keep container tightly closed.',
+  'P312': 'P312 Call a POISON CENTER/doctor if you feel unwell.',
+  'P304+P312': 'P304+P312 IF INHALED: Call a POISON CENTER/doctor if you feel unwell.',
+  'P234': 'P234 Keep only in original packaging.',
+  'P391': 'P391 Collect spillage.',
+  'P333+P313': 'P333+P313 If skin irritation or rash occurs: Get medical advice/attention.',
+  'P363': 'P363 Wash contaminated clothing before reuse.',
 };
+
+export function translateGhsPrecautionary(p) {
+  if (!p) return '';
+  const normalized = p.replace(/P(\d+)\s*\+\s*\.?\s*P?(\d+)/gi, 'P$1+P$2');
+  const codeMatch = normalized.match(/^(P\d+(?:\+P\d+)*)/i);
+  const code = codeMatch ? codeMatch[1].toUpperCase() : '';
+  if (code && GHS_P_TRANS_MAP[code]) {
+    return GHS_P_TRANS_MAP[code];
+  }
+  return GHS_P_TRANS_MAP[code] || p;
+}
 
 /**
  * 从源文档 Section 2 提取真实结构化事实
@@ -1049,7 +1117,7 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
     if (!isNonHazardous && parsed) {
       paragraphs.push('2.1 Classification of the substance or mixture:');
       for (const cat of parsed.categories) {
-        paragraphs.push(GHS_CATEGORY_TRANS_MAP[cat] || cat);
+        paragraphs.push(translateGhsCategory(cat));
       }
       paragraphs.push(
         '2.2 GHS Label Elements:',
@@ -1075,27 +1143,19 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         'Prevention:'
       );
       for (const p of parsed.prevention) {
-        const codeMatch = p.match(/^(P\d+(?:\+P\d+)*)/);
-        const code = codeMatch ? codeMatch[1] : '';
-        paragraphs.push('        ' + (GHS_P_TRANS_MAP[code] || p));
+        paragraphs.push('        ' + translateGhsPrecautionary(p));
       }
       paragraphs.push('Response:');
       for (const p of parsed.response) {
-        const codeMatch = p.match(/^(P\d+(?:\+P\d+)*)/);
-        const code = codeMatch ? codeMatch[1] : '';
-        paragraphs.push('        ' + (GHS_P_TRANS_MAP[code] || p));
+        paragraphs.push('        ' + translateGhsPrecautionary(p));
       }
       paragraphs.push('Storage:');
       for (const p of parsed.storage) {
-        const codeMatch = p.match(/^(P\d+(?:\+P\d+)*)/);
-        const code = codeMatch ? codeMatch[1] : '';
-        paragraphs.push('        ' + (GHS_P_TRANS_MAP[code] || p));
+        paragraphs.push('        ' + translateGhsPrecautionary(p));
       }
       paragraphs.push('Disposal:');
       for (const p of parsed.disposal) {
-        const codeMatch = p.match(/^(P\d+(?:\+P\d+)*)/);
-        const code = codeMatch ? codeMatch[1] : '';
-        paragraphs.push('        ' + (GHS_P_TRANS_MAP[code] || p));
+        paragraphs.push('        ' + translateGhsPrecautionary(p));
       }
       let enOther = '2.3 Other hazards: No applicable information.';
       if (/N[－-]甲基吡咯烷酮/i.test(parsed.otherHazards)) {
@@ -1434,6 +1494,14 @@ export async function buildBaseChineseEngine({
 
   // 11. 规范化 Section 11：单组分插槽表格高精排版 (严格源事实驱动，通用排版，绝无针对型号硬编码假数据)
   let s11 = engine.records.find(r => r.sectionNumber === 11);
+  if (s11) {
+    for (let i = 2; i < s11.rows.length; i++) {
+      const c = s11.rows[i].cells[s11.rows[i].cells.length - 1];
+      if (c && !(c.text || '').trim()) {
+        safeWriteCellValue(c, '无数据资料。');
+      }
+    }
+  }
   if (s11 && s11Paradigm !== 'PARADIGM_1_FULL_WIDTH_MERGED' && !isNonHazComposite) {
     const srcS11 = srcEngine?.records?.find(r => r.sectionNumber === 11);
     const hasPreambleOnly = s11.rows.length >= 2 && /无可用的毒理学研究/i.test(s11.rows[1].cells[0]?.text || '') &&
@@ -1772,10 +1840,14 @@ function translateToxicologyValueToEnglish(cnText, endpoint = '') {
 
   // 急性毒性经口/吸入/经皮实测值翻译
   if (isDermal) {
-    t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*[/／]\s*大鼠\s*[:：]\s*/g, 'LD50 / Dermal / Rat: ');
+    t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*[/／]?\s*大鼠\s*[:：]\s*/g, 'LD50 / Dermal / Rat: ');
   } else {
-    t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*[/／]\s*大鼠\s*[:：]\s*/g, 'LD50 / Oral / Rat: ');
+    t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*[/／]?\s*大鼠\s*[:：]\s*/g, 'LD50 / Oral / Rat: ');
   }
+  t = t.replace(/，/g, ',');
+  t = t.replace(/轻微刺激/g, 'Slight irritation');
+  t = t.replace(/皮肤接触可能致敏/g, 'May cause sensitization by skin contact.');
+  t = t.replace(/在\s*AMES\s*试验中无致突变性。?/gi, 'Non-mutagenic in Ames test.');
   t = t.replace(/半数致死浓度\s*[（(]\s*LC50\s*[）)]\s*[/／]\s*1\s*h\s*[/／]\s*大鼠(?:\s*雌性)?\s*[:：]\s*/gi, 'LC50 / Inhalation / 1h / Rat: ');
   t = t.replace(/半数致死浓度\s*[（(]\s*LC50\s*[）)]\s*[/／]\s*4\s*h\s*[/／]\s*大鼠(?:\s*雌性)?\s*[:：]\s*/gi, 'LC50 / Inhalation / 4h / Rat: ');
   t = t.replace(/\s*[（(]\s*蒸气\s*[）)]/g, ' (vapour)');
@@ -1995,38 +2067,55 @@ export async function buildBaseEnglishEngine({
     let comps = facts.components;
     if (!comps && baseCnEngine) {
       const cnS3 = baseCnEngine.records.find(r => r.sectionNumber === 3);
-      if (cnS3 && cnS3.rows.length > 4) {
+      if (cnS3 && cnS3.rows.length >= 5) {
         comps = [];
         for (let i = 4; i < cnS3.rows.length; i++) {
           const r = cnS3.rows[i];
-          const cnName = (r.cells[0]?.text || '').trim();
-          let cas = (r.cells[1]?.text || '').trim();
-          const conc = (r.cells[2]?.text || '').trim();
-          let enName = cnName;
-          if (/封闭型脂肪族聚异氰酸酯/i.test(cnName)) enName = 'Blocked aliphatic polyisocyanate';
-          else if (/丙酮/i.test(cnName)) enName = 'Acetone';
-          else if (/乙酸/i.test(cnName)) enName = 'Acetic acid';
-          else if (/聚乙烯蜡/i.test(cnName)) enName = 'Polyethylene wax';
-          else if (/蜡/i.test(cnName)) enName = 'Wax';
-          else if (/二甲基乙酰胺|DMAC/i.test(cnName)) enName = 'N,N-Dimethylacetamide (DMAC)';
-          else if (/甲基吡咯烷酮|NMP/i.test(cnName)) enName = 'N-Methyl-2-pyrrolidone (NMP)';
-          else if (/乙基吡咯烷酮|NEP/i.test(cnName)) enName = '1-Ethylpyrrolidin-2-one (NEP)';
-          else if (/去离子水/i.test(cnName)) enName = 'Deionized water';
-          else if (/聚氨酯.*分散体|水性聚氨酯/i.test(cnName)) enName = 'Polyurethane dispersion';
-          else if (/聚氨酯/i.test(cnName)) enName = 'Polyurethane';
-          else if (/水$/i.test(cnName)) enName = 'Water';
-          else if (/环氧改性丙烯酸聚合物|环氧.*丙烯酸/i.test(cnName)) enName = 'Epoxy modified acrylic polymer';
-          else if (/丁氧基乙醇|乙二醇丁醚/i.test(cnName)) enName = '2-Butoxyethanol';
-          else if (/羟基丙烯酸酯.*聚合物|丙烯酸酯.*聚合物/i.test(cnName)) enName = 'Hydroxy acrylic polymer';
-          else if (/丙二醇.*丁醚|丙二醇单丁醚/i.test(cnName)) enName = 'Propylene glycol butyl ether';
-          else if (/N,N[－\-—\s]*二甲基乙醇胺|二甲基乙醇胺|DMEA/i.test(cnName)) enName = '2-Dimethylaminoethanol';
-          if (/商业机密|商业秘密/i.test(cas)) cas = 'Trade secret';
+          const rawC0 = (r.cells[0]?.text || '').trim();
+          const rawC1 = (r.cells[1]?.text || '').trim();
+          const rawC2 = (r.cells[2]?.text || '').trim();
 
-          comps.push({
-            name: enName,
-            cas: /商业机密|商业秘密/i.test(cas) ? 'Trade secret' : cas,
-            conc: conc
-          });
+          const subNames = rawC0.includes('\n') ? rawC0.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : [rawC0];
+          const subCas = rawC1.includes('\n') ? rawC1.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : [rawC1];
+          const subConc = rawC2.includes('\n') ? rawC2.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : [rawC2];
+
+          for (let k = 0; k < subNames.length; k++) {
+            const cnName = subNames[k];
+            let cas = subCas[k] || subCas[0] || '';
+            const conc = subConc[k] || subConc[0] || '';
+            let enName = cnName;
+            if (/封闭型脂肪族聚异氰酸酯/i.test(cnName)) enName = 'Blocked aliphatic polyisocyanate';
+            else if (/六甲撑二异氰酸酯基均聚物|六亚甲基二异氰酸酯.*均聚物|HDI.*均聚物|HDI.*低聚物/i.test(cnName)) {
+              if (/亲水/i.test(cnName)) enName = 'Hydrophilically modified hexamethylene diisocyanate homopolymer';
+              else enName = 'Hexamethylene diisocyanate oligomers';
+            }
+            else if (/亲水改性.*异氰酸酯/i.test(cnName)) enName = 'Hydrophilically modified polyisocyanate';
+            else if (/六甲撑二异氰酸酯|六亚甲基二异氰酸酯|HDI/i.test(cnName)) enName = 'Hexamethylene diisocyanate';
+            else if (/丙二醇二乙酸酯|PGDA/i.test(cnName)) enName = 'Propylene glycol diacetate';
+            else if (/丙二醇甲醚醋酸酯|PMA/i.test(cnName)) enName = 'Propylene glycol monomethyl ether acetate (PMA)';
+            else if (/丙酮/i.test(cnName)) enName = 'Acetone';
+            else if (/乙酸/i.test(cnName)) enName = 'Acetic acid';
+            else if (/聚乙烯蜡/i.test(cnName)) enName = 'Polyethylene wax';
+            else if (/蜡/i.test(cnName)) enName = 'Wax';
+            else if (/二甲基乙酰胺|DMAC/i.test(cnName)) enName = 'N,N-Dimethylacetamide (DMAC)';
+            else if (/甲基吡咯烷酮|NMP/i.test(cnName)) enName = 'N-Methyl-2-pyrrolidone (NMP)';
+            else if (/乙基吡咯烷酮|NEP/i.test(cnName)) enName = '1-Ethylpyrrolidin-2-one (NEP)';
+            else if (/去离子水/i.test(cnName)) enName = 'Deionized water';
+            else if (/聚氨酯.*分散体|水性聚氨酯/i.test(cnName)) enName = 'Polyurethane dispersion';
+            else if (/聚氨酯/i.test(cnName)) enName = 'Polyurethane';
+            else if (/水$/i.test(cnName)) enName = 'Water';
+            else if (/环氧改性丙烯酸聚合物|环氧.*丙烯酸/i.test(cnName)) enName = 'Epoxy modified acrylic polymer';
+            else if (/丁氧基乙醇|乙二醇丁醚/i.test(cnName)) enName = '2-Butoxyethanol';
+            else if (/羟基丙烯酸酯.*聚合物|丙烯酸酯.*聚合物/i.test(cnName)) enName = 'Hydroxy acrylic polymer';
+            else if (/丙二醇.*丁醚|丙二醇单丁醚/i.test(cnName)) enName = 'Propylene glycol butyl ether';
+            else if (/N,N[－\-—\s]*二甲基乙醇胺|二甲基乙醇胺|DMEA/i.test(cnName)) enName = '2-Dimethylaminoethanol';
+
+            comps.push({
+              name: enName,
+              cas: /商业机密|商业秘密/i.test(cas) ? 'Trade secret' : cas,
+              conc: conc
+            });
+          }
         }
       }
     }
@@ -2182,6 +2271,15 @@ export async function buildBaseEnglishEngine({
       const cnS9 = baseCnEngine.records.find(r => r.sectionNumber === 9);
       if (cnS9) {
         const cnIndicators = cnS9.rows.map(r => (r.cells[0]?.text || '').trim());
+        const hasPh = cnIndicators.some(t => /pH/i.test(t));
+        const hasBoiling = cnIndicators.some(t => /沸点/i.test(t));
+        const hasFlash = cnIndicators.some(t => /闪点/i.test(t));
+        const hasEvap = cnIndicators.some(t => /蒸发速率/i.test(t));
+        const hasFlammability = cnIndicators.some(t => /可燃性/i.test(t));
+        const hasCombustion = cnIndicators.some(t => /燃烧值/i.test(t));
+        const hasVapourDensity = cnIndicators.some(t => /相对蒸气密度/i.test(t));
+        const hasDensity = cnIndicators.some(t => /(?:^|[\s\t])密度/i.test(t));
+        const hasSolubility = cnIndicators.some(t => /水溶性/i.test(t));
         const hasIonicity = cnIndicators.some(t => /离子性/i.test(t));
         const hasSaturatedVapour = cnIndicators.some(t => /饱和蒸气压/i.test(t));
         const hasSurfaceTension = cnIndicators.some(t => /表面张力/i.test(t));
@@ -2192,13 +2290,23 @@ export async function buildBaseEnglishEngine({
         const hasExplosive = cnIndicators.some(t => /爆炸特性|爆炸极限/i.test(t));
         const hasDustExplosion = cnIndicators.some(t => /粉尘爆炸/i.test(t));
         const hasSolids = cnIndicators.some(t => /固体含量|固含量/i.test(t));
-        const hasCombustion = cnIndicators.some(t => /燃烧值/i.test(t));
+        const hasViscosity = cnIndicators.some(t => /粘度|动力粘度/i.test(t));
+        const hasOtherInfo = cnIndicators.some(t => /其他信息/i.test(t));
 
-        // 倒序对中文不存在的未测死重行执行同构剪枝 (包含离子性 Ionicity 1:1 同构对齐)
+        // 倒序对中文不存在的未测死重行执行全量同构剪枝，确保中英文行数与槽位 100% 1:1 对齐
         for (let rIdx = s9.rows.length - 1; rIdx >= 1; rIdx--) {
           const rowText = (s9.rows[rIdx]?.cells[0]?.text || '').trim();
           let shouldPrune = false;
-          if (!hasIonicity && /Ionicity/i.test(rowText)) shouldPrune = true;
+          if (!hasPh && /pH value/i.test(rowText)) shouldPrune = true;
+          else if (!hasBoiling && /Initial boiling/i.test(rowText)) shouldPrune = true;
+          else if (!hasFlash && /Flash point/i.test(rowText)) shouldPrune = true;
+          else if (!hasEvap && /Evaporation rate/i.test(rowText)) shouldPrune = true;
+          else if (!hasFlammability && /Flammability/i.test(rowText)) shouldPrune = true;
+          else if (!hasCombustion && /Heat of combustion|Combustion/i.test(rowText)) shouldPrune = true;
+          else if (!hasVapourDensity && /Relative vapour/i.test(rowText)) shouldPrune = true;
+          else if (!hasDensity && /(?:^|\s)Density/i.test(rowText)) shouldPrune = true;
+          else if (!hasSolubility && /Solubility in water/i.test(rowText)) shouldPrune = true;
+          else if (!hasIonicity && /Ionicity/i.test(rowText)) shouldPrune = true;
           else if (!hasSaturatedVapour && /Saturated vapour/i.test(rowText)) shouldPrune = true;
           else if (!hasSurfaceTension && /Surface tension/i.test(rowText)) shouldPrune = true;
           else if (!hasPartition && /log Pow|Partition/i.test(rowText)) shouldPrune = true;
@@ -2208,7 +2316,8 @@ export async function buildBaseEnglishEngine({
           else if (!hasExplosive && /Explosive properties/i.test(rowText)) shouldPrune = true;
           else if (!hasDustExplosion && /Dust explosion/i.test(rowText)) shouldPrune = true;
           else if (!hasSolids && /Solid(?:s)?\s*content/i.test(rowText)) shouldPrune = true;
-          else if (!hasCombustion && /Heat of combustion|Combustion/i.test(rowText)) shouldPrune = true;
+          else if (!hasViscosity && /Dynamic viscosity/i.test(rowText)) shouldPrune = true;
+          else if (!hasOtherInfo && /Other information/i.test(rowText)) shouldPrune = true;
 
           if (shouldPrune) {
             s9 = deleteRow(engine, s9, rIdx);
@@ -2336,7 +2445,12 @@ export async function buildBaseEnglishEngine({
         else if (/Carcinogenicity/i.test(rText) && carcCn) safeWrite(lastCell, translateToxicologyValueToEnglish(carcCn));
         else if (/Teratogenicity/i.test(rText) && teratoCn) safeWrite(lastCell, translateToxicologyValueToEnglish(teratoCn));
         else if (/Fertility/i.test(rText) && fertCn) safeWrite(lastCell, translateToxicologyValueToEnglish(fertCn));
-        else if (/Reproductive toxicity/i.test(rText) && repCn) safeWrite(lastCell, translateToxicologyValueToEnglish(repCn));
+        else if (/Reproductive toxicity/i.test(rText)) {
+          const repRowInCn = cnS11?.rows?.some(r => /生殖毒性/i.test(r.cells[0]?.text || ''));
+          if (repRowInCn) {
+            safeWrite(lastCell, repCn ? translateToxicologyValueToEnglish(repCn) : 'No data available.');
+          }
+        }
         else if (/Specific target organ/i.test(rText) && stotCn) safeWrite(lastCell, translateToxicologyValueToEnglish(stotCn));
         else if (/Aspiration hazard/i.test(rText) && aspCn) safeWrite(lastCell, translateToxicologyValueToEnglish(aspCn));
         else if (/Additional information/i.test(rText)) {
@@ -2363,7 +2477,10 @@ export async function buildBaseEnglishEngine({
         else if (/Carcinogenicity/i.test(rText) && !carcCn) shouldPrune = true;
         else if (/Teratogenicity/i.test(rText) && !findCnVal(/致畸/i)) shouldPrune = true;
         else if (/In vitro genotoxicity/i.test(rText) && !findCnVal(/体外遗传毒性|体外基因毒性/i)) shouldPrune = true;
-        else if (/Reproductive toxicity/i.test(rText) && !repCn) shouldPrune = true;
+        const repRowInCn = cnS11?.rows?.some(r => /生殖毒性/i.test(r.cells[0]?.text || ''));
+        const stotRowInCn = cnS11?.rows?.some(r => /特异性靶器官/i.test(r.cells[0]?.text || ''));
+        if (/Reproductive toxicity/i.test(rText) && !repCn && !repRowInCn) shouldPrune = true;
+        else if (/Specific target organ/i.test(rText) && !stotCn && !stotRowInCn) shouldPrune = true;
         else if (/Specific target organ/i.test(rText) && !stotCn) shouldPrune = true;
         else if (/根据现有数据，二乙二醇/i.test(rText)) shouldPrune = true;
         else if (/Aspiration hazard/i.test(rText) && !aspCn) shouldPrune = true;
