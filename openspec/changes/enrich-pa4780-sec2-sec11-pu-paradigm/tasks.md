@@ -12,7 +12,7 @@
 - [x] Task 4: 受控生产并执行终审 <!-- id: 4 -->
   - [x] 4.1 运行受控驱动脚本生成 PA-4780 标准 8 交付物
   - [x] 4.2 验证交付目录严格 8 交付物并通过双极双层全景机械终审 (`Exit Code 0 [Measured]`)
-- [ ] Task 5: 规范归档与 CHANGELOG 知识沉淀 <!-- id: 5 -->
-  - [ ] 5.1 运行 `npx openspec validate enrich-pa4780-sec2-sec11-pu-paradigm --strict`
-  - [ ] 5.2 提交 `CHANGELOG.md` 并通过 VS Code 原生 Diff 检阅
-  - [ ] 5.3 Git 原子归档
+- [x] Task 5: 规范归档与 CHANGELOG 知识沉淀 <!-- id: 5 -->
+  - [x] 5.1 运行 `npx openspec validate enrich-pa4780-sec2-sec11-pu-paradigm --strict`
+  - [x] 5.2 提交 `CHANGELOG.md` 并通过 VS Code 原生 Diff 检阅
+  - [x] 5.3 Git 原子归档
