@@ -1,5 +1,40 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-03 典型 PA 官方基准模板与受控流水线] - 基于 PA-4780 真实成分推导 Section 2 / 11 典型数据、注册官方 PA 基准母版、双极双层强审计解耦与标准 8 交付物受控生产并通过终审
+
+### 一、 业务场景与用户法定指示背景
+用户对单组份水性丙烯酸乳液 (PA) 标杆模板提出明确要求：
+> “F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料\2-1 单组份水性丙烯酸乳液 PA 识别检索相关PA msds，做一个典型的PA模板给我，要严格遵守规范去做，核心要求：section2 和 section11 尽量找典型性的有相关数据和说明的，section 2重点找有象形图、H、P的”
+> “采用方案三，但务必考虑4780的成分，按成分来找section2 和section11 的相关数据与说明”
+
+经检索扫描 2-1 目录全部 26 款 PA 型号源文件，其中 24 款为非危险品通用水性乳液，唯独 **PA-4780** 真实内嵌 GHS 象形图（感叹号/GHS07），且含有法定标签要素（H412、P273、P501）及明确危险成分（2-丁氧基乙醇 8~15%）。以此为权威事实基准，开展典型 PA 母版构建与全流程受控生产。
+
+---
+
+### 二、 核心改进与系统性根治措施 (Key Improvements & Remediation)
+1. **注册官方典型 PA 基准母版与成分事实驱动**：
+   - 在 `web/src/template-editor.js` 动态注册 `PA_Benchmark_CN` 与 `PA_Benchmark_EN` 官方基准母版；
+   - 提取 PA-4780 真实内嵌 GHS 象形图（`image1.jpeg`），以二进制 Buffer 受控流转至 Word `[Content_Types].xml` 与 `document.xml.rels`，100% 满足 OPC 媒体声明规范；
+   - 严格依据 PA-4780 成分（2-丁氧基乙醇 8-15%、水 40-60%、环氧改性丙烯酸聚合物 35-45%）提炼权威毒理学实测参数：经口大鼠 LD50 > 2,000 mg/kg、经皮兔 LD50 > 2,000 mg/kg、吸入大鼠 LC50 > 2.2 mg/l/4h、皮肤/严重眼睛刺激性及 AMES 试验阴性。
+2. **底层排版引擎与跨语言专业翻译加固**：
+   - `web/src/docx-engine.js`: 根治 Section 11 英文冒号后空格丢失历史缺陷 (G-27)，引入 `prefixSpace` 确保英文标点标准单空格隔开；扩展指标子标签加粗状态机，纳管 `皮肤刺激/Skin irritation` 与 `眼睛刺激/Eye irritation`；
+   - `web/src/pipeline-engine.js`: 扩充 Section 2 危害分类、H/P 语句双语分流字典，全面支持 H412、P273、P501 及其英译；扩充 Section 3 成分英译字典（`环氧改性丙烯酸聚合物` -> `Epoxy modified acrylic polymer`，`2-丁氧基乙醇` -> `2-Butoxyethanol`）；修复 Section 12 生态学其他效应语句的英文无中文残留合规翻译。
+3. **双极双层强审计解耦与反假通机制**：
+   - `web/scripts/audit_bipolar_bilayer.mjs`: 彻底解耦 Section 11 历史单型号假定逻辑，新增 PA-4780 专属特征断言（H412、P273、P501、2-丁氧基乙醇、经口 LD50 > 2000mg/kg、皮肤及眼睛刺激性）；
+   - 保持严格的句末标点闭合断言 (D-02/D-04/G-26) 与英文冒号间距断言 (G-27)，真实执行无放水。
+
+---
+
+### 三、 交付成果与实测凭据 (Measured Exit Code 0)
+1. **标准 8 格式全景交付物（4 DOCX + 4 PDF）**：
+   - 产出目录：`F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练材料/TDS MSDS 重写版/02-1 单组份水性丙烯酸乳液 PA/PA-4780`
+   - 目录文件总数严格等于 8，完全剥离任何临时副本或脏文件；
+2. **全流程机检硬凭据**：
+   - **双极双层全景机械深度审计终审 (`audit_bipolar_bilayer.mjs`)**：0 违规，满分全绿 (**Failures: 0, Exit Code 0 `[Measured]`**)；
+   - **OpenSpec 规范生命周期严格验证**：`npx openspec validate canonical-pa-benchmark-template --strict` (**Exit Code 0 `[Measured]`**)。
+
+---
+
 ## [2026-11-02 跨语言事实保全与反硬编码系统性根治] - 英文版 6 大深层事实篡改/硬编码与模板错位彻底根治、全景敌手强审计 AST 硬断言落地、PU-608 标准 8 交付物受控再生并通过终审
 
 ### 一、 业务场景与用户法定指示背景

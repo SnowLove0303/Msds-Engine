@@ -2840,7 +2840,8 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
       spacing.setAttributeNS(W_NS, 'w:line', '300');
       spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
       // Section 11 组分间距公理：组件与组件之间严格且唯美地空一行 (before="240"=12pt)，杜绝软回车双重叠加空两行
-      if (options.isSection11 && pIdx >= 2) {
+      const isSecondComponentOrLater = (rawParagraphs.length === 2 && pIdx === 1) || pIdx >= 2;
+      if (options.isSection11 && isSecondComponentOrLater) {
         spacing.setAttributeNS(W_NS, 'w:before', '240');
       }
       // Section 2 模块间保留一个空行间隔公理 (before="240"=12pt)：在各主要标签要素与危险性说明、防范说明、其他危险起始段落前注入
@@ -2974,20 +2975,21 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
             if (isComponentHeader) {
               runSpecs.push({ text: line, bold: true });
             } else {
-              // 匹配指标子标签：如 "毒性："、"刺激性："、"经皮（鼠）LD50："、"吸入（鼠）LD50："、"经口（鼠）LD50：" 等
-              const labelMatch = line.match(/^(\s*(?:毒性|刺激性|急性毒性|主要皮肤刺激性|主要粘膜刺激性|主要眼睛刺激性|致敏性|致突变性|致癌性|生殖毒性|特异性靶器官系统毒性(?:（一次接触\/反复接触）)?|吸入危险|附加信息|重复剂量中毒|经皮（鼠）LD50|吸入（鼠）LD50|经口（鼠）LD50|经皮|吸入|经口|物种|分类|结果|病理变化|生育力|致畸形|体外遗传毒性|Toxicity|Irritation|Acute toxicity|Primary skin irritation|Primary mucous membrane irritation|Sensitization|Mutagenicity|Carcinogenicity|Reproductive toxicity|Specific target organ toxicity|Aspiration hazard|Additional information|Repeated dose toxicity|Dermal|Oral|Inhalation|Species|Classification|Result|Fertility|Teratogenicity|In vitro genotoxicity)[：:])\s*(.*)$/i);
+              // 匹配指标子标签：如 "毒性："、"刺激性："、"皮肤刺激："、"经皮（鼠）LD50："、"吸入（鼠）LD50："、"经口（鼠）LD50：" 等
+              const labelMatch = line.match(/^(\s*(?:毒性|刺激性|皮肤刺激|眼睛刺激|急性毒性|主要皮肤刺激性|主要粘膜刺激性|主要眼睛刺激性|致敏性|致突变性|致癌性|生殖毒性|特异性靶器官系统毒性(?:（一次接触\/反复接触）)?|吸入危险|附加信息|重复剂量中毒|经皮（鼠）LD50|吸入（鼠）LD50|经口（鼠）LD50|经皮|吸入|经口|物种|分类|结果|病理变化|生育力|致畸形|体外遗传毒性|Toxicity|Irritation|Skin irritation|Eye irritation|Acute toxicity|Primary skin irritation|Primary mucous membrane irritation|Sensitization|Mutagenicity|Carcinogenicity|Reproductive toxicity|Specific target organ toxicity|Aspiration hazard|Additional information|Repeated dose toxicity|Dermal|Oral|Inhalation|Species|Classification|Result|Fertility|Teratogenicity|In vitro genotoxicity)[：:])\s*(.*)$/i);
               if (labelMatch) {
                 const subLabel = labelMatch[1];
                 const restVal = labelMatch[2];
+                const prefixSpace = options.isEnglish ? ' ' : '';
                 runSpecs.push({ text: subLabel, bold: true });
                 if (restVal) {
                   // 嵌套子标签匹配
                   const innerMatch = restVal.match(/^((?:经皮（鼠）LD50|吸入（鼠）LD50|经口（鼠）LD50|经皮|吸入|经口|物种|分类|结果|病理变化|Dermal|Oral|Inhalation|Species|Classification|Result)[：:])\s*(.*)$/i);
                   if (innerMatch) {
-                    runSpecs.push({ text: innerMatch[1], bold: true });
-                    if (innerMatch[2]) runSpecs.push({ text: innerMatch[2], bold: false });
+                    runSpecs.push({ text: prefixSpace + innerMatch[1], bold: true });
+                    if (innerMatch[2]) runSpecs.push({ text: prefixSpace + innerMatch[2], bold: false });
                   } else {
-                    runSpecs.push({ text: restVal, bold: false });
+                    runSpecs.push({ text: prefixSpace + restVal, bold: false });
                   }
                 }
               } else {

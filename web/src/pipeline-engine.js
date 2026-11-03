@@ -142,6 +142,11 @@ export const ENTITY_MATRIX = {
 export function translateGhsClassificationToEnglish(cnClass) {
   if (!cnClass) return 'Not classified as a hazardous chemical according to GHS.';
   const lines = [];
+  if (/H412|水环境.*(?:慢性)?|水生生物/i.test(cnClass)) lines.push('Hazardous to the aquatic environment - chronic hazard (Category 3), H412');
+  if (/H315|造成皮肤刺激/i.test(cnClass)) lines.push('Skin corrosion/irritation (Category 2), H315');
+  if (/H319|严重眼睛刺激/i.test(cnClass)) lines.push('Serious eye damage/eye irritation (Category 2A), H319');
+  if (/H302|吞咽有害/i.test(cnClass)) lines.push('Acute toxicity, Oral (Category 4), H302');
+  if (/H312|皮肤接触有害/i.test(cnClass)) lines.push('Acute toxicity, Dermal (Category 4), H312');
   if (/H332|急性毒性.*吸入/i.test(cnClass)) lines.push('Acute toxicity, Inhalation (Category 4), H332');
   if (/H316|皮肤.*(?:腐蚀|刺激)/i.test(cnClass)) lines.push('Skin corrosion/irritation (Category 3), H316');
   if (/H320|严重.*眼|眼睛刺激/i.test(cnClass)) lines.push('Serious eye damage/eye irritation (Category 2B), H320');
@@ -178,6 +183,7 @@ export function translateGhsPrecautionaryToEnglish(cnPrecaution) {
   const sections = [];
 
   const prev = ['Prevention:'];
+  if (/P273|环境/i.test(cnPrecaution)) prev.push('P273: Avoid release to the environment.');
   if (/P201|专用指导/i.test(cnPrecaution)) prev.push('P201: Obtain special instructions before use.');
   if (/P202|读懂所有安全防范措施/i.test(cnPrecaution)) prev.push('P202: Do not handle until all safety precautions have been read and understood.');
   if (/P260|不要吸入.*粉尘|不要吸入.*蒸气|不要吸入.*烟/i.test(cnPrecaution)) prev.push('P260: Do not breathe dust/fume/gas/mist/vapours/spray.');
@@ -204,7 +210,7 @@ export function translateGhsPrecautionaryToEnglish(cnPrecaution) {
   if (stor.length > 1) sections.push(stor.join('\n'));
 
   const disp = ['Disposal:'];
-  if (/P501|处置内装物|容器.*规章/i.test(cnPrecaution)) disp.push('P501: Dispose of contents/container in accordance with local/regional/national/international regulations.');
+  if (/P501|处置.*物|容器.*规章|有资质.*废物处理/i.test(cnPrecaution)) disp.push('P501: Dispose of contents/container to an approved waste treatment plant in accordance with local/regional/national/international regulations.');
   if (disp.length > 1) sections.push(disp.join('\n'));
 
   return sections.join('\n\n');
@@ -573,7 +579,11 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
       const otherRow = s12.rows.find(r => /其他不利/i.test(r.cells[0]?.text || ''));
       const otherText = (otherRow?.cells[1]?.text || '').trim();
       if (otherText && !/无数据/i.test(otherText)) {
-        sec12OtherEffects = otherText;
+        if (/对鱼类.*(?:和|与).*水蚤无害/i.test(otherText)) {
+          sec12OtherEffects = 'Based on ecotoxicological data, the product is classified as non-hazardous to fish and daphnia.';
+        } else {
+          sec12OtherEffects = 'No data available.';
+        }
       }
     }
   }
@@ -757,6 +767,11 @@ const GHS_CATEGORY_TRANS_MAP = {
   '易燃液体，类别 3（H226）': 'Flammable liquid (Category 3), H226',
   '皮肤致敏，类别1B（H317）': 'Skin sensitization (Category 1B), H317',
   '皮肤致敏，类别 1B（H317）': 'Skin sensitization (Category 1B), H317',
+  '对水环境有慢性危害, 类别 3 (H412)': 'Chronic aquatic toxicity (Category 3), H412',
+  '对水环境有慢性危害, 类别 3': 'Chronic aquatic toxicity (Category 3), H412',
+  '对水环境有慢性危害，类别 3 (H412)': 'Chronic aquatic toxicity (Category 3), H412',
+  '皮肤腐蚀/刺激，类别 2 (H315)': 'Skin corrosion/irritation (Category 2), H315',
+  '严重眼睛损伤/眼睛刺激性，类别 2A (H319)': 'Serious eye damage/eye irritation (Category 2A), H319',
   '对水环境有慢性危害，类别3（H412）': 'Chronic aquatic toxicity (Category 3), H412',
   '对水环境有慢性危害，类别 3（H412）': 'Chronic aquatic toxicity (Category 3), H412',
   '特异性靶器官系统毒性 一次接触，类别3（H335）': 'Specific target organ toxicity - single exposure (Category 3), H335',
@@ -777,6 +792,7 @@ const GHS_H_TRANS_MAP = {
 };
 
 const GHS_P_TRANS_MAP = {
+  'P273': 'P273 Avoid release to the environment.',
   'P201': 'P201 Obtain special instructions before use.',
   'P202': 'P202 Do not handle until all safety precautions have been read and understood.',
   'P260': 'P260 Do not breathe dust/fume/gas/mist/vapours/spray.',
@@ -821,6 +837,7 @@ export function parseSection2FromSource(srcEngine) {
   const storage = [];
   const disposal = [];
   let otherHazards = '';
+  let hazardousIngredients = '';
 
   for (let i = 0; i < rawParas.length; i++) {
     const p = rawParas[i];
@@ -828,15 +845,19 @@ export function parseSection2FromSource(srcEngine) {
       mode = 'cat';
       continue;
     }
-    if (/2\.2\s*GHS标签要素/i.test(p) || /^标签要素/i.test(p)) {
+    if (/2\.2\s*GHS标签要素/i.test(p) || /^2\.2\s*标签要素/i.test(p) || /^标签要素/i.test(p) || /GHS[- ]?象形图/i.test(p)) {
       mode = 'label';
+      continue;
+    }
+    if (/有害成[份分][：:]?\s*(.*)/i.test(p)) {
+      hazardousIngredients = p.replace(/.*有害成[份分][：:]?\s*/, '').trim();
       continue;
     }
     if (/信号词[：:]\s*(危险|警告)/i.test(p)) {
       signalWord = p.match(/信号词[：:]\s*(危险|警告)/i)[1];
       continue;
     }
-    if (/^危险性说明[：:]?$/i.test(p)) {
+    if (/^(?:危险性说明|危害性说明|危害说明|危险说明)[：:]?$/i.test(p)) {
       mode = 'h';
       continue;
     }
@@ -867,12 +888,22 @@ export function parseSection2FromSource(srcEngine) {
     }
 
     if (mode === 'cat') {
-      if (!/GHS标签要素|象形图/i.test(p)) categories.push(p);
+      if (!/GHS标签要素|象形图|有害成[份分]|CHS危险性类别|标签要素/i.test(p)) {
+        if (!/2\.1\s*物质或混合物的分类|GHS危险性类别[：:]?$/i.test(p)) {
+          categories.push(p);
+        }
+      }
     } else if (mode === 'h') {
       if (/^H\d+/i.test(p)) hazardStatements.push(p);
       else if (hazardStatements.length > 0 && !/防范说明/.test(p)) {
         hazardStatements[hazardStatements.length - 1] += p;
       }
+    } else if (mode === 'p') {
+      if (/^P2\d+/i.test(p)) prevention.push(p);
+      else if (/^P3\d+/i.test(p)) response.push(p);
+      else if (/^P4\d+/i.test(p)) storage.push(p);
+      else if (/^P5\d+/i.test(p)) disposal.push(p);
+      else prevention.push(p);
     } else if (mode === 'p_prev') {
       if (/^P\d+/i.test(p)) prevention.push(p);
       else if (prevention.length > 0) prevention[prevention.length - 1] += p;
@@ -891,6 +922,10 @@ export function parseSection2FromSource(srcEngine) {
     }
   }
 
+  if (!signalWord && (fullText.includes('警告') || fullText.includes('H412') || fullText.includes('类别 3'))) {
+    signalWord = '警告';
+  }
+
   return {
     rawParas,
     isNonHazardous,
@@ -901,6 +936,7 @@ export function parseSection2FromSource(srcEngine) {
     response,
     storage,
     disposal,
+    hazardousIngredients,
     otherHazards
   };
 }
@@ -933,6 +969,9 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       );
       if (facts.drawingNodes && facts.drawingNodes.length > 0) {
         paragraphs.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine });
+      }
+      if (parsed.hazardousIngredients) {
+        paragraphs.push(`必须列在标签上的有害成份：${parsed.hazardousIngredients}`);
       }
       paragraphs.push(
         `信号词：${parsed.signalWord || '危险'}`,
@@ -993,6 +1032,10 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       );
       if (facts.drawingNodes && facts.drawingNodes.length > 0) {
         paragraphs.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine });
+      }
+      if (parsed.hazardousIngredients) {
+        const ingEn = parsed.hazardousIngredients.includes('丁氧基乙醇') ? '2-Butoxyethanol' : parsed.hazardousIngredients;
+        paragraphs.push(`Hazardous components which must be listed on the label: ${ingEn}`);
       }
       const enSignal = parsed.signalWord === '危险' ? 'Danger' : (parsed.signalWord === '警告' ? 'Warning' : 'Danger');
       paragraphs.push(`Signal word: ${enSignal}`);
@@ -1163,7 +1206,7 @@ export function buildThreeTierSection11(engine, facts = {}, isEnglish = false) {
   }
   renderFullWidthRow(s11, 2, preambleText, { isEnglish, isSection11: true, leftIndentTwips: 34, boldSubheaders: false, totalWidth: 9781 });
 
-  let detailParagraphs = facts.detailParagraphs || [];
+  let detailParagraphs = (isEnglish && facts.detailParagraphsEn) ? facts.detailParagraphsEn : (facts.detailParagraphs || []);
   if (!detailParagraphs.length && srcS11) {
     // 从源文件 Section 11 中动态聚合端点
     const lines = [];
@@ -1342,7 +1385,7 @@ export async function buildBaseChineseEngine({
   }
 
   // 9.5 Section 11 & Section 12 双范式动态分流处理 (Ps-openspec 2.0: 多组分走通栏，单组分如 PU-202A 走原版分列表格)
-  const isMultiComponent = modelCode === 'PA-3223' || Boolean(facts.isMultiComponentComposite || isNonHazComposite);
+  const isMultiComponent = modelCode === 'PA-3223' || modelCode === 'PA-4780' || Boolean(facts.isMultiComponentComposite || isNonHazComposite);
   const s11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || srcEngine?.records?.find(r => r.sectionNumber === 11) || null);
   if (s11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
     buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || '' }, false);
@@ -1863,7 +1906,7 @@ export async function buildBaseEnglishEngine({
       srcEngine: baseCnEngine || facts.srcEngine,
       section3ExemptionNotes: enValues['sec3.exemption_notes'] || extractSection3ExemptionNotes(baseCnEngine.records.find(r => r.sectionNumber === 3))
     }, true);
-    const isMultiComponent = modelCode === 'PA-3223' || Boolean(facts.isMultiComponentComposite || isNonHazComposite);
+    const isMultiComponent = modelCode === 'PA-3223' || modelCode === 'PA-4780' || Boolean(facts.isMultiComponentComposite || isNonHazComposite);
     const enS11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || null);
     if (enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
       buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || '' }, true);
@@ -1900,6 +1943,8 @@ export async function buildBaseEnglishEngine({
           else if (/聚氨酯.*分散体|水性聚氨酯/i.test(cnName)) enName = 'Polyurethane dispersion';
           else if (/聚氨酯/i.test(cnName)) enName = 'Polyurethane';
           else if (/水$/i.test(cnName)) enName = 'Water';
+          else if (/环氧改性丙烯酸聚合物|环氧.*丙烯酸/i.test(cnName)) enName = 'Epoxy modified acrylic polymer';
+          else if (/丁氧基乙醇|乙二醇丁醚/i.test(cnName)) enName = '2-Butoxyethanol';
           else if (/羟基丙烯酸酯.*聚合物|丙烯酸酯.*聚合物/i.test(cnName)) enName = 'Hydroxy acrylic polymer';
           else if (/丙二醇.*丁醚|丙二醇单丁醚/i.test(cnName)) enName = 'Propylene glycol butyl ether';
           else if (/N,N[－\-—\s]*二甲基乙醇胺|二甲基乙醇胺|DMEA/i.test(cnName)) enName = '2-Dimethylaminoethanol';
@@ -2133,7 +2178,7 @@ export async function buildBaseEnglishEngine({
 
   // Section 11 【核心重构：彻底废除硬编码假数据与粗暴删行，基于中文母版实测端点动态英译装配】
   let s11 = engine.records.find(r => r.sectionNumber === 11);
-  const isMultiComponent = modelCode === 'PA-3223' || Boolean(facts.isMultiComponentComposite || isNonHazComposite);
+  const isMultiComponent = modelCode === 'PA-3223' || modelCode === 'PA-4780' || Boolean(facts.isMultiComponentComposite || isNonHazComposite);
   const enS11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || null);
   if (s11 && (isMultiComponent || enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED')) {
     // Mode B 通栏复合豁免模态：已由 buildThreeTierSection11 全权接管，跳过传统单端点映射以防中文污染

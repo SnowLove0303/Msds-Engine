@@ -592,6 +592,20 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
       assert(/Reproductive toxicity/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文生殖毒性通栏完备`);
       assert(/Signal word:\s*Danger/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文信号词 Danger 准确`);
       assert(/Precautionary statements|Prevention|Response/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文防范说明通栏完备`);
+    } else if (model === 'PA-4780' || /对水环境有慢性危害|H412/.test(s2Text)) {
+      assert(/对水环境有慢性危害|H412/.test(s2Text), `Section 2 (L-S2): ${model} 水环境慢性危害分类保全`);
+      assert(/H412/.test(s2Text) && /对水生生物有害并具有长期持续影响/.test(s2Text), `Section 2 (L-S2): ${model} H412 危害说明保全`);
+      assert(/P273/.test(s2Text) && /禁止排入环境/.test(s2Text), `Section 2 (L-S2): ${model} P273 预防措施保全`);
+      assert(/P501/.test(s2Text) && /处置/.test(s2Text), `Section 2 (L-S2): ${model} P501 废弃处置保全`);
+      assert(/2-丁氧基乙醇/.test(s2Text), `Section 2 (L-S2): ${model} 标签有害成分 2-丁氧基乙醇保全`);
+
+      const s2EnRow1 = tblsEn[1].getElementsByTagName('w:tr')[1];
+      const s2EnText = s2EnRow1?.textContent || '';
+      assert(/aquatic/i.test(s2EnText) && /H412/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文水环境危害分类 H412 保全`);
+      assert(/Harmful to aquatic life with long lasting effects/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文 H412 语句保全`);
+      assert(/P273/i.test(s2EnText) && /Avoid release to the environment/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文 P273 语句保全`);
+      assert(/P501/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文 P501 语句保全`);
+      assert(/2-Butoxyethanol/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文有害成份 2-Butoxyethanol 保全`);
     } else if (model === 'PA-3223' || /成盐|N,N-二甲基乙醇胺/.test(s2Text)) {
       // PA-3223 Mode B 专属成盐豁免与 5 级缩进断言
       assert(!/商业机密|7732-18-5|46±5/.test(s2Text), 'Section 2 (L-S2): 无菌覆写，彻底切断 Section 3 成分数据行穿透污染');
@@ -781,10 +795,19 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   if (isS11FullWidth) {
     assert(s11Cn.getElementsByTagName('w:tr').length === 4, `Section 11 (L-S11): 规范化收敛为 4 行三层排版`);
     const s11Row3Text = s11CnRow3?.textContent || '';
-    if (model === 'PU-202A') {
+    if (model === 'PA-4780') {
+      assert(/乙二醇丁醚|2-丁氧基乙醇/.test(s11Row3Text), 'Section 11 (L-S11): PA-4780 组分乙二醇丁醚毒理学数据保全');
+      assert(/2000/.test(s11Row3Text), 'Section 11 (L-S11): PA-4780 经口急性毒性实测值 >2000mg/kg 保全');
+      assert(/2-Butoxyethanol/i.test(tblsEn[10].textContent), 'Section 11 英文版 (L-S11 EN): PA-4780 2-Butoxyethanol 毒理学数据保全');
+      assert(/2,000|2000/.test(tblsEn[10].textContent), 'Section 11 英文版 (L-S11 EN): PA-4780 经口急性毒性 >2,000mg/kg 英译保全');
+      assert(/Causes skin irritation/i.test(tblsEn[10].textContent), 'Section 11 英文版 (L-S11 EN): PA-4780 皮肤刺激英译保全');
+      assert(/Causes serious eye irritation/i.test(tblsEn[10].textContent), 'Section 11 英文版 (L-S11 EN): PA-4780 眼睛刺激英译保全');
+    } else if (model === 'PA-3223') {
+      assert(/羟基聚丙烯酸酯分散体/.test(s11Row3Text) && /丙二醇丁醚/.test(s11Row3Text) && /二乙二醇丁醚/.test(s11Row3Text), 'Section 11 (L-S11): PA-3223 组分实测毒理试验数据 100% 内容守恒且无空值截断');
+    } else if (model === 'PU-202A') {
       assert(/N,N[-－]二甲基乙酰胺/.test(s11Row3Text), 'Section 11 (L-S11): PU-202A DMAC 实测毒理试验数据保全');
     } else {
-      assert(/羟基聚丙烯酸酯分散体/.test(s11Row3Text) && /丙二醇丁醚/.test(s11Row3Text) && /二乙二醇丁醚/.test(s11Row3Text), 'Section 11 (L-S11): 组分实测毒理试验数据 100% 内容守恒且无空值截断');
+      assert(/急性毒性/i.test(s11Row3Text) && /\d+/.test(s11Row3Text), 'Section 11 (L-S11): 组分实测毒理试验数据保全');
     }
   } else {
     const s11CnTrCount = s11Cn.getElementsByTagName('w:tr').length;
