@@ -2921,7 +2921,7 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
       if (options.isSection2) {
         if (options.isEnglish) {
           // 英文版 Section 2 专属：标题与标题对齐 (left="480")，内容与内容对齐 (left="960")，换行首字对齐 (无 hanging)
-          if (/^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable liquid|Acute toxicity|Skin corrosion|Serious eye|Reproductive|Specific target)/i.test(trimmed)) {
+          if (/^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable|Acute toxicity|Skin|Serious eye|Eye irritation|Reproductive|Specific target|Sensitisation|Sensitization|Aquatic|Hazardous to the aquatic)/i.test(trimmed) || /(?:Category|\(H\d+[A-Za-z]?\))/i.test(trimmed)) {
             const ind = doc.createElementNS(W_NS, 'w:ind');
             ind.setAttributeNS(W_NS, 'w:left', '480');
             pPr.appendChild(ind);
@@ -2929,7 +2929,7 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
             const ind = doc.createElementNS(W_NS, 'w:ind');
             ind.setAttributeNS(W_NS, 'w:left', '480');
             pPr.appendChild(ind);
-          } else if (/^(?:P\d{3}|Wear protective|Wash contact|Do not eat|Use only outdoors|If inhaled|Skin and eye|Ingestion|Spillage|Fire|Store in a cool|Empty containers)/i.test(trimmed)) {
+          } else if (/^P\d{3}/i.test(trimmed) || /^(?:Wear protective|Wash contact|Do not eat|Use only outdoors|If inhaled|Skin and eye|Ingestion|Spillage|Fire|Store in a cool|Empty containers)/i.test(trimmed)) {
             const ind = doc.createElementNS(W_NS, 'w:ind');
             ind.setAttributeNS(W_NS, 'w:left', '960');
             pPr.appendChild(ind);
@@ -2940,7 +2940,7 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
           }
         } else {
           // 中文版 Section 2 专属 5 级缩进几何状态机 (完全对齐 PA-3223 与 PU-202A 通栏规范)
-          if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃液体3|急性毒性|皮肤腐蚀|严重眼睛|生殖毒性|特异性靶器官)/i.test(trimmed)) {
+          if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃|急性毒性|皮肤|严重眼睛|生殖毒性|特异性靶器官|对水环境|致敏)/i.test(trimmed) || /(?:类别|\(H\d+[A-Za-z]?\))/i.test(trimmed)) {
             const ind = doc.createElementNS(W_NS, 'w:ind');
             ind.setAttributeNS(W_NS, 'w:firstLine', '480');
             ind.setAttributeNS(W_NS, 'w:right', '480');
@@ -2970,8 +2970,9 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
       // Section 2 细粒度加粗状态机 (精准分离标签加粗与常规体正文)
       let runSpecs = [];
       if (options.isSection2) {
-        if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃液体3|急性毒性|皮肤腐蚀|严重眼睛|生殖毒性|特异性靶器官)/i.test(trimmed) ||
-            /^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable liquid|Acute toxicity|Skin corrosion|Serious eye|Reproductive|Specific target)/i.test(trimmed) ||
+        if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃|急性毒性|皮肤|严重眼睛|生殖毒性|特异性靶器官|对水环境|致敏)/i.test(trimmed) ||
+            /^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable|Acute toxicity|Skin|Serious eye|Eye irritation|Reproductive|Specific target|Sensitisation|Sensitization|Aquatic|Hazardous to the aquatic)/i.test(trimmed) ||
+            /(?:类别|Category|\(H\d+[A-Za-z]?\))/i.test(trimmed) ||
             /^H\d{3}/i.test(trimmed) || /^P\d{3}/i.test(trimmed)) {
           runSpecs = [{ text: pText, bold: false }];
         } else if (/^(?:预防措施|事故响应|安全存储|安全储存|废弃处置)[：:]/i.test(trimmed) ||
@@ -4226,15 +4227,17 @@ export function renderThreeColumnVMergeSubRows(record, mainRowIndex, subRowIndex
  * @param {Object} record - 表格 record
  */
 export function enforceTableStandardBorders(record) {
-  if (!record || record.kind !== 'table' || !record.node) return;
-  const doc = record.node.ownerDocument;
+  if (!record || record.kind !== 'table') return;
+  const tblNode = record.node || record.rows?.[0]?.node?.parentNode;
+  if (!tblNode) return;
+  const doc = tblNode.ownerDocument;
   if (!doc) return;
 
   // 1. 设置表格级 tblBorders
-  let tblPr = firstChild(record.node, 'tblPr');
+  let tblPr = firstChild(tblNode, 'tblPr');
   if (!tblPr) {
     tblPr = doc.createElementNS(W_NS, 'w:tblPr');
-    record.node.insertBefore(tblPr, record.node.firstChild);
+    tblNode.insertBefore(tblPr, tblNode.firstChild);
   }
   let tblBorders = firstChild(tblPr, 'tblBorders');
   if (!tblBorders) {
@@ -4265,7 +4268,8 @@ export function enforceTableStandardBorders(record) {
   const numRows = rows.length;
   for (let rIdx = 0; rIdx < numRows; rIdx++) {
     const row = rows[rIdx];
-    const isFirstRow = (rIdx === 0);
+    const isTitleRow = (rIdx === 0);
+    const isFirstDataRow = (rIdx === 1);
     const isLastRow = (rIdx === numRows - 1);
     const numCells = row.cells?.length || 0;
 
@@ -4286,8 +4290,19 @@ export function enforceTableStandardBorders(record) {
         while (tcBorders.firstChild) tcBorders.removeChild(tcBorders.firstChild);
       }
 
-      const topVal = isFirstRow ? 'single' : 'dotted';
-      const bottomVal = isLastRow ? 'single' : 'dotted';
+      let topVal = 'dotted';
+      let bottomVal = 'dotted';
+      if (isTitleRow) {
+        topVal = 'single';
+        bottomVal = 'single';
+      } else if (isFirstDataRow) {
+        topVal = 'single';
+        bottomVal = isLastRow ? 'single' : 'dotted';
+      } else if (isLastRow) {
+        topVal = 'dotted';
+        bottomVal = 'single';
+      }
+
       const isLeft = (cIdx === 0);
       const isRight = (cIdx === numCells - 1);
       const leftVal = isLeft ? 'single' : 'dotted';

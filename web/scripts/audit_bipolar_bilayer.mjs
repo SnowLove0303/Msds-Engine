@@ -601,6 +601,16 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
       if (model === 'PA-4780' || /2-丁氧基乙醇/.test(s2Text)) {
         assert(/2-丁氧基乙醇/.test(s2Text), `Section 2 (L-S2): ${model} 标签有害成分 2-丁氧基乙醇保全`);
       }
+      if (model === 'OS-9547 PGDA80') {
+        const s2Ps = Array.from(s2Row1.getElementsByTagName('w:p'));
+        const catPs = s2Ps.filter(p => /类别\s*\d|\(H\d+\)/.test(p.textContent || ''));
+        assert(catPs.length >= 4, `Section 2 (L-S2): OS-9547 必须包含至少 4 项危险性分类 (实测: ${catPs.length})`);
+        for (const p of catPs) {
+          const ind = p.getElementsByTagName('w:ind')[0];
+          const fl = ind?.getAttribute('w:firstLine');
+          assert(fl === '480', `Section 2 (L-S2): 分类条目必须统一首行缩进 480 dxa (实测: "${p.textContent.trim().slice(0, 20)}" fl=${fl})`);
+        }
+      }
 
       const s2EnRow1 = tblsEn[1].getElementsByTagName('w:tr')[1];
       const s2EnText = s2EnRow1?.textContent || '';
@@ -739,6 +749,22 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   }
   assert(nonCenterIngredientCells === 0, `Section 3 (L-S3): 成分表格内容居中对齐 (jc=center) (违规格数: ${nonCenterIngredientCells})`);
 
+  // L-S3 边框规范断言 (各 section 表格外框实线，内框统一虚线)
+  const tblBorders = s3.getElementsByTagName('w:tblBorders')[0];
+  const insideH = tblBorders?.getElementsByTagName('w:insideH')[0]?.getAttribute('w:val');
+  const insideV = tblBorders?.getElementsByTagName('w:insideV')[0]?.getAttribute('w:val');
+  assert(insideH === 'dotted' && insideV === 'dotted', `Section 3 表格内框线必须为统一虚线 (dotted) (实测: insideH=${insideH}, insideV=${insideV})`);
+
+  let nonDottedInnerBorderCells = 0;
+  for (let r = 1; r < s3Trs.length - 1; r++) {
+    const tcs = s3Trs[r].getElementsByTagName('w:tc');
+    for (let c = 0; c < tcs.length; c++) {
+      const bottom = tcs[c].getElementsByTagName('w:bottom')[0]?.getAttribute('w:val');
+      if (bottom !== 'dotted') nonDottedInnerBorderCells++;
+    }
+  }
+  assert(nonDottedInnerBorderCells === 0, `Section 3 非末行数据格底边必须为虚线 (dotted) (实测违规: ${nonDottedInnerBorderCells})`);
+
   // L-S3 英文版成分表居中对齐断言
   const s3En = tblsEn[2];
   const s3TrsEn = s3En.getElementsByTagName('w:tr');
@@ -851,6 +877,11 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   // L-S12: 生态学信息 (说明行与生态指标)
   const s12 = tblsCn[11];
   assert(s12.getElementsByTagName('w:tr').length >= 4, 'Section 12 (L-S12): 生态学资料行数与引导说明行保全');
+  if (model === 'OS-9547 PGDA80') {
+    const s12En = tblsEn[11];
+    assert(s12.getElementsByTagName('w:tr').length === 4, `Section 12 (L-S12): OS-9547 PGDA80 格式严格服从原文 (无多余独立说明行)，行数严格为 4 行 (实测: ${s12.getElementsByTagName('w:tr').length})`);
+    assert(s12En.getElementsByTagName('w:tr').length === 4, `Section 12 (L-S12-EN): 英文版格式严格服从原文，行数严格为 4 行 (实测: ${s12En.getElementsByTagName('w:tr').length})`);
+  }
 
   // L-S13: 废弃处置 (废弃原则与双居中标签，英文内容严格纯左对齐 jc=left 彻底终结假性居中失真)
   const s13 = tblsCn[12];

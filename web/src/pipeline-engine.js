@@ -1078,13 +1078,13 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         ...parsed.hazardStatements,
         '防范说明：',
         '预防措施：',
-        ...parsed.prevention.map(p => p.startsWith('        ') ? p : '        ' + p),
+        ...parsed.prevention.map(p => p.trim()),
         '事故响应：',
-        ...parsed.response.map(p => p.startsWith('        ') ? p : '        ' + p),
+        ...parsed.response.map(p => p.trim()),
         '安全储存：',
-        ...parsed.storage.map(p => p.startsWith('        ') ? p : '        ' + p),
+        ...parsed.storage.map(p => p.trim()),
         '废弃处置：',
-        ...parsed.disposal.map(p => p.startsWith('        ') ? p : '        ' + p),
+        ...parsed.disposal.map(p => p.trim()),
         parsed.otherHazards || '2.3 其他危险：无适用资料。'
       );
     } else {
@@ -1154,19 +1154,19 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         'Prevention:'
       );
       for (const p of parsed.prevention) {
-        paragraphs.push('        ' + translateGhsPrecautionary(p));
+        paragraphs.push(translateGhsPrecautionary(p.trim()));
       }
       paragraphs.push('Response:');
       for (const p of parsed.response) {
-        paragraphs.push('        ' + translateGhsPrecautionary(p));
+        paragraphs.push(translateGhsPrecautionary(p.trim()));
       }
       paragraphs.push('Storage:');
       for (const p of parsed.storage) {
-        paragraphs.push('        ' + translateGhsPrecautionary(p));
+        paragraphs.push(translateGhsPrecautionary(p.trim()));
       }
       paragraphs.push('Disposal:');
       for (const p of parsed.disposal) {
-        paragraphs.push('        ' + translateGhsPrecautionary(p));
+        paragraphs.push(translateGhsPrecautionary(p.trim()));
       }
       let enOther = '2.3 Other hazards: No applicable information.';
       if (/N[－-]甲基吡咯烷酮/i.test(parsed.otherHazards)) {
@@ -1844,14 +1844,23 @@ export async function buildBaseChineseEngine({
     }
   }
 
-  // 11.9 规范化 Section 12 说明行与 12.1 去重
+  // 11.9 规范化 Section 12 说明行：若源文件 Section 12 首行即为端点行（无独立通栏说明行），彻底删除底模的独立说明行 (Row 1)
+  const srcS12 = srcEngine?.records?.find(r => r.sectionNumber === 12);
+  let srcHasS12Preamble = false;
+  if (srcS12 && srcS12.rows.length > 1) {
+    const firstDataRow = srcS12.rows[1];
+    const firstCellText = (firstDataRow.cells[0]?.text || '').trim();
+    if (firstDataRow.cells.length === 1 || (!/生态毒性|12\.\d/i.test(firstCellText) && firstCellText.length > 15)) {
+      srcHasS12Preamble = true;
+    }
+  }
+
   let s12Cn = engine.records.find(r => r.sectionNumber === 12);
-  if (s12Cn && s12Cn.rows.length >= 3) {
+  if (s12Cn && !srcHasS12Preamble && s12Cn.rows.length >= 4) {
     const r1Text = (s12Cn.rows[1]?.cells[0]?.text || '').trim();
-    const r2Text = (s12Cn.rows[2]?.cells[s12Cn.rows[2].cells.length - 1]?.text || '').trim();
-    if (r1Text.includes('禁止排入下水道') && r2Text.includes('禁止排入下水道')) {
-      safeWriteCellValue(s12Cn.rows[1].cells[0], '该产品无可用的生态毒理学研究。');
-      safeWriteCellValue(s12Cn.rows[2].cells[s12Cn.rows[2].cells.length - 1], '该产品无可用的生态毒理学研究。禁止排入下水道，废水或土壤中。');
+    if (/无可用的生态毒理学研究|生态毒理学/i.test(r1Text) && s12Cn.rows[1].cells.length === 1) {
+      s12Cn = deleteRow(engine, s12Cn, 1);
+      renumberRecord(s12Cn, '12');
     }
   }
 
@@ -2681,8 +2690,10 @@ export async function buildBaseEnglishEngine({
         s12 = deleteRow(engine, s12, 2);
       }
     } else if (cnPreambles.length === 0) {
-      if (s12.rows[2]?.cells?.length === 1) s12 = deleteRow(engine, s12, 2);
-      if (s12.rows[1]?.cells?.length === 1) s12 = deleteRow(engine, s12, 1);
+      while (s12.rows.length > 1 && s12.rows[1].cells.length === 1) {
+        s12 = deleteRow(engine, s12, 1);
+      }
+      renumberRecord(s12, '12');
     }
 
     // 动态提取中文生态毒性实测值并专业英译
@@ -3135,7 +3146,9 @@ export async function executeEightDeliverablesPipeline({
   let expectedS12PreamblesCount = 0;
   if (s12RecordForAudit) {
     for (let i = 1; i < s12RecordForAudit.rows.length; i++) {
-      const t = s12RecordForAudit.rows[i].cells.map(c => c.text || '').join('').trim();
+      const row = s12RecordForAudit.rows[i];
+      if (row.cells.length > 1) break;
+      const t = row.cells.map(c => c.text || '').join('').trim();
       if (/生态毒性|持久性|12\.\d/i.test(t)) break;
       if (t) expectedS12PreamblesCount++;
     }

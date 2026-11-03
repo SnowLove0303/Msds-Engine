@@ -7,16 +7,20 @@
 > “这是最新的TDS 文件：... OS-9547 PGDA80_TDS_CN_冠志.pdf。你需要通过TDS 获取最新的指标，然后找到msds 源文件：... OS-9547 PGDA80 msds_CN 冠志.docx，更正指标并进行标准化覆写产出...”
 > “审计了吗，为什么section2 、section9、section11 、section3、section12都不符合规范，不都告诉你要审计了吗，不都告诉你正确的做法了吗，为什么还能犯这么多问题，问题我不告诉你，自己给我审计出来”
 > “上述问题发现的很准确，但是我补一个：Section3 的后两个成分的表格框线不对，各section表格外框用实线，内框用统一虚线，这个需要补进全局规范里，现在开始根治各个问题，在工作流调用那里请务必把最终的审计及其审计方案拉到强制级别”
+> “先写一份问题总结md给我，然后再次对结果进行审计，我看了你产出的结果，还是有问题，比如section2.1 的排版；section3 的表格内框线，我都说过了，外面实线里面虚线；section12 相比源文件内容好像多了些什么；等等，可能不止以上问题”
 
 ---
 
 ### 二、 核心改进与系统性根治措施 (Key Improvements & Remediation)
 1. **全局表格边框规范立法与引擎执行 (`enforceTableStandardBorders`)**：
    - 在 `SKILL.md` 全局规范中确立：所有表格外框（top, left, bottom, right）使用实线 (`single`, 4 dxa)，内框（insideH, insideV）使用统一虚线 (`dotted`, 4 dxa)；
-   - 在 `docx-engine.js` 中新增通用原语 `enforceTableStandardBorders(record)`，自适应遍历设置 `w:tblBorders` 与所有单元格的 `w:tcBorders`，确保外边界实线、内网格统一虚线，彻底解决 Section 3 等多成分表格框线混乱不一致问题；并在 `executeEightDeliverablesPipeline` 中作为全局后处理强制生效。
+   - 修复 DOM 节点定位缺陷：`docx-engine.js` 中 `tableRecord` 无 `.node` 属性，原代码 `if (!record.node) return` 导致函数静默退出；现修正为 `record.node || record.rows?.[0]?.node?.parentNode`，全面穿透设置 `w:tblBorders`（上下左右实线、内部行列虚线）与所有单元格的 `w:tcBorders`（非末行 bottom/right 统一设为 dotted 虚线），彻底根除 Section 3 等多成分表格框线实线混乱问题；
+   - 并在 `audit_bipolar_bilayer.mjs` 中新增物理级 XML 边框硬断言（`insideH === 'dotted'`, `insideV === 'dotted'`, 非末行 `bottom === 'dotted'`），构建不可穿透的机器防御墙。
 2. **工作流审计套件拉升为强制级别硬阻断门禁 (Mandatory Hard Blocker Gate)**：
    - 在 `SKILL.md` 工作流 SOP 中立法：`runBipolarBilayerAudit` 与 `verifyAuditContract` (G-01 ~ G-40) 成为强制级别门禁，任何单项失败直接阻断交付并抛出异常，真实退出码 0 为充要准入条件。
-3. **Section 2 标签规范性与防范说明 OCR 错别字根除**：
+3. **Section 2.1 排版缩进统一与防范说明 OCR 错别字根除**：
+   - 根治分类项排版锯齿：修复了 `renderFullWidthRow` 中 GHS 危害分类正则遗漏“皮肤致敏/水环境”导致部分分类行顶格（0 dxa）、部分分类行缩进（480 dxa）的锯齿不齐病态；泛化正则为匹配 `类别`、`Category`、`(Hxxx)`、`致敏` 等全部 GHS 关键字，确保全量分类行严格统一获得 `w:firstLine="480"` 缩进与标准常规字重；
+   - 清理 P 语句硬编码：剔除 `pipeline-engine.js` 中手动拼接的 8 空格字符串前缀，交由 `w:left="960"` 标准样式进行层级分段排版；
    - 修复 OCR 识别瑕疵：“宇防护服”纠正为“穿防护服”，“P403+.P233”纠正为“P403+P233”，“废物外理厂”纠正为“废物处理厂”；
    - 英文版标签要素补齐：必须列在标签上的有害成分标注为 `Hazardous components which must be listed on the label: Hydrophilic aliphatic polyisocyanate based on HDI`。
 4. **Section 9 TDS 权威事实指标精准注入与序号自增同步**：
@@ -25,17 +29,17 @@
 5. **Section 11 格式服从原文剪枝与中英文严格同构**：
    - 实现“格式服从原文”动态判定：源文件未提及的生殖毒性、特异性靶器官、致癌性、吸入危害及附加信息占位行全部干净删除；
    - 修复说明行 2 英译：`类似产品的风险评估`翻译为 `Toxicological data from risk assessment of similar products:`；中英文版最终均精准收敛为 8 行（1个标题行 + 2个说明行 + 5个实测端点行），杜绝任何凭空伪造。
-6. **Section 12 前言说明行去重与英文标点规范化**：
-   - 消除前言行与 12.1 鱼类急性毒性之间的重复描述；
-   - 英文版前言行句号后增加标准半角空格（`. Do not allow...`）。
+6. **Section 12 格式严格服从原文剪枝与底模中文残留彻底剥离**：
+   - 实现源事实前言动态感知：源文件若无独立前言，底模第 1 行独立说明行（“该产品无可用的生态毒理学研究。”）自动彻底删除，中英文版均精准收敛为法定 4 行（1个标题行 + 3个实测端点行），杜绝底模幽灵行与重复语句污染；
+   - 英文版裁剪规则硬化：只要中文前言为 0，英文版无条件删除所有数据行前的单列占位行，彻底根除英文底模原有的硬编码中文占位行（`该产品无可用的生态毒理学研究。` 与 `以下为二乙二醇单丁醚...`）。
 
 ---
 
 ### 三、 交付成果与实测凭据 (Measured Exit Code 0)
 1. **全流程机检硬凭据**：
    - **双极双层全景机械深度审计终审 (`audit_bipolar_bilayer.mjs`)**：0 违规，满分全绿 (**Failures: 0, Exit Code 0 `[Measured]`**)；
-   - **G-01 ~ G-40 终审门禁 (`verifyAuditContract`)**：14/14 全绿通过 (**Failures: 0, Exit Code 0 `[Measured]`**)，其中 G-40 末页避免纯空门禁 4 份 PDF 最后一页均包含实质主体内容（冠志/国彩中文 19 块，冠志/国彩英文 9 块）；
-   - **正式交付物**：8 份正式交付文件（4 DOCX + 4 PDF）全部成功产出至目标目录，时间戳同步差值 7.1 秒。
+   - **G-01 ~ G-40 终审门禁 (`verifyAuditContract`)**：14/14 全绿通过 (**Failures: 0, Exit Code 0 `[Measured]`**)，其中 G-40 末页避免纯空门禁 4 份 PDF 最后一页均包含实质主体内容（冠志中文 19 块、国彩中文 18 块，冠志英文 8 块、国彩英文 8 块）；
+   - **正式交付物**：8 份正式交付文件（4 DOCX + 4 PDF）全部成功产出至目标目录，时间戳同步差值 7.9 秒。
 
 ---
 
