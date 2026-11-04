@@ -2832,7 +2832,7 @@ export function cleanSlateTemplateRecord(tRecord, sectionNumber, editorEngine) {
     if (s === 15 && /其它的规定|符合下列法规要求/i.test(rowText)) continue;
 
     // 5. Section 2 与 Section 9: 由专有剪枝与写值流程处理，不在此预清空
-    if (s === 2 || s === 9) continue;
+    if (s === 2 || s === 8 || s === 9) continue;
     // Section 11: 保留顶部产品说明语，避免被清空误删
     if (s === 11 && /无可用的毒理学研究/i.test(rowText)) continue;
     // Section 12: 保留顶部生态说明语，避免被清空误删 (PU-202B 审阅批注 8, 9)
@@ -3655,14 +3655,6 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
             writeCellValue(engRow.cells[1], engVal, editorEngine.roleStyles?.value);
             injectedCount++;
           } catch (e) {}
-        } else if (!engVal && engRow) {
-          const engRowIdx = tRecord.rows.indexOf(engRow);
-          if (engRowIdx !== -1) {
-            try {
-              const updated = deleteRow(editorEngine, tRecord, engRowIdx);
-              if (updated) tRecord = updated;
-            } catch (e) {}
-          }
         }
 
         // 手部防护：若源文档无独立建议，保底设置“建议戴上防护手套。”
@@ -3681,10 +3673,11 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
           }
         }
 
-        // 组分控制参数 (严格基于实质数值限值判定，排除纯否定声明；若无则将底模空 4 列表头与行彻底连根拔除)
+        // 组分控制参数 (源文档明确包含 8.1 控制参数 / 工作场所组分控制参数，或异氰酸酯产品，必须保留)
         const oelCombinedText = matchedSec.sourceRecord?.rows?.map((r) => r.cells?.map((c) => c.text || '').join(' ')).join('\n') || '';
-        const hasSubstantiveOel = /(?:\b(?:PC-TWA|PC-STEL|MAC|TLV|OEL|TWA|STEL|WEL)\b|mg\/m3|mg\/m³|ppm)\s*[:：]?\s*\d+/i.test(oelCombinedText)
-          && !/未制定|无可用的接触限值|无已知|无数据|不适用|not established|no exposure limits/i.test(oelCombinedText);
+        const sourceMentionsOel = /控制参数|组分控制参数|接触限值|六亚甲基|异氰酸酯/i.test(oelCombinedText);
+        const hasSubstantiveOel = sourceMentionsOel || (/(?:\b(?:PC-TWA|PC-STEL|MAC|TLV|OEL|TWA|STEL|WEL)\b|mg\/m3|mg\/m³|ppm)\s*[:：]?\s*\d+/i.test(oelCombinedText)
+          && !/未制定|无可用的接触限值|无已知|无数据|不适用|not established|no exposure limits/i.test(oelCombinedText));
 
         if (!hasSubstantiveOel) {
           for (let rIdx = tRecord.rows.length - 1; rIdx >= 0; rIdx--) {
@@ -3694,6 +3687,19 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
             if (row.cells.length === 4 || /工作场所组分控制参数|组分控制参数|物质.*依据.*类型|六亚甲基|丙二醇|CAS号.*PC-TWA/i.test(rowText)) {
               try {
                 const updated = deleteRow(editorEngine, tRecord, rIdx);
+                if (updated) tRecord = updated;
+              } catch (e) {}
+            }
+          }
+        } else {
+          // 若产品不含 PMA（丙二醇甲醚醋酸酯），修剪无用 PMA 行，保留六亚甲基-1,6-二异氰酸酯
+          const compNames = (matchedSec.components || []).map(c => c.name).join(' ');
+          const hasPma = /丙二醇甲醚醋酸酯|PMA/i.test(compNames);
+          if (!hasPma) {
+            const pmaRowIdx = tRecord.rows.findIndex(r => r.cells.some(c => /丙二醇甲醚醋酸酯/i.test(c.text || '')));
+            if (pmaRowIdx !== -1) {
+              try {
+                const updated = deleteRow(editorEngine, tRecord, pmaRowIdx);
                 if (updated) tRecord = updated;
               } catch (e) {}
             }

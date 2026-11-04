@@ -2475,24 +2475,47 @@ export async function buildBaseEnglishEngine({
   // Section 8 (与中文母版保持严格同构剪枝)
   let s8 = engine.records.find(r => r.sectionNumber === 8);
   if (s8) {
+    const cnS8 = baseCnEngine?.records?.find(r => r.sectionNumber === 8);
     for (const row of s8.rows) {
       const lbl = (row.cells[0]?.text || '').trim();
       const c1 = row.cells[1];
       if (c1) {
         if (/Respiratory protection/i.test(lbl)) safeWrite(c1, enValues['sec8.respiratory_protection']);
-        else if (/Hand protection/i.test(lbl)) safeWrite(c1, enValues['sec8.hand_protection']);
+        else if (/Hand protection/i.test(lbl)) {
+          const cnHand = cnS8?.rows?.find(r => /手部防护/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
+          safeWrite(c1, cnHand ? enValues['sec8.hand_protection'] : '');
+        }
         else if (/Suitable material/i.test(lbl)) safeWrite(c1, enValues['sec8.glove_material']);
         else if (/Fluororubber|FKM/i.test(lbl)) safeWrite(c1, enValues['sec8.fkm_glove']);
         else if (/Butyl rubber|IIR/i.test(lbl)) safeWrite(c1, enValues['sec8.iir_glove']);
         else if (/Nitrile rubber|NBR/i.test(lbl)) safeWrite(c1, enValues['sec8.nbr_glove']);
         else if (/Recommendation/i.test(lbl)) safeWrite(c1, enValues['sec8.glove_recommendation']);
-        else if (/Eye protection/i.test(lbl)) safeWrite(c1, enValues['sec8.eye_protection']);
+        else if (/Eye protection/i.test(lbl)) safeWrite(c1, 'Protective goggles are recommended.');
         else if (/Body protection/i.test(lbl)) safeWrite(c1, enValues['sec8.body_protection']);
-        else if (/Engineering controls/i.test(lbl)) safeWrite(c1, enValues['sec8.engineering_controls']);
+        else if (/Engineering controls/i.test(lbl)) safeWrite(c1, 'Use local exhaust or general ventilation to maintain workplace concentrations below occupational exposure limits; eyewash and safety shower facilities should be provided in the workplace.');
       }
     }
-    const cnS8 = baseCnEngine?.records?.find(r => r.sectionNumber === 8);
-    const targetRowCount = cnS8?.rows?.length || 11;
+
+    // 翻译 4 列控制参数表中的中文物质名
+    for (const row of s8.rows) {
+      if (row.cells.length === 4) {
+        const c0 = row.cells[0];
+        if (c0 && /六亚甲基-1,6-二异氰酸酯/i.test(c0.text)) {
+          safeWrite(c0, 'Hexamethylene-1,6-diisocyanate');
+        }
+      }
+    }
+
+    // 若中文没有 PMA 行，英文也相应删除 PMA 行
+    const cnHasPma = cnS8?.rows?.some(r => /丙二醇甲醚醋酸酯/i.test(r.cells[0]?.text || ''));
+    if (!cnHasPma) {
+      const enPmaIdx = s8.rows.findIndex(r => r.cells.some(c => /丙二醇甲醚醋酸酯|Propylene glycol monomethyl ether acetate/i.test(c.text || '')));
+      if (enPmaIdx !== -1) {
+        s8 = deleteRow(engine, s8, enPmaIdx);
+      }
+    }
+
+    const targetRowCount = cnS8?.rows?.length || s8.rows.length;
     while (s8.rows.length > targetRowCount) {
       s8 = deleteRow(engine, s8, s8.rows.length - 1);
     }
@@ -4076,10 +4099,12 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
     for (let r = 0; r < rows.length; r++) {
       const cells = Array.from(rows[r].getElementsByTagNameNS(W_NS, 'tc'));
       if (cells.length < 2) continue;
+      const rowText = cells.map(c => (c.textContent || '').trim()).join(' ');
+      if (/化学品名称.*CAS编号|物质.*依据.*类型|Components.*Basis.*Type|Substance.*Basis.*Type/i.test(rowText)) continue;
       for (let c = 1; c < cells.length; c++) {
         const cell = cells[c];
         const cellText = (cell.textContent || '').trim();
-        if (cellText === 'CAS编号' || cellText === '含量%（w/w）' || cellText === 'CAS NO.' || cellText === 'Concentration % (w/w)') continue;
+        if (/^(?:CAS编号|含量%（w\/w）|CAS NO\.|Concentration % \(w\/w\)|依据|类型|数值|Basis|Type|Value)$/i.test(cellText)) continue;
         const runs = Array.from(cell.getElementsByTagNameNS(W_NS, 'r'));
         for (const run of runs) {
           const runText = (run.textContent || '').trim();

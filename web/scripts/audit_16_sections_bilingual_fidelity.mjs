@@ -144,6 +144,7 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath) {
       }
       case 8: {
         assert(cnSec.rows.length === enSec.rows.length, `Section 8: 表格行数必须与中文严格同构 (CN: ${cnSec.rows.length} vs EN: ${enSec.rows.length})`);
+        assert(cnSec.rows.length >= 14, `Section 8: 包含控制参数与工程控制时行数必须 >= 14 行 (实测: ${cnSec.rows.length})`);
         const cnText8 = cnSec.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
         const enText8 = enSec.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
         assert(!/建议戴上防护手套/i.test(cnText8), `Section 8: 手部防护严禁底模外生编造“建议戴上防护手套。”`);
@@ -152,6 +153,15 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath) {
           assert(/Protective goggles are recommended/i.test(enText8), `Section 8: 眼睛防护必须忠实翻译为“Protective goggles are recommended.”`);
           assert(!/Wear protective goggles or face shield/i.test(enText8), `Section 8: 眼睛防护严禁底模篡改编造“Wear protective goggles or face shield.”`);
         }
+        // 关键门禁：工程控制与工作场所组分控制参数必须 100% 存在且内容保真
+        assert(/8\.2\s*工程控制/i.test(cnText8), `Section 8: 中文必须包含 8.2 工程控制`);
+        assert(/8\.2\s*Engineering controls/i.test(enText8), `Section 8: 英文必须包含 8.2 Engineering controls`);
+        assert(/工作场所组分控制参数/.test(cnText8), `Section 8: 中文必须包含“工作场所组分控制参数”通栏题头`);
+        assert(/Control parameters for workplace components|Workplace component control parameters/i.test(enText8), `Section 8: 英文必须包含工作场所组分控制参数题头`);
+        assert(/物质.*依据.*类型.*数值/.test(cnText8.replace(/\s+/g, '')), `Section 8: 中文必须包含四列表头（物质|依据|类型|数值）`);
+        assert(/(?:Substance|Components).*Basis.*Type.*Value/i.test(enText8.replace(/\s+/g, '')), `Section 8: 英文必须包含四列表头（Substance|Basis|Type|Value）`);
+        assert(/六亚甲基-1,6-二异氰酸酯/.test(cnText8) && /0\.03\s*mg\/m3/.test(cnText8), `Section 8: 中文必须包含“六亚甲基-1,6-二异氰酸酯”及其接触限值 0.03 mg/m3`);
+        assert(/Hexamethylene-1,6-diisocyanate/i.test(enText8) && /0\.03\s*mg\/m3/.test(enText8), `Section 8: 英文必须包含“Hexamethylene-1,6-diisocyanate”及其接触限值 0.03 mg/m3`);
         break;
       }
       case 9: {
