@@ -108,6 +108,9 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath) {
             assert(/Signal word:\s*Warning/i.test(enFull), `Section 2.2: 信号词必须翻译为 Warning`);
           }
         }
+        if (!/2\.3/i.test(cnFull)) {
+          assert(!/2\.3|Other hazards/i.test(enFull), `Section 2: 中文母版无 2.3 其他危险，英文严禁外生虚构 2.3 Other hazards`);
+        }
         break;
       }
       case 3: {
@@ -141,6 +144,14 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath) {
       }
       case 8: {
         assert(cnSec.rows.length === enSec.rows.length, `Section 8: 表格行数必须与中文严格同构 (CN: ${cnSec.rows.length} vs EN: ${enSec.rows.length})`);
+        const cnText8 = cnSec.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
+        const enText8 = enSec.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
+        assert(!/建议戴上防护手套/i.test(cnText8), `Section 8: 手部防护严禁底模外生编造“建议戴上防护手套。”`);
+        assert(!/Protective gloves are recommended/i.test(enText8), `Section 8: 手部防护严禁英文外生编造“Protective gloves are recommended.”`);
+        if (/建议使用护目镜/.test(cnText8)) {
+          assert(/Protective goggles are recommended/i.test(enText8), `Section 8: 眼睛防护必须忠实翻译为“Protective goggles are recommended.”`);
+          assert(!/Wear protective goggles or face shield/i.test(enText8), `Section 8: 眼睛防护严禁底模篡改编造“Wear protective goggles or face shield.”`);
+        }
         break;
       }
       case 9: {
@@ -173,6 +184,12 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath) {
         }
         if (/分散.*乳化|乳化.*分散/.test(cnText9)) {
           assert(/Dispersible and emulsifiable in water/i.test(enText9), `Section 9: 水溶性必须精准体现 Dispersible and emulsifiable in water`);
+        }
+        if (/NCO/.test(cnText9)) {
+          assert(/NCO content/i.test(enText9), `Section 9: NCO含量必须对齐翻译为 NCO content:`);
+        }
+        if (!/密度/.test(cnText9)) {
+          assert(!/Density/i.test(enText9), `Section 9: 中文母版无密度，英文严禁外生硬塞 Density`);
         }
         break;
       }
@@ -218,6 +235,10 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath) {
         assert(/Decree No\. 591/i.test(enText15), `Section 15: 法规时效性正向演进公理: 必须引用现行有效的国务院 591 号令`);
         assert(!/GB 20576/i.test(enText15), `Section 15: 法规时效性正向演进公理: 严禁引用已废止的 GB 20576 系列旧国标`);
         assert(/GB 30000/i.test(enText15), `Section 15: 法规时效性正向演进公理: 必须引用现行有效的 GB 30000 系列化学品分类国标`);
+        const cnText15 = cnSec.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
+        if (!/15258|安全标签/i.test(cnText15)) {
+          assert(!/15258|precautionary label/i.test(enText15), `Section 15: 中文母版未列 GB 15258，英文严禁外生强塞 GB 15258`);
+        }
         break;
       }
     }

@@ -676,13 +676,13 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
 
     // Section 8
     'sec8.respiratory_protection': 'Respiratory protection equipment is required during spraying.',
-    'sec8.hand_protection': 'Protective gloves are recommended.',
+    'sec8.hand_protection': '',
     'sec8.glove_material': 'EN 374-3',
     'sec8.fkm_glove': 'Thickness ≥ 0.4 mm; Breakthrough time ≥ 480 min.',
     'sec8.iir_glove': 'Thickness ≥ 0.5 mm; Breakthrough time ≥ 480 min.',
     'sec8.nbr_glove': 'Thickness ≥ 0.35 mm; Breakthrough time ≥ 480 min.',
     'sec8.glove_recommendation': 'Contaminated gloves should be discarded.',
-    'sec8.eye_protection': 'Wear protective goggles or face shield.',
+    'sec8.eye_protection': 'Protective goggles are recommended.',
     'sec8.body_protection': 'Wear appropriate protective clothing.',
     'sec8.engineering_controls': 'No exposure limit information is available under EC Directive 2006/121/EC.',
 
@@ -1049,6 +1049,124 @@ export function parseSection2FromSource(srcEngine) {
   };
 }
 
+
+export function extractSection9PropertiesFromSource(srcEngine) {
+  const s9 = srcEngine?.records?.find(r => r.sectionNumber === 9);
+  if (!s9) return [];
+
+  const items = [];
+  for (let rIdx = 1; rIdx < s9.rows.length; rIdx++) {
+    const row = s9.rows[rIdx];
+    const c0 = row.cells[0];
+    const c1 = row.cells[1];
+    if (!c0) continue;
+
+    const p0s = c0.node ? Array.from(c0.node.getElementsByTagName('w:p')) : [];
+    const p1s = c1 && c1.node ? Array.from(c1.node.getElementsByTagName('w:p')) : [];
+
+    const getPText = (p) => {
+      if (!p) return '';
+      const ts = p.getElementsByTagName('w:t');
+      let text = '';
+      for (let i = 0; i < ts.length; i++) text += ts[i].textContent || '';
+      return text.trim();
+    };
+
+    const lines0 = p0s.length > 0 ? p0s.map(getPText).filter(Boolean) : (c0.text || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const lines1 = p1s.length > 0 ? p1s.map(getPText).filter(Boolean) : (c1?.text || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+
+    if (lines0.length > 1 && lines0.length === lines1.length) {
+      for (let k = 0; k < lines0.length; k++) {
+        items.push({
+          rawLabel: lines0[k],
+          rawValue: lines1[k]
+        });
+      }
+    } else {
+      items.push({
+        rawLabel: lines0.join(' ') || (c0.text || '').trim(),
+        rawValue: lines1.join(' ') || (c1?.text || '').trim()
+      });
+    }
+  }
+  return items;
+}
+
+export function translateSection9Item(cnNum, cnLabel, cnVal) {
+  let enLabel = '';
+  let enVal = '';
+
+  if (/外观/i.test(cnLabel)) {
+    enLabel = 'Appearance:';
+    if (/无色.*淡黄|淡黄.*粘稠/i.test(cnVal)) enVal = 'Colourless to light yellow transparent viscous liquid';
+    else if (/无色.*微黄|微黄.*透明/i.test(cnVal)) enVal = 'Colorless to slightly yellow transparent liquid';
+    else if (/无色透明/i.test(cnVal)) enVal = 'Colourless transparent liquid';
+    else enVal = cnVal;
+  } else if (/嗅觉/i.test(cnLabel)) {
+    enLabel = 'Odour threshold:';
+    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
+  } else if (/pH/i.test(cnLabel)) {
+    enLabel = 'pH value:';
+    enVal = cnVal;
+  } else if (/离子性/i.test(cnLabel)) {
+    enLabel = 'Ionicity:';
+    if (/阴离子/i.test(cnVal)) enVal = 'Anionic';
+    else if (/阳离子/i.test(cnVal)) enVal = 'Cationic';
+    else if (/非离子/i.test(cnVal)) enVal = 'Non-ionic';
+    else enVal = cnVal;
+  } else if (/初沸点|沸程/i.test(cnLabel)) {
+    enLabel = 'Initial boiling point:';
+    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
+  } else if (/可燃性|易燃性/i.test(cnLabel)) {
+    enLabel = /固态|固体/i.test(cnLabel) ? 'Flammability (solids, gases):' : 'Flammability:';
+    enVal = /不适用/.test(cnVal) ? 'Not applicable' : cnVal;
+  } else if (/NCO/i.test(cnLabel)) {
+    enLabel = 'NCO content:';
+    enVal = cnVal;
+  } else if (/水溶性|溶解性/i.test(cnLabel)) {
+    enLabel = 'Solubility in water:';
+    if (/分散.*乳化|乳化.*分散/i.test(cnVal)) enVal = 'Dispersible and emulsifiable in water';
+    else if (/混溶/i.test(cnVal)) enVal = 'Miscible with water';
+    else if (/不溶/i.test(cnVal)) enVal = 'Insoluble in water';
+    else enVal = cnVal;
+  } else if (/粘度/i.test(cnLabel)) {
+    enLabel = /25/i.test(cnLabel) ? 'Dynamic viscosity at 25 °C:' : 'Dynamic viscosity:';
+    enVal = cnVal;
+  } else if (/自燃温度/i.test(cnLabel)) {
+    enLabel = 'Auto-ignition temperature:';
+    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
+  } else if (/闪点/i.test(cnLabel)) {
+    enLabel = /闭口|闭杯/i.test(cnLabel) ? 'Flash point (closed cup):' : 'Flash point:';
+    enVal = cnVal.replace(/℃/g, ' °C').replace(/(\d+)\s*°C/, '$1 °C');
+  } else if (/引燃温度/i.test(cnLabel)) {
+    enLabel = 'Ignition temperature:';
+    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
+  } else if (/分解温度/i.test(cnLabel)) {
+    enLabel = 'Decomposition temperature:';
+    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
+  } else if (/爆炸特性/i.test(cnLabel)) {
+    enLabel = 'Explosive properties:';
+    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
+  } else if (/粉尘爆炸/i.test(cnLabel)) {
+    enLabel = 'Dust explosion class:';
+    enVal = /不适用/.test(cnVal) ? 'Not applicable' : cnVal;
+  } else if (/固体含量|固含/i.test(cnLabel)) {
+    enLabel = 'Solid content:';
+    enVal = cnVal;
+  } else if (/密度/i.test(cnLabel)) {
+    enLabel = /25/i.test(cnLabel) ? 'Density at 25 °C:' : 'Density:';
+    enVal = cnVal;
+  } else if (/其他信息/i.test(cnLabel)) {
+    enLabel = 'Other information:';
+    enVal = 'The above data are not product specifications. Please refer to the product technical information sheet for specifications.';
+  } else {
+    enLabel = cnLabel;
+    enVal = cnVal;
+  }
+
+  return { enLabel, enVal };
+}
+
 export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
   let s2 = engine.records.find((r) => r.sectionNumber === 2);
   if (!s2) return;
@@ -1094,8 +1212,10 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         ...parsed.storage.map(p => p.trim()),
         '废弃处置：',
         ...parsed.disposal.map(p => p.trim()),
-        parsed.otherHazards || '2.3 其他危险：无适用资料。'
       );
+      if (parsed.otherHazards) {
+        paragraphs.push(parsed.otherHazards);
+      }
     } else {
       // 真实非危通栏组装
       paragraphs.push('GHS危险性类别: 无');
@@ -1184,13 +1304,17 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       for (const p of parsed.disposal) {
         paragraphs.push(translateGhsPrecautionary(p.trim()));
       }
-      let enOther = '2.3 Other hazards: No applicable information.';
-      if (/N[－-]甲基吡咯烷酮/i.test(parsed.otherHazards)) {
-        enOther = '2.3 Other hazards: Risk of cutaneous absorption of N-Methyl-2-pyrrolidone (NMP).';
-      } else if (/N,N[－-]二甲基乙酰胺/i.test(parsed.otherHazards)) {
-        enOther = '2.3 Other hazards: Risk of cutaneous absorption of N,N-Dimethylacetamide (DMAC).';
+      if (parsed.otherHazards) {
+        let enOther = '2.3 Other hazards: No applicable information.';
+        if (/N[－-]甲基吡咯烷酮/i.test(parsed.otherHazards)) {
+          enOther = '2.3 Other hazards: Risk of cutaneous absorption of N-Methyl-2-pyrrolidone (NMP).';
+        } else if (/N,N[－-]二甲基乙酰胺/i.test(parsed.otherHazards)) {
+          enOther = '2.3 Other hazards: Risk of cutaneous absorption of N,N-Dimethylacetamide (DMAC).';
+        } else {
+          enOther = `2.3 Other hazards: ${translateGhsPrecautionary(parsed.otherHazards.replace(/^2\.3\s*(其他危险[:：]?\s*)?/, '')) || 'No applicable information.'}`;
+        }
+        paragraphs.push(enOther);
       }
-      paragraphs.push(enOther);
     } else {
       // 英文真实非危通栏
       paragraphs.push('GHS hazard classification: Not classified as a hazardous chemical according to GHS.');
@@ -1457,66 +1581,53 @@ export async function buildBaseChineseEngine({
     if (lastRow && lastRow.cells.length >= 2 && lastRow.cells[1]?.node) {
       enforceSection13JustifiedContent(lastRow.cells[1].node);
     }
-  }  // 8. Section 9 理化特性全量标签与指标更新及激光绝对垂直对齐 (G-38: 原生 <w:tab/> 锚定 + 420 dxa 悬挂缩进)
+  }  // 8. Section 9 理化特性全量标签与指标按源文件 1:1 精准重构 (内容与物理顺序 100% 来源源文件，模板仅提供排版与格式)
   let s9 = engine.records.find(r => r.sectionNumber === 9);
   if (s9) {
-    if (viscosityOverride) {
-      for (const row of s9.rows) {
-        const lbl = (row.cells[0]?.text || '').trim();
-        if (/粘度/i.test(lbl) && row.cells[1]) {
-          safeWriteCellValue(row.cells[1], viscosityOverride);
+    const srcProps = extractSection9PropertiesFromSource(srcEngine);
+    if (srcProps && srcProps.length > 0) {
+      // 依据源文件实际物理项数动态缩减或扩充行数
+      while (s9.rows.length > srcProps.length + 1) {
+        s9 = deleteRow(engine, s9, s9.rows.length - 1);
+      }
+      while (s9.rows.length < srcProps.length + 1) {
+        s9 = addRowAfter(engine, s9, s9.rows.length - 1);
+      }
+      for (let i = 0; i < srcProps.length; i++) {
+        const prop = srcProps[i];
+        const row = s9.rows[i + 1];
+        if (!row) continue;
+        let coreLabel = prop.rawLabel.replace(/^\s*(?:9\.\d+\s*)+/, '').trim();
+        if (!coreLabel.endsWith('：') && !coreLabel.endsWith(':')) coreLabel += '：';
+        let val = prop.rawValue;
+
+        // 覆盖高优先级事实 (如 TDS 核准的粘度、固含、外观等)
+        if (/粘度|动力粘度/i.test(coreLabel) && (viscosityOverride || facts.section9Overrides?.['粘度|动力粘度'])) {
+          val = viscosityOverride || facts.section9Overrides?.['粘度|动力粘度'];
+        } else if (/固体含量|固含/i.test(coreLabel) && (facts.solidsOverride || facts.section9Overrides?.['固体含量|固含'])) {
+          val = facts.solidsOverride || facts.section9Overrides?.['固体含量|固含'];
+        } else if (/外观/i.test(coreLabel) && (facts.appearanceOverride || facts.section9Overrides?.['外观'])) {
+          val = facts.appearanceOverride || facts.section9Overrides?.['外观'];
+        } else if (/NCO/i.test(coreLabel) && (facts.ncoOverride || facts.section9Overrides?.['NCO'] || facts.section9Overrides?.['NCO|NCO含量'])) {
+          val = facts.ncoOverride || facts.section9Overrides?.['NCO'] || facts.section9Overrides?.['NCO|NCO含量'];
+        }
+
+        formatSection9LabelCell(row.cells[0], `9.${i + 1}`, coreLabel, false);
+        if (row.cells[1]) {
+          safeWriteCellValue(row.cells[1], val);
         }
       }
-    }
-    // 强制将 facts.section9Overrides 覆盖至中文 Section 9，彻底根治中英文理化指标倒挂
-    if (facts.section9Overrides) {
-      for (const [pattern, val] of Object.entries(facts.section9Overrides)) {
-        for (const row of s9.rows) {
-          const lbl = (row.cells[0]?.text || '').trim();
-          if (new RegExp(pattern, 'i').test(lbl) && row.cells[1]) {
-            safeWriteCellValue(row.cells[1], val);
-          }
+    } else {
+      // 容灾兜底逻辑
+      renumberRecord(s9, '9');
+      for (let rIdx = 1; rIdx < s9.rows.length; rIdx++) {
+        const c0 = s9.rows[rIdx]?.cells[0];
+        if (!c0) continue;
+        const text = (c0.text || '').trim();
+        const match = text.match(/^(\d+\.\d+)\s*(.*)$/);
+        if (match) {
+          formatSection9LabelCell(c0, match[1], match[2], false);
         }
-      }
-    }
-    if (facts.solidsOverride) {
-      const row = s9.rows.find(r => /固体含量|固含/i.test(r.cells[0]?.text || ''));
-      if (row && row.cells[1]) safeWriteCellValue(row.cells[1], facts.solidsOverride);
-    }
-    if (facts.appearanceOverride) {
-      const row = s9.rows.find(r => /外观/i.test(r.cells[0]?.text || ''));
-      if (row && row.cells[1]) safeWriteCellValue(row.cells[1], facts.appearanceOverride);
-    }
-
-    // 检查密度与 NCO 含量是否存在，若不存在则插入
-    const densityVal = facts.densityOverride || facts.section9Overrides?.['密度'] || facts.density;
-    if (densityVal && !s9.rows.some(r => /密度/i.test(r.cells[0]?.text || ''))) {
-      const viscIdx = s9.rows.findIndex(r => /粘度/i.test(r.cells[0]?.text || ''));
-      const insertIdx = viscIdx !== -1 ? viscIdx : s9.rows.length - 2;
-      s9 = addRowAfter(engine, s9, insertIdx);
-      writeCellLabel(s9.rows[insertIdx + 1].cells[0], '9.11密度/25℃：', true);
-      safeWriteCellValue(s9.rows[insertIdx + 1].cells[1], densityVal);
-    }
-
-    const ncoVal = facts.ncoOverride || facts.section9Overrides?.['NCO'] || facts.nco;
-    if (ncoVal && !s9.rows.some(r => /NCO/i.test(r.cells[0]?.text || ''))) {
-      const viscIdx = s9.rows.findIndex(r => /粘度/i.test(r.cells[0]?.text || ''));
-      const insertIdx = viscIdx !== -1 ? viscIdx : s9.rows.length - 2;
-      s9 = addRowAfter(engine, s9, insertIdx);
-      writeCellLabel(s9.rows[insertIdx + 1].cells[0], '9.12NCO含量：', true);
-      safeWriteCellValue(s9.rows[insertIdx + 1].cells[1], ncoVal);
-    }
-
-    renumberRecord(s9, '9');
-
-    // 全量遍历 Section 9 每一行标签，标准化格式并注入 <w:tab/> 锚定
-    for (let rIdx = 1; rIdx < s9.rows.length; rIdx++) {
-      const c0 = s9.rows[rIdx]?.cells[0];
-      if (!c0) continue;
-      const text = (c0.text || '').trim();
-      const match = text.match(/^(\d+\.\d+)\s*(.*)$/);
-      if (match) {
-        formatSection9LabelCell(c0, match[1], match[2], false);
       }
     }
   }
@@ -1547,15 +1658,39 @@ export async function buildBaseChineseEngine({
     cleanSection12Preambles(engine, false);
   }
 
-  // 10. 规范化 Section 8：若 8.2 为“不含有职业接触限值的物质”，一并删除下方的工作场所组分控制参数及四列表格
+  // 10. 规范化 Section 8：手部防护清除底模编造、眼睛防护还原源文件，若 8.2 为“不含有职业接触限值的物质”剪枝四列表格
   let s8 = engine.records.find(r => r.sectionNumber === 8);
   if (s8) {
+    for (const row of s8.rows) {
+      const lbl = (row.cells[0]?.text || '').trim();
+      if (/手部防护/i.test(lbl) && row.cells.length > 1) {
+        if (/建议戴上防护手套/i.test(row.cells[1]?.text || '')) {
+          safeWriteCellValue(row.cells[1], '');
+        }
+      } else if (/眼睛防护/i.test(lbl) && row.cells.length > 1) {
+        safeWriteCellValue(row.cells[1], '建议使用护目镜。');
+      }
+    }
     const row82 = s8.rows.find(r => /8\.2\s*工程控制/i.test(r.cells[0]?.text || ''));
     const isNoOEL = row82 && /不含有职业接触限值|不含职业接触/i.test(row82.cells[row82.cells.length - 1]?.text || '');
     if (isNoOEL) {
       const r82Idx = s8.rows.indexOf(row82);
       while (s8.rows.length > r82Idx + 1) {
         s8 = deleteRow(engine, s8, s8.rows.length - 1);
+      }
+    }
+  }
+
+  // 10.5 规范化 Section 15：源文件仅 4 部法规时，剔除底模外生强塞的 GB 15258
+  let s15Rec = engine.records.find(r => r.sectionNumber === 15);
+  if (s15Rec) {
+    const srcS15 = srcEngine?.records?.find(r => r.sectionNumber === 15);
+    const srcS15Text = srcS15 ? srcS15.rows.map(r => r.cells.map(c => c.text).join(' ')).join(' ') : '';
+    const srcHasGb15258 = /15258|安全标签编写/i.test(srcS15Text);
+    if (!srcHasGb15258) {
+      const gb15258Row = s15Rec.rows.find(r => /15258|安全标签/i.test(r.cells[0]?.text || ''));
+      if (gb15258Row) {
+        s15Rec = deleteRow(engine, s15Rec, s15Rec.rows.indexOf(gb15258Row));
       }
     }
   }
@@ -2363,226 +2498,28 @@ export async function buildBaseEnglishEngine({
     }
   }
 
-  // Section 9 【核心重构：以中文母版保留项为绝对基准，对英文底模执行同构剪枝与编号对齐】
+  // Section 9 【核心重构：以中文母版保留项为绝对基准，对英文底模执行 1:1 同构镜像装配】
   let s9 = engine.records.find(r => r.sectionNumber === 9);
-  if (s9) {
-    // 1. 先将已知的值写入英文模板对应槽位
-    for (const row of s9.rows) {
-      const lbl = (row.cells[0]?.text || '').trim();
-      const c1 = row.cells[1];
-      if (!c1) continue;
-      if (/Appearance/i.test(lbl)) safeWrite(c1, enValues['sec9.appearance']);
-      else if (/Odour threshold/i.test(lbl)) safeWrite(c1, enValues['sec9.odour_threshold']);
-      else if (/pH value/i.test(lbl)) safeWrite(c1, enValues['sec9.ph']);
-      else if (/Ionicity/i.test(lbl)) safeWrite(c1, enValues['sec9.ionicity']);
-      else if (/Initial boiling/i.test(lbl)) safeWrite(c1, enValues['sec9.boiling_point']);
-      else if (/Flash point/i.test(lbl)) safeWrite(c1, enValues['sec9.flash_point']);
-      else if (/Evaporation rate/i.test(lbl)) safeWrite(c1, enValues['sec9.evaporation_rate']);
-      else if (/Flammability/i.test(lbl)) safeWrite(c1, enValues['sec9.flammability']);
-      else if (/Heat of combustion|Combustion/i.test(lbl)) safeWrite(c1, enValues['sec9.combustion_value']);
-      else if (/Saturated vapour/i.test(lbl)) safeWrite(c1, enValues['sec9.saturated_vapour']);
-      else if (/Relative vapour/i.test(lbl)) safeWrite(c1, enValues['sec9.vapour_density']);
-      else if (/Density/i.test(lbl)) safeWrite(c1, enValues['sec9.density']);
-      else if (/Solubility in water/i.test(lbl)) safeWrite(c1, enValues['sec9.solubility']);
-      else if (/Surface tension/i.test(lbl)) safeWrite(c1, enValues['sec9.surface_tension']);
-      else if (/log Pow|Partition/i.test(lbl)) safeWrite(c1, enValues['sec9.partition_coefficient']);
-      else if (/Auto-ignition/i.test(lbl)) safeWrite(c1, enValues['sec9.auto_ignition']);
-      else if (/Ignition temp/i.test(lbl)) safeWrite(c1, enValues['sec9.ignition_temp']);
-      else if (/Decomposition/i.test(lbl)) safeWrite(c1, enValues['sec9.decomposition_temp']);
-      else if (/Dynamic viscosity/i.test(lbl)) safeWrite(c1, enValues['sec9.viscosity']);
-      else if (/Explosive properties/i.test(lbl)) safeWrite(c1, enValues['sec9.explosive_properties']);
-      else if (/Dust explosion/i.test(lbl)) safeWrite(c1, enValues['sec9.dust_explosion']);
-      else if (/Solid(?:s)?\s*content/i.test(lbl)) safeWrite(c1, enValues['sec9.solids']);
-      else if (/Other information/i.test(lbl)) safeWrite(c1, enValues['sec9.other_info']);
-    }
-
-    // 2. 若有 baseCnEngine，提取中文 Section 9 包含的物理量关键词白名单
-    if (baseCnEngine) {
-      const cnS9 = baseCnEngine.records.find(r => r.sectionNumber === 9);
-      // 若中文母版包含 NCO，英文模板缺失则对称补齐，实现 1:1 绝对同构
-      const cnNcoRow = cnS9?.rows?.find(r => /NCO/i.test(r.cells[0]?.text || ''));
-      if (cnNcoRow && !s9.rows.some(r => /NCO/i.test(r.cells[0]?.text || ''))) {
-        const viscIdx = s9.rows.findIndex(r => /Dynamic viscosity/i.test(r.cells[0]?.text || ''));
-        const insertIdx = viscIdx !== -1 ? viscIdx : s9.rows.length - 2;
-        s9 = addRowAfter(engine, s9, insertIdx);
-        const ncoVal = (cnNcoRow.cells[cnNcoRow.cells.length - 1]?.text || '17.8±0.5%').trim();
-        writeCellLabel(s9.rows[insertIdx + 1].cells[0], '9.11 NCO content:', true);
-        safeWrite(s9.rows[insertIdx + 1].cells[1], ncoVal);
+  if (s9 && baseCnEngine) {
+    const cnS9 = baseCnEngine.records.find(r => r.sectionNumber === 9);
+    if (cnS9 && cnS9.rows.length >= 2) {
+      while (s9.rows.length > cnS9.rows.length) {
+        s9 = deleteRow(engine, s9, s9.rows.length - 1);
       }
-      if (cnS9) {
-        const cnIndicators = cnS9.rows.map(r => (r.cells[0]?.text || '').trim());
-        const hasPh = cnIndicators.some(t => /pH/i.test(t));
-        const hasBoiling = cnIndicators.some(t => /沸点/i.test(t));
-        const hasFlash = cnIndicators.some(t => /闪点/i.test(t));
-        const hasEvap = cnIndicators.some(t => /蒸发速率/i.test(t));
-        const hasFlammability = cnIndicators.some(t => /可燃性/i.test(t));
-        const hasCombustion = cnIndicators.some(t => /燃烧值/i.test(t));
-        const hasVapourDensity = cnIndicators.some(t => /相对蒸气密度/i.test(t));
-        const hasDensity = cnIndicators.some(t => /(?:^|[\s\t])密度/i.test(t));
-        const hasSolubility = cnIndicators.some(t => /水溶性/i.test(t));
-        const hasIonicity = cnIndicators.some(t => /离子性/i.test(t));
-        const hasSaturatedVapour = cnIndicators.some(t => /饱和蒸气压/i.test(t));
-        const hasSurfaceTension = cnIndicators.some(t => /表面张力/i.test(t));
-        const hasPartition = cnIndicators.some(t => /分配系数/i.test(t));
-        const hasAutoIgnition = cnIndicators.some(t => /自燃温度/i.test(t));
-        const hasIgnitionTemp = cnIndicators.some(t => /引燃温度/i.test(t));
-        const hasDecompTemp = cnIndicators.some(t => /分解温度/i.test(t));
-        const hasExplosive = cnIndicators.some(t => /爆炸特性|爆炸极限/i.test(t));
-        const hasDustExplosion = cnIndicators.some(t => /粉尘爆炸/i.test(t));
-        const hasSolids = cnIndicators.some(t => /固体含量|固含量/i.test(t));
-        const hasViscosity = cnIndicators.some(t => /粘度|动力粘度/i.test(t));
-        const hasOtherInfo = cnIndicators.some(t => /其他信息/i.test(t));
-
-        // 倒序对中文不存在的未测死重行执行全量同构剪枝，确保中英文行数与槽位 100% 1:1 对齐
-        for (let rIdx = s9.rows.length - 1; rIdx >= 1; rIdx--) {
-          const rowText = (s9.rows[rIdx]?.cells[0]?.text || '').trim();
-          let shouldPrune = false;
-          if (!hasPh && /pH value/i.test(rowText)) shouldPrune = true;
-          else if (!hasBoiling && /Initial boiling/i.test(rowText)) shouldPrune = true;
-          else if (!hasFlash && /Flash point/i.test(rowText)) shouldPrune = true;
-          else if (!hasEvap && /Evaporation rate/i.test(rowText)) shouldPrune = true;
-          else if (!hasFlammability && /Flammability/i.test(rowText)) shouldPrune = true;
-          else if (!hasCombustion && /Heat of combustion|Combustion/i.test(rowText)) shouldPrune = true;
-          else if (!hasVapourDensity && /Relative vapour/i.test(rowText)) shouldPrune = true;
-          else if (!hasDensity && /(?:^|\s)Density/i.test(rowText)) shouldPrune = true;
-          else if (!hasSolubility && /Solubility in water/i.test(rowText)) shouldPrune = true;
-          else if (!hasIonicity && /Ionicity/i.test(rowText)) shouldPrune = true;
-          else if (!hasSaturatedVapour && /Saturated vapour/i.test(rowText)) shouldPrune = true;
-          else if (!hasSurfaceTension && /Surface tension/i.test(rowText)) shouldPrune = true;
-          else if (!hasPartition && /log Pow|Partition/i.test(rowText)) shouldPrune = true;
-          else if (!hasAutoIgnition && /Auto-ignition/i.test(rowText)) shouldPrune = true;
-          else if (!hasIgnitionTemp && /Ignition temp/i.test(rowText)) shouldPrune = true;
-          else if (!hasDecompTemp && /Decomposition/i.test(rowText)) shouldPrune = true;
-          else if (!hasExplosive && /Explosive properties/i.test(rowText)) shouldPrune = true;
-          else if (!hasDustExplosion && /Dust explosion/i.test(rowText)) shouldPrune = true;
-          else if (!hasSolids && /Solid(?:s)?\s*content/i.test(rowText)) shouldPrune = true;
-          else if (!hasViscosity && /Dynamic viscosity/i.test(rowText)) shouldPrune = true;
-          else if (!hasOtherInfo && /Other information/i.test(rowText)) shouldPrune = true;
-
-          if (shouldPrune) {
-            s9 = deleteRow(engine, s9, rIdx);
-          }
+      while (s9.rows.length < cnS9.rows.length) {
+        s9 = addRowAfter(engine, s9, s9.rows.length - 1);
+      }
+      for (let i = 1; i < cnS9.rows.length; i++) {
+        const cnRow = cnS9.rows[i];
+        const enRow = s9.rows[i];
+        const cnLabel = (cnRow.cells[0]?.text || '').trim();
+        const cnVal = (cnRow.cells[1]?.text || '').trim();
+        const { enLabel, enVal } = translateSection9Item(i, cnLabel, cnVal);
+        formatSection9LabelCell(enRow.cells[0], `9.${i}`, enLabel, true);
+        if (enRow.cells[1]) {
+          safeWriteCellValue(enRow.cells[1], enVal);
         }
       }
-    }
-
-    // 3. 核心升级：依据中文母版 cnS9.rows 对英文 s9.rows 执行 1:1 槽位排序与物理量限定词对齐
-    s9 = engine.records.find(r => r.sectionNumber === 9);
-    if (s9 && baseCnEngine) {
-      const cnS9 = baseCnEngine.records.find(r => r.sectionNumber === 9);
-      if (cnS9 && cnS9.rows.length >= 2) {
-        const getCnRowKey = (text) => {
-          if (/外观/i.test(text)) return 'appearance';
-          if (/嗅觉/i.test(text)) return 'odour_threshold';
-          if (/pH/i.test(text)) return 'ph';
-          if (/离子性/i.test(text)) return 'ionicity';
-          if (/沸点/i.test(text)) return 'boiling_point';
-          if (/闪点/i.test(text)) return 'flash_point';
-          if (/蒸发速率/i.test(text)) return 'evaporation';
-          if (/可燃性/i.test(text)) return 'flammability';
-          if (/燃烧/i.test(text)) return 'combustion';
-          if (/饱和蒸气压/i.test(text)) return 'saturated_vapour';
-          if (/相对蒸气密度/i.test(text)) return 'vapour_density';
-          if (/水溶性/i.test(text)) return 'solubility';
-          if (/表面张力/i.test(text)) return 'surface_tension';
-          if (/分配系数/i.test(text)) return 'partition';
-          if (/自燃温度/i.test(text)) return 'auto_ignition';
-          if (/引燃温度/i.test(text)) return 'ignition_temp';
-          if (/分解温度/i.test(text)) return 'decomposition_temp';
-          if (/粘度/i.test(text)) return 'viscosity';
-          if (/NCO/i.test(text)) return 'nco';
-          if (/密度/i.test(text)) return 'density';
-          if (/爆炸特性/i.test(text)) return 'explosive';
-          if (/粉尘爆炸/i.test(text)) return 'dust_explosion';
-          if (/固体含量|固含量/i.test(text)) return 'solids';
-          if (/其他信息/i.test(text)) return 'other_info';
-          return 'unknown';
-        };
-
-        const getEnRowKey = (text) => {
-          if (/Appearance/i.test(text)) return 'appearance';
-          if (/Odour threshold/i.test(text)) return 'odour_threshold';
-          if (/pH/i.test(text)) return 'ph';
-          if (/Ionicity/i.test(text)) return 'ionicity';
-          if (/Initial boiling/i.test(text)) return 'boiling_point';
-          if (/Flash point/i.test(text)) return 'flash_point';
-          if (/Evaporation/i.test(text)) return 'evaporation';
-          if (/Flammability/i.test(text)) return 'flammability';
-          if (/Combustion/i.test(text)) return 'combustion';
-          if (/Saturated vapour/i.test(text)) return 'saturated_vapour';
-          if (/Relative vapour/i.test(text)) return 'vapour_density';
-          if (/Solubility/i.test(text)) return 'solubility';
-          if (/Surface tension/i.test(text)) return 'surface_tension';
-          if (/log Pow|Partition/i.test(text)) return 'partition';
-          if (/Auto-ignition/i.test(text)) return 'auto_ignition';
-          if (/Ignition temp/i.test(text)) return 'ignition_temp';
-          if (/Decomposition/i.test(text)) return 'decomposition_temp';
-          if (/Dynamic viscosity/i.test(text)) return 'viscosity';
-          if (/NCO/i.test(text)) return 'nco';
-          if (/(?:^|\s)Density/i.test(text)) return 'density';
-          if (/Explosive/i.test(text)) return 'explosive';
-          if (/Dust/i.test(text)) return 'dust_explosion';
-          if (/Solid/i.test(text)) return 'solids';
-          if (/Other info/i.test(text)) return 'other_info';
-          return 'unknown';
-        };
-
-        const cnKeys = cnS9.rows.slice(1).map(r => getCnRowKey(r.cells[0]?.text || ''));
-        const bodyRows = s9.rows.slice(1);
-        bodyRows.sort((a, b) => {
-          const keyA = getEnRowKey(a.cells[0]?.text || '');
-          const keyB = getEnRowKey(b.cells[0]?.text || '');
-          const idxA = cnKeys.indexOf(keyA);
-          const idxB = cnKeys.indexOf(keyB);
-          return (idxA !== -1 ? idxA : 999) - (idxB !== -1 ? idxB : 999);
-        });
-
-        // 在 DOM 中物理重排并对齐限定条件 (closed cup, at 25 °C, solids, gases)
-        const tblNode = s9.rows[0]?.node?.parentNode;
-        bodyRows.forEach((row, idx) => {
-          if (tblNode) tblNode.appendChild(row.node);
-          const cnRow = cnS9.rows[idx + 1];
-          const cnLabel = (cnRow?.cells[0]?.text || '').trim();
-          const enKey = getEnRowKey(row.cells[0]?.text || '');
-
-          let cleanLabelText = 'Label:';
-          if (enKey === 'appearance') cleanLabelText = 'Appearance:';
-          else if (enKey === 'odour_threshold') cleanLabelText = 'Odour threshold:';
-          else if (enKey === 'ph') cleanLabelText = 'pH value:';
-          else if (enKey === 'ionicity') cleanLabelText = 'Ionicity:';
-          else if (enKey === 'boiling_point') cleanLabelText = 'Initial boiling point:';
-          else if (enKey === 'flash_point') {
-            cleanLabelText = /闭口/i.test(cnLabel) ? 'Flash point (closed cup):' : 'Flash point:';
-          } else if (enKey === 'evaporation') cleanLabelText = 'Evaporation rate:';
-          else if (enKey === 'flammability') {
-            cleanLabelText = /固态/i.test(cnLabel) ? 'Flammability (solids, gases):' : 'Flammability:';
-          } else if (enKey === 'combustion') cleanLabelText = 'Heat of combustion:';
-          else if (enKey === 'saturated_vapour') cleanLabelText = 'Saturated vapour pressure:';
-          else if (enKey === 'vapour_density') cleanLabelText = 'Relative vapour density:';
-          else if (enKey === 'solubility') cleanLabelText = 'Solubility in water:';
-          else if (enKey === 'surface_tension') cleanLabelText = 'Surface tension:';
-          else if (enKey === 'partition') cleanLabelText = 'log Pow (n-octanol/water partition coefficient):';
-          else if (enKey === 'auto_ignition') cleanLabelText = 'Auto-ignition temperature:';
-          else if (enKey === 'ignition_temp') cleanLabelText = 'Ignition temperature:';
-          else if (enKey === 'decomposition_temp') cleanLabelText = 'Decomposition temperature:';
-          else if (enKey === 'viscosity') {
-            cleanLabelText = /25/i.test(cnLabel) ? 'Dynamic viscosity at 25 °C:' : 'Dynamic viscosity:';
-          } else if (enKey === 'nco') cleanLabelText = 'NCO content:';
-          else if (enKey === 'density') {
-            cleanLabelText = /25/i.test(cnLabel) ? 'Density at 25 °C:' : 'Density:';
-          } else if (enKey === 'explosive') cleanLabelText = 'Explosive properties:';
-          else if (enKey === 'dust_explosion') cleanLabelText = 'Dust explosion class:';
-          else if (enKey === 'solids') cleanLabelText = 'Solid content:';
-          else if (enKey === 'other_info') cleanLabelText = 'Other information:';
-
-          formatSection9LabelCell(row.cells[0], `9.${idx + 1}`, cleanLabelText, true);
-        });
-        s9.rows = [s9.rows[0], ...bodyRows];
-      }
-    } else {
-      // 4. 若无 baseCnEngine，回退至 renumberRecord
-      s9 = engine.records.find(r => r.sectionNumber === 9);
-      if (s9) renumberRecord(s9);
     }
   }
 
@@ -2892,16 +2829,36 @@ export async function buildBaseEnglishEngine({
     }
   }
 
-  // Section 15 (法规标准 100% 官方标准纯英文化，绝对零中文)
-  const s15 = engine.records.find(r => r.sectionNumber === 15);
+  // Section 15 (法规标准 100% 官方标准纯英文化，绝对零中文；根据中文母版剪枝未列法规)
+  let s15 = engine.records.find(r => r.sectionNumber === 15);
   if (s15) {
+    const cnS15 = baseCnEngine?.records?.find(r => r.sectionNumber === 15);
+    const cnS15Text = cnS15 ? cnS15.rows.map(r => r.cells.map(c => c.text).join(' ')).join(' ') : '';
+    const cnHasGb15258 = /15258|安全标签编写/i.test(cnS15Text);
+
+    if (!cnHasGb15258) {
+      const enGb15258Row = s15.rows.find(r => /15258|precautionary label/i.test(r.cells[0]?.text || ''));
+      if (enGb15258Row) {
+        s15 = deleteRow(engine, s15, s15.rows.indexOf(enGb15258Row));
+      }
+    }
+
+    if (cnS15) {
+      while (s15.rows.length > cnS15.rows.length) {
+        s15 = deleteRow(engine, s15, s15.rows.length - 1);
+      }
+    }
+
     const stdRegulations = [
       'Regulations on the Safety Management of Hazardous Chemicals, State Council Decree No. 591',
       'GB/T 16483 Safety data sheet for chemical products - Content and order of sections',
       'GB 13690 General rules for classification and hazard communication of chemicals',
-      'GB 30000.2-29 Rules for classification and labelling of chemicals',
-      'GB 15258 General rules for preparation of precautionary label for chemicals'
+      'GB 30000.2-29 Rules for classification and labelling of chemicals'
     ];
+    if (cnHasGb15258) {
+      stdRegulations.push('GB 15258 General rules for preparation of precautionary label for chemicals');
+    }
+
     let regIdx = 0;
     for (let i = 0; i < s15.rows.length; i++) {
       const row = s15.rows[i];
@@ -2911,13 +2868,6 @@ export async function buildBaseEnglishEngine({
         if (row.cells[1]) safeWrite(row.cells[1], 'Complies');
         regIdx++;
       }
-    }
-  }
-
-  // 规范化英文 Section 11 实测各行行高
-  if (s11) {
-    for (const row of s11.rows) {
-      normalizeSection11RowHeight(row);
     }
   }
 
