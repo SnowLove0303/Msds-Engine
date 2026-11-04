@@ -691,10 +691,24 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
       const cnEye = cnS8Rec?.rows?.find(r => /眼睛防护/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
       if (/眼罩|面罩/i.test(cnEye)) return 'Wear safety glasses/face shield.';
       if (/建议使用护目镜|护目镜/i.test(cnEye)) return 'Protective goggles are recommended.';
-      return cnEye || 'Wear safety glasses/face shield.';
+      return cnEye || '';
     })(),
     'sec8.body_protection': 'Wear appropriate protective clothing.',
-    'sec8.engineering_controls': 'No exposure limit information is available under EC Directive 2006/121/EC.',
+    'sec8.engineering_controls': (() => {
+      const cnS8Rec = baseCnEngine?.records?.find(r => r.sectionNumber === 8);
+      const cnEng = cnS8Rec?.rows?.find(r => /工程控制/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
+      if (!cnEng) return '';
+      if (/局部排风.*全面通风/i.test(cnEng)) {
+        return 'Use local exhaust or general ventilation to maintain workplace concentrations below occupational exposure limits; eyewash and safety shower facilities should be provided in the workplace.';
+      }
+      if (/2006\/121|无可用的接触限值/i.test(cnEng)) {
+        return 'No exposure limit information is available under EC Directive 2006/121/EC.';
+      }
+      if (/不含有职业接触限值|不含职业接触/i.test(cnEng)) {
+        return 'Contains no substances with occupational exposure limit values.';
+      }
+      return '';
+    })(),
 
     // Section 9
     'sec9.appearance': sec9Facts.appearance,
@@ -2548,31 +2562,11 @@ export async function buildBaseEnglishEngine({
         else if (/Nitrile rubber|NBR/i.test(lbl)) safeWrite(c1, enValues['sec8.nbr_glove']);
         else if (/Recommendation/i.test(lbl)) safeWrite(c1, enValues['sec8.glove_recommendation']);
         else if (/Eye protection/i.test(lbl)) {
-          const cnEye = cnS8?.rows?.find(r => /眼睛防护/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
-          if (/眼罩|面罩/i.test(cnEye)) {
-            safeWrite(c1, 'Wear safety glasses/face shield.');
-          } else if (/建议使用护目镜|护目镜/i.test(cnEye)) {
-            safeWrite(c1, 'Protective goggles are recommended.');
-          } else if (cnEye) {
-            safeWrite(c1, cnEye);
-          } else {
-            safeWrite(c1, '');
-          }
+          safeWrite(c1, enValues['sec8.eye_protection'] || '');
         }
         else if (/Body protection/i.test(lbl)) safeWrite(c1, enValues['sec8.body_protection']);
         else if (/Engineering controls/i.test(lbl)) {
-          const cnEng = cnS8?.rows?.find(r => /工程控制/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
-          if (cnEng && /局部排风.*全面通风/i.test(cnEng)) {
-            safeWrite(c1, 'Use local exhaust or general ventilation to maintain workplace concentrations below occupational exposure limits; eyewash and safety shower facilities should be provided in the workplace.');
-          } else if (cnEng && /2006\/121|无可用的接触限值/i.test(cnEng)) {
-            safeWrite(c1, 'No exposure limit information is available under EC Directive 2006/121/EC.');
-          } else if (cnEng && /不含有职业接触限值|不含职业接触/i.test(cnEng)) {
-            safeWrite(c1, 'Contains no substances with occupational exposure limit values.');
-          } else if (cnEng) {
-            safeWrite(c1, enValues['sec8.engineering_controls'] || '');
-          } else {
-            safeWrite(c1, '');
-          }
+          safeWrite(c1, enValues['sec8.engineering_controls'] || '');
         }
       }
     }

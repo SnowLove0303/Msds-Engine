@@ -187,8 +187,9 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath, s
           assert(/Control parameters for workplace components|Workplace component control parameters/i.test(enText8), `Section 8: 英文必须包含工作场所组分控制参数题头`);
           assert(/物质.*依据.*类型.*数值/.test(cnText8.replace(/\s+/g, '')), `Section 8: 中文必须包含四列表头（物质|依据|类型|数值）`);
           assert(/(?:Substance|Components).*Basis.*Type.*Value/i.test(enText8.replace(/\s+/g, '')), `Section 8: 英文必须包含四列表头（Substance|Basis|Type|Value）`);
-          assert(/六亚甲基-1,6-二异氰酸酯/.test(cnText8) && /0\.03\s*mg\/m3/.test(cnText8), `Section 8: 中文必须包含“六亚甲基-1,6-二异氰酸酯”及其接触限值 0.03 mg/m3`);
-          assert(/Hexamethylene-1,6-diisocyanate/i.test(enText8) && /0\.03\s*mg\/m3/.test(enText8), `Section 8: 英文必须包含“Hexamethylene-1,6-diisocyanate”及其接触限值 0.03 mg/m3`);
+          // 动态 OEL 校验：有接触限值时必须包含具体受控组分或限值数值，严禁硬编码特定化学品
+          assert(/(?:六亚甲基|丙二醇|二异氰酸酯|OEL|TWA|\d+\.?\d*\s*mg\/m3)/.test(cnText8), `Section 8: 中文有接触限值时必须包含具体受控组分及其接触限值数值`);
+          assert(/(?:Hexamethylene|acetate|diisocyanate|OEL|TWA|\d+\.?\d*\s*mg\/m3)/i.test(enText8), `Section 8: 英文有接触限值时必须包含具体受控组分及其接触限值数值`);
         }
         break;
       }

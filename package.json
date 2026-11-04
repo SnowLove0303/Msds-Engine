@@ -8,6 +8,9 @@
     "dev": "npm run dev --prefix web",
     "build": "npm run build --prefix web",
     "start": "npm run start --prefix web",
+    "lint:code": "npm run lint:code --prefix web",
+    "lint:grounding": "npm run lint:grounding --prefix web",
+    "lint": "npm run lint --prefix web",
     "update:win": "powershell -ExecutionPolicy Bypass -File scripts/update.ps1",
     "update:linux": "bash scripts/update.sh"
   },
