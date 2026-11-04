@@ -109,8 +109,10 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath, s
           // 信号词对照
           if (/(?:警示词|信号词|警告词)[：:]\s*危险/.test(cnFull) && !/警告/.test(cnFull)) {
             assert(/Signal word:\s*Danger/i.test(enFull), `Section 2.2: 信号词必须翻译为 Danger`);
-          } else if (/警告/.test(cnFull)) {
+          } else if (/(?:警示词|信号词|警告词)[：:]\s*警告/.test(cnFull)) {
             assert(/Signal word:\s*Warning/i.test(enFull), `Section 2.2: 信号词必须翻译为 Warning`);
+          } else if (/(?:警示词|信号词|警告词)[：:]\s*无/.test(cnFull)) {
+            assert(/Signal word:\s*(?:None|No signal word)/i.test(enFull), `Section 2.2: 信号词为无时必须翻译为 None`);
           }
         }
         if (!/2\.3/i.test(cnFull)) {
@@ -174,8 +176,13 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath, s
 
         const isNoOel = /无可用的接触限值|2006\/121|不含有职业接触限值|不含职业接触/i.test(cnText8);
         if (isNoOel) {
-          // 无接触限值商品门禁：必须彻底剪除 4 列表格与题头，行数 <= 13 (实测 12 行)
-          assert(cnSec.rows.length <= 13, `Section 8: 无接触限值时必须彻底剪枝四列表格 (实测行数: ${cnSec.rows.length})`);
+          // 无接触限值商品门禁：必须彻底剪除 4 列表格与题头，行数严格为 12 行 (含手部防护唯一父级分类题头与受控建议行)
+          assert(cnSec.rows.length === 12, `Section 8: 无接触限值时必须保持标准 12 行结构 (实测中文行数: ${cnSec.rows.length})`);
+          assert(enSec.rows.length === 12, `Section 8: 无接触限值时必须保持标准 12 行结构 (实测英文行数: ${enSec.rows.length})`);
+          assert(/手部防护[：:]/.test(cnText8), `Section 8: 中文必须包含唯一父级分类题头“手部防护：”`);
+          assert(/Hand protection:/i.test(enText8), `Section 8: 英文必须包含唯一父级分类题头“Hand protection:”`);
+          assert(/建议[：:]/.test(cnText8), `Section 8: 中文必须包含受控建议行“建议：”`);
+          assert(/Recommendation:/i.test(enText8), `Section 8: 英文必须包含受控建议行“Recommendation:”`);
           assert(!/工作场所组分控制参数/.test(cnText8), `Section 8: 无接触限值时严禁残留“工作场所组分控制参数”通栏题头`);
           assert(!/Control parameters for workplace components|Workplace component control parameters/i.test(enText8), `Section 8: 无接触限值时英文严禁残留控制参数题头`);
           assert(!/六亚甲基-1,6-二异氰酸酯/.test(cnText8), `Section 8: 无接触限值时严禁强塞“六亚甲基-1,6-二异氰酸酯”`);

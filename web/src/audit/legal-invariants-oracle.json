@@ -10,7 +10,10 @@
       "section": "Section 1",
       "title": "中文版产品名称值格法定留空与型号拼接中文名称",
       "authority": "MSDS覆写全局约束体系与八格式规范报告.md §Section 1; OW-080; OW-208",
-      "historicalIncidents": ["9547 审计", "EC-1804 审计"],
+      "historicalIncidents": [
+        "9547 审计",
+        "EC-1804 审计"
+      ],
       "rule": "中文版 (CN) 1.1 产品名称 的右侧值格按企业法定惯例必须留空（严禁在此格填入型号）；产品型号必须拼接入第二行 1.2 中文名称，格式为：[产品中文名] + [半角空格] + [产品型号]（例如：水性环氧固化剂 EC-1804）。",
       "forbiddenAccusations": [
         "产品名称值格留空",
@@ -26,7 +29,9 @@
       "section": "Section 1",
       "title": "英文版 Product name 法定构成",
       "authority": "OW-080",
-      "historicalIncidents": ["9547 审计"],
+      "historicalIncidents": [
+        "9547 审计"
+      ],
       "rule": "英文版 Product name 必须为已评审专业英文名 + 半角空格 + 型号。",
       "forbiddenAccusations": [
         "Product name 格式错误"
@@ -37,7 +42,10 @@
       "section": "Section 8",
       "title": "Section 8 反直觉语义对调（源8.1进模板8.2工程控制，源8.2进模板8.1暴露控制）",
       "authority": "MSDS覆写全局约束体系与八格式规范报告.md §Section 8; OW-131; OW-132",
-      "historicalIncidents": ["9547 审计", "EC-1804 审计"],
+      "historicalIncidents": [
+        "9547 审计",
+        "EC-1804 审计"
+      ],
       "rule": "根据企业模板既定结构与 OW-131 规范：源文档的 8.1 控制参数（含 OEL 接触限值说明）必须映射至模板的 8.2 工程控制；源文档的 8.2 暴露控制（含 PPE 防护装备）必须映射至模板的 8.1 暴露控制。此为企业模板的法定语义映射，绝非颠倒！",
       "forbiddenAccusations": [
         "标题与层级严重颠倒",
@@ -53,7 +61,10 @@
       "section": "Section 2",
       "title": "非危险品/未分类物质标签要素合法缺省",
       "authority": "OW-093; OW-094; GHS 标准",
-      "historicalIncidents": ["EC-1804 审计", "PU-202A 审计"],
+      "historicalIncidents": [
+        "EC-1804 审计",
+        "PU-202A 审计"
+      ],
       "rule": "当产品属于未分类或非危险品（如仅 H412 或无分类）时，无 GHS 象形图、无信号词属于法定正当表现；但标签行不可悬空断层，若展示标签应有标准说明或整行隐藏抑制。",
       "forbiddenAccusations": [
         "非危险品缺少象形图属于瞒报",
@@ -65,7 +76,9 @@
       "section": "Section 10",
       "title": "源文档缺失项整行安全隐藏抑制",
       "authority": "OW-150; MSDS覆写全局约束体系与八格式规范报告.md §Section 10",
-      "historicalIncidents": ["9547 审计"],
+      "historicalIncidents": [
+        "9547 审计"
+      ],
       "rule": "当源文档缺失'应避免的条件'或'禁配物'时，模板对应项直接安全隐藏消失，不留空行。注意：跳号（如 10.1 直接跳到 10.3 缺失 10.2）属于编号缺陷，不属于合法隐藏。",
       "forbiddenAccusations": [
         "源文档未载项隐藏属于漏行"
@@ -76,7 +89,9 @@
       "section": "Section 11",
       "title": "三列行锁定与名词性短语末尾不加多余句号",
       "authority": "MSDS中英文覆写排版与数据装配全景统一工业级规范.md §5.2 / §5.5",
-      "historicalIncidents": ["BL-8129A 审计"],
+      "historicalIncidents": [
+        "BL-8129A 审计"
+      ],
       "rule": "Section 11 等章节的名词性短语声明（如'刺激性：无资料'），遵循手做母版原貌，末尾严禁强行追加多余句号；前两列加粗标签锁定不可写。",
       "forbiddenAccusations": [
         "名词性短语末尾缺失句号"
@@ -87,11 +102,30 @@
       "section": "Section 15",
       "title": "现行有效法定法规自动更新合法性",
       "authority": "PROJECT_CONSTITUTION.md §现行有效法定法规唯一权威; OW-180",
-      "historicalIncidents": ["9547 审计", "PU-608 审计"],
+      "historicalIncidents": [
+        "9547 审计",
+        "PU-608 审计"
+      ],
       "rule": "法规条款必须采用现行有效国家法规（如国令第 591 号替代已废止的 344 号，GB 30000 系列替代已废止的 GB 20576 系列）。生成端自动采用现行有效法规属于强制合规升级，严禁误报为违背源文件篡改。",
       "forbiddenAccusations": [
         "法规升级为GB 30000属于篡改",
         "采用现行有效法规属于外生编造"
+      ]
+    },
+    {
+      "id": "INV-PRUNE-01",
+      "section": "Global & Section 8",
+      "title": "唯一父级分类题头与法定骨架免剪枝白名单",
+      "authority": "用户最高立法裁决；PROJECT_CONSTITUTION.md 第八大公理；OW-134",
+      "historicalIncidents": [
+        "EC-1804 剪枝争议"
+      ],
+      "rule": "在表格中起分类聚合、统领下属细分参数的标签（如 Section 8.1 的'手部防护：'/'Hand protection:'统领下属的手套材质参数；Section 8.1 的受控建议行'建议：'/'Recommendation:'），属于全系统不可剪枝骨架白名单对象，绝对不可通过 deleteRow 物理删行！对值格无独立一句话陈述的父级分类题头，法定处理方式为：保留加粗标签，彻底清洗单元格内的历史残留空行与错位文字，值格保持纯净空白。",
+      "forbiddenAccusations": [
+        "手部防护未整行删除属于开天窗",
+        "建议行未删行属于多余残留",
+        "唯一父级题头留存属于未完全剪枝",
+        "手部防护没有值格内容必须整行删除"
       ]
     }
   ]

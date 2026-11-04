@@ -695,7 +695,7 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     'sec8.fkm_glove': 'Thickness ≥ 0.4 mm; Breakthrough time ≥ 480 min.',
     'sec8.iir_glove': 'Thickness ≥ 0.5 mm; Breakthrough time ≥ 480 min.',
     'sec8.nbr_glove': 'Thickness ≥ 0.35 mm; Breakthrough time ≥ 480 min.',
-    'sec8.glove_recommendation': 'Contaminated gloves should be discarded.',
+    'sec8.glove_recommendation': 'Discard contaminated gloves.',
     'sec8.eye_protection': (() => {
       const cnS8Rec = baseCnEngine?.records?.find(r => r.sectionNumber === 8);
       const cnEye = cnS8Rec?.rows?.find(r => /眼睛防护/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
@@ -1064,7 +1064,7 @@ export function parseSection2FromSource(srcEngine) {
     }
   }
 
-  if (!signalWord && (fullText.includes('警告') || fullText.includes('H412') || fullText.includes('类别 3'))) {
+  if (!signalWord && fullText.includes('警告')) {
     signalWord = '警告';
   }
 
@@ -1762,11 +1762,25 @@ export async function buildBaseChineseEngine({
   // 10. 规范化 Section 8：手部防护清除底模编造、眼睛防护还原源文件，若 8.2 为“不含有职业接触限值的物质”剪枝四列表格
   let s8 = engine.records.find(r => r.sectionNumber === 8);
   if (s8) {
+    const srcS8 = srcEngine?.records?.find(r => r.sectionNumber === 8);
+    const srcS8Rows = srcS8?.rows || [];
+    const srcRecRow = srcS8Rows.find(r => /建议/i.test(r.cells[0]?.text || ''));
+    let srcRecVal = '';
+    if (srcRecRow) {
+      srcRecVal = (srcRecRow.cells[1]?.text || srcRecRow.cells[0]?.text?.replace(/^[建议:：\s]+/, '') || '').trim();
+    }
+    const srcHandRow = srcS8Rows.find(r => /手部/i.test(r.cells[0]?.text || ''));
+    let srcHandVal = '';
+    if (srcHandRow && srcHandRow.cells.length > 1) {
+      srcHandVal = (srcHandRow.cells[1]?.text || '').trim();
+    }
+
     for (let rIdx = s8.rows.length - 1; rIdx >= 0; rIdx--) {
       const row = s8.rows[rIdx];
       const lblCell = row.cells[0];
       const lbl = (lblCell?.text || '').trim();
       if (/手部/i.test(lbl)) {
+        // 唯一父级分类题头不可剪枝公理：严禁 deleteRow！保留加粗标签，彻底清洗单元格脏数据
         if (lblCell?.node) {
           const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
           const tabs = Array.from(lblCell.node.getElementsByTagNameNS(W_NS, 'tab'));
@@ -1778,12 +1792,44 @@ export async function buildBaseChineseEngine({
             ind.removeAttributeNS(W_NS, 'w:leftChars');
             ind.removeAttributeNS(W_NS, 'w:hangingChars');
           });
+          const ps = Array.from(lblCell.node.getElementsByTagNameNS(W_NS, 'p'));
+          if (ps.length > 0) {
+            const firstP = ps[0];
+            for (let i = 1; i < ps.length; i++) {
+              ps[i].parentNode?.removeChild(ps[i]);
+            }
+            const existingRuns = Array.from(firstP.getElementsByTagNameNS(W_NS, 'r'));
+            existingRuns.forEach(r => firstP.removeChild(r));
+            const newRun = firstP.ownerDocument.createElementNS(W_NS, 'w:r');
+            const rPr = firstP.ownerDocument.createElementNS(W_NS, 'w:rPr');
+            const rFonts = firstP.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+            rFonts.setAttributeNS(W_NS, 'w:ascii', '宋体');
+            rFonts.setAttributeNS(W_NS, 'w:eastAsia', '宋体');
+            rFonts.setAttributeNS(W_NS, 'w:hAnsi', '宋体');
+            rPr.appendChild(rFonts);
+            const b = firstP.ownerDocument.createElementNS(W_NS, 'w:b');
+            rPr.appendChild(b);
+            const sz = firstP.ownerDocument.createElementNS(W_NS, 'w:sz');
+            sz.setAttributeNS(W_NS, 'w:val', '19');
+            rPr.appendChild(sz);
+            newRun.appendChild(rPr);
+            const t = firstP.ownerDocument.createElementNS(W_NS, 'w:t');
+            t.textContent = '手部防护：';
+            newRun.appendChild(t);
+            firstP.appendChild(newRun);
+          }
         }
-        const valText = (row.cells[1]?.text || '').trim();
-        // 剪枝黄金法则：源文件若无独立手部防护描述，物理删除整行！
-        if (!valText || /建议戴上防护手套/i.test(valText)) {
-          s8 = deleteRow(engine, s8, rIdx);
-          continue;
+        // 值格处理：若源文件有独立通用陈述则写入，否则置空（清除底模“建议戴上防护手套。”虚构）
+        if (row.cells.length > 1 && row.cells[1]) {
+          safeWriteCellValue(row.cells[1], srcHandVal || '');
+        }
+        continue;
+      }
+      if (/建议/i.test(lbl)) {
+        // 建议行受控门控：源文档有建议则填入，无则置空，严禁删行
+        if (row.cells.length > 1 && row.cells[1]) {
+          const recText = srcRecVal || (/污染的手套应废弃/i.test(row.cells[1].text || '') ? '污染的手套应废弃。' : '');
+          safeWriteCellValue(row.cells[1], recText);
         }
       }
       // 统一标签冒号为全角冒号
@@ -2627,13 +2673,7 @@ export async function buildBaseEnglishEngine({
   if (s8) {
     const cnS8 = baseCnEngine?.records?.find(r => r.sectionNumber === 8);
     // 如果中文母版剪枝删除了手部防护行，英文版必须同步物理删除 Hand protection 行！
-    const cnHasHand = cnS8?.rows?.some(r => /手部/i.test(r.cells[0]?.text || ''));
-    if (!cnHasHand) {
-      const enHandIdx = s8.rows.findIndex(r => /Hand protection/i.test(r.cells[0]?.text || ''));
-      if (enHandIdx !== -1) {
-        s8 = deleteRow(engine, s8, enHandIdx);
-      }
-    }
+    // 废除 deleteRow(engine, s8, enHandIdx)！唯一父级分类题头 Hand protection 保持存活
 
     for (const row of s8.rows) {
       const lbl = (row.cells[0]?.text || '').trim();
@@ -2648,7 +2688,10 @@ export async function buildBaseEnglishEngine({
         else if (/Fluororubber|FKM/i.test(lbl)) safeWrite(c1, enValues['sec8.fkm_glove']);
         else if (/Butyl rubber|IIR/i.test(lbl)) safeWrite(c1, enValues['sec8.iir_glove']);
         else if (/Nitrile rubber|NBR/i.test(lbl)) safeWrite(c1, enValues['sec8.nbr_glove']);
-        else if (/Recommendation/i.test(lbl)) safeWrite(c1, enValues['sec8.glove_recommendation']);
+        else if (/Recommendation/i.test(lbl)) {
+          const cnRec = cnS8?.rows?.find(r => /建议/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
+          safeWrite(c1, cnRec ? (enValues['sec8.glove_recommendation'] || 'Discard contaminated gloves.') : '');
+        }
         else if (/Eye protection/i.test(lbl)) {
           safeWrite(c1, enValues['sec8.eye_protection'] || '');
         }
