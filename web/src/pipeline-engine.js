@@ -686,7 +686,13 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     'sec8.iir_glove': 'Thickness ≥ 0.5 mm; Breakthrough time ≥ 480 min.',
     'sec8.nbr_glove': 'Thickness ≥ 0.35 mm; Breakthrough time ≥ 480 min.',
     'sec8.glove_recommendation': 'Contaminated gloves should be discarded.',
-    'sec8.eye_protection': 'Protective goggles are recommended.',
+    'sec8.eye_protection': (() => {
+      const cnS8Rec = baseCnEngine?.records?.find(r => r.sectionNumber === 8);
+      const cnEye = cnS8Rec?.rows?.find(r => /眼睛防护/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
+      if (/眼罩|面罩/i.test(cnEye)) return 'Wear safety glasses/face shield.';
+      if (/建议使用护目镜|护目镜/i.test(cnEye)) return 'Protective goggles are recommended.';
+      return cnEye || 'Wear safety glasses/face shield.';
+    })(),
     'sec8.body_protection': 'Wear appropriate protective clothing.',
     'sec8.engineering_controls': 'No exposure limit information is available under EC Directive 2006/121/EC.',
 
@@ -1102,16 +1108,21 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
 
   if (/外观/i.test(cnLabel)) {
     enLabel = 'Appearance:';
-    if (/无色.*淡黄|淡黄.*粘稠/i.test(cnVal)) enVal = 'Colourless to light yellow transparent viscous liquid';
+    if (/半透明.*乳液|乳液.*半透明/i.test(cnVal)) enVal = 'Translucent emulsion';
+    else if (/半透明/i.test(cnVal)) enVal = 'Translucent liquid';
+    else if (/乳白/i.test(cnVal)) enVal = 'Milky white liquid';
+    else if (/无色.*淡黄|淡黄.*粘稠/i.test(cnVal)) enVal = 'Colourless to light yellow transparent viscous liquid';
     else if (/无色.*微黄|微黄.*透明/i.test(cnVal)) enVal = 'Colorless to slightly yellow transparent liquid';
     else if (/无色透明/i.test(cnVal)) enVal = 'Colourless transparent liquid';
-    else enVal = cnVal;
+    else if (/微黄|淡黄/i.test(cnVal)) enVal = 'Slightly yellowish liquid';
+    else if (/均质/i.test(cnVal)) enVal = 'Homogeneous liquid';
+    else enVal = 'Liquid';
   } else if (/嗅觉/i.test(cnLabel)) {
     enLabel = 'Odour threshold:';
     enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
   } else if (/pH/i.test(cnLabel)) {
     enLabel = 'pH value:';
-    enVal = cnVal;
+    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
   } else if (/离子性/i.test(cnLabel)) {
     enLabel = 'Ionicity:';
     if (/阴离子/i.test(cnVal)) enVal = 'Anionic';
@@ -1120,31 +1131,53 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
     else enVal = cnVal;
   } else if (/初沸点|沸程/i.test(cnLabel)) {
     enLabel = 'Initial boiling point:';
-    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
+    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal.replace(/约\s*/g, 'Approx. ').replace(/℃/g, ' °C');
   } else if (/可燃性|易燃性/i.test(cnLabel)) {
     enLabel = /固态|固体/i.test(cnLabel) ? 'Flammability (solids, gases):' : 'Flammability:';
-    enVal = /不适用/.test(cnVal) ? 'Not applicable' : cnVal;
+    enVal = /不适用/.test(cnVal) ? 'Not applicable' : (/无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal);
+  } else if (/燃烧值/i.test(cnLabel)) {
+    enLabel = 'Combustion value:';
+    enVal = /不适用/.test(cnVal) ? 'Not applicable' : (/无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal);
+  } else if (/饱和蒸气压/i.test(cnLabel)) {
+    enLabel = 'Saturated vapour pressure:';
+    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal.replace(/约\s*/g, 'Approx. ').replace(/在\s*(\d+)℃/g, 'at $1℃').replace(/hPa/gi, ' hPa');
+  } else if (/蒸发速率/i.test(cnLabel)) {
+    enLabel = 'Evaporation rate:';
+    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : (/不适用/.test(cnVal) ? 'Not applicable' : cnVal);
+  } else if (/相对蒸气密度|蒸气密度/i.test(cnLabel)) {
+    enLabel = 'Relative vapour density:';
+    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
   } else if (/NCO/i.test(cnLabel)) {
     enLabel = 'NCO content:';
     enVal = cnVal;
   } else if (/水溶性|溶解性/i.test(cnLabel)) {
     enLabel = 'Solubility in water:';
     if (/分散.*乳化|乳化.*分散/i.test(cnVal)) enVal = 'Dispersible and emulsifiable in water';
-    else if (/混溶/i.test(cnVal)) enVal = 'Miscible with water';
+    else if (/混溶|互溶|完全/i.test(cnVal)) enVal = 'Miscible with water';
     else if (/不溶/i.test(cnVal)) enVal = 'Insoluble in water';
+    else if (/分散|乳化/i.test(cnVal)) enVal = 'Dispersible in water';
     else enVal = cnVal;
+  } else if (/表面张力/i.test(cnLabel)) {
+    enLabel = 'Surface tension:';
+    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
+  } else if (/分配系数/i.test(cnLabel)) {
+    enLabel = 'Partition coefficient n-octanol/water:';
+    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
   } else if (/粘度/i.test(cnLabel)) {
     enLabel = /25/i.test(cnLabel) ? 'Dynamic viscosity at 25 °C:' : 'Dynamic viscosity:';
-    enVal = cnVal;
+    enVal = cnVal.replace(/＜/g, '< ').replace(/＞/g, '> ').replace(/mPa\.s/gi, 'mPa·s');
   } else if (/自燃温度/i.test(cnLabel)) {
     enLabel = 'Auto-ignition temperature:';
-    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
+    enVal = /不适用/.test(cnVal) ? 'Not applicable' : (/无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal);
   } else if (/闪点/i.test(cnLabel)) {
     enLabel = /闭口|闭杯/i.test(cnLabel) ? 'Flash point (closed cup):' : 'Flash point:';
-    enVal = cnVal.replace(/℃/g, ' °C').replace(/(\d+)\s*°C/, '$1 °C');
+    if (/无闪点/i.test(cnVal)) enVal = 'No flash point below initial boiling point';
+    else if (/不适用/i.test(cnVal)) enVal = 'Not applicable';
+    else if (/无数据|无资料/.test(cnVal)) enVal = 'No data available.';
+    else enVal = cnVal.replace(/℃/g, ' °C').replace(/(\d+)\s*°C/, '$1 °C');
   } else if (/引燃温度/i.test(cnLabel)) {
     enLabel = 'Ignition temperature:';
-    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
+    enVal = /不适用/.test(cnVal) ? 'Not applicable' : (/无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal);
   } else if (/分解温度/i.test(cnLabel)) {
     enLabel = 'Decomposition temperature:';
     enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
@@ -1153,13 +1186,13 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
     enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
   } else if (/粉尘爆炸/i.test(cnLabel)) {
     enLabel = 'Dust explosion class:';
-    enVal = /不适用/.test(cnVal) ? 'Not applicable' : cnVal;
+    enVal = /不适用/.test(cnVal) ? 'Not applicable' : (/无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal);
   } else if (/固体含量|固含/i.test(cnLabel)) {
     enLabel = 'Solid content:';
-    enVal = cnVal;
+    enVal = cnVal.replace(/约\s*/g, 'Approx. ');
   } else if (/密度/i.test(cnLabel)) {
     enLabel = /25/i.test(cnLabel) ? 'Density at 25 °C:' : 'Density:';
-    enVal = cnVal;
+    enVal = cnVal.replace(/约\s*/g, 'Approx. ').replace(/g\/cm3/gi, ' g/cm³');
   } else if (/其他信息/i.test(cnLabel)) {
     enLabel = 'Other information:';
     enVal = 'The above data are not product specifications. Please refer to the product technical information sheet for specifications.';
@@ -1667,7 +1700,7 @@ export async function buildBaseChineseEngine({
   }
 
   // 9.5 Section 11 & Section 12 双范式动态分流处理 (Ps-openspec 2.0: 多组分走通栏，单组分如 PU-202A 走原版分列表格)
-  const isMultiComponent = modelCode === 'PA-3223' || Boolean(facts.isMultiComponentComposite || isNonHazComposite);
+  const isMultiComponent = modelCode === 'PA-3223' || Boolean(facts.isMultiComponentComposite);
   const s11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || srcEngine?.records?.find(r => r.sectionNumber === 11) || null);
   if (s11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
     buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || '' }, false);
@@ -1685,13 +1718,12 @@ export async function buildBaseChineseEngine({
         if (/建议戴上防护手套/i.test(row.cells[1]?.text || '')) {
           safeWriteCellValue(row.cells[1], '');
         }
-      } else if (/眼睛防护/i.test(lbl) && row.cells.length > 1) {
-        safeWriteCellValue(row.cells[1], '建议使用护目镜。');
       }
     }
     const row82 = s8.rows.find(r => /8\.2\s*工程控制/i.test(r.cells[0]?.text || ''));
-    const isNoOEL = row82 && /不含有职业接触限值|不含职业接触/i.test(row82.cells[row82.cells.length - 1]?.text || '');
-    if (isNoOEL) {
+    const s8FullText = s8.rows.map(r => r.cells.map(c => c.text || '').join(' ')).join(' ');
+    const isNoOEL = /不含有职业接触限值|不含职业接触|无可用的接触限值|2006\/121/i.test(s8FullText);
+    if (isNoOEL && row82) {
       const r82Idx = s8.rows.indexOf(row82);
       while (s8.rows.length > r82Idx + 1) {
         s8 = deleteRow(engine, s8, s8.rows.length - 1);
@@ -2129,6 +2161,9 @@ function translateToxicologyValueToEnglish(cnText, endpoint = '') {
   }
   t = t.replace(/，/g, ',');
   t = t.replace(/轻微刺激/g, 'Slight irritation');
+  t = t.replace(/无刺激/g, 'No irritation');
+  t = t.replace(/皮肤接触不致敏/g, 'Not sensitizing by skin contact.');
+  t = t.replace(/不致敏/g, 'Non-sensitizing.');
   t = t.replace(/皮肤接触可能致敏/g, 'May cause sensitization by skin contact.');
   t = t.replace(/在\s*AMES\s*试验中无致突变性。?/gi, 'Non-mutagenic in Ames test.');
   t = t.replace(/半数致死浓度\s*[（(]\s*LC50\s*[）)]\s*[/／]\s*1\s*h\s*[/／]\s*大鼠(?:\s*雌性)?\s*[:：]\s*/gi, 'LC50 / Inhalation / 1h / Rat: ');
@@ -2337,7 +2372,7 @@ export async function buildBaseEnglishEngine({
       srcEngine: baseCnEngine || facts.srcEngine,
       section3ExemptionNotes: enValues['sec3.exemption_notes'] || extractSection3ExemptionNotes(baseCnEngine.records.find(r => r.sectionNumber === 3))
     }, true);
-    const isMultiComponent = modelCode === 'PA-3223' || Boolean(facts.isMultiComponentComposite || isNonHazComposite);
+    const isMultiComponent = modelCode === 'PA-3223' || Boolean(facts.isMultiComponentComposite);
     const enS11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || null);
     if (enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
       buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || '' }, true);
@@ -2514,10 +2549,10 @@ export async function buildBaseEnglishEngine({
         else if (/Recommendation/i.test(lbl)) safeWrite(c1, enValues['sec8.glove_recommendation']);
         else if (/Eye protection/i.test(lbl)) {
           const cnEye = cnS8?.rows?.find(r => /眼睛防护/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
-          if (/建议使用护目镜/i.test(cnEye)) {
-            safeWrite(c1, 'Protective goggles are recommended.');
-          } else if (/护目镜|面罩/i.test(cnEye)) {
+          if (/眼罩|面罩/i.test(cnEye)) {
             safeWrite(c1, 'Wear safety glasses/face shield.');
+          } else if (/建议使用护目镜|护目镜/i.test(cnEye)) {
+            safeWrite(c1, 'Protective goggles are recommended.');
           } else if (cnEye) {
             safeWrite(c1, cnEye);
           } else {
@@ -2529,8 +2564,12 @@ export async function buildBaseEnglishEngine({
           const cnEng = cnS8?.rows?.find(r => /工程控制/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
           if (cnEng && /局部排风.*全面通风/i.test(cnEng)) {
             safeWrite(c1, 'Use local exhaust or general ventilation to maintain workplace concentrations below occupational exposure limits; eyewash and safety shower facilities should be provided in the workplace.');
+          } else if (cnEng && /2006\/121|无可用的接触限值/i.test(cnEng)) {
+            safeWrite(c1, 'No exposure limit information is available under EC Directive 2006/121/EC.');
+          } else if (cnEng && /不含有职业接触限值|不含职业接触/i.test(cnEng)) {
+            safeWrite(c1, 'Contains no substances with occupational exposure limit values.');
           } else if (cnEng) {
-            safeWrite(c1, cnEng);
+            safeWrite(c1, enValues['sec8.engineering_controls'] || '');
           } else {
             safeWrite(c1, '');
           }
@@ -2545,6 +2584,20 @@ export async function buildBaseEnglishEngine({
         if (c0 && /六亚甲基-1,6-二异氰酸酯/i.test(c0.text)) {
           safeWrite(c0, 'Hexamethylene-1,6-diisocyanate');
         }
+      }
+    }
+
+    // 若无接触限值（isNoOEL），彻底剪除 8.2 工程控制之后的所有 4 列表格行
+    const row82En = s8.rows.find(r => /8\.2\s*Engineering controls/i.test(r.cells[0]?.text || ''));
+    const cnRow82 = cnS8?.rows?.find(r => /8\.2\s*工程控制/i.test(r.cells[0]?.text || ''));
+    const cnS8Text = cnS8 ? cnS8.rows.map(r => r.cells.map(c => c.text || '').join(' ')).join(' ') : '';
+    const isNoOELEn = (row82En && /No exposure limit|Contains no substances/i.test(row82En.cells[row82En.cells.length - 1]?.text || ''))
+      || (cnRow82 && /不含有职业接触限值|不含职业接触|无可用的接触限值|2006\/121/i.test(cnRow82.cells[cnRow82.cells.length - 1]?.text || ''))
+      || (/不含有职业接触限值|不含职业接触|无可用的接触限值|2006\/121/i.test(cnS8Text));
+    if (isNoOELEn && row82En) {
+      const r82IdxEn = s8.rows.indexOf(row82En);
+      while (s8.rows.length > r82IdxEn + 1) {
+        s8 = deleteRow(engine, s8, s8.rows.length - 1);
       }
     }
 
@@ -2630,7 +2683,7 @@ export async function buildBaseEnglishEngine({
 
   // Section 11 【核心重构：彻底废除硬编码假数据与粗暴删行，基于中文母版实测端点动态英译装配】
   let s11 = engine.records.find(r => r.sectionNumber === 11);
-  const isMultiComponent = modelCode === 'PA-3223' || Boolean(facts.isMultiComponentComposite || isNonHazComposite);
+  const isMultiComponent = modelCode === 'PA-3223' || Boolean(facts.isMultiComponentComposite);
   const enS11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || null);
   if (s11 && (isMultiComponent || enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED')) {
     // Mode B 通栏复合豁免模态：已由 buildThreeTierSection11 全权接管，跳过传统单端点映射以防中文污染

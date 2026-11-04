@@ -3632,7 +3632,7 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
           if (eyeItem?.value) {
             const cleanEye = eyeItem.value.trim();
             const valToWrite = isEnglishTemplate
-              ? (/建议使用护目镜/i.test(cleanEye) ? 'Protective goggles are recommended.' : (/面罩/i.test(cleanEye) ? 'Wear safety glasses/face shield.' : cleanEye))
+              ? (/眼罩|面罩/i.test(cleanEye) ? 'Wear safety glasses/face shield.' : (/建议使用护目镜|护目镜/i.test(cleanEye) ? 'Protective goggles are recommended.' : cleanEye))
               : cleanEye;
             try { writeCellValue(eyeRow.cells[eyeRow.cells.length - 1], valToWrite, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
           } else {
@@ -3680,11 +3680,11 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
           }
         }
 
-        // 组分控制参数 (源文档明确包含 8.1 控制参数 / 工作场所组分控制参数，或异氰酸酯产品，必须保留)
+        // 组分控制参数 (源文档明确包含 8.1 控制参数 / 工作场所组分控制参数，或异氰酸酯产品，必须保留；但若明确无接触限值，绝不外生强塞)
         const oelCombinedText = matchedSec.sourceRecord?.rows?.map((r) => r.cells?.map((c) => c.text || '').join(' ')).join('\n') || '';
+        const isExplicitNoOel = /未制定|无可用的接触限值|无已知|无数据|不适用|not established|no exposure limits|2006\/121|不含有职业接触限值|不含职业接触/i.test(oelCombinedText);
         const sourceMentionsOel = /控制参数|组分控制参数|接触限值|六亚甲基|异氰酸酯/i.test(oelCombinedText);
-        const hasSubstantiveOel = sourceMentionsOel || (/(?:\b(?:PC-TWA|PC-STEL|MAC|TLV|OEL|TWA|STEL|WEL)\b|mg\/m3|mg\/m³|ppm)\s*[:：]?\s*\d+/i.test(oelCombinedText)
-          && !/未制定|无可用的接触限值|无已知|无数据|不适用|not established|no exposure limits/i.test(oelCombinedText));
+        const hasSubstantiveOel = !isExplicitNoOel && (sourceMentionsOel || /(?:\b(?:PC-TWA|PC-STEL|MAC|TLV|OEL|TWA|STEL|WEL)\b|mg\/m3|mg\/m³|ppm)\s*[:：]?\s*\d+/i.test(oelCombinedText));
 
         if (!hasSubstantiveOel) {
           for (let rIdx = tRecord.rows.length - 1; rIdx >= 0; rIdx--) {

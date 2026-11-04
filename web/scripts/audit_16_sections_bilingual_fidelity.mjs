@@ -99,7 +99,7 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath, s
       case 2: {
         const cnFull = cnSec.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
         const enFull = enSec.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
-        const isNonHaz = /不属于危害|非危险|不属于危险/i.test(cnFull);
+        const isNonHaz = /不属于危害|非危险|不属于危险|危险性类别[：:]\s*无|not classified/i.test(cnFull);
 
         if (isNonHaz) {
           assert(!/H412|H315|Category|H332|H317/i.test(enFull), `Section 2: 中文非危险品，英文严禁残留旧模板危害分类与 H 声明`);
@@ -149,12 +149,13 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath, s
       }
       case 8: {
         assert(cnSec.rows.length === enSec.rows.length, `Section 8: 表格行数必须与中文严格同构 (CN: ${cnSec.rows.length} vs EN: ${enSec.rows.length})`);
-        assert(cnSec.rows.length >= 14, `Section 8: 包含控制参数与工程控制时行数必须 >= 14 行 (实测: ${cnSec.rows.length})`);
         const cnText8 = cnSec.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
         const enText8 = enSec.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
         assert(!/建议戴上防护手套/i.test(cnText8), `Section 8: 手部防护严禁底模外生编造“建议戴上防护手套。”`);
         assert(!/Protective gloves are recommended/i.test(enText8), `Section 8: 手部防护严禁英文外生编造“Protective gloves are recommended.”`);
-        if (/建议使用护目镜/.test(cnText8)) {
+        if (/眼罩|面罩/.test(cnText8)) {
+          assert(/Wear safety glasses\/face shield/i.test(enText8), `Section 8: 眼睛防护必须忠实翻译为“Wear safety glasses/face shield.”`);
+        } else if (/建议使用护目镜/.test(cnText8)) {
           assert(/Protective goggles are recommended/i.test(enText8), `Section 8: 眼睛防护必须忠实翻译为“Protective goggles are recommended.”`);
           assert(!/Wear protective goggles or face shield/i.test(enText8), `Section 8: 眼睛防护严禁底模篡改编造“Wear protective goggles or face shield.”`);
         }
@@ -167,15 +168,28 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath, s
           const c0Text = (r.cells[0]?.text || '').trim();
           assert(!/[:：]$/.test(c0Text), `Section 8: 4列表格 Col 0 严禁包含末尾冒号 (实测: "${c0Text}")`);
         }
-        // 关键门禁：工程控制与工作场所组分控制参数必须 100% 存在且内容保真
+        // 关键门禁：工程控制
         assert(/8\.2\s*工程控制/i.test(cnText8), `Section 8: 中文必须包含 8.2 工程控制`);
         assert(/8\.2\s*Engineering controls/i.test(enText8), `Section 8: 英文必须包含 8.2 Engineering controls`);
-        assert(/工作场所组分控制参数/.test(cnText8), `Section 8: 中文必须包含“工作场所组分控制参数”通栏题头`);
-        assert(/Control parameters for workplace components|Workplace component control parameters/i.test(enText8), `Section 8: 英文必须包含工作场所组分控制参数题头`);
-        assert(/物质.*依据.*类型.*数值/.test(cnText8.replace(/\s+/g, '')), `Section 8: 中文必须包含四列表头（物质|依据|类型|数值）`);
-        assert(/(?:Substance|Components).*Basis.*Type.*Value/i.test(enText8.replace(/\s+/g, '')), `Section 8: 英文必须包含四列表头（Substance|Basis|Type|Value）`);
-        assert(/六亚甲基-1,6-二异氰酸酯/.test(cnText8) && /0\.03\s*mg\/m3/.test(cnText8), `Section 8: 中文必须包含“六亚甲基-1,6-二异氰酸酯”及其接触限值 0.03 mg/m3`);
-        assert(/Hexamethylene-1,6-diisocyanate/i.test(enText8) && /0\.03\s*mg\/m3/.test(enText8), `Section 8: 英文必须包含“Hexamethylene-1,6-diisocyanate”及其接触限值 0.03 mg/m3`);
+
+        const isNoOel = /无可用的接触限值|2006\/121|不含有职业接触限值|不含职业接触/i.test(cnText8);
+        if (isNoOel) {
+          // 无接触限值商品门禁：必须彻底剪除 4 列表格与题头，行数 <= 13 (实测 12 行)
+          assert(cnSec.rows.length <= 13, `Section 8: 无接触限值时必须彻底剪枝四列表格 (实测行数: ${cnSec.rows.length})`);
+          assert(!/工作场所组分控制参数/.test(cnText8), `Section 8: 无接触限值时严禁残留“工作场所组分控制参数”通栏题头`);
+          assert(!/Control parameters for workplace components|Workplace component control parameters/i.test(enText8), `Section 8: 无接触限值时英文严禁残留控制参数题头`);
+          assert(!/六亚甲基-1,6-二异氰酸酯/.test(cnText8), `Section 8: 无接触限值时严禁强塞“六亚甲基-1,6-二异氰酸酯”`);
+          assert(!/Hexamethylene-1,6-diisocyanate/i.test(enText8), `Section 8: 无接触限值时英文严禁强塞“Hexamethylene-1,6-diisocyanate”`);
+        } else {
+          // 有接触限值商品门禁：四列表头与接触限值必须存在
+          assert(cnSec.rows.length >= 14, `Section 8: 包含控制参数与工程控制时行数必须 >= 14 行 (实测: ${cnSec.rows.length})`);
+          assert(/工作场所组分控制参数/.test(cnText8), `Section 8: 中文必须包含“工作场所组分控制参数”通栏题头`);
+          assert(/Control parameters for workplace components|Workplace component control parameters/i.test(enText8), `Section 8: 英文必须包含工作场所组分控制参数题头`);
+          assert(/物质.*依据.*类型.*数值/.test(cnText8.replace(/\s+/g, '')), `Section 8: 中文必须包含四列表头（物质|依据|类型|数值）`);
+          assert(/(?:Substance|Components).*Basis.*Type.*Value/i.test(enText8.replace(/\s+/g, '')), `Section 8: 英文必须包含四列表头（Substance|Basis|Type|Value）`);
+          assert(/六亚甲基-1,6-二异氰酸酯/.test(cnText8) && /0\.03\s*mg\/m3/.test(cnText8), `Section 8: 中文必须包含“六亚甲基-1,6-二异氰酸酯”及其接触限值 0.03 mg/m3`);
+          assert(/Hexamethylene-1,6-diisocyanate/i.test(enText8) && /0\.03\s*mg\/m3/.test(enText8), `Section 8: 英文必须包含“Hexamethylene-1,6-diisocyanate”及其接触限值 0.03 mg/m3`);
+        }
         break;
       }
       case 9: {
