@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "lint:code": "node scripts/lint_code_invariants.mjs",
     "lint:grounding": "node scripts/lint_source_grounding.mjs",
-    "lint": "npm run lint:code",
+    "lint:audit": "node scripts/lint_audit_false_positives.mjs --self-test",
+    "lint": "npm run lint:code && npm run lint:audit",
     "test:smoke": "node tests/smoke.mjs",
     "test:annotations": "node tests/test_smart_matching_20_annotations.mjs",
     "start": "node server.mjs"

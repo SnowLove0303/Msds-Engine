@@ -17,7 +17,7 @@
   1. 动工前必须经过【门禁 1: 交付矩阵与模板确认门禁】与【门禁 2: 方案、英译与调用报文确认门禁】，严格等待用户明确指令后方可动工；
   2. 执行过程绝对严禁长时间黑盒静默，必须实时输出 Phase 1~12 标准化状态播报；
   3. 交付必须附带 1:1 事实物理对账（`actionableGaps === 0`）与【两阶双轨机械+Agent敌手自审计双重最高门禁】全绿凭据。
-- 最高强制性终审双重门禁 (机械确定性审计 + Agent 敌手认知自审计双钥匙)：全系统将终审审计的强制性拉升至最高法定级别，每次产出必须经过机械确定性审计与 Agent 敌手认知自审计双重门禁，缺一不可：
+- 最高强制性终审双重门禁与反假报错阻断体系 (机械确定性审计 + Agent 敌手认知自审计 + 白名单反向硬阻断)：全系统将终审审计的强制性与准确性拉升至最高法定级别，每次产出必须经过机械确定性审计、Agent 敌手自审计与白名单反假报错硬过滤三重门禁，缺一不可：
   1. **第一重：机械确定性硬阻断审计 (Step 1: Mechanical Deterministic Audit - 机器底座准入钥匙 1)**：
      - 运行双极双层全景深度审计 (`audit_bipolar_bilayer.mjs`) 与 G-01~G-46 终审门禁；
      - 刚性覆盖：8 份交付物完整存在且无杂件 (G-01)、时间戳同步差 $\le 300\text{s}$ (G-36)、英文说明行字号 9.50pt (G-37)、Section 9 标签垂直对齐 80.28pt (G-38)、OPC 媒体声明 100% 完备 (G-39)、避免末页纯空包含实质内容 (G-40)、英文媒体资产纯度无中文光栅 (G-41)、页脚几何安全无越界截断 (G-42)、中英文 16 章节 1:1 双向物理对账门禁 (G-43~G-46，加载 `audit_16_sections_bilingual_fidelity.mjs`)、表格外框实线/内框统一虚线、英文版零中文强门禁；
@@ -32,6 +32,10 @@
        ⑤ **格式服从原文与零幽灵残留**：检查源文件无独立说明行时是否已彻底剔除模板冗余前言行与英文底模硬编码中文占位行；严禁凭空捏造未提及的毒理学端点；
        ⑥ **1:1 事实绝对守恒**：对账 TDS 实测参数与源文件理化特性，确认数值、公差、单位 100% 精准覆写且中英完全对称；
      - 交付时必须在报告中明确出具【Agent 敌手自审计反向挑刺核查清单】，逐项记录反向挑刺结果，严禁消极放行与形式主义打勾。
+  3. **第三重：法定不变量免检白名单与反假报错硬过滤 (Step 3: Anti-False-Positive Lint Filter - 机器阻断把正确当错误)**：
+     - **法定白名单最高效力**：严格认定 `web/src/audit/legal-invariants-oracle.json` 为全系统法定免检与合法改写白名单（如 Section 1.1 留空、Section 8.1/8.2 语义对调等）；
+     - **严禁以通用常识挑战法定规范**：严禁任何审计脚本或 Agent 凭通用大模型常识、通用国标层级或字面差异，将白名单内的法定正确行为判定为“缺陷/错误”；
+     - **审计报告出具前强制机检过滤**：出具任何形式的审计报告（TXT/MD/JSON）前，必须无条件执行 `npm run lint:audit`。任何命中白名单的虚假指控将直接触发 Exit Code 1 阻断报告流出，强制审计方撤回错误！
 - 源文件绝对无损保护: 任何导出或生成任务严禁直接原地覆盖同名物理源文件。执行前强制调用 `preserveOriginalFileBackup` 将输入源文件克隆为 `<原文件名>_源文件留存.docx/pdf` 并单向只读封存，永久保护源数据母本。
 - MSDS Studio 唯一法定通道与直改 DOCX 禁令: 所有 MSDS 生产、装配、英译、预设派生与 8 格式导出任务，必须且仅能通过 MSDS Studio（REST API `/api/msds/*` 或工作台底座流水线 `web/run_pipeline.mjs` / `pipeline-engine.js`）执行；严格禁止任何 Agent 绕开 Studio 直接编写 ad-hoc 脚本（如使用 python-docx、原生 XML 修改或文件写入）直接操作 DOCX 文件。任何脱离 Studio 管道的直改行为一律视为非法并直接阻断。
 - 规格落点先行: 任何写入型任务（新增或修改代码、文档、配置、脚本、数据产出）先确认规格落点；`openspec/specs/` 已有对应条目则以其为准，没有则先建 change 提案，规格未落地前不开始实现。
@@ -58,30 +62,3 @@
   - 核心模块: `web/src/docx-engine.js`, `web/src/universal-editor-primitives.js`, `web/src/template-editor.js`, `web/src/recognition-engine.js`, `web/src/audit-planner.js`, `web/src/mcp-server.js`
 - 系统架构、顶层拓扑与跨端契约
   - 权威来源: `ARCHITECTURE.md`
-- 行为规格与业务流转 (OpenSpec)
-  - 权威来源: `openspec/specs/` 与 `openspec/changes/`
-- MSDS 业务单品生产与八格式导出 SOP
-  - 权威来源: `.agents/skills/msds-studio/SKILL.md` 与 `.agents/skills/msds-agent-api/SKILL.md`
-
-## Commands (高频指令集)
-
-- 启动前端可视化工作台: `npm run dev --prefix web`（默认端口 5173，包含界面与内置 API 中间件）
-- 启动独立无头 Agent API 服务: `npm run api --prefix web`（默认端口 5174）
-- 启动原生 MCP 协议服务: `node web/src/mcp-server.js`
-- 运行端到端全通道 MCP 集成测试: `node web/tests/test_mcp_full_channels.mjs`
-- 运行五大拼图闭环集成测试: `node web/tests/test_five_puzzles_workflow.mjs`
-- 运行万能编辑器严苛测试: `node web/tests/test_universal_editor.mjs`
-
-## Completion Criteria (任务准出与交付标准)
-
-- 差分测试通过: 变动影响范围内的自动化测试、端到端生成脚本全部以退出码 0 真实通过。
-- 规范有效性通过: `ai-harness validate` 返回 0 errors；`openspec validate --all` 返回 0 failed。
-- 事实对账零差距: `msds_compare_source_with_output` 返回 `actionableGaps === 0` 且字符保全比达标。
-- 英文交付物门禁: 英文版交付物必须通过 `assertZeroChinese` 门禁（中文字符数严格为 0）。
-- 排版与字体合规: 遵循 G-11 字体分立契约（标签加粗，数值常规体；西文字体显式注入 Times New Roman / Arial）。
-- 源文件安全封存: 输入文件必须已生成对应的 `*_源文件留存.docx/pdf` 物理副本。
-- 人工验收归口: 涉及 UI 界面调整与功能验收的变更，交付时附复现步骤与改动前后对照材料；人工确认前保留未勾选状态。
-
-## Ask for Human Judgment When (人工介入条件)
-
-- 产品配方或 GHS 危险性分类源数据存在矛盾、歧义或多解，无法从已有规格推导唯一合理的分类结论。

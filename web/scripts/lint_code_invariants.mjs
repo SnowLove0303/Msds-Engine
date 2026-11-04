@@ -4,12 +4,17 @@
  * MSDS-Engine 源码级架构承重墙与反过拟合 Lint 门禁 (Layer 2 编译器与静态分析硬门禁)
  * 落实 Lauren Tan 黄金法则：“纠错两遍即立项为 Lint”
  * 
- * 强制检测规则：
- * 1. RULE-CODE-01: 严禁在 pipeline-engine.js 或 smart-matching.js 中硬编码中文/英文业务覆写
- *    (例如 safeWriteCellValue(..., '建议使用护目镜。') 或 'Use local exhaust...')
- * 2. RULE-CODE-02: 严禁单型号特判分支 (例如 if (modelCode === 'OS-9547') 或 if (model === 'BL-8123'))
- * 3. RULE-CODE-03: 严禁在通用审计脚本中无条件硬编码特定化学品名称断言 (例如无源文档基准时硬断言必须包含六亚甲基-1,6-二异氰酸酯)
- * 4. RULE-CODE-04: 严禁在关键管道中绕过 cleanSlateTemplate 直接写值
+ * 十大强制架构硬阻断规则：
+ * 1. LINT-CODE-01: 严禁在流水线中硬编码眼睛防护覆写（如强制写入“建议使用护目镜”）
+ * 2. LINT-CODE-02: 严禁硬编码英文工程控制通风长句
+ * 3. LINT-CODE-03: 严禁单型号特判分支（如 PU-1002, OS-9547, BL-8123 等）
+ * 4. LINT-CODE-04: 严禁中文手部防护外生编造保底
+ * 5. LINT-CODE-05: 严禁英文手部防护外生编造保底
+ * 6. LINT-CODE-06: 严禁在毒理学或匹配中硬编码写入“聚氨酯分散体”
+ * 7. LINT-CODE-07: 严禁在 cleanSlateTemplate 中对特定化学品进行定向豁免
+ * 8. LINT-CODE-08: 严禁在 Section 8 中仅对六亚甲基进行单一硬编码英译
+ * 9. LINT-CODE-09: 严禁在 Section 12 中硬编码英文生态说明长句
+ * 10. LINT-AUDIT-01: 严禁在通用审计脚本中无条件硬断言特定化学品
  */
 
 import fs from 'fs';
@@ -48,6 +53,7 @@ function checkFile(filePath, rules) {
 
 console.log('========================================================================');
 console.log('  MSDS-Engine 源码级架构不变量静态分析 Lint (Layer 2 Static Analysis)');
+console.log('  十项硬阻断规则检测 (Zero-Tolerance Invariant Checks)');
 console.log('========================================================================\n');
 
 // 1. 检查 pipeline-engine.js
@@ -69,14 +75,35 @@ checkFile(path.join(SRC_DIR, 'pipeline-engine.js'), [
   {
     id: 'LINT-CODE-03',
     severity: 'ERROR',
-    pattern: /if\s*\(\s*(?:modelCode|model)\s*===?\s*['"](?:OS-9547|BL-8123|PU-608|PU-202A)['"]\s*\)/,
+    pattern: /if\s*\(\s*(?:modelCode|model|targetModel)\s*===?\s*['"](?:OS-9547|BL-8123|PU-608|PU-1002|PU-202A)['"]\s*\)/,
     message: '严禁在通用流水线中硬编码单型号特判分支！必须基于通用数据形态分流。',
     remediation: '将特判逻辑抽象为通用数据形态（如 isNonHaz、hasOel、row.cells.length 等）。'
+  },
+  {
+    id: 'LINT-CODE-08',
+    severity: 'ERROR',
+    pattern: /if\s*\(c0\s*&&\s*\/六亚甲基-1,6-二异氰酸酯\/i\.test\(c0\.text\)\)\s*safeWrite\(c0,\s*['"]Hexamethylene-1,6-diisocyanate['"]\)/,
+    message: '严禁在 Section 8 中仅对六亚甲基单一硬编码写死英译！',
+    remediation: '改用通用化学品英译字典 CHEMICAL_TRANSLATION_MAP 迭代匹配。'
+  },
+  {
+    id: 'LINT-CODE-09',
+    severity: 'ERROR',
+    pattern: /safeWrite\(s12\.rows\[1\]\.cells\[0\],\s*['"]No ecotoxicological studies are available for this product\\.['"]\)/,
+    message: '严禁在 Section 12 中硬编码英文生态前言长句！',
+    remediation: '改用 translateSection12PreambleToEnglish 动态翻译源前言。'
   }
 ]);
 
 // 2. 检查 smart-matching.js
 checkFile(path.join(SRC_DIR, 'smart-matching.js'), [
+  {
+    id: 'LINT-CODE-03',
+    severity: 'ERROR',
+    pattern: /if\s*\(\s*\/PU\[-\s\]\?1002\\b\/i\.test\(targetModel\)\)/,
+    message: '严禁针对 PU-1002 等特定型号进行组分特判！',
+    remediation: '在组分提取层按源文档原文提取，严禁在匹配层特判。'
+  },
   {
     id: 'LINT-CODE-04',
     severity: 'ERROR',
@@ -90,6 +117,20 @@ checkFile(path.join(SRC_DIR, 'smart-matching.js'), [
     pattern: /finalHp\s*=\s*['"]Protective gloves are recommended\.?['"]/,
     message: '严禁英文手部防护外生编造保底！',
     remediation: '源文档无建议时保持置空 ""。'
+  },
+  {
+    id: 'LINT-CODE-06',
+    severity: 'ERROR',
+    pattern: /['"]聚氨酯分散体\\n无数据资料['"]|['"]致癌性\\n聚氨酯分散体\\n无数据资料['"]/,
+    message: '严禁在毒理学中硬编码写入“聚氨酯分散体”！',
+    remediation: '动态从 Section 3 提取当前产品真实主组分名称。'
+  },
+  {
+    id: 'LINT-CODE-07',
+    severity: 'ERROR',
+    pattern: /if\s*\(s\s*===\s*8\s*&&\s*\/六亚甲基-1,6-二异氰酸酯.*\/i\.test\(rowText\)\)\s*continue;/,
+    message: '严禁在 cleanSlateTemplateRecord 中针对特定化学品设置清空豁免后门！',
+    remediation: '删除定向豁免，底模数据行必须 100% 绝对清零。'
   }
 ]);
 
@@ -98,7 +139,6 @@ checkFile(path.join(SCRIPTS_DIR, 'audit_16_sections_bilingual_fidelity.mjs'), [
   {
     id: 'LINT-AUDIT-01',
     severity: 'ERROR',
-    // 检查是否有无条件断言六亚甲基（没有判断 isNoOel 的情况）
     pattern: /^\s*assert\(\s*\/六亚甲基-1,6-二异氰酸酯\/\.test\(cnText8\)\s*&&/,
     message: '严禁在通用审计脚本中无条件硬断言必须包含“六亚甲基”！必须先判定产品是否有接触限值。',
     remediation: '将断言包裹在 if (!isNoOel) 条件块内，或依据 sourceGroundTruth 动态断言。'
@@ -109,7 +149,7 @@ checkFile(path.join(SCRIPTS_DIR, 'audit_16_sections_bilingual_fidelity.mjs'), [
 console.log(`扫描完成。发现违规项: ${violations.length} 项\n`);
 
 if (violations.length === 0) {
-  console.log('✅ [LINT PASSED] 源码架构与反过拟合 Lint 100% 通过，无任何硬编码篡改或特判！\n');
+  console.log('✅ [LINT PASSED] 源码架构与反过拟合 10 大硬门禁 100% 通过，无任何硬编码篡改或特判！\n');
   process.exit(0);
 } else {
   console.error('❌ [LINT FAILED] 检测到源码架构违规，触发硬阻断：\n');

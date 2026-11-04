@@ -225,6 +225,9 @@ export function translateGhsPrecautionaryToEnglish(cnPrecaution) {
  */
 export function translateChemicalCategoryToEnglish(cnCategory, cnName = '') {
   const combined = `${cnCategory || ''} ${cnName || ''}`.trim();
+  if (/改性.*脂肪胺|脂肪胺/i.test(combined)) {
+    return 'Modified aliphatic amine';
+  }
   if (/封闭(?:型)?(?:聚)?异氰酸酯/i.test(combined)) {
     return 'Blocked polyisocyanate water dispersion';
   }
@@ -509,6 +512,7 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
           if (/阳离子/i.test(val)) sec9Facts.ionicity = 'Cationic';
           else if (/阴离子/i.test(val)) sec9Facts.ionicity = 'Anionic';
           else if (/非离子/i.test(val)) sec9Facts.ionicity = 'Non-ionic';
+          else if (/无数据|无资料/.test(val)) sec9Facts.ionicity = 'No data available.';
           else sec9Facts.ionicity = val;
         } else if (/初沸点/i.test(lbl)) {
           sec9Facts.boiling_point = val.replace(/约\s*/g, 'Approx. ').replace(/℃/g, '℃');
@@ -1120,9 +1124,10 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
   let enLabel = '';
   let enVal = '';
 
-  if (/外观/i.test(cnLabel)) {
+  if (/外\s*观/i.test(cnLabel)) {
     enLabel = 'Appearance:';
-    if (/半透明.*乳液|乳液.*半透明/i.test(cnVal)) enVal = 'Translucent emulsion';
+    if (/黄色至浅褐色透明液体|黄.*浅褐.*透明/i.test(cnVal)) enVal = 'Yellow to light brown transparent liquid';
+    else if (/半透明.*乳液|乳液.*半透明/i.test(cnVal)) enVal = 'Translucent emulsion';
     else if (/半透明/i.test(cnVal)) enVal = 'Translucent liquid';
     else if (/乳白/i.test(cnVal)) enVal = 'Milky white liquid';
     else if (/无色.*淡黄|淡黄.*粘稠/i.test(cnVal)) enVal = 'Colourless to light yellow transparent viscous liquid';
@@ -1133,19 +1138,20 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
     else enVal = 'Liquid';
   } else if (/嗅觉/i.test(cnLabel)) {
     enLabel = 'Odour threshold:';
-    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
+    enVal = /胺味/.test(cnVal) ? 'Amine-like' : (/无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal);
   } else if (/pH/i.test(cnLabel)) {
     enLabel = 'pH value:';
     enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
-  } else if (/离子性/i.test(cnLabel)) {
+  } else if (/离\s*子\s*性/i.test(cnLabel)) {
     enLabel = 'Ionicity:';
     if (/阴离子/i.test(cnVal)) enVal = 'Anionic';
     else if (/阳离子/i.test(cnVal)) enVal = 'Cationic';
     else if (/非离子/i.test(cnVal)) enVal = 'Non-ionic';
+    else if (/无数据|无资料/.test(cnVal)) enVal = 'No data available.';
     else enVal = cnVal;
   } else if (/初沸点|沸程/i.test(cnLabel)) {
     enLabel = 'Initial boiling point:';
-    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal.replace(/约\s*/g, 'Approx. ').replace(/℃/g, ' °C');
+    enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal.replace(/约\s*/g, 'Approx. ').replace(/℃/g, ' °C').replace(/＞/g, '> ');
   } else if (/可燃性|易燃性/i.test(cnLabel)) {
     enLabel = /固态|固体/i.test(cnLabel) ? 'Flammability (solids, gases):' : 'Flammability:';
     enVal = /不适用/.test(cnVal) ? 'Not applicable' : (/无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal);
@@ -1188,7 +1194,7 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
     if (/无闪点/i.test(cnVal)) enVal = 'No flash point below initial boiling point';
     else if (/不适用/i.test(cnVal)) enVal = 'Not applicable';
     else if (/无数据|无资料/.test(cnVal)) enVal = 'No data available.';
-    else enVal = cnVal.replace(/℃/g, ' °C').replace(/(\d+)\s*°C/, '$1 °C');
+    else enVal = cnVal.replace(/℃/g, ' °C').replace(/＞/g, '> ').replace(/(\d+)\s*°C/, '$1 °C');
   } else if (/引燃温度/i.test(cnLabel)) {
     enLabel = 'Ignition temperature:';
     enVal = /不适用/.test(cnVal) ? 'Not applicable' : (/无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal);
@@ -1361,6 +1367,8 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
           enOther = '2.3 Other hazards: Risk of cutaneous absorption of N-Methyl-2-pyrrolidone (NMP).';
         } else if (/N,N[－-]二甲基乙酰胺/i.test(parsed.otherHazards)) {
           enOther = '2.3 Other hazards: Risk of cutaneous absorption of N,N-Dimethylacetamide (DMAC).';
+        } else if (/无适用资料|无已知|无数据|无/i.test(parsed.otherHazards)) {
+          enOther = '2.3 Other hazards: No applicable information.';
         } else {
           enOther = `2.3 Other hazards: ${translateGhsPrecautionary(parsed.otherHazards.replace(/^2\.3\s*(其他危险[:：]?\s*)?/, '')) || 'No applicable information.'}`;
         }
@@ -2244,6 +2252,9 @@ function translateToxicologyValueToEnglish(cnText, endpoint = '') {
 export function translateSection12PreambleToEnglish(cnText) {
   if (!cnText) return '';
   if (/无可用的生态|未做任何试验|生态学/i.test(cnText)) {
+    if (/禁止排入地表水或下水道|禁止排入下水道/i.test(cnText)) {
+      return 'No ecotoxicological studies are available for this product. Do not allow to enter surface water or sewage.';
+    }
     return 'No ecotoxicological studies are available for this product.';
   }
   const match = cnText.match(/以下(?:是|为)(.*?)(?:生态毒理学(?:参考)?数据|毒理学数据)[：:]?/);
@@ -2420,7 +2431,8 @@ export async function buildBaseEnglishEngine({
             let cas = subCas[k] || subCas[0] || '';
             const conc = subConc[k] || subConc[0] || '';
             let enName = cnName;
-            if (/封闭型脂肪族聚异氰酸酯/i.test(cnName)) enName = 'Blocked aliphatic polyisocyanate';
+            if (/胺和环氧树脂的加合物|环氧.*胺.*加合物/i.test(cnName)) enName = 'Amine and epoxy resin adduct';
+            else if (/封闭型脂肪族聚异氰酸酯/i.test(cnName)) enName = 'Blocked aliphatic polyisocyanate';
             else if (/六甲撑二异氰酸酯基均聚物|六亚甲基二异氰酸酯.*均聚物|HDI.*均聚物|HDI.*低聚物/i.test(cnName)) {
               if (/亲水/i.test(cnName)) enName = 'Hydrophilically modified hexamethylene diisocyanate homopolymer';
               else enName = 'Hexamethylene diisocyanate homopolymer';
@@ -2571,12 +2583,28 @@ export async function buildBaseEnglishEngine({
       }
     }
 
-    // 翻译 4 列控制参数表中的中文物质名
+    // 翻译 4 列控制参数表中的中文物质名（通用化学品英译词典）
+    const CHEMICAL_TRANSLATION_MAP = {
+      '六亚甲基-1,6-二异氰酸酯': 'Hexamethylene-1,6-diisocyanate',
+      '二异氰酸六亚甲基酯': 'Hexamethylene-1,6-diisocyanate',
+      '二乙二醇丁醚': '2-(2-Butoxyethoxy)ethanol',
+      '丙二醇甲醚醋酸酯': '2-Methoxy-1-methylethyl acetate',
+      '乙酸丁酯': 'n-Butyl acetate',
+      '二甲苯': 'Xylene',
+      '甲苯': 'Toluene',
+      '乙酸乙酯': 'Ethyl acetate'
+    };
     for (const row of s8.rows) {
       if (row.cells.length === 4) {
         const c0 = row.cells[0];
-        if (c0 && /六亚甲基-1,6-二异氰酸酯/i.test(c0.text)) {
-          safeWrite(c0, 'Hexamethylene-1,6-diisocyanate');
+        if (c0 && c0.text) {
+          const trimmed = c0.text.trim();
+          for (const [cnName, enName] of Object.entries(CHEMICAL_TRANSLATION_MAP)) {
+            if (trimmed.includes(cnName)) {
+              safeWrite(c0, enName);
+              break;
+            }
+          }
         }
       }
     }
@@ -2833,6 +2861,12 @@ export async function buildBaseEnglishEngine({
           normalizeRowGeometry(repRow);
         }
       }
+
+      // 若中文母版行数少于英文版（例如中文仅有前言说明无指标项），严格对齐双语行数，修剪英文多余尾行
+      const targetRowCount = cnS11?.rows?.length || s11.rows.length;
+      while (s11.rows.length > targetRowCount) {
+        s11 = deleteRow(engine, s11, s11.rows.length - 1);
+      }
     }
 
     // 4. 重新编号确保 11.1 ~ 11.N 严密对齐
@@ -2875,7 +2909,7 @@ export async function buildBaseEnglishEngine({
     if (cnPreambles.length >= 2) {
       // 中文母版有 2 行说明行：Row 1 产品免责，Row 2 组分引言 (G-35 统一 9.5pt)
       if (s12.rows[1]?.cells?.[0]) {
-        safeWrite(s12.rows[1].cells[0], 'No ecotoxicological studies are available for this product.');
+        safeWrite(s12.rows[1].cells[0], translateSection12PreambleToEnglish(cnPreambles[0]) || 'No ecotoxicological studies are available for this product.');
         setCellPreambleTypography(s12.rows[1].cells[0], true);
       }
       if (s12.rows[2]?.cells?.[0]) {
@@ -2884,7 +2918,7 @@ export async function buildBaseEnglishEngine({
       }
     } else if (cnPreambles.length === 1) {
       if (s12.rows[1]?.cells?.[0]) {
-        safeWrite(s12.rows[1].cells[0], 'No ecotoxicological studies are available for this product.');
+        safeWrite(s12.rows[1].cells[0], translateSection12PreambleToEnglish(cnPreambles[0]) || 'No ecotoxicological studies are available for this product.');
         setCellPreambleTypography(s12.rows[1].cells[0], true);
       }
       if (s12.rows[2]?.cells?.length === 1) {
@@ -2992,7 +3026,11 @@ export async function buildBaseEnglishEngine({
       const lbl = (row.cells[0]?.text || '').trim();
       if (/591|16483|13690|30000|15258|危险化学品|化学品安全|分类和危险性|标签规范|安全标签/i.test(lbl) || (i >= 4 && regIdx < stdRegulations.length)) {
         safeWrite(row.cells[0], stdRegulations[regIdx]);
-        if (row.cells[1]) safeWrite(row.cells[1], 'Complies');
+        if (row.cells[1]) {
+          const cnVal = row.cells[1].text?.trim() || '';
+          if (/不适用/i.test(cnVal)) safeWrite(row.cells[1], 'Not applicable');
+          else safeWrite(row.cells[1], 'Complies');
+        }
         regIdx++;
       }
     }

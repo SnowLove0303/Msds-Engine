@@ -2825,10 +2825,9 @@ export function cleanSlateTemplateRecord(tRecord, sectionNumber, editorEngine) {
       continue;
     }
 
-    // 3. Section 8: 保护工作场所组分控制参数结构题头及 OEL 4列表头与特定组分
+    // 3. Section 8: 保护工作场所组分控制参数结构题头及 OEL 4列表头（数据行必须清空，绝无特定化学品豁免）
     if (s === 8 && /工作场所组分控制参数|Occupational exposure limit/i.test(rowText)) continue;
     if (s === 8 && /物质.*依据.*类型|Substance.*Basis.*Type/i.test(rowText)) continue;
-    if (s === 8 && /六亚甲基-1,6-二异氰酸酯|Hexamethylene-1,6-diisocyanate/i.test(rowText)) continue;
 
     // 4. Section 15: 保护结构性法规子题头
     if (s === 15 && /其它的规定|符合下列法规要求/i.test(rowText)) continue;
@@ -3527,14 +3526,7 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
         const headerIdx = tRecord.rows.findIndex((r) => r.cells.some((c) => /化学品名称|CAS编号/i.test(c.text || '')));
         const comps = matchedSec.components || [];
 
-        // PU-1002 组分名称保真（水性聚氨酯树脂分散体）
-        if (/PU[-\s]?1002\b/i.test(targetModel)) {
-          for (const comp of comps) {
-            if (comp.name === '聚氨酯分散体') {
-              comp.name = '水性聚氨酯树脂分散体';
-            }
-          }
-        }
+        // 组分名称严格保持源事实解析结果，严禁单型号特判
 
         if (headerIdx !== -1) {
           const headerRow = tRecord.rows[headerIdx];
@@ -3934,12 +3926,18 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
           
           let combinedInVitroVal = '';
           const hasOECDStudies = (mutItem && /473|染色体/i.test(mutItem.value)) || (inVitroItem && /471|Ames/i.test(inVitroItem.value));
+          // 动态从 Section 3 提取产品真实主组分名称，绝无硬编码“聚氨酯分散体”
+          const mainCompName = editorEngine?.records
+            ?.find((r) => r.sectionNumber === 3)
+            ?.rows?.slice(1)
+            ?.find((r) => r.cells?.[0]?.text && !/化学品名称|CAS编号|物质/i.test(r.cells[0].text))
+            ?.cells?.[0]?.text?.trim() || '';
 
           if (hasOECDStudies) {
             let part1 = (inVitroItem?.value || '').replace(/^体外遗传毒性\s*\n?/g, '').trim();
             let part2 = (mutItem?.value || '').replace(/^生殖细胞突变性\s*\n?/g, '').trim();
-            if (!part1.startsWith('聚氨酯分散体') && !part2.startsWith('聚氨酯分散体')) {
-              combinedInVitroVal = '聚氨酯分散体\n' + part1 + '\n' + part2;
+            if (mainCompName && !part1.startsWith(mainCompName) && !part2.startsWith(mainCompName)) {
+              combinedInVitroVal = mainCompName + '\n' + part1 + '\n' + part2;
             } else {
               combinedInVitroVal = (part1 + '\n' + part2).trim();
             }
@@ -3968,7 +3966,7 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
               injectedCount++;
 
               writeCellLabel(tRecord.rows[mutIdx + 1].cells[0], '11.7  体内基因毒性：', true, editorEngine.roleStyles?.label);
-              writeCellValue(tRecord.rows[mutIdx + 1].cells[tRecord.rows[mutIdx + 1].cells.length - 1], '聚氨酯分散体\n无数据资料', editorEngine.roleStyles?.value);
+              writeCellValue(tRecord.rows[mutIdx + 1].cells[tRecord.rows[mutIdx + 1].cells.length - 1], mainCompName ? `${mainCompName}\n无数据资料` : '无数据资料。', editorEngine.roleStyles?.value);
               injectedCount++;
 
               batchSuspended = prevSuspended;
@@ -3988,7 +3986,7 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
           if (carcRow) {
             try {
               writeCellLabel(carcRow.cells[0], `${carcLabelSeq}  致癌性：`, true, editorEngine.roleStyles?.label);
-              const cVal = carcItem?.value || (hasOECDStudies ? '致癌性\n聚氨酯分散体\n无数据资料' : '');
+              const cVal = carcItem?.value || (hasOECDStudies ? (mainCompName ? `致癌性\n${mainCompName}\n无数据资料` : '无数据资料。') : '');
               writeCellValue(carcRow.cells[carcRow.cells.length - 1], cVal, editorEngine.roleStyles?.value);
               injectedCount++;
             } catch (e) {}
@@ -4027,7 +4025,7 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
               normalizeRowGeometry(repRow);
               const fertValCell = repRow.cells[repRow.cells.length - 1];
               if (fertValCell && fertValCell.editable) {
-                const fVal = repGenItem?.value || (hasOECDStudies ? '聚氨酯分散体\n无数据资料' : '');
+                const fVal = repGenItem?.value || (hasOECDStudies ? (mainCompName ? `${mainCompName}\n无数据资料` : '无数据资料。') : '');
                 try { writeCellValue(fertValCell, fVal, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
               }
             }
@@ -4040,7 +4038,7 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
             }
             const teratoValCell = teratoRow.cells[teratoRow.cells.length - 1];
             if (teratoValCell && teratoValCell.editable) {
-              const tVal = repTeratoItem?.value || (hasOECDStudies ? '聚氨酯分散体\n无数据资料' : '');
+              const tVal = repTeratoItem?.value || (hasOECDStudies ? (mainCompName ? `${mainCompName}\n无数据资料` : '无数据资料。') : '');
               try { writeCellValue(teratoValCell, tVal, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
             }
           }
@@ -4429,7 +4427,11 @@ export function runAutomatedAudits(editorEngine, matchResult) {
   const allText = editorEngine.records
     .flatMap((r) => (r.rows ? r.rows.flatMap((row) => row.cells.map((c) => c.text)) : [r.text]))
     .join(' ');
-  const ghostTokens = ['二乙二醇单丁醚', '成分1', '3,306', '六亚甲基-1,6-二异氰酸酯'];
+  const ghostTokens = ['二乙二醇单丁醚', '成分1', '3,306'];
+  const srcDocText = editorEngine.sourceFacts?.rawText || '';
+  if (!srcDocText.includes('六亚甲基')) {
+    ghostTokens.push('六亚甲基-1,6-二异氰酸酯');
+  }
   for (const token of ghostTokens) {
     if (allText.includes(token)) {
       issues.push({
