@@ -1247,29 +1247,37 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       paragraphs.push(
         '2.1 GHS危险性类别：',
         ...parsed.categories,
-        '2.2 GHS标签要素：',
-        'GHS象形图：'
+        '2.2 GHS标签要素：'
       );
       if (facts.drawingNodes && facts.drawingNodes.length > 0) {
+        paragraphs.push('GHS象形图：');
         paragraphs.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine });
+      } else {
+        paragraphs.push('GHS象形图：无');
       }
       if (parsed.hazardousIngredients) {
         paragraphs.push(`必须列在标签上的有害成份：${parsed.hazardousIngredients}`);
       }
-      paragraphs.push(
-        `信号词：${parsed.signalWord || '危险'}`,
-        '危险性说明：',
-        ...parsed.hazardStatements,
-        '防范说明：',
-        '预防措施：',
-        ...parsed.prevention.map(p => p.trim()),
-        '事故响应：',
-        ...parsed.response.map(p => p.trim()),
-        '安全储存：',
-        ...parsed.storage.map(p => p.trim()),
-        '废弃处置：',
-        ...parsed.disposal.map(p => p.trim()),
-      );
+      paragraphs.push(`信号词：${parsed.signalWord || '无'}`);
+      if (parsed.hazardStatements && parsed.hazardStatements.length > 0) {
+        paragraphs.push('危险性说明：', ...parsed.hazardStatements);
+      }
+      const hasPrecaution = (parsed.prevention?.length || 0) + (parsed.response?.length || 0) + (parsed.storage?.length || 0) + (parsed.disposal?.length || 0) > 0;
+      if (hasPrecaution) {
+        paragraphs.push('防范说明：');
+        if (parsed.prevention && parsed.prevention.length > 0) {
+          paragraphs.push('预防措施：', ...parsed.prevention.map(p => p.trim()));
+        }
+        if (parsed.response && parsed.response.length > 0) {
+          paragraphs.push('事故响应：', ...parsed.response.map(p => p.trim()));
+        }
+        if (parsed.storage && parsed.storage.length > 0) {
+          paragraphs.push('安全储存：', ...parsed.storage.map(p => p.trim()));
+        }
+        if (parsed.disposal && parsed.disposal.length > 0) {
+          paragraphs.push('废弃处置：', ...parsed.disposal.map(p => p.trim()));
+        }
+      }
       if (parsed.otherHazards) {
         paragraphs.push(parsed.otherHazards);
       }
@@ -1311,11 +1319,9 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       for (const cat of parsed.categories) {
         paragraphs.push(translateGhsCategory(cat));
       }
-      paragraphs.push(
-        '2.2 GHS Label Elements:',
-        'GHS pictograms:'
-      );
+      paragraphs.push('2.2 GHS Label Elements:');
       if (facts.drawingNodes && facts.drawingNodes.length > 0) {
+        paragraphs.push('GHS pictograms:');
         let cleanGhsBytes = null;
         try {
           const cleanGhsPath = fileURLToPath(new URL('../public/assets/ghs/ghs07.png', import.meta.url));
@@ -1324,6 +1330,8 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
           }
         } catch (e) {}
         paragraphs.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine, overrideImageBytes: cleanGhsBytes, overrideExt: 'png' });
+      } else {
+        paragraphs.push('GHS pictograms: None');
       }
       if (parsed.hazardousIngredients) {
         let ingEn = parsed.hazardousIngredients;
@@ -1334,32 +1342,43 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         }
         paragraphs.push(`Hazardous components which must be listed on the label: ${ingEn}`);
       }
-      const enSignal = parsed.signalWord === '危险' ? 'Danger' : (parsed.signalWord === '警告' ? 'Warning' : 'Danger');
+      const enSignal = parsed.signalWord === '危险' ? 'Danger' : (parsed.signalWord === '警告' ? 'Warning' : 'None');
       paragraphs.push(`Signal word: ${enSignal}`);
-      paragraphs.push('Hazard statements:');
-      for (const h of parsed.hazardStatements) {
-        const codeMatch = h.match(/^(H\d+)/);
-        const code = codeMatch ? codeMatch[1] : '';
-        paragraphs.push(GHS_H_TRANS_MAP[code] || h);
+      if (parsed.hazardStatements && parsed.hazardStatements.length > 0) {
+        paragraphs.push('Hazard statements:');
+        for (const h of parsed.hazardStatements) {
+          const codeMatch = h.match(/^(H\d+)/);
+          const code = codeMatch ? codeMatch[1] : '';
+          paragraphs.push(GHS_H_TRANS_MAP[code] || h);
+        }
       }
-      paragraphs.push(
-        'Precautionary statements:',
-        'Prevention:'
-      );
-      for (const p of parsed.prevention) {
-        paragraphs.push(translateGhsPrecautionary(p.trim()));
-      }
-      paragraphs.push('Response:');
-      for (const p of parsed.response) {
-        paragraphs.push(translateGhsPrecautionary(p.trim()));
-      }
-      paragraphs.push('Storage:');
-      for (const p of parsed.storage) {
-        paragraphs.push(translateGhsPrecautionary(p.trim()));
-      }
-      paragraphs.push('Disposal:');
-      for (const p of parsed.disposal) {
-        paragraphs.push(translateGhsPrecautionary(p.trim()));
+      const hasPrecautionEn = (parsed.prevention?.length || 0) + (parsed.response?.length || 0) + (parsed.storage?.length || 0) + (parsed.disposal?.length || 0) > 0;
+      if (hasPrecautionEn) {
+        paragraphs.push('Precautionary statements:');
+        if (parsed.prevention && parsed.prevention.length > 0) {
+          paragraphs.push('Prevention:');
+          for (const p of parsed.prevention) {
+            paragraphs.push(translateGhsPrecautionary(p.trim()));
+          }
+        }
+        if (parsed.response && parsed.response.length > 0) {
+          paragraphs.push('Response:');
+          for (const p of parsed.response) {
+            paragraphs.push(translateGhsPrecautionary(p.trim()));
+          }
+        }
+        if (parsed.storage && parsed.storage.length > 0) {
+          paragraphs.push('Storage:');
+          for (const p of parsed.storage) {
+            paragraphs.push(translateGhsPrecautionary(p.trim()));
+          }
+        }
+        if (parsed.disposal && parsed.disposal.length > 0) {
+          paragraphs.push('Disposal:');
+          for (const p of parsed.disposal) {
+            paragraphs.push(translateGhsPrecautionary(p.trim()));
+          }
+        }
       }
       if (parsed.otherHazards) {
         let enOther = '2.3 Other hazards: No applicable information.';
@@ -1735,10 +1754,25 @@ export async function buildBaseChineseEngine({
   let s8 = engine.records.find(r => r.sectionNumber === 8);
   if (s8) {
     for (const row of s8.rows) {
-      const lbl = (row.cells[0]?.text || '').trim();
-      if (/手部防护/i.test(lbl) && row.cells.length > 1) {
-        if (/建议戴上防护手套/i.test(row.cells[1]?.text || '')) {
-          safeWriteCellValue(row.cells[1], '');
+      const lblCell = row.cells[0];
+      const lbl = (lblCell?.text || '').trim();
+      if (/手部防护/i.test(lbl)) {
+        if (lblCell?.node) {
+          const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+          const tabs = Array.from(lblCell.node.getElementsByTagNameNS(W_NS, 'tab'));
+          tabs.forEach(t => t.parentNode?.removeChild(t));
+          const inds = Array.from(lblCell.node.getElementsByTagNameNS(W_NS, 'ind'));
+          inds.forEach(ind => {
+            ind.setAttributeNS(W_NS, 'w:left', '0');
+            ind.setAttributeNS(W_NS, 'w:hanging', '0');
+            ind.removeAttributeNS(W_NS, 'w:leftChars');
+            ind.removeAttributeNS(W_NS, 'w:hangingChars');
+          });
+        }
+        if (row.cells.length > 1) {
+          if (/建议戴上防护手套/i.test(row.cells[1]?.text || '')) {
+            safeWriteCellValue(row.cells[1], '');
+          }
         }
       }
     }
@@ -3387,6 +3421,8 @@ export async function executeEightDeliverablesPipeline({
     }
     const s9 = eng.records.find(r => r.sectionNumber === 9);
     if (s9) renumberRecord(s9);
+    const s10 = eng.records.find(r => r.sectionNumber === 10);
+    if (s10) renumberRecord(s10);
   }
 
   // 3.5 真实性交叉质检门禁（防止再犯：拦截任何模板残留或中英文不一致）
