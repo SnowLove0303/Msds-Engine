@@ -20,7 +20,7 @@ import { loadDocx } from '../src/docx-engine.js';
  * 4. Boundary & Margin Layout Safety Invariant (页眉页脚安全排版不变量)
  * 5. Statutory Modernity Evolution Axiom (现行有效法定法规演化公理)
  */
-export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath) {
+export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath, sourceDocxPath = null) {
   console.log('========================================================================');
   console.log('  16-Section 中英文逐句逐槽位 1:1 双向物理对账审计 (Bilingual Fidelity Auditor)');
   console.log(`  CN: ${path.basename(cnDocxPath)}`);
@@ -89,6 +89,11 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath) {
     switch (sNum) {
       case 1: {
         assert(enSec.rows.length >= 2, `Section 1: 英文交付物至少包含标题与基础信息行`);
+        const cnText1 = cnSec.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
+        const enText1 = enSec.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
+        if (/涂料用添加剂/i.test(cnText1)) {
+          assert(/Additive for coatings/i.test(enText1), `Section 1.2: 涂料用添加剂必须精准翻译为 Additive for coatings (严禁丢失“添加剂”定性)`);
+        }
         break;
       }
       case 2: {
@@ -152,6 +157,15 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath) {
         if (/建议使用护目镜/.test(cnText8)) {
           assert(/Protective goggles are recommended/i.test(enText8), `Section 8: 眼睛防护必须忠实翻译为“Protective goggles are recommended.”`);
           assert(!/Wear protective goggles or face shield/i.test(enText8), `Section 8: 眼睛防护严禁底模篡改编造“Wear protective goggles or face shield.”`);
+        }
+        // 关键门禁：严禁任何底模残留的未授权工程控制外生口水话
+        assert(!/使用局部排风或全面通风|低于职业接触限值|洗眼器与安全淋浴设施/i.test(cnText8), `Section 8: 中文严禁底模外生编造工程控制口水话“使用局部排风或全面通风...”`);
+        assert(!/Use local exhaust or general ventilation|eyewash and safety shower/i.test(enText8), `Section 8: 英文严禁外生编造工程控制口水话“Use local exhaust or general ventilation...”`);
+        // 4列表格冒号与加粗反欺诈硬阻断
+        const s8FourColRows = enSec.rows.filter(r => r.cells.length === 4);
+        for (const r of s8FourColRows) {
+          const c0Text = (r.cells[0]?.text || '').trim();
+          assert(!/[:：]$/.test(c0Text), `Section 8: 4列表格 Col 0 严禁包含末尾冒号 (实测: "${c0Text}")`);
         }
         // 关键门禁：工程控制与工作场所组分控制参数必须 100% 存在且内容保真
         assert(/8\.2\s*工程控制/i.test(cnText8), `Section 8: 中文必须包含 8.2 工程控制`);
@@ -226,8 +240,8 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath) {
         break;
       }
       case 13: {
-        const enRows13 = enSec.rows;
-        assert(enRows13.length >= 2, `Section 13: 必须包含标签行与废弃内容行`);
+        assert(cnSec.rows.length === enSec.rows.length, `Section 13: 中英文行数必须严格同构 (CN: ${cnSec.rows.length} vs EN: ${enSec.rows.length})`);
+        assert(cnSec.rows.length === 4, `Section 13: 必须严格保持 4 行标准结构（标题 + 两行独立说明 + 处置方法）(实测 CN: ${cnSec.rows.length})`);
         break;
       }
       case 14: {

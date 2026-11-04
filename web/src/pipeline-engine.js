@@ -81,7 +81,8 @@ import {
   runSmartMatching,
   applyMatchResultToEditor,
   extractSection3ExemptionNotes,
-  detectNonHazardousComposite
+  detectNonHazardousComposite,
+  cleanSlateTemplate
 } from './smart-matching.js';
 import { convertBatchDocxToPdf } from './pdf-converter.js';
 
@@ -254,6 +255,9 @@ export function translateChemicalCategoryToEnglish(cnCategory, cnName = '') {
 export function translateRecommendedUseToEnglish(cnUse) {
   if (!cnUse || typeof cnUse !== 'string') return 'Raw material for industrial coatings';
   const clean = cnUse.trim();
+
+  if (/涂料.*(?:添加剂|助剂)|(?:添加剂|助剂).*涂料|涂料用添加剂/i.test(clean)) return 'Additive for coatings.';
+  if (/添加剂|助剂/i.test(clean)) return 'Additive for industrial use.';
 
   const USE_TERMS_MAP = [
     { regex: /金属涂层|金属漆|金属表面/i, en: 'metal coatings' },
@@ -1513,6 +1517,9 @@ export async function buildBaseChineseEngine({
   const cnTplBuf = await fs.readFile(cnTplPath);
   let engine = await loadDocx(cnTplBuf, `${modelCode} msds_CN 冠志.docx`);
 
+  // 4.1 必须执行法定预清空协议，将模板残留占位值彻底清零
+  cleanSlateTemplate(engine);
+
   // 5. 将匹配结果精准装配映射入官方底模插槽，并执行空白精删、防污染与语义剪枝
   applyMatchResultToEditor(matchResult, engine);
 
@@ -1571,9 +1578,20 @@ export async function buildBaseChineseEngine({
     }
   }
 
-  // 7. 规范化 Section 13 (严格保持 3 行或 4 行结构，对标签格实施双居中，对方法内容格实施两端对齐 jc="both")
+  // 7. 规范化 Section 13 (严格保持与源文件及英文一致的 4 行标准结构：标题 + 2行独立说明行 + 处置方法)
   let s13 = engine.records.find(r => r.sectionNumber === 13);
   if (s13) {
+    if (s13.rows.length === 3) {
+      const origText = (s13.rows[1].cells[0]?.text || '').trim();
+      s13 = addRowAfter(engine, s13, 1);
+      if (origText.includes('在欧盟领域内废弃')) {
+        const parts = origText.split(/\r?\n|。/);
+        const line1 = parts.find(p => p.includes('适用的国标') || p.includes('国家或当地法规')) || '必须遵守适用的国标、国家或当地法规进行废弃。';
+        const line2 = parts.find(p => p.includes('欧盟领域内废弃')) || '在欧盟领域内废弃，应根据欧洲废弃物分类（EWC）的适当法规。';
+        safeWriteCellValue(s13.rows[1].cells[0], line1.endsWith('。') ? line1 : line1 + '。');
+        safeWriteCellValue(s13.rows[2].cells[0], line2.endsWith('。') ? line2 : line2 + '。');
+      }
+    }
     const lastRow = s13.rows[s13.rows.length - 1];
     if (lastRow && lastRow.cells[0]?.node) {
       enforceSection13DoubleCenter(lastRow.cells[0].node);
@@ -2242,6 +2260,10 @@ export async function buildBaseEnglishEngine({
 
   // 1. 载入官方正式英文底模 (必须使用模板，构建编辑器实例)
   const engine = await loadDocx(tplBuf, `MSDS_EN_${modelCode}.docx`);
+
+  // 1.1 必须执行法定预清空协议，将英文底模残留占位值（含残留中文）彻底清零
+  cleanSlateTemplate(engine);
+
   const enValues = buildEnglishFacts(modelCode, facts, baseCnEngine);
 
   const todayDateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '/');
@@ -2490,9 +2512,29 @@ export async function buildBaseEnglishEngine({
         else if (/Butyl rubber|IIR/i.test(lbl)) safeWrite(c1, enValues['sec8.iir_glove']);
         else if (/Nitrile rubber|NBR/i.test(lbl)) safeWrite(c1, enValues['sec8.nbr_glove']);
         else if (/Recommendation/i.test(lbl)) safeWrite(c1, enValues['sec8.glove_recommendation']);
-        else if (/Eye protection/i.test(lbl)) safeWrite(c1, 'Protective goggles are recommended.');
+        else if (/Eye protection/i.test(lbl)) {
+          const cnEye = cnS8?.rows?.find(r => /眼睛防护/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
+          if (/建议使用护目镜/i.test(cnEye)) {
+            safeWrite(c1, 'Protective goggles are recommended.');
+          } else if (/护目镜|面罩/i.test(cnEye)) {
+            safeWrite(c1, 'Wear safety glasses/face shield.');
+          } else if (cnEye) {
+            safeWrite(c1, cnEye);
+          } else {
+            safeWrite(c1, '');
+          }
+        }
         else if (/Body protection/i.test(lbl)) safeWrite(c1, enValues['sec8.body_protection']);
-        else if (/Engineering controls/i.test(lbl)) safeWrite(c1, 'Use local exhaust or general ventilation to maintain workplace concentrations below occupational exposure limits; eyewash and safety shower facilities should be provided in the workplace.');
+        else if (/Engineering controls/i.test(lbl)) {
+          const cnEng = cnS8?.rows?.find(r => /工程控制/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
+          if (cnEng && /局部排风.*全面通风/i.test(cnEng)) {
+            safeWrite(c1, 'Use local exhaust or general ventilation to maintain workplace concentrations below occupational exposure limits; eyewash and safety shower facilities should be provided in the workplace.');
+          } else if (cnEng) {
+            safeWrite(c1, cnEng);
+          } else {
+            safeWrite(c1, '');
+          }
+        }
       }
     }
 
@@ -2512,6 +2554,19 @@ export async function buildBaseEnglishEngine({
       const enPmaIdx = s8.rows.findIndex(r => r.cells.some(c => /丙二醇甲醚醋酸酯|Propylene glycol monomethyl ether acetate/i.test(c.text || '')));
       if (enPmaIdx !== -1) {
         s8 = deleteRow(engine, s8, enPmaIdx);
+      }
+    }
+
+    // 清理英文 Section 8 4列表格中未填充的空白数据行 (例如无 PMA 时残留的空行)
+    for (let rIdx = s8.rows.length - 1; rIdx >= 14; rIdx--) {
+      const row = s8.rows[rIdx];
+      if (row && row.cells.length === 4) {
+        const isEmptyRow = row.cells.every(c => !(c.text || '').trim());
+        if (isEmptyRow) {
+          try {
+            s8 = deleteRow(engine, s8, rIdx);
+          } catch (e) {}
+        }
       }
     }
 
@@ -2711,7 +2766,9 @@ export async function buildBaseEnglishEngine({
         else if (/Specific target organ/i.test(rText) && !cnHasStot) shouldPrune = true;
         else if (/Aspiration hazard/i.test(rText) && !cnHasAsp) shouldPrune = true;
         else if (/Additional information/i.test(rText) && !cnHasAdd) shouldPrune = true;
-        else if (/根据现有数据，二乙二醇/i.test(rText)) shouldPrune = true;
+        else if (/根据现有数据/i.test(rText)) shouldPrune = true;
+        else if (i >= 3 && row.cells.length === 1) shouldPrune = true;
+        else if (!rText.trim()) shouldPrune = true;
         else if (/^(?:AA|BB|CC)$/.test(lastCellText)) shouldPrune = true;
 
         if (shouldPrune) {
@@ -3349,7 +3406,24 @@ export function standardizeEnglishTypographyAndLabels(engine) {
 
       const isSingleCellRow = cells.length === 1;
 
-      // 2. Section 3 专属豁免：表头加粗无冒号，具体成分名称绝不加粗且末尾绝无冒号
+      // 2. Section 8 4列表格专属处理：表头居中加粗无冒号，数据行居中常规体无冒号
+      if (sectionNumber === 8 && cells.length === 4) {
+        const isHeader = /Substance|Basis|Type|Value|物质|依据|类型|数值/i.test(row.textContent || '');
+        for (let cIdx = 0; cIdx < cells.length; cIdx++) {
+          const cell = cells[cIdx];
+          cleanTabsInNode(cell, W_NS);
+          const p = cell.getElementsByTagNameNS(W_NS, 'p')[0];
+          if (p) {
+            let t = (p.textContent || '').replace(/[:：]$/g, '').trim();
+            removeHangingIndentFromP(p, W_NS);
+            setParagraphAlign(p, 'center', W_NS);
+            rebuildRunsWithTypography(p, t, { font: 'Arial', sizeVal: '19', bold: isHeader }, W_NS);
+          }
+        }
+        continue;
+      }
+
+      // 2.1 Section 3 专属豁免：表头加粗无冒号，具体成分名称绝不加粗且末尾绝无冒号
       if (sectionNumber === 3) {
         if (rIdx === 3 && cells.length >= 3) {
           // 表头行: Chemical name, CAS NO., Concentration % (w/w) -> 均加粗，末尾无冒号

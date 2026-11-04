@@ -2825,14 +2825,16 @@ export function cleanSlateTemplateRecord(tRecord, sectionNumber, editorEngine) {
       continue;
     }
 
-    // 3. Section 8: 保护工作场所组分控制参数结构题头
-    if (s === 8 && /工作场所组分控制参数/i.test(rowText)) continue;
+    // 3. Section 8: 保护工作场所组分控制参数结构题头及 OEL 4列表头与特定组分
+    if (s === 8 && /工作场所组分控制参数|Occupational exposure limit/i.test(rowText)) continue;
+    if (s === 8 && /物质.*依据.*类型|Substance.*Basis.*Type/i.test(rowText)) continue;
+    if (s === 8 && /六亚甲基-1,6-二异氰酸酯|Hexamethylene-1,6-diisocyanate/i.test(rowText)) continue;
 
     // 4. Section 15: 保护结构性法规子题头
     if (s === 15 && /其它的规定|符合下列法规要求/i.test(rowText)) continue;
 
-    // 5. Section 2 与 Section 9: 由专有剪枝与写值流程处理，不在此预清空
-    if (s === 2 || s === 8 || s === 9) continue;
+    // 5. Section 2 与 Section 9: 由专有剪枝与写值流程处理，不在此预清空 (Section 8 必须参与预清空)
+    if (s === 2 || s === 9) continue;
     // Section 11: 保留顶部产品说明语，避免被清空误删
     if (s === 11 && /无可用的毒理学研究/i.test(rowText)) continue;
     // Section 12: 保留顶部生态说明语，避免被清空误删 (PU-202B 审阅批注 8, 9)
@@ -3623,12 +3625,18 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
           } catch (e) {}
         }
 
-        // 眼睛防护：若源文档提及护目镜/面罩，规范化为标准用语“戴护目镜/面罩。”
+        // 眼睛防护：忠实使用源文档原话，绝不无中生有外生捏造“面罩”
         const eyeRow = tRecord.rows.find((r) => r.cells.some((c) => /眼睛防护[：:]/i.test(c.text || '')));
         if (eyeRow && eyeRow.cells.length > 1) {
           const eyeItem = matchedSec.matchedRows.find((r) => r.key === 'eye_protection' && r.value);
-          if (eyeItem && /护目镜|面罩/i.test(eyeItem.value)) {
-            try { writeCellValue(eyeRow.cells[eyeRow.cells.length - 1], isEnglishTemplate ? 'Wear safety glasses/face shield.' : '戴护目镜/面罩。', editorEngine.roleStyles?.value); } catch (e) {}
+          if (eyeItem?.value) {
+            const cleanEye = eyeItem.value.trim();
+            const valToWrite = isEnglishTemplate
+              ? (/建议使用护目镜/i.test(cleanEye) ? 'Protective goggles are recommended.' : (/面罩/i.test(cleanEye) ? 'Wear safety glasses/face shield.' : cleanEye))
+              : cleanEye;
+            try { writeCellValue(eyeRow.cells[eyeRow.cells.length - 1], valToWrite, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
+          } else {
+            try { writeCellValue(eyeRow.cells[eyeRow.cells.length - 1], '', editorEngine.roleStyles?.value); } catch (e) {}
           }
         }
 
@@ -3650,14 +3658,14 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
         }
 
         const engRow = tRecord.rows.find((r) => r.cells.some((c) => /工程控制/i.test(c.text || '')));
-        if (engVal && engRow && engRow.cells.length > 1) {
+        if (engRow && engRow.cells.length > 1) {
           try {
             writeCellValue(engRow.cells[1], engVal, editorEngine.roleStyles?.value);
-            injectedCount++;
+            if (engVal) injectedCount++;
           } catch (e) {}
         }
 
-        // 手部防护：若源文档无独立建议，保底设置“建议戴上防护手套。”
+        // 手部防护：若源文档无独立建议，严格保持清空，严禁凭空外生编造“建议戴上防护手套。”
         const hpVal = matchedSec.matchedRows.find((r) => r.key === 'hand_protection' && r.value)?.value;
         const hpRow = tRecord.rows.find((r) => r.cells.some((c) => /手部防护/i.test(c.text || '')));
         if (hpRow) {
@@ -3665,10 +3673,9 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
           if (valCell && valCell.editable) {
             let finalHp = hpVal || '';
             finalHp = finalHp.replace(/^手部防护[:：\s]+/i, '').trim();
-            if (!finalHp) finalHp = isEnglishTemplate ? 'Protective gloves are recommended.' : '建议戴上防护手套。';
             try {
               writeCellValue(valCell, finalHp, editorEngine.roleStyles?.value);
-              injectedCount++;
+              if (finalHp) injectedCount++;
             } catch (e) {}
           }
         }
@@ -3702,6 +3709,20 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
                 const updated = deleteRow(editorEngine, tRecord, pmaRowIdx);
                 if (updated) tRecord = updated;
               } catch (e) {}
+            }
+          }
+
+          // 清理 4 列 OEL 表格中未填充的空白数据行 (例如无 PMA 时残留的空行)
+          for (let rIdx = tRecord.rows.length - 1; rIdx >= 14; rIdx--) {
+            const row = tRecord.rows[rIdx];
+            if (row && row.cells.length === 4) {
+              const isEmptyRow = row.cells.every(c => !(c.text || '').trim());
+              if (isEmptyRow) {
+                try {
+                  const updated = deleteRow(editorEngine, tRecord, rIdx);
+                  if (updated) tRecord = updated;
+                } catch (e) {}
+              }
             }
           }
         }
