@@ -107,7 +107,7 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath, s
           assert(/Classification of the substance/i.test(enFull), `Section 2.1: 英文危险分类标签必须完备`);
           assert(/GHS Label Elements/i.test(enFull), `Section 2.2: 英文 GHS 标签要素必须完备`);
           // 信号词对照
-          if (/危险/.test(cnFull) && !/警告/.test(cnFull)) {
+          if (/(?:警示词|信号词|警告词)[：:]\s*危险/.test(cnFull) && !/警告/.test(cnFull)) {
             assert(/Signal word:\s*Danger/i.test(enFull), `Section 2.2: 信号词必须翻译为 Danger`);
           } else if (/警告/.test(cnFull)) {
             assert(/Signal word:\s*Warning/i.test(enFull), `Section 2.2: 信号词必须翻译为 Warning`);

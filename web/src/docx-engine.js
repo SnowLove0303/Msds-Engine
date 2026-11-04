@@ -1042,7 +1042,8 @@ export function updateHeaderFooterData(engine, patch = {}) {
               runs[0].appendChild(t);
             }
             const cleanV = targetVersion.replace(/^Version[：:\s]*/i, '');
-            t.textContent = `Version：${cleanV}`;
+            const isEnDoc = /EN|English/i.test(partName) || engine?.headerFooterData?.language === 'en' || /_EN_|EN\b/i.test(engine?.filename || '');
+            t.textContent = isEnDoc ? `Version: ${cleanV}` : `Version：${cleanV}`;
             for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
             modified = true;
           }

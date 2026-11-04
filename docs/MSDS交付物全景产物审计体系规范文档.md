@@ -25,6 +25,10 @@
   - [2.6 双实体预设物理隔离公理 (Dual-Entity Isolation Invariant)](#26-双实体预设物理隔离公理-dual-entity-isolation-invariant)
   - [2.7 法规时效性正向演进公理 (Statutory Modernity Evolution Invariant)](#27-法规时效性正向演进公理-statutory-modernity-evolution-invariant)
   - [2.8 交付物时间戳同步与末页防纯空门禁 (Timestamp & Anti-Blank-Page)](#28-交付物时间戳同步与末页防纯空门禁-timestamp--anti-blank-page)
+  - [2.9 模板标签物理剪枝与零开天窗公理 (The Absolute Physical Pruning Axiom)](#29-模板标签物理剪枝与零开天窗公理-the-absolute-physical-pruning-axiom)
+  - [2.10 标点符号纯度与中西文严格隔离公理 (Punctuation Purity Axiom)](#210-标点符号纯度与中西文严格隔离公理-punctuation-purity-axiom)
+  - [2.11 中英事实同构与防外生底模编造公理 (Isomorphic Grounding & Anti-Fabrication Axiom)](#211-中英事实同构与防外生底模编造公理-isomorphic-grounding--anti-fabrication-axiom)
+  - [2.12 化工专业定性公理 (Chemical Domain Qualitative Invariant)](#212-化工专业定性公理-chemical-domain-qualitative-invariant)
 - [三、 16 章节微观逐节审计规范与判定细则 (Section-by-Section Specifications)](#三-16-章节微观逐节审计规范与判定细则-section-by-section-specifications)
   - [Section 1: 化学品及企业标识 (Identification)](#section-1-化学品及企业标识-identification)
   - [Section 2: 危险性概述 (Hazards Identification)](#section-2-危险性概述-hazards-identification)
@@ -201,6 +205,36 @@ flowchart TD
   - 严禁由于多余换行符、过大行高或分页符溢出，导致生成的 PDF 最后一页仅包含页眉页脚而无实质主体文本；
   - 审计必须使用 PyMuPDF 读取末页全部文本块，扣除页眉页脚后主体文本块数量必须 $> 0$。
 
+### 2.9 模板标签物理剪枝与零开天窗公理 (The Absolute Physical Pruning Axiom)
+> **剪枝法定定义**：剪枝绝不是向值单元格填入空字符串 `""`，更不是在表格中留下“左侧粗体标签、右侧空白开天窗（Left-Hand Dangling Label Windowing）”的悬空半死状态。
+- **物理整行删除铁律**：如果源文件没有对应值内容（即源文件无任何事实支撑或值段落可以写进模板标签对应的值，且无映射槽位数据），该模板标签行必须在底层表格 DOM 树中执行**物理整行删除（`deleteRow` / `tr.parentNode.removeChild(tr)`）**，在最终交付物中必须彻底物理消失！
+- **紧密排列与行序自愈**：整行物理删除后，存活行必须重新连续紧密排列，序号自动连续重算（`renumberRecord`），表格内外边框自动闭合。中英文两套模板必须同步执行对称物理剪枝，行数绝对守恒；
+- **典型范例（Section 8 手部防护剪枝）**：当源文件仅包含控制参数说明而无独立手部防护值段落时，模板预设的“手部防护：”独立标签行必须整行删除，严禁留下右侧空白单元格让表格开天窗；中文与英文表格行数必须同步收敛为标准的 11 行；
+- **审计一票否决红线**：凡在交付物中发现“左侧留有粗体标签（如手部防护：、事故响应：、安全储存：），右侧值格为空或开天窗”，或者“整行无实质内容却占着一行”的，一律判定为【重大未剪枝缺陷 (INCOMPLETE_PRUNING_DEFECT)】，直接一票否决！
+
+### 2.10 标点符号纯度与中西文严格隔离公理 (Punctuation Purity Axiom)
+> **标点纯度铁律**：中文交付物必须全量使用中文全角标点，英文交付物必须全量使用西文半角标点，绝不允许混用或游离标点。
+- **中文交付物标点规范**：
+  1. 所有表格标签冒号及正文子标题冒号必须统一为全角中文冒号 `：`（U+FF1A），严禁使用半角西文冒号 `:`；
+  2. 完整陈述句段落末尾必须规范闭合全角中文句号 `。`（U+3002），并列成分使用中文逗号 `，` 或顿号 `、`，括号使用全角括号 `（）`；
+  3. 参数、数值、厚度与单位之间严禁残留游离的西文半角句点 `.`（如将“厚度≧0.4mm；穿透时间≧480min”误写为带有游离句点）；
+  4. 名词性标签冒号后严禁添加多余句号（如“外观：”后绝不能出现“：。”）。
+- **英文交付物标点与字符纯度规范**：
+  1. 页眉版本号（`Version: V1.0`）、页脚及正文所有标签冒号必须采用西文半角冒号加单空格 `: `；
+  2. 句子末尾使用标准半角句点 `.`，绝不允许残留任何中文全角冒号、句号或逗号；
+  3. 度数符号规范：英文文档中绝对严禁使用汉字库全角符号 `℃`（U+2103），必须统一规范转换为西文国际标准 `°C`（U+00B0 + C）；
+  4. 词法完整性：英文单词内部严禁出现排版断裂空格（如 `equ ipment` 必须规范为 `equipment`）。
+
+### 2.11 中英事实同构与防外生底模编造公理 (Isomorphic Grounding & Anti-Fabrication Axiom)
+> **同构防编造铁律**：英文交付物必须 100% 由中文事实同构派生（Sourced-Grounded Translation），严禁大模型借翻译之名注入通用 GHS 模板预训练外生话术。
+- **外生话术零容忍**：严禁注入源文件未提及的消防员 SCBA 呼吸器、虚构危险分解产物、虚构环境排入土壤警告等；
+- **核心安全指标保真**：源文档载明的核心安全指标（如 Section 10.3“避免0℃以下和超过70℃高温”）必须 1:1 精准翻译保留在 10.3（`Avoid low temperatures below 0°C and high temperatures above 70°C.`），严禁遗漏或用通用废话替代；
+- **底模死标签彻底清除**：英文版必须按中文母版事实 1:1 动态装配，彻底剔除英文底模历史残留标签（如 Section 10 残留的 `Hazardous decomposition products:`）。
+
+### 2.12 化工专业定性公理 (Chemical Domain Qualitative Invariant)
+> **化工定性铁律**：在涂料与高分子化工原理中，固化剂（改性脂肪胺固化剂、异氰酸酯固化剂等）与乳液/分散体（水性环氧乳液、水性聚氨酯分散体等）属于完全对立的双组分反应物料（主剂组分与固化剂组分）。
+- **分类匹配优先级**：在生成英文品名或定性分类时，必须建立严格的分类优先级规则，优先匹配 `/固化剂/`、`/curing agent/`、`/hardener/`，绝对严禁因品名含“环氧”二字就武断将环氧固化剂降级或误译为环氧乳液（`Waterborne epoxy emulsion`），必须输出 `Waterborne epoxy curing agent`。
+
 ---
 
 ## 三、 16 章节微观逐节审计规范与判定细则 (Section-by-Section Specifications)
@@ -225,10 +259,13 @@ flowchart TD
 
 #### 2. 核心判定标准与断言
 - **型号精确覆写**：产品名称槽位必须精准包含目标型号，严禁残留其他型号（如把 BL-8123 写成 OS-9547）；
+- **化工专业定性校验**：固化剂（改性脂肪胺固化剂等）英文品名必须为 `Waterborne epoxy curing agent [型号]` 或 `Waterborne curing agent [型号]`，绝对严禁误判或降级为乳液（`emulsion`）；
+- **英文标题与版本号西文纯度**：Row 0 必须为标准西文加粗标题 `1. Identification`（严禁仅留 `Identification`）；页眉必须输出西文标准冒号 `Version: V1.0`（严禁中文全角冒号 `Version：V1.0`）；
 - **用途英译定性守恒**：
   - “涂料用添加剂”必须精准英译为 `Additive for coatings.`（严禁泛化为 `Used in coatings` 而丢失“添加剂”定性）；
   - “粘合剂、涂料”精准英译为 `Used in adhesives and coatings.`；
-- **实体隔离校验**：冠志版与国材版的供应商名称、地址、电话、传真必须 100% 对应各自实体，严禁错乱。
+- **实体隔离校验**：冠志版与国材版的供应商名称、地址、电话、传真必须 100% 对应各自实体，严禁错乱；
+- **法定免检白名单 (INV-S1-01)**：中文版 1.1 产品名称值格必须法定留空，型号与中文品名单空格拼接；严禁将“1.1 留空”误判为缺陷！
 
 ---
 
@@ -239,12 +276,14 @@ flowchart TD
   - 必须包含清晰的 2.1 分类与 2.2 标签要素；
   - 象形图、信号词（“危险”/“警告”）、H 声明（危险说明）与 P 声明（防范说明）必须完备；
   - 英文版信号词必须精准对应：中文“危险” $\rightarrow$ `Danger`，中文“警告” $\rightarrow$ `Warning`；
-  - 严禁底模外生强塞未经源文件授权的 `2.3 其他危害：无适用资料。`。
+  - 严禁底模外生强塞未经源文件授权的 `2.3 其他危害：无适用资料。`；
+  - **标点符号纯度**：若存在 2.3 其他危险，必须规范使用中文全角冒号 `2.3 其他危险：无适用资料。`（严禁西文半角冒号 `:` 或缺失冒号）。
 - **模态 B：非危品通栏模态 (Non-Hazardous Composite)**
   - GHS 危险性类别标明“根据 GHS 不属于危险物”或“无”；
   - 象形图标明“无”或“不属于危险物”；
   - 英文版严禁出现任何危化品残留词汇：`assert(!/H412|H315|H332|H317|Category/i.test(enText))`；
-  - 英文危险性说明必须标准化输出：`Not classified as a hazardous chemical according to GHS.` 与 `No known significant effects or critical hazards.`。
+  - 英文危险性说明必须标准化输出：`Not classified as a hazardous chemical according to GHS.` 与 `No known significant effects or critical hazards.`；
+  - **法定免检白名单 (INV-S2-01)**：非危品不设象形图与信号词（写“无”）属于法定合规表现，严禁误报为漏报或缺陷。
 
 ---
 
@@ -253,7 +292,8 @@ flowchart TD
 #### 1. 结构与几何契约
 - **行数与组分 1:1 守恒**：中文表格的组分行数与英文表格的组分行数必须绝对相等（`cnSec.rows.length === enSec.rows.length`）；
 - **3 列标准网格**：表头必须为 `化学品名称 | CAS编号 | %（w/w）`，英文对应 `Chemical name | CAS NO. | Concentration % (w/w)`；
-- **边框保护**：动态增行（如从底模 2 行增至 4 行）时，首行顶框和末行底框必须为实线，内部水平和垂直线必须为统一虚线。
+- **边框保护**：动态增行（如从底模 2 行增至 4 行）时，首行顶框和末行底框必须为实线，内部水平和垂直线必须为统一虚线；
+- **子标题跨列合并消除空白单元格**：Table 3 Row 2（`成分` 或 `3.2 Ingredients:`）必须在底层 DOM 中执行跨列单元格合并（`gridSpan=3`, 宽度 `9781` dxa），彻底消除子标题右侧出现空白开天窗单元格的排版缺陷。
 
 #### 2. 核心判定标准与断言
 - **商业机密保护**：若 CAS 标明“商业机密”，英文必须标准化翻译为 `Trade secret` 或 `Confidential`；
@@ -282,7 +322,10 @@ flowchart TD
   - 5.1 合适的灭火剂（二氧化碳、泡沫、灭火粉末、水喷雾）；
   - 5.2 不合适的灭火剂（高流量水喷射、高压水枪）；
   - 审计断言：`5.1 与 5.2 灭火剂内容绝对严禁相同或重叠`！
-- **燃烧产物保真**：燃烧分解产物（一氧化碳、二氧化碳、氮氧化物、氰化氢）中英文必须一一对应。
+- **燃烧产物保真与 5.3/5.4 独立解耦**：
+  - 5.3 燃烧分解产物（一氧化碳、二氧化碳、氮氧化物、氰化氢）中英文必须一一对应；
+  - 5.4 消防预防措施与保护设备必须独立英译源文件内容（如“在着火或爆炸情况下，不要吸进烟尘。” $\rightarrow$ `In case of fire or explosion, do not breathe fumes/smoke.`）；
+  - **严禁强塞 SCBA 外生底模长句**：`assert(!/Firefighters must wear self-contained breathing apparatus/i.test(enSec5))`，绝对严禁将未经源文件授权的消防员空气呼吸器等口水话硬编码进 5.4！
 
 ---
 
@@ -305,11 +348,14 @@ flowchart TD
 ### Section 8: 接触控制/个体防护 (Exposure Controls / Personal Protection)
 
 > [!CAUTION]
-> **本章节为历史外生口水话泄露与虚假组分强塞的最高发重灾区，执行最高级别严审！**
+> **本章节为历史外生口水话泄露、虚假组分强塞与标签开天窗的最高发重灾区，执行最高级别严审！**
 
 #### 1. 结构与行数同构律
 - **有接触限值产品 (With OEL)**：保持 15 行标准结构（包含“工作场所组分控制参数”通栏题头与“物质 | 依据 | 类型 | 数值” 4 列表格）；
-- **无接触限值产品 (No OEL)**：**必须彻底剪枝四列表格与通栏题头，严格收敛为 12 行纯净事实**！
+- **无接触限值产品 (No OEL)**：必须彻底剪枝四列表格与通栏题头，严格收敛为 12 行纯净事实；
+- **手部防护无独立值段落彻底物理剪枝 (11 行对称同构律)**：
+  - 当源文档仅包含手套材料参数（如 EN 374-3、FKM、IIR 等）而无“手部防护：”独立值段落时，模板预设的“手部防护：”标签行必须通过 `deleteRow` 整行物理删除，严禁留下右侧空白单元格让表格开天窗；
+  - 中文表格与英文表格行数必须同步收敛为标准的 11 行（`cnS8.rows.length === 11 && enS8.rows.length === 11`）。
 
 #### 2. 外生口水话绝对零容忍硬门禁 (Zero Boilerplate Invariant)
 - **工程控制口水话拦截器**：
@@ -325,13 +371,20 @@ flowchart TD
   - 若源文档明文为“戴眼罩/面罩。”，中文必须写“戴眼罩/面罩。”，英文写 `Wear safety glasses/face shield.`；
   - **严禁无视源文档事实，在代码中硬编码暴力覆盖！**
 
-#### 3. 4 列表格排版与虚假数据排除门禁
+#### 3. 标点符号纯度与数值参数规范
+- **标签冒号统一**：`氟化橡胶 –FKM:` 西文冒号必须修正为中文全角冒号 `：`（`氟化橡胶 –FKM：`）；
+- **参数数值去游离句点**：手套厚度与穿透时间末尾严禁残留游离句点（必须规范为 `厚度≧0.4mm；穿透时间≧480min`）。
+
+#### 4. 4 列表格排版与虚假数据排除门禁
 - **无接触限值商品虚假数据排除**：
   - 若源文档明文为“无可用的接触限值信息”或“不含有职业接触限值的物质”，**严禁残留底模中的“六亚甲基-1,6-二异氰酸酯 0.03 mg/m3”或“丙二醇甲醚醋酸酯 100 mg/m3”**！
 - **4 列表格排版规范**：
   - 表头行（物质/依据/类型/数值 / Substance/Basis/Type/Value）：**必须水平居中，彻底去除末尾冒号**；
   - 数据行：**必须水平居中，常规字重 (`bold: false`)，无末尾冒号，字号 Arial 9.5pt**；
   - 空白行剪枝：未填充数据的空白 4 列行必须物理删除。
+
+#### 5. 法定反直觉语义映射免检白名单 (INV-S8-01)
+- 源文档 8.1 控制参数进模板 8.2 工程控制；源文档 8.2 暴露控制进模板 8.1 暴露控制。此为企业模板的法定语义映射，绝非颠倒，严禁指责为“层级颠倒”！
 
 ---
 
@@ -359,9 +412,12 @@ flowchart TD
 ### Section 10: 稳定性和反应性 (Stability and Reactivity)
 
 #### 1. 核心判定标准
-- **标准小节结构**：必须完备包含 10.1 反应性、10.2 化学稳定性、10.3 危险反应可能性、10.4 应避免的条件、10.5 不相容物质、10.6 危险分解产物；
-- **英文标签防混淆**：
-  - 10.2 危险分解产物英文标签必须为 `Hazardous decomposition products:`，**严禁误写为 `Decomposition temperature:`**。
+- **标准小节结构与连续递增编号**：必须从 10.1 开始连续递增编号（10.1, 10.2, 10.3...），严禁跳号（如 10.1 直接跳至 10.3 缺失 10.2）；
+- **中英 100% 事实同构与温控指标保真**：
+  - 源文档载明的核心操作安全指标（如“避免0℃以下和超过70℃高温”）必须 1:1 精准英译并保存在 10.3（`Avoid low temperatures below 0°C and high temperatures above 70°C.`），严禁遗漏或泛化；
+- **英文模板底模残留彻底清除**：
+  - 彻底删除英文模板残留的 `Hazardous decomposition products:` 虚构行，按中文母版事实 1:1 动态装配（10.1 稳定性、10.2 危害反应、10.3 避免条件）；
+- **法定免检白名单 (INV-S10-01)**：源文档若缺失“应避免条件/禁配物”，对应行安全隐藏消失不留空行，属于企业法定规范，严禁误报为遗漏（但跳号属于真缺陷）。
 
 ---
 
@@ -425,11 +481,14 @@ flowchart TD
 ### Section 15: 法规信息 (Regulatory Information)
 
 #### 1. 核心判定标准
+- **英文版导语行防断层补全**：
+  - Row 1 必须完备输出导语 `Relevant safety, health and environmental regulations for the substance or mixture`（Arial 9.5pt 常规体），严禁出现空白断层行；
 - **现行有效性正向演进**：
   - 英文版法规信息必须引用现行有效的国务院令第 591 号（`Regulations on the Safety Management of Hazardous Chemicals, State Council Decree No. 591`）；
   - 必须引用现行有效的 GB 30000 系列国标（`GB 30000.2-29 Rules for classification and labelling of chemicals`）；
 - **排除底模外生强塞法规**：
-  - 若源文档仅列明 4 部法规，英文交付物**严禁从底模强塞未经源文件授权的第 5 部法规（如 GB 15258 化学品安全标签编写规定）**。
+  - 若源文档仅列明 4 部法规，英文交付物**严禁从底模强塞未经源文件授权的第 5 部法规（如 GB 15258 化学品安全标签编写规定）**；
+- **法定免检白名单 (INV-S15-01)**：采用现行有效国家法规（如 GB 30000 替代 GB 20576）属于强制合规升级，严禁误报为违背源文件篡改。
 
 ---
 

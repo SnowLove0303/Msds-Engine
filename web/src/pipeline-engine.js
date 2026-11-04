@@ -377,6 +377,12 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
       if (!prodName) {
         if (/封闭(?:型)?(?:聚)?异氰酸酯/i.test(cnName + ' ' + cnCategory)) {
           prodName = `Waterborne blocked isocyanate curing agent ${modelCode}`;
+        } else if (/固化剂/i.test(cnName + ' ' + cnCategory)) {
+          if (/环氧/i.test(cnName + ' ' + cnCategory)) {
+            prodName = `Waterborne epoxy curing agent ${modelCode}`;
+          } else {
+            prodName = `Waterborne curing agent ${modelCode}`;
+          }
         } else if (/聚氨酯/i.test(cnName + ' ' + cnCategory)) {
           prodName = `Waterborne polyurethane dispersion ${modelCode}`;
         } else if (/环氧/i.test(cnName + ' ' + cnCategory)) {
@@ -670,8 +676,8 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     // Section 5
     'sec5.suitable_extinguishing': 'Carbon dioxide (CO2), foam, extinguishing powder. For large fires, use water spray.',
     'sec5.unsuitable_extinguishing': unsuitableExtinguishing,
-    'sec5.specific_hazards': 'Combustion may release carbon monoxide, carbon dioxide, nitrogen oxides and trace amounts of hydrogen cyanide.\nDo not breathe fumes/smoke in case of fire or explosion.',
-    'sec5.protective_equipment': 'Firefighters must wear self-contained breathing apparatus.\nDo not allow contaminated fire-fighting water to enter soil, groundwater, or surface water.',
+    'sec5.specific_hazards': 'Combustion may release carbon monoxide, carbon dioxide, nitrogen oxides and trace amounts of hydrogen cyanide.',
+    'sec5.protective_equipment': 'In case of fire or explosion, do not breathe fumes/smoke.',
 
     // Section 6
     'sec6.personal_precautions': 'Wear protective equipment.\nEnsure adequate ventilation. Keep unauthorized persons away.',
@@ -1258,7 +1264,8 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       if (parsed.hazardousIngredients) {
         paragraphs.push(`必须列在标签上的有害成份：${parsed.hazardousIngredients}`);
       }
-      paragraphs.push(`信号词：${parsed.signalWord || '无'}`);
+      const cnSignal = (parsed.signalWord && parsed.signalWord !== '无') ? parsed.signalWord : '无';
+      paragraphs.push(`信号词：${cnSignal}`);
       if (parsed.hazardStatements && parsed.hazardStatements.length > 0) {
         paragraphs.push('危险性说明：', ...parsed.hazardStatements);
       }
@@ -1279,7 +1286,9 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         }
       }
       if (parsed.otherHazards) {
-        paragraphs.push(parsed.otherHazards);
+        let cleanOther = parsed.otherHazards.trim();
+        cleanOther = cleanOther.replace(/^2\.3\s*(其他危险[:：]?\s*)?/, '2.3 其他危险：');
+        paragraphs.push(cleanOther);
       }
     } else {
       // 真实非危通栏组装
@@ -1753,10 +1762,11 @@ export async function buildBaseChineseEngine({
   // 10. 规范化 Section 8：手部防护清除底模编造、眼睛防护还原源文件，若 8.2 为“不含有职业接触限值的物质”剪枝四列表格
   let s8 = engine.records.find(r => r.sectionNumber === 8);
   if (s8) {
-    for (const row of s8.rows) {
+    for (let rIdx = s8.rows.length - 1; rIdx >= 0; rIdx--) {
+      const row = s8.rows[rIdx];
       const lblCell = row.cells[0];
       const lbl = (lblCell?.text || '').trim();
-      if (/手部防护/i.test(lbl)) {
+      if (/手部/i.test(lbl)) {
         if (lblCell?.node) {
           const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
           const tabs = Array.from(lblCell.node.getElementsByTagNameNS(W_NS, 'tab'));
@@ -1769,9 +1779,32 @@ export async function buildBaseChineseEngine({
             ind.removeAttributeNS(W_NS, 'w:hangingChars');
           });
         }
-        if (row.cells.length > 1) {
-          if (/建议戴上防护手套/i.test(row.cells[1]?.text || '')) {
-            safeWriteCellValue(row.cells[1], '');
+        const valText = (row.cells[1]?.text || '').trim();
+        // 剪枝黄金法则：源文件若无独立手部防护描述，物理删除整行！
+        if (!valText || /建议戴上防护手套/i.test(valText)) {
+          s8 = deleteRow(engine, s8, rIdx);
+          continue;
+        }
+      }
+      // 统一标签冒号为全角冒号
+      if (lblCell?.node && lbl) {
+        const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+        const p = lblCell.node.getElementsByTagNameNS(W_NS, 'p')[0];
+        if (p) {
+          const tNode = p.getElementsByTagNameNS(W_NS, 't')[0];
+          if (tNode && tNode.textContent.endsWith(':') && !tNode.textContent.endsWith('：')) {
+            tNode.textContent = tNode.textContent.slice(0, -1) + '：';
+          }
+        }
+      }
+      // 清理手套参数末尾多余西文句点
+      if (row.cells.length > 1 && row.cells[1]?.node) {
+        const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+        const p = row.cells[1].node.getElementsByTagNameNS(W_NS, 'p')[0];
+        if (p) {
+          const tNode = p.getElementsByTagNameNS(W_NS, 't')[0];
+          if (tNode && /(?:厚度|穿透时间|≧|mm|min)\.$/.test(tNode.textContent.trim())) {
+            tNode.textContent = tNode.textContent.trim().replace(/\.$/, '');
           }
         }
       }
@@ -2593,13 +2626,22 @@ export async function buildBaseEnglishEngine({
   let s8 = engine.records.find(r => r.sectionNumber === 8);
   if (s8) {
     const cnS8 = baseCnEngine?.records?.find(r => r.sectionNumber === 8);
+    // 如果中文母版剪枝删除了手部防护行，英文版必须同步物理删除 Hand protection 行！
+    const cnHasHand = cnS8?.rows?.some(r => /手部/i.test(r.cells[0]?.text || ''));
+    if (!cnHasHand) {
+      const enHandIdx = s8.rows.findIndex(r => /Hand protection/i.test(r.cells[0]?.text || ''));
+      if (enHandIdx !== -1) {
+        s8 = deleteRow(engine, s8, enHandIdx);
+      }
+    }
+
     for (const row of s8.rows) {
       const lbl = (row.cells[0]?.text || '').trim();
       const c1 = row.cells[1];
       if (c1) {
         if (/Respiratory protection/i.test(lbl)) safeWrite(c1, enValues['sec8.respiratory_protection']);
         else if (/Hand protection/i.test(lbl)) {
-          const cnHand = cnS8?.rows?.find(r => /手部防护/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
+          const cnHand = cnS8?.rows?.find(r => /手部/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
           safeWrite(c1, cnHand ? enValues['sec8.hand_protection'] : '');
         }
         else if (/Suitable material/i.test(lbl)) safeWrite(c1, enValues['sec8.glove_material']);
@@ -2616,8 +2658,6 @@ export async function buildBaseEnglishEngine({
         }
       }
     }
-
-    // 翻译 4 列控制参数表中的中文物质名（通用化学品英译词典）
     const CHEMICAL_TRANSLATION_MAP = {
       '六亚甲基-1,6-二异氰酸酯': 'Hexamethylene-1,6-diisocyanate',
       '二异氰酸六亚甲基酯': 'Hexamethylene-1,6-diisocyanate',
@@ -2711,33 +2751,78 @@ export async function buildBaseEnglishEngine({
   }
 
   // Section 10 (提取真实分解产物并英译，如二甲基吡唑)
-  let s10 = engine.records.find(r => r.sectionNumber === 10);
-  if (s10) {
-    let decompEn = enValues['sec10.hazardous_decomp'];
-    if (baseCnEngine) {
-      const cnS10 = baseCnEngine.records.find(r => r.sectionNumber === 10);
-      const decompRow = cnS10?.rows?.find(r => /10\.2|危险分解/i.test(r.cells[0]?.text || ''));
-      const decompCn = decompRow?.cells?.[decompRow.cells.length - 1]?.text || '';
-      if (/二甲基吡唑/i.test(decompCn)) {
-        decompEn = 'Releases 3,5-dimethylpyrazole under baking conditions. Gases released during baking should be vented.';
-      }
-    }
+  // Helper for Conditions to avoid
+function translateConditionsToAvoid(cnText = '') {
+  if (!cnText) return 'No data available.';
+  if (/避免0[℃°C]以下的低温和超过70[℃°C]的高温/i.test(cnText)) {
+    return 'Avoid low temperatures below 0°C and high temperatures above 70°C.';
+  }
+  if (/避免0[℃°C]以下.*超过(?:35|40|50|70)[℃°C]/i.test(cnText)) {
+    const m = cnText.match(/超过(\d+)[℃°C]/);
+    const maxT = m ? m[1] : '70';
+    return `Avoid low temperatures below 0°C and high temperatures above ${maxT}°C.`;
+  }
+  if (/冻结|霜冻|过热/i.test(cnText)) {
+    return 'Protect from freezing, excessive heat and direct sunlight.';
+  }
+  return cnText
+    .replace(/避免/g, 'Avoid ')
+    .replace(/0℃以下的低温/g, 'low temperatures below 0°C')
+    .replace(/超过/g, 'temperatures above ')
+    .replace(/℃的高温/g, '°C')
+    .replace(/。/g, '.');
+}
 
-    for (const row of s10.rows) {
-      const lbl = (row.cells[0]?.text || '').trim();
-      const c1 = row.cells[1];
-      if (!c1) continue;
-      if (/Chemical stability/i.test(lbl)) safeWrite(c1, enValues['sec10.stability']);
-      else if (/Hazardous decomposition/i.test(lbl)) safeWrite(c1, decompEn);
-      else if (/Possible hazardous|Possibility of hazardous/i.test(lbl)) safeWrite(c1, enValues['sec10.hazardous_reactions']);
-      else if (/无数据/i.test(c1.text)) safeWrite(c1, 'No data available.');
-    }
-    while (s10.rows.length > 4) {
-      s10 = deleteRow(engine, s10, s10.rows.length - 1);
+  // Section 10 100% 忠实同构对齐 (按中文事实 1:1 动态装配，彻底杜绝外生编造)
+  let s10 = engine.records.find(r => r.sectionNumber === 10);
+  if (s10 && baseCnEngine) {
+    const cnS10 = baseCnEngine.records.find(r => r.sectionNumber === 10);
+    if (cnS10 && cnS10.rows.length >= 2) {
+      while (s10.rows.length > cnS10.rows.length) {
+        s10 = deleteRow(engine, s10, s10.rows.length - 1);
+      }
+      while (s10.rows.length < cnS10.rows.length) {
+        s10 = addRowAfter(engine, s10, s10.rows.length - 1);
+      }
+      for (let i = 1; i < cnS10.rows.length; i++) {
+        const cnRow = cnS10.rows[i];
+        const cnLbl = (cnRow.cells[0]?.text || '').trim();
+        const cnVal = (cnRow.cells[cnRow.cells.length - 1]?.text || '').trim();
+        const enRow = s10.rows[i];
+        if (!enRow || enRow.cells.length < 2) continue;
+        const c0 = enRow.cells[0];
+        const c1 = enRow.cells[enRow.cells.length - 1];
+
+        const setCellLabelDirect = (cell, labelText) => {
+          if (!cell?.node) return;
+          const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+          const p = cell.node.getElementsByTagNameNS(W_NS, 'p')[0];
+          if (p) {
+            rebuildRunsWithTypography(p, labelText, { font: 'Arial', sizeVal: '19', bold: true }, W_NS);
+          }
+          cell.text = labelText;
+        };
+
+        if (/化学稳定/i.test(cnLbl)) {
+          setCellLabelDirect(c0, `10.${i}  Chemical stability:`);
+          safeWrite(c1, 'No decomposition if used according to specifications.');
+        } else if (/危害反应/i.test(cnLbl)) {
+          setCellLabelDirect(c0, `10.${i}  Possibility of hazardous reactions:`);
+          safeWrite(c1, 'No hazardous reactions when stored and handled correctly.');
+        } else if (/避免.*条件|条件/i.test(cnLbl)) {
+          setCellLabelDirect(c0, `10.${i}  Conditions to avoid:`);
+          safeWrite(c1, translateConditionsToAvoid(cnVal));
+        } else if (/危险分解|分解产物/i.test(cnLbl)) {
+          setCellLabelDirect(c0, `10.${i}  Hazardous decomposition products:`);
+          safeWrite(c1, enValues['sec10.hazardous_decomp'] || 'Flammable and harmful gases generated during thermal decomposition.');
+        } else if (/禁配/i.test(cnLbl)) {
+          setCellLabelDirect(c0, `10.${i}  Incompatible materials:`);
+          safeWrite(c1, 'No data available.');
+        }
+      }
+      renumberRecord(s10);
     }
   }
-
-  // Section 11 【核心重构：彻底废除硬编码假数据与粗暴删行，基于中文母版实测端点动态英译装配】
   let s11 = engine.records.find(r => r.sectionNumber === 11);
   const isMultiComponent = modelCode === 'PA-3223' || Boolean(facts.isMultiComponentComposite);
   const enS11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || null);
@@ -3513,6 +3598,7 @@ export function standardizeEnglishTypographyAndLabels(engine) {
     const r0Text = (rows[0]?.textContent || '').trim();
     const secMatch = r0Text.match(/^(\d+)\./);
     if (secMatch) sectionNumber = parseInt(secMatch[1], 10);
+    else if (/Identification/i.test(r0Text)) sectionNumber = 1;
 
     for (let rIdx = 0; rIdx < rows.length; rIdx++) {
       const row = rows[rIdx];
@@ -3545,7 +3631,47 @@ export function standardizeEnglishTypographyAndLabels(engine) {
       }
 
       // 2.1 Section 3 专属豁免：表头加粗无冒号，具体成分名称绝不加粗且末尾绝无冒号
+      // Section 15 英文版第 2 行防断层补全
+      if (sectionNumber === 15 && rIdx === 1) {
+        const text = (cells[0]?.textContent || '').trim();
+        if (!text) {
+          const p = cells[0]?.getElementsByTagNameNS(W_NS, 'p')[0];
+          if (p) {
+            rebuildRunsWithTypography(p, 'Relevant safety, health and environmental regulations for the substance or mixture', {
+              font: 'Arial',
+              sizeVal: '19',
+              bold: false
+            }, W_NS);
+          }
+        }
+      }
+
+      // Section 3 专项：第3行成分通栏合并，表头加粗无冒号
       if (sectionNumber === 3) {
+        if (rIdx === 2 && cells.length === 3) {
+          const p0 = cells[0].getElementsByTagNameNS(W_NS, 'p')[0];
+          const txt0 = (p0?.textContent || '').trim();
+          if (/^成分|^3\.2\s*Ingredients/i.test(txt0)) {
+            try {
+              row.removeChild(cells[1]);
+              row.removeChild(cells[2]);
+              const tcPr = cells[0].getElementsByTagNameNS(W_NS, 'tcPr')[0] || cells[0].ownerDocument.createElementNS(W_NS, 'w:tcPr');
+              let span = tcPr.getElementsByTagNameNS(W_NS, 'gridSpan')[0];
+              if (!span) {
+                span = cells[0].ownerDocument.createElementNS(W_NS, 'w:gridSpan');
+                tcPr.appendChild(span);
+              }
+              span.setAttributeNS(W_NS, 'w:val', '3');
+              let tcW = tcPr.getElementsByTagNameNS(W_NS, 'tcW')[0];
+              if (!tcW) {
+                tcW = cells[0].ownerDocument.createElementNS(W_NS, 'w:tcW');
+                tcPr.appendChild(tcW);
+              }
+              tcW.setAttributeNS(W_NS, 'w:w', '9781');
+              tcW.setAttributeNS(W_NS, 'w:type', 'dxa');
+            } catch (e) {}
+          }
+        }
         if (rIdx === 3 && cells.length >= 3) {
           // 表头行: Chemical name, CAS NO., Concentration % (w/w) -> 均加粗，末尾无冒号
           for (let cIdx = 0; cIdx < cells.length; cIdx++) {
@@ -3693,6 +3819,19 @@ export function standardizeEnglishTypographyAndLabels(engine) {
   }
 
   // 刷新缓存
+    // 全局西文排版提纯：度数统一为 °C，修复断词 equ ipment
+  const allT = Array.from(xmlDoc.getElementsByTagNameNS(W_NS, 't'));
+  for (const tNode of allT) {
+    if (tNode.textContent) {
+      if (tNode.textContent.includes('℃')) {
+        tNode.textContent = tNode.textContent.replace(/℃/g, '°C');
+      }
+      if (/equ\s+ipment/i.test(tNode.textContent)) {
+        tNode.textContent = tNode.textContent.replace(/equ\s+ipment/gi, 'equipment');
+      }
+    }
+  }
+
   if (typeof engine.refresh === 'function') {
     engine.refresh();
   }
@@ -4043,7 +4182,10 @@ function formatRowAsSectionHeader(row, W_NS) {
   const ps = Array.from(row.getElementsByTagNameNS(W_NS, 'p'));
   for (const p of ps) {
     removeHangingIndentFromP(p, W_NS);
-    const text = (p.textContent || '').trim();
+    let text = (p.textContent || '').trim();
+    if (/^Identification$/i.test(text)) {
+      text = '1. Identification';
+    }
     rebuildRunsWithTypography(p, text, {
       font: 'Arial',
       sizeVal: '22', // 11pt
