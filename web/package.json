@@ -12,6 +12,7 @@
     "lint:grounding": "node scripts/lint_source_grounding.mjs",
     "lint:audit": "node scripts/lint_audit_false_positives.mjs --self-test",
     "lint": "npm run lint:code && npm run lint:audit",
+    "audit:master": "node scripts/run_master_msds_audit.mjs",
     "test:smoke": "node tests/smoke.mjs",
     "test:annotations": "node tests/test_smart_matching_20_annotations.mjs",
     "start": "node server.mjs"
