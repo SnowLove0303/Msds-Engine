@@ -590,16 +590,29 @@ export async function runMasterMsdsAudit(options = {}) {
 
   // Section 5: 消防措施
   const enS5 = enDocx.records.find(r => r.sectionNumber === 5);
+  const cnS5 = cnDocx.records.find(r => r.sectionNumber === 5);
+  const cnS5HasScba = cnS5 && /自供气式呼吸器|正压式空气呼吸器|自给式呼吸器|SCBA/i.test(cnS5.rows.map(r => r.cells.map(c => c.text).join(' ')).join(' '));
   if (enS5) {
     const enS5Text = enS5.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
-    assert(
-      !/Firefighters must wear self-contained breathing apparatus/i.test(enS5Text),
-      '环3',
-      'Section 5 反外生 SCBA 口水话',
-      '严禁注入源文件未授权的消防员空气呼吸器 SCBA 外生通用口水话',
-      enS5Text.includes('self-contained') ? '包含外生口水话' : '纯净保真',
-      'Section 5 EN'
-    );
+    if (cnS5HasScba) {
+      assert(
+        /self-contained breathing apparatus/i.test(enS5Text),
+        '环3',
+        'Section 5 源事实 SCBA 保真',
+        '源文件包含呼吸器要求时，英文版必须真实保真翻译 SCBA',
+        enS5Text.includes('self-contained') ? '保真翻译 (规范)' : '严重漏译',
+        'Section 5 EN'
+      );
+    } else {
+      assert(
+        !/Firefighters must wear self-contained breathing apparatus/i.test(enS5Text),
+        '环3',
+        'Section 5 反外生 SCBA 口水话',
+        '源文件无呼吸器要求时，严禁注入底模未授权的外生口水话',
+        enS5Text.includes('self-contained') ? '包含外生口水话' : '纯净保真',
+        'Section 5 EN'
+      );
+    }
   }
 
   // Section 8: 接触控制与个体防护 (最高发重灾区)
@@ -880,18 +893,33 @@ export async function runMasterMsdsAudit(options = {}) {
     }
   }
 
-  // Section 14: 运输信息 (负温符号保真)
+    // Section 14: 运输信息 (负温符号保真与防反转 - 结合源事实认知判定)
   const enS14 = enDocx.records.find(r => r.sectionNumber === 14);
+  const cnS14 = cnDocx.records.find(r => r.sectionNumber === 14);
   if (enS14) {
     const enS14Text = enS14.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
-    assert(
-      !/must not fall below \+5/i.test(enS14Text),
-      '环3',
-      'Section 14 负温符号保真与防反转',
-      '严禁将源文件负温符号 -5°C 错判或反转为 +5°C',
-      enS14Text.slice(0, 150),
-      'Section 14 EN'
-    );
+    const cnS14Text = cnS14 ? cnS14.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n') : '';
+    const srcHasNegativeFive = /低于\s*[－\-]5/i.test(cnS14Text);
+    if (srcHasNegativeFive) {
+      assert(
+        !/must not fall below \+5/i.test(enS14Text),
+        '环3',
+        'Section 14 负温符号保真与防反转',
+        '严禁将源文件负温符号 -5°C 错判或反转为 +5°C',
+        enS14Text.slice(0, 150),
+        'Section 14 EN'
+      );
+    } else {
+      // 源文件为 +5°C，保真输出 +5°C
+      assert(
+        !/must not fall below \-5/i.test(enS14Text),
+        '环3',
+        'Section 14 正温符号保真',
+        '源文件为正温 +5°C 时，严禁错判为负温 -5°C',
+        enS14Text.slice(0, 150),
+        'Section 14 EN'
+      );
+    }
   }
 
   // Section 15: 法规信息 (正向演进国令 591 号 + GB 30000 系列)
@@ -1007,9 +1035,13 @@ if (process.argv[1] && process.argv[1].endsWith('run_master_msds_audit.mjs')) {
   let sourceDocx = null;
 
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--model' && args[i + 1]) model = args[++i];
-    else if (args[i] === '--targetDir' && args[i + 1]) targetDir = args[++i];
-    else if (args[i] === '--sourceDocx' && args[i + 1]) sourceDocx = args[++i];
+    const arg = args[i];
+    if (arg.startsWith('--model=')) model = arg.slice(8);
+    else if (arg === '--model' && args[i + 1]) model = args[++i];
+    else if (arg.startsWith('--targetDir=')) targetDir = arg.slice(12);
+    else if (arg === '--targetDir' && args[i + 1]) targetDir = args[++i];
+    else if (arg.startsWith('--sourceDocx=')) sourceDocx = arg.slice(13);
+    else if (arg === '--sourceDocx' && args[i + 1]) sourceDocx = args[++i];
   }
 
   runMasterMsdsAudit({ model, targetDir, sourceDocx }).then(res => {

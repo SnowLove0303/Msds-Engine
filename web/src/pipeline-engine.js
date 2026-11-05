@@ -539,7 +539,8 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
         } else if (/密度/i.test(lbl)) {
           sec9Facts.density = val.replace(/约\s*/g, 'Approx. ').replace(/g\/cm3/gi, ' g/cm³');
         } else if (/水溶性/i.test(lbl)) {
-          if (/混溶|互溶|完全/i.test(val)) sec9Facts.solubility = 'Miscible';
+          if (/完全.*(?:混溶|互溶)|(?:混溶|互溶).*完全/i.test(val)) sec9Facts.solubility = 'Completely miscible with water';
+          else if (/混溶|互溶/i.test(val)) sec9Facts.solubility = 'Miscible with water';
           else if (/分散.*乳化|乳化.*分散/i.test(val)) sec9Facts.solubility = 'Dispersible and emulsifiable in water';
           else if (/分散|乳化/i.test(val)) sec9Facts.solubility = 'Dispersible in water';
           else sec9Facts.solubility = val;
@@ -585,7 +586,7 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     if (s10) {
       const cnDecomp = s10.rows.find(r => /分解产物/i.test(r.cells[0]?.text || ''))?.cells[1]?.text?.trim() || '';
       if (/二甲基吡唑/i.test(cnDecomp)) {
-        decompEn = 'Releases 3,5-dimethylpyrazole under baking conditions. Gases released during baking should be vented.';
+        decompEn = 'Releases dimethylpyrazole under baking conditions. Gases released during baking should be vented.';
       }
     }
   }
@@ -687,7 +688,21 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     'sec5.suitable_extinguishing': 'Carbon dioxide (CO2), foam, extinguishing powder. For large fires, use water spray.',
     'sec5.unsuitable_extinguishing': unsuitableExtinguishing,
     'sec5.specific_hazards': 'Combustion may release carbon monoxide, carbon dioxide, nitrogen oxides and trace amounts of hydrogen cyanide.',
-    'sec5.protective_equipment': 'In case of fire or explosion, do not breathe fumes/smoke.',
+    'sec5.protective_equipment': (() => {
+      const cnS5Rec = baseCnEngine?.records?.find(r => r.sectionNumber === 5);
+      const cnProt = cnS5Rec?.rows?.find(r => /消防预防措施|保护设备/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
+      const parts = [];
+      if (/自供气式呼吸器|正压式空气呼吸器|自给式呼吸器|SCBA/i.test(cnProt)) {
+        parts.push('Firefighters must wear self-contained breathing apparatus (SCBA).');
+      }
+      if (/禁止污染的灭火用水|污染.*灭火.*用水.*(?:土壤|地下水|地表水)/i.test(cnProt)) {
+        parts.push('Do not allow contaminated firefighting water to enter soil, groundwater or surface water.');
+      }
+      if (/吸进烟尘|吸入烟气|吸入烟尘|烟雾/i.test(cnProt) || parts.length === 0) {
+        parts.push('In case of fire or explosion, do not breathe fumes/smoke.');
+      }
+      return parts.join('\n');
+    })(),
 
     // Section 6
     'sec6.personal_precautions': 'Wear protective equipment.\nEnsure adequate ventilation. Keep unauthorized persons away.',
@@ -709,7 +724,7 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     'sec8.eye_protection': (() => {
       const cnS8Rec = baseCnEngine?.records?.find(r => r.sectionNumber === 8);
       const cnEye = cnS8Rec?.rows?.find(r => /眼睛防护/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
-      if (/眼罩|面罩/i.test(cnEye)) return 'Wear safety glasses/face shield.';
+      if (/眼罩|面罩/i.test(cnEye)) return 'Wear protective goggles/face shield.';
       if (/建议使用护目镜|护目镜/i.test(cnEye)) return 'Protective goggles are recommended.';
       return cnEye || '';
     })(),
@@ -1191,7 +1206,8 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
   } else if (/水溶性|溶解性/i.test(cnLabel)) {
     enLabel = 'Solubility in water:';
     if (/分散.*乳化|乳化.*分散/i.test(cnVal)) enVal = 'Dispersible and emulsifiable in water';
-    else if (/混溶|互溶|完全/i.test(cnVal)) enVal = 'Miscible with water';
+    else if (/完全.*(?:混溶|互溶)|(?:混溶|互溶).*完全/i.test(cnVal)) enVal = 'Completely miscible with water';
+    else if (/混溶|互溶/i.test(cnVal)) enVal = 'Miscible with water';
     else if (/不溶/i.test(cnVal)) enVal = 'Insoluble in water';
     else if (/分散|乳化/i.test(cnVal)) enVal = 'Dispersible in water';
     else enVal = cnVal;
@@ -1475,7 +1491,7 @@ export function detectSection11Paradigm(section11FactsOrRecords) {
   casMatches.forEach(c => componentMatches.add(c));
 
   const knownComponentKeywords = [
-    '分散体', '丙二醇丁醚', '二乙二醇丁醚', '聚合物', '溶剂', '添加剂'
+    '丙二醇丁醚', '二乙二醇丁醚', '溶剂', '添加剂'
   ];
   knownComponentKeywords.forEach(kw => {
     if (rawText.includes(kw)) componentMatches.add(kw);
@@ -2089,7 +2105,7 @@ export async function buildBaseChineseEngine({
         const vCell = dermRow.cells[dermRow.cells.length - 1];
         let val = vCell?.text?.trim() || '';
         if (!val && srcS11) {
-          const srcDerm = srcS11.rows.find(r => /经皮/i.test(r.cells.map(c => c.text).join(' ')));
+          const srcDerm = srcS11.rows.find(r => r.cells.length > 1 && /经皮/i.test(r.cells[0]?.text || ''));
           if (srcDerm) val = (srcDerm.cells[srcDerm.cells.length - 1]?.text || '').trim();
         }
         if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
@@ -2391,13 +2407,66 @@ function translateToxicologyValueToEnglish(cnText, endpoint = '') {
   } else {
     t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*[/／]?\s*大鼠\s*[:：]\s*/g, 'LD50 / Oral / Rat: ');
   }
+  t = t.replace(/聚氨酯聚合物/g, 'Polyurethane polymer');
+  t = t.replace(/聚氨酯分散体/g, 'Polyurethane dispersion');
+  t = t.replace(/聚氨酯/g, 'Polyurethane');
+  t = t.replace(/OECD化学品测试指南\s*(\d+)/gi, 'OECD Test Guideline $1');
+  t = t.replace(/此物质或混合物无急性呼吸毒性/g, 'The substance or mixture has no acute inhalation toxicity');
+  t = t.replace(/此物质或混合物无急性皮肤毒性/g, 'The substance or mixture has no acute dermal toxicity');
+  t = t.replace(/无皮肤刺激/g, 'No skin irritation');
+  t = t.replace(/无眼睛刺激/g, 'No eye irritation');
+  t = t.replace(/不引起皮肤过敏/g, 'Did not cause skin sensitization');
+  t = t.replace(/轻微刺激/g, 'Slight irritation');
+  t = t.replace(/粉尘\/烟雾/g, 'dust/mist');
+  t = t.replace(/试验环境\s*[:：]\s*/g, 'Test atmosphere: ');
+  t = t.replace(/测试种类\s*[:：]\s*/g, 'Test type: ');
+  t = t.replace(/代谢活化\s*[:：]\s*/g, 'Metabolic activation: ');
+  t = t.replace(/有\/无/g, 'with/without');
+  t = t.replace(/阴性/g, 'Negative');
+  t = t.replace(/阳性/g, 'Positive');
+  t = t.replace(/家兔/g, 'Rabbit');
+  t = t.replace(/大鼠/g, 'Rat');
+  t = t.replace(/小鼠/g, 'Mouse');
+  t = t.replace(/豚鼠/g, 'Guinea pig');
+  t = t.replace(/物种\s*[:：]\s*/g, 'Species: ');
+  t = t.replace(/结果\s*[:：]\s*/g, 'Result: ');
+  t = t.replace(/分类\s*[:：]\s*/g, 'Classification: ');
+  t = t.replace(/方法\s*[:：]\s*/g, 'Method: ');
+  t = t.replace(/评估\s*[:：]\s*/g, 'Assessment: ');
+  t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*大鼠\s*[:：]\s*/gi, 'LD50 / Oral / Rat: ');
+  t = t.replace(/方法\s*[:：]\s*OECD化学品测试指南\s*(\d+)/gi, 'Method: OECD Test Guideline $1');
+  t = t.replace(/对类似产品(?:的)?(?:毒理学)?研究/g, 'Studies on a similar product');
+  t = t.replace(/评估\s*[:：]\s*此物质或混合物无急性皮肤毒性/g, 'Assessment: The substance or mixture has no acute dermal toxicity');
+  t = t.replace(/试验环境\s*[:：]\s*粉尘\/烟雾/g, 'Test atmosphere: dust/mist');
+  t = t.replace(/评估\s*[:：]\s*此物质或混合物无急性呼吸毒性/g, 'Assessment: The substance or mixture has no acute inhalation toxicity');
+  t = t.replace(/分类\s*[:：]\s*无皮肤刺激/g, 'Classification: No skin irritation');
+  t = t.replace(/分类\s*[:：]\s*无眼睛刺激/g, 'Classification: No eye irritation');
+  t = t.replace(/根据Buehler\s*[（(]经皮试验[）)]\s*皮肤致敏性\s*[:：]/g, 'Buehler Test (dermal):');
+  t = t.replace(/皮肤致敏性\s*[（(]局部淋巴结试验\s*[（(]LLNA[）)][）)]/g, 'Local lymph node assay (LLNA):');
+  t = t.replace(/分类\s*[:：]\s*不引起皮肤过敏/g, 'Classification: Did not cause skin sensitization');
+  t = t.replace(/结果\s*[:：]\s*阴性/g, 'Result: Negative');
+  t = t.replace(/沙门氏菌\/微粒体试验\s*[（(]Ames试验[）)]/gi, 'Salmonella/microsome test (Ames test)');
+  t = t.replace(/体外染色体畸变试验/g, 'In vitro mammalian chromosome aberration test');
+  t = t.replace(/无数据(?:资料)?/g, 'No data available.');
+  t = t.replace(/代谢活化\s*[:：]\s*有\/无/g, 'Metabolic activation: with/without');
+  t = t.replace(/体内基因毒性/g, 'In vivo genotoxicity:');
+  t = t.replace(/STOT评估-一次性接触/g, 'STOT evaluation - single exposure:');
+  t = t.replace(/基于现有数据，未满足分类标准。?/g, 'Based on available data, the classification criteria are not met.');
+  t = t.replace(/STOT评估-重复性接触/g, 'STOT evaluation - repeated exposure:');
+  t = t.replace(/CMR评估/g, 'CMR assessment:');
+  t = t.replace(/亚急性[，, ]*亚慢性和延迟毒性/g, 'Subacute, subchronic and prolonged toxicity:');
+  t = t.replace(/生殖毒性\/生育力/g, 'Reproductive toxicity / fertility:');
+  t = t.replace(/生殖毒性\/致畸形/g, 'Reproductive toxicity / teratogenicity:');
+  t = t.replace(/致癌性/g, 'Carcinogenicity:');
+  t = t.replace(/吸入危害/g, 'Aspiration hazard:');
+    t = t.replace(/在\s*AMES\s*试验中无(?:致突变性|Mutagenicity[:：]?)。?/gi, 'Non-mutagenic in Ames test.');
+  t = t.replace(/致突变性/g, 'Mutagenicity:');
   t = t.replace(/，/g, ',');
   t = t.replace(/轻微刺激/g, 'Slight irritation');
   t = t.replace(/无刺激/g, 'No irritation');
   t = t.replace(/皮肤接触不致敏/g, 'Not sensitizing by skin contact.');
   t = t.replace(/不致敏/g, 'Non-sensitizing.');
   t = t.replace(/皮肤接触可能致敏/g, 'May cause sensitization by skin contact.');
-  t = t.replace(/在\s*AMES\s*试验中无致突变性。?/gi, 'Non-mutagenic in Ames test.');
   t = t.replace(/半数致死浓度\s*[（(]\s*LC50\s*[）)]\s*[/／]\s*1\s*h\s*[/／]\s*大鼠(?:\s*雌性)?\s*[:：]\s*/gi, 'LC50 / Inhalation / 1h / Rat: ');
   t = t.replace(/半数致死浓度\s*[（(]\s*LC50\s*[）)]\s*[/／]\s*4\s*h\s*[/／]\s*大鼠(?:\s*雌性)?\s*[:：]\s*/gi, 'LC50 / Inhalation / 4h / Rat: ');
   t = t.replace(/\s*[（(]\s*蒸气\s*[）)]/g, ' (vapour)');
@@ -2608,7 +2677,9 @@ export async function buildBaseEnglishEngine({
       section3ExemptionNotes: enValues['sec3.exemption_notes'] || extractSection3ExemptionNotes(baseCnEngine.records.find(r => r.sectionNumber === 3))
     }, true);
     const isMultiComponent = modelCode === 'PA-3223' || Boolean(facts.isMultiComponentComposite);
-    const enS11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || null);
+    const cnS11ForCheck = baseCnEngine?.records?.find(r => r.sectionNumber === 11);
+    const isCnS11FullWidth = cnS11ForCheck && cnS11ForCheck.rows.length === 4 && cnS11ForCheck.rows[3]?.cells?.length === 1;
+    const enS11Paradigm = (isMultiComponent || isCnS11FullWidth) ? 'PARADIGM_1_FULL_WIDTH_MERGED' : 'PARADIGM_2_STANDARD_SLOTS';
     if (enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
       buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || '' }, true);
     }
@@ -2642,6 +2713,7 @@ export async function buildBaseEnglishEngine({
             const conc = subConc[k] || subConc[0] || '';
             let enName = cnName;
             if (/胺和环氧树脂的加合物|环氧.*胺.*加合物/i.test(cnName)) enName = 'Amine and epoxy resin adduct';
+            else if (/改性环氧聚合物|环氧聚合物/i.test(cnName)) enName = 'Modified epoxy polymer';
             else if (/封闭型脂肪族聚异氰酸酯/i.test(cnName)) enName = 'Blocked aliphatic polyisocyanate';
             else if (/二丙二醇二甲醚/i.test(cnName)) enName = 'Dipropylene glycol dimethyl ether';
             else if (/六甲撑二异氰酸酯基均聚物|六亚甲基二异氰酸酯.*均聚物|HDI.*均聚物|HDI.*低聚物/i.test(cnName)) {
@@ -2652,6 +2724,7 @@ export async function buildBaseEnglishEngine({
             else if (/六甲撑二异氰酸酯|六亚甲基二异氰酸酯|HDI/i.test(cnName)) enName = 'Hexamethylene diisocyanate';
             else if (/丙二醇二乙酸酯|PGDA/i.test(cnName)) enName = 'Propylene glycol diacetate';
             else if (/丙二醇甲醚醋酸酯|PMA/i.test(cnName)) enName = 'Propylene glycol monomethyl ether acetate (PMA)';
+            else if (/丙二醇甲醚|1-甲氧基-2-丙醇/i.test(cnName)) enName = '1-Methoxy-2-propanol';
             else if (/丙酮/i.test(cnName)) enName = 'Acetone';
             else if (/乙酸/i.test(cnName)) enName = 'Acetic acid';
             else if (/聚乙烯蜡/i.test(cnName)) enName = 'Polyethylene wax';
@@ -2661,7 +2734,10 @@ export async function buildBaseEnglishEngine({
             else if (/乙基吡咯烷酮|NEP/i.test(cnName)) enName = '1-Ethylpyrrolidin-2-one (NEP)';
             else if (/去离子水/i.test(cnName)) enName = 'Deionized water';
             else if (/聚氨酯.*分散体|水性聚氨酯/i.test(cnName)) enName = 'Polyurethane dispersion';
+            else if (/聚氨酯.*聚合物/i.test(cnName)) enName = 'Polyurethane polymer';
             else if (/聚氨酯/i.test(cnName)) enName = 'Polyurethane';
+            else if (/氢氧化钠/i.test(cnName)) enName = 'Sodium hydroxide';
+            else if (/三乙胺/i.test(cnName)) enName = 'Triethylamine';
             else if (/水$/i.test(cnName)) enName = 'Water';
             else if (/环氧改性丙烯酸聚合物|环氧.*丙烯酸/i.test(cnName)) enName = 'Epoxy modified acrylic polymer';
             else if (/丁氧基乙醇|乙二醇丁醚/i.test(cnName)) enName = '2-Butoxyethanol';
@@ -2966,7 +3042,9 @@ function translateConditionsToAvoid(cnText = '') {
   }
   let s11 = engine.records.find(r => r.sectionNumber === 11);
   const isMultiComponent = modelCode === 'PA-3223' || Boolean(facts.isMultiComponentComposite);
-  const enS11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || baseCnEngine?.records?.find(r => r.sectionNumber === 11) || null);
+  const cnS11ForCheck = baseCnEngine?.records?.find(r => r.sectionNumber === 11);
+  const isCnS11FullWidth = cnS11ForCheck && cnS11ForCheck.rows.length === 4 && cnS11ForCheck.rows[3]?.cells?.length === 1;
+  const enS11Paradigm = (isMultiComponent || isCnS11FullWidth) ? 'PARADIGM_1_FULL_WIDTH_MERGED' : 'PARADIGM_2_STANDARD_SLOTS';
   if (s11 && (isMultiComponent || enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED')) {
     // Mode B 通栏复合豁免模态：已由 buildThreeTierSection11 全权接管，跳过传统单端点映射以防中文污染
   } else if (s11) {
@@ -3215,6 +3293,16 @@ function translateConditionsToAvoid(cnText = '') {
   // Section 13 (标准 4 行：标题行 + 2 行独立说明行 + 处置方法行)
   let s13 = engine.records.find(r => r.sectionNumber === 13);
   if (s13) {
+    if (s13.rows[0]?.cells[0]) {
+      const c0 = s13.rows[0].cells[0];
+      if (c0.labelNodes && c0.labelNodes.length >= 2) {
+        c0.labelNodes[0].textContent = '13.';
+        c0.labelNodes[1].textContent = ' Disposal considerations';
+      } else if (c0.labelNodes && c0.labelNodes.length === 1) {
+        c0.labelNodes[0].textContent = '13. Disposal considerations';
+      }
+      c0.text = '13. Disposal considerations';
+    }
     if (s13.rows.length === 3) {
       s13 = addRowAfter(engine, s13, 1);
     }
@@ -3270,10 +3358,16 @@ function translateConditionsToAvoid(cnText = '') {
       }
     }
 
+    const has16483Year = /16483-2008/i.test(cnS15Text);
+    const has13690Year = /13690-2009/i.test(cnS15Text);
     const stdRegulations = [
       'Regulations on the Safety Management of Hazardous Chemicals, State Council Decree No. 591',
-      'GB/T 16483 Safety data sheet for chemical products - Content and order of sections',
-      'GB 13690 General rules for classification and hazard communication of chemicals',
+      has16483Year
+        ? 'GB/T 16483-2008 Safety data sheet for chemical products - Content and order of sections'
+        : 'GB/T 16483 Safety data sheet for chemical products - Content and order of sections',
+      has13690Year
+        ? 'GB 13690-2009 General rules for classification and hazard communication of chemicals'
+        : 'GB 13690 General rules for classification and hazard communication of chemicals',
       'GB 30000.2-29 Rules for classification and labelling of chemicals'
     ];
     if (cnHasGb15258) {
