@@ -690,15 +690,15 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     'sec5.specific_hazards': 'Combustion may release carbon monoxide, carbon dioxide, nitrogen oxides and trace amounts of hydrogen cyanide.',
     'sec5.protective_equipment': (() => {
       const cnS5Rec = baseCnEngine?.records?.find(r => r.sectionNumber === 5);
-      const cnProt = cnS5Rec?.rows?.find(r => /消防预防措施|保护设备/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
+      const allS5Text = cnS5Rec?.rows?.map(r => (r.cells[0]?.text || '') + ' ' + (r.cells[1]?.text || '')).join('\n') || '';
       const parts = [];
-      if (/自供气式呼吸器|正压式空气呼吸器|自给式呼吸器|SCBA/i.test(cnProt)) {
+      if (/自供气式呼吸器|正压式空气呼吸器|自给式呼吸器|SCBA/i.test(allS5Text)) {
         parts.push('Firefighters must wear self-contained breathing apparatus (SCBA).');
       }
-      if (/禁止污染的灭火用水|污染.*灭火.*用水.*(?:土壤|地下水|地表水)/i.test(cnProt)) {
+      if (/禁止污染的灭火用水|污染.*灭火.*用水.*(?:土壤|地下水|地表水)/i.test(allS5Text)) {
         parts.push('Do not allow contaminated firefighting water to enter soil, groundwater or surface water.');
       }
-      if (/吸进烟尘|吸入烟气|吸入烟尘|烟雾/i.test(cnProt) || parts.length === 0) {
+      if (/吸进烟尘|吸入烟气|吸入烟尘|烟雾/i.test(allS5Text) || parts.length === 0) {
         parts.push('In case of fire or explosion, do not breathe fumes/smoke.');
       }
       return parts.join('\n');
@@ -941,7 +941,7 @@ const GHS_P_TRANS_MAP = {
   'P337+P313': 'P337+P313 If eye irritation persists: Get medical advice/attention.',
   'P370+P378': 'P370+P378 In case of fire: Use foam, dry powder or carbon dioxide to extinguish.',
   'P405': 'P405 Store locked up.',
-  'P501': 'P501 Dispose of contents/container in accordance with local regulations.',
+  'P501': 'P501 Dispose of contents/container to an approved waste disposal plant.',
   'P261': 'P261 Avoid breathing dust/fume/gas/mist/vapours/spray.',
   'P301+P312+P330': 'P301+P312+P330 IF SWALLOWED: Call a POISON CENTER/doctor if you feel unwell. Rinse mouth.',
   'P301+P312': 'P301+P312 IF SWALLOWED: Call a POISON CENTER/doctor if you feel unwell.',
@@ -3738,6 +3738,7 @@ export async function executeEightDeliverablesPipeline({
 
   // 3.4 全局强化表格边框规范 (外框实线，内框统一虚线) 与理化指标序号自增同步
   for (const eng of [baseCnEngine, baseEnEngine, cnPresetEngine, enPresetEngine]) {
+    const isEn = eng === baseEnEngine || eng === enPresetEngine;
     for (const record of eng.records) {
       if (record.kind === 'table') {
         enforceTableStandardBorders(record);
@@ -3745,7 +3746,7 @@ export async function executeEightDeliverablesPipeline({
     }
     const s8Rec = eng.records.find(r => r.sectionNumber === 8);
     if (s8Rec) {
-      // 1. Table 8 值格粗细隔离规范 (INV-S8-03): Row 2..end 的 Cell 1 必须为常规细体，严禁加粗
+      // 1. Table 8 值格粗细与字阶规范 (INV-S8-03): Row 2..end 的 Cell 1 必须为常规细体五号字 (sz="21")，严禁加粗或超标放大 (sz="24")
       for (let r = 2; r < s8Rec.rows.length; r++) {
         const vCell = s8Rec.rows[r]?.cells?.[1];
         if (vCell?.node) {
@@ -3755,6 +3756,10 @@ export async function executeEightDeliverablesPipeline({
             bs.forEach(b => rPr.removeChild(b));
             const bCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
             bCss.forEach(b => rPr.removeChild(b));
+            const szs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'sz'));
+            szs.forEach(sz => sz.setAttribute('w:val', '21'));
+            const szCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'szCs'));
+            szCss.forEach(szCs => szCs.setAttribute('w:val', '21'));
           }
         }
       }
@@ -3772,18 +3777,20 @@ export async function executeEightDeliverablesPipeline({
           ind.removeAttribute('w:hangingChars');
         });
       }
-      // 3. Section 8 英文 Hand protection: 字号规范: 统一为 w:sz="24" (12pt 加粗)
-      const handRowEn = s8Rec.rows.find(row => /Hand protection/i.test(row.cells[0]?.text || ''));
-      if (handRowEn && handRowEn.cells[0]?.node) {
-        const c0 = handRowEn.cells[0].node;
-        const szs = Array.from(c0.getElementsByTagNameNS(W_NS, 'sz'));
-        szs.forEach(sz => sz.setAttribute('w:val', '24'));
-        const szCss = Array.from(c0.getElementsByTagNameNS(W_NS, 'szCs'));
-        szCss.forEach(szCs => szCs.setAttribute('w:val', '24'));
+      // 3. Section 8 英文标签题头统一字号规范: 统一为 w:sz="24" (12pt 加粗)，消除 sz="19" 与 sz="24" 断层
+      if (isEn) {
+        for (let r = 2; r < s8Rec.rows.length; r++) {
+          const c0 = s8Rec.rows[r]?.cells?.[0]?.node;
+          if (c0) {
+            const szs = Array.from(c0.getElementsByTagNameNS(W_NS, 'sz'));
+            szs.forEach(sz => sz.setAttribute('w:val', '24'));
+            const szCss = Array.from(c0.getElementsByTagNameNS(W_NS, 'szCs'));
+            szCss.forEach(szCs => szCs.setAttribute('w:val', '24'));
+          }
+        }
       }
     }
     // 4. Section 13 废弃处置段落对齐规范 (INV-S13-01): 英文版内容严格纯左对齐 (left)，中文版保持两端对齐 (both)
-    const isEn = eng === baseEnEngine || eng === enPresetEngine;
     const s13Rec = eng.records.find(r => r.sectionNumber === 13);
     if (s13Rec && isEn) {
       for (const row of s13Rec.rows) {

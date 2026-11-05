@@ -1910,38 +1910,40 @@ export function runSmartMatching(inspectorRecords) {
     if (s === 3 && sourceRecord && sourceRecord.rows) {
       for (const row of sourceRecord.rows) {
         if (row.index === 0) continue;
-        const c0 = row.cells?.[0]?.text?.trim()?.split(/\r?\n/)[0]?.trim() || '';
+        const rawC0 = row.cells?.[0]?.text?.trim() || '';
+        const c0FirstLine = rawC0.split(/\r?\n/)[0]?.trim() || '';
         const c1 = row.cells?.[1]?.text?.trim() || '';
         const c2 = row.cells?.[2]?.text?.trim() || '';
 
         // 检测混杂急救信息并流转至 Section 4
-        if (/误服|意外吞食|不要催吐/i.test(c0) || /误服|意外吞食|不要催吐/i.test(c1)) {
-          crossSectionFacts[4].push({ rawLabel: '误服：', rawValue: c1 || c0, rowObj: row });
+        if (/误服|意外吞食|不要催吐/i.test(c0FirstLine) || /误服|意外吞食|不要催吐/i.test(c1)) {
+          crossSectionFacts[4].push({ rawLabel: '误服：', rawValue: c1 || rawC0, rowObj: row });
           continue;
         }
-        if (/皮肤接触|脱掉所有被污染的衣物/i.test(c0) || /皮肤接触|脱掉所有被污染的衣物/i.test(c1)) {
-          crossSectionFacts[4].push({ rawLabel: '皮肤接触：', rawValue: c1 || c0, rowObj: row });
+        if (/皮肤接触|脱掉所有被污染的衣物/i.test(c0FirstLine) || /皮肤接触|脱掉所有被污染的衣物/i.test(c1)) {
+          crossSectionFacts[4].push({ rawLabel: '皮肤接触：', rawValue: c1 || rawC0, rowObj: row });
           continue;
         }
 
         // 识别组分行 (排除表头，支持单行与单元格内换行列表)
-        const isHeader = /化学品名称|CAS编号|产品类型|成分|组成|Chemical Name|CAS NO/i.test(c0) && /CAS|含量|比例|%/i.test(c1 || c2);
-        if (!isHeader && c0 && (c1 || c2) && !/产品类型|Product type/i.test(c0)) {
-          const names = c0.split(/[\r\n]+/).map((t) => t.trim()).filter(Boolean);
+        const isHeader = /化学品名称|CAS编号|产品类型|成分|组成|Chemical Name|CAS NO/i.test(c0FirstLine) && /CAS|含量|比例|%/i.test(c1 || c2);
+        if (!isHeader && rawC0 && (c1 || c2) && !/产品类型|Product type/i.test(c0FirstLine)) {
+          const names = rawC0.split(/[\r\n]+/).map((t) => t.trim()).filter(Boolean);
           const casList = c1.split(/[\r\n]+/).map((t) => t.trim()).filter(Boolean);
           const concList = c2.split(/[\r\n]+/).map((t) => t.trim()).filter(Boolean);
+          const count = Math.max(names.length, casList.length, concList.length);
 
-          if (names.length > 1) {
-            for (let k = 0; k < names.length; k++) {
+          if (count > 1) {
+            for (let k = 0; k < count; k++) {
               s3Components.push({
-                name: names[k],
-                cas: casList[k] || '无',
+                name: names[k] || names[0] || '',
+                cas: casList[k] || (k === 0 ? '无' : (casList[0] || '无')),
                 concentration: concList[k] || '',
               });
             }
           } else {
             s3Components.push({
-              name: c0,
+              name: rawC0,
               cas: c1 || '无',
               concentration: c2 || '',
             });
