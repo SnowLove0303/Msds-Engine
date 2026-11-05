@@ -1863,6 +1863,52 @@ export async function buildBaseChineseEngine({
       while (s8.rows.length > r82Idx + 1) {
         s8 = deleteRow(engine, s8, s8.rows.length - 1);
       }
+      // 标点符号规范化：西文半角逗号替换为中文全角逗号
+      if (row82.cells.length > 1 && row82.cells[1]) {
+        const val = (row82.cells[1].text || '').trim();
+        if (val.includes('2006/121/EG,')) {
+          safeWriteCellValue(row82.cells[1], val.replace(/2006\/121\/EG,/g, '2006/121/EG，'));
+        }
+      }
+    }
+  }
+
+  // 10.4 规范化 Section 3：第 3 行 3.2成分 通栏三列合并 (gridSpan=3, w=9781 dxa)
+  const s3Rec = engine.records.find(r => r.sectionNumber === 3);
+  if (s3Rec && s3Rec.rows.length >= 3) {
+    const r2 = s3Rec.rows[2];
+    if (r2 && r2.cells.length === 3) {
+      const txt0 = (r2.cells[0]?.text || '').trim();
+      if (/^(?:3\.2\s*)?(?:成分|Ingredients)/i.test(txt0)) {
+        try {
+          const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+          const rNode = r2.node;
+          const cNodes = Array.from(rNode.getElementsByTagNameNS(W_NS, 'tc'));
+          if (cNodes.length >= 3) {
+            rNode.removeChild(cNodes[1]);
+            rNode.removeChild(cNodes[2]);
+            let tcPr = cNodes[0].getElementsByTagNameNS(W_NS, 'tcPr')[0];
+            if (!tcPr) {
+              tcPr = cNodes[0].ownerDocument.createElementNS(W_NS, 'w:tcPr');
+              cNodes[0].insertBefore(tcPr, cNodes[0].firstChild);
+            }
+            let span = tcPr.getElementsByTagNameNS(W_NS, 'gridSpan')[0];
+            if (!span) {
+              span = cNodes[0].ownerDocument.createElementNS(W_NS, 'w:gridSpan');
+              tcPr.appendChild(span);
+            }
+            span.setAttributeNS(W_NS, 'w:val', '3');
+            let tcW = tcPr.getElementsByTagNameNS(W_NS, 'tcW')[0];
+            if (!tcW) {
+              tcW = cNodes[0].ownerDocument.createElementNS(W_NS, 'w:tcW');
+              tcPr.appendChild(tcW);
+            }
+            tcW.setAttributeNS(W_NS, 'w:w', '9781');
+            tcW.setAttributeNS(W_NS, 'w:type', 'dxa');
+            r2.cells = [r2.cells[0]];
+          }
+        } catch (e) {}
+      }
     }
   }
 
@@ -1876,6 +1922,18 @@ export async function buildBaseChineseEngine({
       const gb15258Row = s15Rec.rows.find(r => /15258|安全标签/i.test(r.cells[0]?.text || ''));
       if (gb15258Row) {
         s15Rec = deleteRow(engine, s15Rec, s15Rec.rows.indexOf(gb15258Row));
+      }
+    }
+
+    // 依据法定现代化公理 (INV-S15-01): 将已废止的 344 号令演进为 591 号令，已废止的 GB 20576 演进为 GB 30000.2-29
+    for (const r of s15Rec.rows) {
+      const c = r.cells[0];
+      if (!c) continue;
+      const t = (c.text || '').trim();
+      if (/344号/i.test(t)) {
+        safeWriteCellValue(c, '危险化学品安全管理条例，国务院令591号');
+      } else if (/20576|20598/i.test(t)) {
+        safeWriteCellValue(c, 'GB 30000.2-29 化学品分类和标签规范');
       }
     }
   }
@@ -3694,11 +3752,15 @@ export function standardizeEnglishTypographyAndLabels(engine) {
         if (rIdx === 2 && cells.length === 3) {
           const p0 = cells[0].getElementsByTagNameNS(W_NS, 'p')[0];
           const txt0 = (p0?.textContent || '').trim();
-          if (/^成分|^3\.2\s*Ingredients/i.test(txt0)) {
+          if (/^(?:3\.2\s*)?(?:成分|Ingredients)/i.test(txt0)) {
             try {
               row.removeChild(cells[1]);
               row.removeChild(cells[2]);
-              const tcPr = cells[0].getElementsByTagNameNS(W_NS, 'tcPr')[0] || cells[0].ownerDocument.createElementNS(W_NS, 'w:tcPr');
+              let tcPr = cells[0].getElementsByTagNameNS(W_NS, 'tcPr')[0];
+              if (!tcPr) {
+                tcPr = cells[0].ownerDocument.createElementNS(W_NS, 'w:tcPr');
+                cells[0].insertBefore(tcPr, cells[0].firstChild);
+              }
               let span = tcPr.getElementsByTagNameNS(W_NS, 'gridSpan')[0];
               if (!span) {
                 span = cells[0].ownerDocument.createElementNS(W_NS, 'w:gridSpan');
@@ -4001,6 +4063,8 @@ function formatEnglishLabelCell(cell, W_NS, sectionNumber) {
     cleanLabel = 'Decomposition temperature:';
   } else if (/Saturated vapour/i.test(cleanLabel)) {
     cleanLabel = 'Saturated vapour pressure:';
+  } else if (/Firefighting precautions/i.test(cleanLabel)) {
+    cleanLabel = 'Firefighting precautions and protective equipment:';
   } else {
     // 通用连续重复词清洗
     cleanLabel = cleanLabel
@@ -4225,8 +4289,10 @@ function formatRowAsSectionHeader(row, W_NS) {
   const ps = Array.from(row.getElementsByTagNameNS(W_NS, 'p'));
   for (const p of ps) {
     removeHangingIndentFromP(p, W_NS);
+    const numPrs = Array.from(p.getElementsByTagNameNS(W_NS, 'numPr'));
+    numPrs.forEach(n => n.parentNode?.removeChild(n));
     let text = (p.textContent || '').trim();
-    if (/^Identification$/i.test(text)) {
+    if (/^(?:1\.?)*\s*Identification$/i.test(text)) {
       text = '1. Identification';
     }
     rebuildRunsWithTypography(p, text, {

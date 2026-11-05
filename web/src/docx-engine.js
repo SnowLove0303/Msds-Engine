@@ -1042,7 +1042,7 @@ export function updateHeaderFooterData(engine, patch = {}) {
               runs[0].appendChild(t);
             }
             const cleanV = targetVersion.replace(/^Version[：:\s]*/i, '');
-            const isEnDoc = /EN|English/i.test(partName) || engine?.headerFooterData?.language === 'en' || /_EN_|EN\b/i.test(engine?.filename || '');
+            const isEnDoc = /^en$/i.test(next.language || '') || /^en$/i.test(engine?.headerFooterData?.language || '') || /EN|English/i.test(partName) || /_EN_|EN\b/i.test(engine?.filename || '');
             t.textContent = isEnDoc ? `Version: ${cleanV}` : `Version：${cleanV}`;
             for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
             modified = true;
@@ -2296,7 +2296,7 @@ export function writeCellValue(cell, value, roleStyle = null) {
 
 export function writeCellLabel(cell, value, allowLabelEdit = false, roleStyle = null) {
   if (!allowLabelEdit) throw new DocxEngineError('标签默认锁定，请先开启“允许修改标签文本”。', 'LOCKED_LABEL');
-  if (cell?.record?.sectionNumber && ![2, 6, 9, 10, 11, 12].includes(cell.record.sectionNumber)) {
+  if (cell?.record?.sectionNumber && ![2, 5, 6, 9, 10, 11, 12].includes(cell.record.sectionNumber)) {
     throw new DocxEngineError('只有第2、6、9、10、11、12部分允许根据源文件微调特殊标签，其他章节标签完全锁定。', 'LABEL_MUTATION_FORBIDDEN');
   }
   if (!cell?.labelNodes?.length) throw new DocxEngineError('该单元格没有可编辑的标签运行区。', 'NO_LABEL');
