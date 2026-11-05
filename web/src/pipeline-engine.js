@@ -1306,8 +1306,7 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
     } else {
       // 真实非危通栏组装 (遵循 INV-ZERO-EXOGENOUS 与源事实忠实公理)
       paragraphs.push(
-        '2.1 GHS危险性类别：',
-        '根据GHS不属于危险物'
+        '2.1 GHS危险性类别：根据GHS不属于危险物'
       );
       if (facts.section3ExemptionNotes) {
         paragraphs.push(...facts.section3ExemptionNotes.split(/\r?\n/).filter(Boolean));

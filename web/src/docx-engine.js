@@ -2846,6 +2846,32 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
   vAlign.setAttributeNS(W_NS, 'w:val', 'center');
   tcPr.appendChild(vAlign);
 
+  // Section 2 单元格上下留空呼吸规范 (w:tcMar: top/bottom 160 dxa)
+  if (options.isSection2) {
+    const tcMar = doc.createElementNS(W_NS, 'w:tcMar');
+    const topMar = doc.createElementNS(W_NS, 'w:top');
+    topMar.setAttributeNS(W_NS, 'w:w', '160');
+    topMar.setAttributeNS(W_NS, 'w:type', 'dxa');
+    tcMar.appendChild(topMar);
+
+    const bottomMar = doc.createElementNS(W_NS, 'w:bottom');
+    bottomMar.setAttributeNS(W_NS, 'w:w', '160');
+    bottomMar.setAttributeNS(W_NS, 'w:type', 'dxa');
+    tcMar.appendChild(bottomMar);
+
+    const leftMar = doc.createElementNS(W_NS, 'w:left');
+    leftMar.setAttributeNS(W_NS, 'w:w', '140');
+    leftMar.setAttributeNS(W_NS, 'w:type', 'dxa');
+    tcMar.appendChild(leftMar);
+
+    const rightMar = doc.createElementNS(W_NS, 'w:right');
+    rightMar.setAttributeNS(W_NS, 'w:w', '140');
+    rightMar.setAttributeNS(W_NS, 'w:type', 'dxa');
+    tcMar.appendChild(rightMar);
+
+    tcPr.appendChild(tcMar);
+  }
+
   // 边框注入
   if (options.borders !== false) {
     const tcBorders = doc.createElementNS(W_NS, 'w:tcBorders');
@@ -2922,7 +2948,7 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
       // Section 2 模块间保留一个空行间隔公理 (before="240"=12pt)：在各主要标签要素与危险性说明、防范说明、其他危险起始段落前注入
       if (options.isSection2) {
         if (/^(?:(?:2\.\d+\s*)?(?:GHS\s*)?标签要素|Label elements|(?:2\.\d+\s*)?GHS Label Elements|危险性说明|Hazard statements|防范说明|Precautionary statements|(?:2\.\d+\s*)?(?:其他危害|其他危险)|(?:2\.\d+\s*)?Other\s*Hazards?)/i.test(trimmed)) {
-          spacing.setAttributeNS(W_NS, 'w:before', '240');
+          spacing.setAttributeNS(W_NS, 'w:before', '160');
         }
       }
       pPr.appendChild(spacing);
@@ -2934,7 +2960,11 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
         if (!isSection2Header) {
           if (options.isEnglish) {
             // 英文版 Section 2 专属：标题与标题对齐 (left="480")，内容与内容对齐 (left="960")，换行首字对齐 (无 hanging)
-            if (/^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable|Acute toxicity|Skin|Serious eye|Eye irritation|Reproductive|Specific target|Sensitisation|Sensitization|Aquatic|Hazardous to the aquatic)/i.test(trimmed) || /(?:Category|\(H\d+[A-Za-z]?\))/i.test(trimmed)) {
+            if (/^(?:GHS\s*)?pictograms/i.test(trimmed)) {
+              const ind = doc.createElementNS(W_NS, 'w:ind');
+              ind.setAttributeNS(W_NS, 'w:left', '480'); // 父子级缩进 480 twips
+              pPr.appendChild(ind);
+            } else if (/^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable|Acute toxicity|Skin|Serious eye|Eye irritation|Reproductive|Specific target|Sensitisation|Sensitization|Aquatic|Hazardous to the aquatic)/i.test(trimmed) || /(?:Category|\(H\d+[A-Za-z]?\))/i.test(trimmed)) {
               const ind = doc.createElementNS(W_NS, 'w:ind');
               ind.setAttributeNS(W_NS, 'w:left', '480');
               pPr.appendChild(ind);
@@ -2953,7 +2983,11 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
             }
           } else {
             // 中文版 Section 2 专属 5 级缩进几何状态机 (完全对齐 PA-3223 与 PU-202A 通栏规范)
-            if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃|急性毒性|皮肤|严重眼睛|生殖毒性|特异性靶器官|对水环境|致敏)/i.test(trimmed) || /(?:类别|\(H\d+[A-Za-z]?\))/i.test(trimmed)) {
+            if (/^(?:GHS\s*)?象形图/i.test(trimmed)) {
+              const ind = doc.createElementNS(W_NS, 'w:ind');
+              ind.setAttributeNS(W_NS, 'w:left', '480'); // 父子级缩进 2 字符 (480 twips)
+              pPr.appendChild(ind);
+            } else if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃|急性毒性|皮肤|严重眼睛|生殖毒性|特异性靶器官|对水环境|致敏)/i.test(trimmed) || /(?:类别|\(H\d+[A-Za-z]?\))/i.test(trimmed)) {
               const ind = doc.createElementNS(W_NS, 'w:ind');
               ind.setAttributeNS(W_NS, 'w:firstLine', '480');
               ind.setAttributeNS(W_NS, 'w:right', '480');
