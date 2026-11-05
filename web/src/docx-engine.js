@@ -3195,7 +3195,8 @@ export function enforceSection13JustifiedContent(cellNode, isEnglish = false) {
       pPr.appendChild(jc);
     }
     // 英文版严格左对齐 (left)，彻底消除 both 两端分散对齐引发的假性居中失真；中文版保持两端对齐 (both)
-    jc.setAttributeNS(W_NS, 'w:val', isEnglish ? 'left' : 'both');
+    // 废弃处置叙述性长文本中英文统一规范为靠左对齐 (left)，彻底消除 both 两端分散对齐引发的横向拉伸走样
+    jc.setAttributeNS(W_NS, 'w:val', 'left');
   }
 }
 

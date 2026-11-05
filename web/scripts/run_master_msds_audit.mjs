@@ -533,6 +533,28 @@ export async function runMasterMsdsAudit(options = {}) {
           ['非危品源文件未提信号词未输出无属于缺陷']
         );
       }
+      // 严禁非危品外生冒出“警告词：警告”或“Signal word: Warning”
+      const hasFakeWarningCn = /警告词[：:]\s*警告/.test(cnS2Text);
+      const hasFakeWarningEn = /Signal word:\s*Warning/i.test(enS2Text);
+      assert(
+        !hasFakeWarningCn && !hasFakeWarningEn,
+        '环3',
+        'Section 2 非危品严禁虚假警示词',
+        '非危品绝对严禁外生强塞“警告词：警告”或“Signal word: Warning”严重化工违规',
+        `CN虚警=${hasFakeWarningCn}, EN虚警=${hasFakeWarningEn}`,
+        'Section 2 CN/EN'
+      );
+      // 严禁非危品外生强塞20行虚假防范说明
+      const hasExoPrecautionCn = /操作时穿戴必要的防护用品/.test(cnS2Text);
+      const hasExoPrecautionEn = /Wear necessary protective equipment/.test(enS2Text);
+      assert(
+        !hasExoPrecautionCn && !hasExoPrecautionEn,
+        '环3',
+        'Section 2 非危品零外生防范说明',
+        '源文档无防范说明时，绝对严禁外生强塞模板自带的20行虚假防范与废弃说明长句',
+        `CN虚增=${hasExoPrecautionCn}, EN虚增=${hasExoPrecautionEn}`,
+        'Section 2 CN/EN'
+      );
     }
   }
 
@@ -738,6 +760,20 @@ export async function runMasterMsdsAudit(options = {}) {
       `CN=${cnItems.length}, EN=${enItems.length}`,
       'Section 9'
     );
+    // 检查蓝光乳液地道英译
+    const cnS9AllText = cnS9.rows.map(r => r.cells.map(c => c.text).join(' ')).join(' ');
+    if (/蓝光/.test(cnS9AllText)) {
+      const enS9AllText = enS9.rows.map(r => r.cells.map(c => c.text).join(' ')).join(' ');
+      assert(
+        /bluish/i.test(enS9AllText),
+        '环3',
+        'Section 9.1 外观蓝光乳液地道英译',
+        '中文外观含蓝光乳液时，英文必须地道译为 with bluish tint，严禁漏译',
+        enS9AllText.slice(0, 120),
+        'Section 9.1 EN'
+      );
+    }
+
     // 检查编号严格连续递增无跳号
     enItems.forEach((r, idx) => {
       const expectedNum = `9.${idx + 1}`;
@@ -842,6 +878,20 @@ export async function runMasterMsdsAudit(options = {}) {
         }
       }
     }
+  }
+
+  // Section 14: 运输信息 (负温符号保真)
+  const enS14 = enDocx.records.find(r => r.sectionNumber === 14);
+  if (enS14) {
+    const enS14Text = enS14.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
+    assert(
+      !/must not fall below \+5/i.test(enS14Text),
+      '环3',
+      'Section 14 负温符号保真与防反转',
+      '严禁将源文件负温符号 -5°C 错判或反转为 +5°C',
+      enS14Text.slice(0, 150),
+      'Section 14 EN'
+    );
   }
 
   // Section 15: 法规信息 (正向演进国令 591 号 + GB 30000 系列)

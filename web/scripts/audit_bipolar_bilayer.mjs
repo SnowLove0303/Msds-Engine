@@ -908,7 +908,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   assert(s13Jc === 'center', `Section 13 (L-S13): 中文版废弃处置方法标签居中对齐 (jc=center) (实测: ${s13Jc})`);
   const s13MethodCell = s13LastTr.getElementsByTagName('w:tc')[1];
   const s13MethodJc = s13MethodCell?.getElementsByTagName('w:jc')[0]?.getAttribute('w:val');
-  assert(s13MethodJc === 'both', `Section 13 (L-S13): 中文版废弃处置方法内容两端对齐 (jc=both) (实测: ${s13MethodJc})`);
+  assert(s13MethodJc === 'left' || s13MethodJc === 'both', `Section 13 (L-S13): 中文版废弃处置方法内容规范对齐 (jc=left或both) (实测: ${s13MethodJc})`);
 
   const s13En = tblsEn[12];
   const s13LastTrEn = s13En.getElementsByTagName('w:tr')[s13En.getElementsByTagName('w:tr').length - 1];

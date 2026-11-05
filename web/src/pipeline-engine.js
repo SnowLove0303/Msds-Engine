@@ -635,12 +635,18 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
       const specText = (specRow?.cells[1]?.text || '').trim();
       if (specText) {
         const parts = ['Not regulated as dangerous goods.'];
-        const highMatch = specText.match(/高于\s*([+\-]?\d+)℃/);
-        const lowMatch = specText.match(/低于\s*([+\-]?\d+)℃/);
+        const highMatch = specText.match(/高于\s*([+\-－]?\d+)℃/);
+        const lowMatch = specText.match(/低于\s*([+\-－]?\d+)℃/);
         if (highMatch || lowMatch) {
-          const maxTemp = highMatch ? (highMatch[1].startsWith('+') ? highMatch[1] : `+${highMatch[1]}`) : '+35';
-          const minTemp = lowMatch ? (lowMatch[1].startsWith('+') ? lowMatch[1] : `+${lowMatch[1]}`) : '+5';
-          parts.push(`Temperature must not exceed ${maxTemp}℃ and must not fall below ${minTemp}℃.`);
+          const normalizeTemp = (m, def) => {
+            if (!m) return def;
+            let val = m[1].replace('－', '-');
+            if (!val.startsWith('+') && !val.startsWith('-')) val = `+${val}`;
+            return val;
+          };
+          const maxTemp = normalizeTemp(highMatch, '+35');
+          const minTemp = normalizeTemp(lowMatch, '-5');
+          parts.push(`Temperature must not exceed ${maxTemp}°C and must not fall below ${minTemp}°C.`);
         }
         if (/远离.*(?:食品|食物)/i.test(specText) || /远离.*(?:酸|碱)/i.test(specText)) {
           parts.push('Keep away from food, acids and bases.');
@@ -1068,7 +1074,7 @@ export function parseSection2FromSource(srcEngine) {
     }
   }
 
-  if (!signalWord && fullText.includes('警告')) {
+  if (!isNonHazardous && !signalWord && fullText.includes('警告')) {
     signalWord = '警告';
   }
 
@@ -1137,6 +1143,8 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
   if (/外\s*观/i.test(cnLabel)) {
     enLabel = 'Appearance:';
     if (/黄色至浅褐色透明液体|黄.*浅褐.*透明/i.test(cnVal)) enVal = 'Yellow to light brown transparent liquid';
+    else if (/乳白.*蓝光|蓝光.*乳液/i.test(cnVal)) enVal = 'Milky white emulsion with bluish tint';
+    else if (/乳白.*乳液/i.test(cnVal)) enVal = 'Milky white emulsion';
     else if (/半透明.*乳液|乳液.*半透明/i.test(cnVal)) enVal = 'Translucent emulsion';
     else if (/半透明/i.test(cnVal)) enVal = 'Translucent liquid';
     else if (/乳白/i.test(cnVal)) enVal = 'Milky white liquid';
@@ -1296,35 +1304,25 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         paragraphs.push(cleanOther);
       }
     } else {
-      // 真实非危通栏组装
-      paragraphs.push('GHS危险性类别: 无');
+      // 真实非危通栏组装 (遵循 INV-ZERO-EXOGENOUS 与源事实忠实公理)
+      paragraphs.push(
+        '2.1 GHS危险性类别：',
+        '根据GHS不属于危险物'
+      );
       if (facts.section3ExemptionNotes) {
         paragraphs.push(...facts.section3ExemptionNotes.split(/\r?\n/).filter(Boolean));
       }
-      paragraphs.push(
-        '象形图：无',
-        '警告词：警告',
-        '危害性说明:没有明显的已知作用或严重危险。',
-        '防范说明:',
-        '预防措施：',
-        '        操作时穿戴必要的防护用品（手套、防护镜、工作服等）。',
-        '        操作后彻底清洗身体接触部位。',
-        '        作业场所不得进食，饮水或吸烟。',
-        '在室外或通风良好处操作。',
-        '事故响应：',
-        '        吸入：一旦吸入，如有不适，就医。',
-        '        眼睛、皮肤接触；使用肥皂、清水等清洗即可。如有不适感，就医。',
-        '        食入：立即漱口，禁止催吐，立即就医诊治。',
-        '        泄露：收集泄漏物。',
-        '        灭火：火灾时，使用干粉、泡沫、二氧化碳灭火。',
-        '安全存储：',
-        '    请置于避光、阴凉干燥处存放，存储温度应保持在5-35℃，避免霜冻，保持产品装完整。每次取用之后立即密封，打开包装后尽快使用完毕。',
-        '废弃处置：',
-        '    使用后的空桶未经无害化处理前，不得存储食物及其他物品，以免对人体、环境造成危害；包装物的回收、利用、处置应符合国家及当地相关法律、法规规定，因包装物处置不当造成的危害及损失，由处置方承担。',
-        '物理化学危险：对水体、土壤可造成一定的污染。',
-        '健康危害：无',
-        '环境危害：无危险物质释放，防止进入下水道，以防聚合物沉积阻塞下水道。'
-      );
+      if (parsed?.rawParas && parsed.rawParas.some(p => /象形图/.test(p))) {
+        paragraphs.push(
+          '2.2 GHS标签要素：',
+          'GHS象形图：根据GHS不属于危险物'
+        );
+      }
+      if (parsed?.otherHazards) {
+        let cleanOther = parsed.otherHazards.trim();
+        cleanOther = cleanOther.replace(/^2\.3\s*(其他危险[:：]?\s*)?/, '2.3 其他危险：');
+        paragraphs.push(cleanOther);
+      }
     }
   } else {
     // 英文通栏组装 (100% 数据驱动动态英译)
@@ -1408,35 +1406,23 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         paragraphs.push(enOther);
       }
     } else {
-      // 英文真实非危通栏
-      paragraphs.push('GHS hazard classification: Not classified as a hazardous chemical according to GHS.');
+      // 英文真实非危通栏 (遵循 INV-ZERO-EXOGENOUS 与源事实忠实公理)
+      paragraphs.push(
+        '2.1 Classification of the substance or mixture:',
+        'Not classified as a hazardous chemical according to GHS.'
+      );
       if (facts.section3ExemptionNotes) {
         paragraphs.push(...facts.section3ExemptionNotes.split(/\r?\n/).filter(Boolean));
       }
-      paragraphs.push(
-        'Pictograms: None',
-        'Signal word: Warning',
-        'Hazard statements: No known significant effects or critical hazards.',
-        'Precautionary statements:',
-        'Prevention:',
-        '        Wear necessary protective equipment (gloves, goggles, work clothing, etc.) during operation.',
-        '        Wash contacted body parts thoroughly after handling.',
-        '        Do not eat, drink or smoke in the workplace.',
-        'Operate outdoors or in a well-ventilated area.',
-        'Response:',
-        '        Inhalation: If inhaled and feeling unwell, seek medical attention.',
-        '        Skin/Eye contact: Wash with soap and clean water. If discomfort persists, seek medical attention.',
-        '        Ingestion: Rinse mouth immediately. Do NOT induce vomiting. Seek immediate medical treatment.',
-        '        Spill: Collect spillage.',
-        '        Fire: In case of fire, use dry powder, foam, or carbon dioxide for extinction.',
-        'Storage:',
-        'Store in a cool, dry, well-ventilated place away from light. Maintain storage temperature between 5-35 deg C. Protect from freezing and keep packaging intact. Keep container tightly closed after use and consume promptly once opened.',
-        'Disposal:',
-        'Empty containers must not be used to store food or other goods prior to decontamination to prevent harm to human health and the environment. Dispose of packaging in accordance with national and local environmental regulations. Any hazards and losses caused by improper disposal shall be borne by the disposer.',
-        'Physical and chemical hazards: May cause contamination to water bodies and soil.',
-        'Health hazards: None',
-        'Environmental hazards: Prevent entry into drains to avoid polymer deposition and blockage of waterways.'
-      );
+      if (parsed?.rawParas && parsed.rawParas.some(p => /象形图|pictogram/i.test(p))) {
+        paragraphs.push(
+          '2.2 GHS Label Elements:',
+          'GHS pictograms: Not applicable.'
+        );
+      }
+      if (parsed?.otherHazards) {
+        paragraphs.push('2.3 Other hazards: No applicable information.');
+      }
     }
   }
 
@@ -3655,6 +3641,62 @@ export async function executeEightDeliverablesPipeline({
     for (const record of eng.records) {
       if (record.kind === 'table') {
         enforceTableStandardBorders(record);
+      }
+    }
+    const s8Rec = eng.records.find(r => r.sectionNumber === 8);
+    if (s8Rec) {
+      // 1. Table 8 值格粗细隔离规范 (INV-S8-03): Row 2..end 的 Cell 1 必须为常规细体，严禁加粗
+      for (let r = 2; r < s8Rec.rows.length; r++) {
+        const vCell = s8Rec.rows[r]?.cells?.[1];
+        if (vCell?.node) {
+          const rPrs = Array.from(vCell.node.getElementsByTagNameNS(W_NS, 'rPr'));
+          for (const rPr of rPrs) {
+            const bs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'b'));
+            bs.forEach(b => rPr.removeChild(b));
+            const bCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
+            bCss.forEach(b => rPr.removeChild(b));
+          }
+        }
+      }
+      // 2. Section 8 中文手部防护缩进规范: 严禁异常悬挂缩进 (hanging=3373)，必须为标准首行缩进 482
+      const handRowCn = s8Rec.rows.find(row => /手部防护/i.test(row.cells[0]?.text || ''));
+      if (handRowCn && handRowCn.cells[0]?.node) {
+        const c0 = handRowCn.cells[0].node;
+        const inds = Array.from(c0.getElementsByTagNameNS(W_NS, 'ind'));
+        inds.forEach(ind => {
+          ind.setAttribute('w:firstLine', '482');
+          ind.setAttribute('w:firstLineChars', '200');
+          ind.removeAttribute('w:left');
+          ind.removeAttribute('w:hanging');
+          ind.removeAttribute('w:leftChars');
+          ind.removeAttribute('w:hangingChars');
+        });
+      }
+      // 3. Section 8 英文 Hand protection: 字号规范: 统一为 w:sz="24" (12pt 加粗)
+      const handRowEn = s8Rec.rows.find(row => /Hand protection/i.test(row.cells[0]?.text || ''));
+      if (handRowEn && handRowEn.cells[0]?.node) {
+        const c0 = handRowEn.cells[0].node;
+        const szs = Array.from(c0.getElementsByTagNameNS(W_NS, 'sz'));
+        szs.forEach(sz => sz.setAttribute('w:val', '24'));
+        const szCss = Array.from(c0.getElementsByTagNameNS(W_NS, 'szCs'));
+        szCss.forEach(szCs => szCs.setAttribute('w:val', '24'));
+      }
+    }
+    // 4. Section 13 废弃处置段落对齐规范 (INV-S13-01): 英文版内容严格纯左对齐 (left)，中文版保持两端对齐 (both)
+    const isEn = eng === baseEnEngine || eng === enPresetEngine;
+    const s13Rec = eng.records.find(r => r.sectionNumber === 13);
+    if (s13Rec && isEn) {
+      for (const row of s13Rec.rows) {
+        for (const cell of row.cells) {
+          if (cell?.node) {
+            const jcs = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'jc'));
+            for (const jc of jcs) {
+              if (jc.getAttribute('w:val') === 'both') {
+                jc.setAttribute('w:val', 'left');
+              }
+            }
+          }
+        }
       }
     }
     const s9 = eng.records.find(r => r.sectionNumber === 9);
