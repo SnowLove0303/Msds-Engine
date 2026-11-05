@@ -1250,9 +1250,10 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
   if (!isEnglish) {
     // 中文通栏组装
     if (!isNonHazardous && parsed) {
+      const cleanCats = parsed.categories.map(c => c.replace(/,\s*/g, '，').replace(/\((H\d+)\)/g, '（$1）'));
       paragraphs.push(
         '2.1 GHS危险性类别：',
-        ...parsed.categories,
+        ...cleanCats,
         '2.2 GHS标签要素：'
       );
       if (facts.drawingNodes && facts.drawingNodes.length > 0) {
@@ -1637,11 +1638,20 @@ export async function buildBaseChineseEngine({
   if (s5Rec) {
     for (const row of s5Rec.rows) {
       const lbl = (row.cells[0]?.text || '').trim();
-      if (/合适的灭火剂/i.test(lbl) && row.cells[1]) {
-        let val = (row.cells[1].text || '').trim();
+      if (!row.cells[1]) continue;
+      let val = (row.cells[1].text || '').trim();
+      if (/不合适的灭火剂/i.test(lbl)) {
+        if (val && !/[。！]$/.test(val)) {
+          safeWriteCellValue(row.cells[1], val + '。');
+        }
+      } else if (/合适的灭火剂/i.test(lbl)) {
         if (val.includes('大火时应用喷洒水') && !val.includes('大火时应用喷洒水。')) {
           val = val.replace(/大火时应用喷洒水(?![。])/g, '大火时应用喷洒水。');
           safeWriteCellValue(row.cells[1], val);
+        }
+      } else if (/特殊危害/i.test(lbl)) {
+        if (val && !/[。！]$/.test(val)) {
+          safeWriteCellValue(row.cells[1], val + '。');
         }
       }
     }
@@ -1680,6 +1690,11 @@ export async function buildBaseChineseEngine({
       enforceSection13DoubleCenter(lastRow.cells[0].node);
     }
     if (lastRow && lastRow.cells.length >= 2 && lastRow.cells[1]?.node) {
+      let mText = (lastRow.cells[1].text || '').trim();
+      if (mText.includes('“滴干”）') && !mText.includes('“滴干”）。')) {
+        mText = mText.replace(/“滴干”）(?![。])/g, '“滴干”）。');
+        safeWriteCellValue(lastRow.cells[1], mText);
+      }
       enforceSection13JustifiedContent(lastRow.cells[1].node);
     }
   }  // 8. Section 9 理化特性全量标签与指标按源文件 1:1 精准重构 (内容与物理顺序 100% 来源源文件，模板仅提供排版与格式)
@@ -1840,6 +1855,20 @@ export async function buildBaseChineseEngine({
           const tNode = p.getElementsByTagNameNS(W_NS, 't')[0];
           if (tNode && tNode.textContent.endsWith(':') && !tNode.textContent.endsWith('：')) {
             tNode.textContent = tNode.textContent.slice(0, -1) + '：';
+          }
+        }
+      }
+      // 统一手套材料破折号间距规范
+      if (lblCell?.node && /(?:氟化橡胶|丁基橡胶|丁腈橡胶)/i.test(lbl)) {
+        const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+        const p = lblCell.node.getElementsByTagNameNS(W_NS, 'p')[0];
+        if (p) {
+          const tNode = p.getElementsByTagNameNS(W_NS, 't')[0];
+          if (tNode) {
+            tNode.textContent = tNode.textContent
+              .replace(/–FKM/g, '– FKM')
+              .replace(/–IIR/g, '– IIR')
+              .replace(/–\s*NBR/g, '– NBR');
           }
         }
       }
