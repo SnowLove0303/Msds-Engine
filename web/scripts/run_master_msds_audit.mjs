@@ -14,6 +14,7 @@ if (!globalThis.DOMParser || !globalThis.XMLSerializer) {
 }
 
 import { loadDocx } from '../src/docx-engine.js';
+import { verifySentenceCountFidelity } from '../src/sentence-translator.js';
 
 /**
  * MSDS Studio 工业级集中式中央主审计套件 (Universal Master MSDS Audit Suite)
@@ -611,6 +612,20 @@ export async function runMasterMsdsAudit(options = {}) {
         '源文件无呼吸器要求时，严禁注入底模未授权的外生口水话',
         enS5Text.includes('self-contained') ? '包含外生口水话' : '纯净保真',
         'Section 5 EN'
+      );
+    }
+
+    const cnS5Prot = cnS5?.rows?.find(r => /消防预防措施|保护设备/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text || '';
+    const enS5Prot = enS5?.rows?.find(r => /Firefighting precautions|protective equipment/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text || '';
+    if (cnS5Prot && enS5Prot) {
+      const s5Check = verifySentenceCountFidelity(cnS5Prot, enS5Prot, 'Section 5.4 消防措施');
+      assert(
+        s5Check.pass,
+        '环3',
+        'Section 5.4 逐句翻译保真',
+        '源文件包含多句消防指令时，英文版严禁单句替换截断丢句',
+        s5Check.pass ? '逐句保真 (规范)' : s5Check.message,
+        'Section 5.4 EN'
       );
     }
   }
