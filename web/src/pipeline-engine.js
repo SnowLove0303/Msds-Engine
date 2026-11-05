@@ -1801,15 +1801,26 @@ export async function buildBaseChineseEngine({
           const tabs = Array.from(lblCell.node.getElementsByTagNameNS(W_NS, 'tab'));
           tabs.forEach(t => t.parentNode?.removeChild(t));
           const inds = Array.from(lblCell.node.getElementsByTagNameNS(W_NS, 'ind'));
-          inds.forEach(ind => {
-            ind.setAttributeNS(W_NS, 'w:left', '0');
-            ind.setAttributeNS(W_NS, 'w:hanging', '0');
-            ind.removeAttributeNS(W_NS, 'w:leftChars');
-            ind.removeAttributeNS(W_NS, 'w:hangingChars');
-          });
+          if (inds.length > 0) {
+            inds.forEach(ind => {
+              ind.setAttributeNS(W_NS, 'w:firstLine', '482');
+              ind.setAttributeNS(W_NS, 'w:firstLineChars', '200');
+              ind.removeAttributeNS(W_NS, 'w:left');
+              ind.removeAttributeNS(W_NS, 'w:hanging');
+              ind.removeAttributeNS(W_NS, 'w:leftChars');
+              ind.removeAttributeNS(W_NS, 'w:hangingChars');
+            });
+          }
           const ps = Array.from(lblCell.node.getElementsByTagNameNS(W_NS, 'p'));
           if (ps.length > 0) {
             const firstP = ps[0];
+            const pPr = firstP.getElementsByTagNameNS(W_NS, 'pPr')[0];
+            if (pPr && pPr.getElementsByTagNameNS(W_NS, 'ind').length === 0) {
+              const ind = firstP.ownerDocument.createElementNS(W_NS, 'w:ind');
+              ind.setAttributeNS(W_NS, 'w:firstLine', '482');
+              ind.setAttributeNS(W_NS, 'w:firstLineChars', '200');
+              pPr.appendChild(ind);
+            }
             for (let i = 1; i < ps.length; i++) {
               ps[i].parentNode?.removeChild(ps[i]);
             }
@@ -1825,7 +1836,7 @@ export async function buildBaseChineseEngine({
             const b = firstP.ownerDocument.createElementNS(W_NS, 'w:b');
             rPr.appendChild(b);
             const sz = firstP.ownerDocument.createElementNS(W_NS, 'w:sz');
-            sz.setAttributeNS(W_NS, 'w:val', '19');
+            sz.setAttributeNS(W_NS, 'w:val', '24');
             rPr.appendChild(sz);
             newRun.appendChild(rPr);
             const t = firstP.ownerDocument.createElementNS(W_NS, 'w:t');
@@ -1837,6 +1848,13 @@ export async function buildBaseChineseEngine({
         // 值格处理：若源文件有独立通用陈述则写入，否则置空（清除底模“建议戴上防护手套。”虚构）
         if (row.cells.length > 1 && row.cells[1]) {
           safeWriteCellValue(row.cells[1], srcHandVal || '');
+          if (!srcHandVal && row.cells[1].node) {
+            const p = row.cells[1].node.getElementsByTagNameNS(W_NS, 'p')[0];
+            if (p) {
+              const inds = Array.from(p.getElementsByTagNameNS(W_NS, 'ind'));
+              inds.forEach(ind => ind.parentNode?.removeChild(ind));
+            }
+          }
         }
         continue;
       }

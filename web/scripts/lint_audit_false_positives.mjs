@@ -85,6 +85,33 @@ export function runSelfTest() {
   }
   console.log('✅ PASS: Intercepted Section 8 false accusation (INV-S8-01)');
 
+  // Test Case 2.1: Section 8 手部防护父级标签免剪枝 (必须拦截)
+  const falseCase21 = "缺陷：Section 8 Table 8 Row 4 手部防护未整行删除属于开天窗";
+  const res21 = checkFindingForFalsePositive(falseCase21);
+  if (!res21.isFalsePositive || res21.matchedInvariant.id !== 'INV-PRUNE-01') {
+    console.error('❌ FAILED: Did not intercept Hand Protection parent header false positive!');
+    process.exit(1);
+  }
+  console.log('✅ PASS: Intercepted Hand Protection parent header false accusation (INV-PRUNE-01)');
+
+  // Test Case 2.2: Section 9 源文件无数据保留 (必须拦截)
+  const falseCase22 = "缺陷：Section 9 应该删减到12行，保留无数据行属于未剪枝";
+  const res22 = checkFindingForFalsePositive(falseCase22);
+  if (!res22.isFalsePositive || res22.matchedInvariant.id !== 'INV-S9-01') {
+    console.error('❌ FAILED: Did not intercept Section 9 source fidelity false positive!');
+    process.exit(1);
+  }
+  console.log('✅ PASS: Intercepted Section 9 source fidelity false accusation (INV-S9-01)');
+
+  // Test Case 2.3: Section 2 GHS 象形图缺省显示 (必须拦截)
+  const falseCase23 = "缺陷：Section 2 GHS象形图为无属于外生捏造";
+  const res23 = checkFindingForFalsePositive(falseCase23);
+  if (!res23.isFalsePositive || res23.matchedInvariant.id !== 'INV-S2-02') {
+    console.error('❌ FAILED: Did not intercept Section 2 default display false positive!');
+    process.exit(1);
+  }
+  console.log('✅ PASS: Intercepted Section 2 default display false accusation (INV-S2-02)');
+
   // Test Case 3: 真缺陷 Section 5.4 漏空 (必须放行通过)
   const trueCase1 = "1. 缺陷 1：Section 5.4 保护设备整行漏空，文本错位串行至 5.3";
   const res3 = checkFindingForFalsePositive(trueCase1);
