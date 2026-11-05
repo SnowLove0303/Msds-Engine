@@ -340,7 +340,7 @@ export function stripExtraneousHeaders(value, slotKey = '', sectionNumber = 0) {
 
   // 2. 针对特定章节的首部重复标题/标签清洗
   if (sectionNumber === 11) {
-    v = v.replace(/^(?:(?:11\.\d+\s*)?(?:毒理学效应|毒理学研究|毒性资料|急性毒性[，, ]*(?:经口|吸入|经皮)?|原发性(?:皮肤|粘膜)刺激|皮肤刺激|粘膜刺激|主要(?:皮肤|眼睛|粘膜)刺激性?|致敏性|呼吸道或皮肤过敏|皮肤致敏性|致突变性|生殖细胞突变性|致癌性|生殖毒性|特异性靶器官系统毒性(?:（一次接触[\/／]反复接触）)?|STOT评估-一次性接触|吸入危害|吸入危险|附加信息|其它信息|其他信息|经口|吸入|经皮)[:：\s]*)+/i, '').trim();
+    v = v.replace(/^(?:(?:11\.\d+\s*)?(?:毒理学效应|毒理学研究|毒性资料|急性毒性[，, ]*(?:经口|吸入|经皮)?|原发性(?:皮肤|粘膜)刺激|皮肤刺激|粘膜刺激|主要(?:皮肤|眼睛|粘膜)刺激性?|致敏性|呼吸道或皮肤过敏|皮肤致敏性|致突变性|生殖细胞突变性|致癌性|生殖毒性|特异性靶器官系统毒性(?:（一次接触[\/／]反复接触）)?|STOT评估-一次性接触|吸入危害|吸入危险|附加信息|其它信息|其他信息|CMR评估|经口|吸入|经皮)[:：\s]*)+/i, '').trim();
   } else if (sectionNumber === 2) {
     v = v.replace(/^(?:(?:2\.\d+\s*)?(?:GHS危险性类别|危险性分类|物质或混合物分类|紧急情况概述|GHS标签要素|标签要素|象形图|信号词|警示词|危险性说明|防范说明|其他危害|其他危险)[:：\s]*)+/i, '').trim();
   } else if (sectionNumber === 12) {
@@ -1569,19 +1569,19 @@ export function decoupleSection11ToxicologyBlocks(cellText, rowObj = null) {
     { key: 'acute_toxicity_dermal', label: '经皮：', re: /(?:^|\n)\s*(?:(?:11\.1\s*)?(?:急性毒性[：:])?\s*经皮[：:]|急性毒性[，, ]*经皮)/i },
     { key: 'acute_toxicity_inhalation', label: '吸入：', re: /(?:^|\n)\s*(?:(?:11\.1\s*)?(?:急性毒性[：:])?\s*吸入[：:]|急性毒性[，, ]*吸入)/i },
     { key: 'subacute_chronic_toxicity', label: '11.2 亚急性，亚慢性和延迟毒性：', re: /(?:^|\n)\s*(?:亚急性[，, ]*亚慢性和延迟毒性)/i },
-    { key: 'skin_corrosion', label: '11.2 主要皮肤刺激性：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:主要皮肤刺激性|原发性皮肤刺激|皮肤刺激)[：:])/i },
-    { key: 'eye_damage', label: '11.3 主要粘膜刺激性：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:主要粘膜刺激性|主要眼睛刺激性|原发性粘膜刺激|眼睛刺激)[：:])/i },
-    { key: 'sensitization', label: '11.4 致敏性：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:致敏性|呼吸道或皮肤过敏|皮肤致敏性)[：:])/i },
-    { key: 'germ_mutagenicity', label: '11.5 致突变性：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:致突变性|生殖细胞突变性|测试种类：体外染色体畸变试验)[：:])/i },
-    { key: 'carcinogenicity', label: '11.6 致癌性：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:致癌性)[：:])/i },
-    { key: 'reproductive_toxicity', label: '11.7 生殖毒性：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:生殖毒性)[：:])/i },
+    { key: 'skin_corrosion', label: '11.2 主要皮肤刺激性：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:主要皮肤刺激性|原发性皮肤刺激|皮肤刺激)[：:]?)/i },
+    { key: 'eye_damage', label: '11.3 主要粘膜刺激性：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:主要粘膜刺激性|主要眼睛刺激性|原发性粘膜刺激|眼睛刺激)[：:]?)/i },
+    { key: 'sensitization', label: '11.4 致敏性：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:致敏性|呼吸道或皮肤过敏|皮肤致敏性)[：:]?)/i },
+    { key: 'germ_mutagenicity', label: '11.5 致突变性：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:致突变性|生殖细胞突变性|测试种类：体外染色体畸变试验)[：:]?)/i },
+    { key: 'carcinogenicity', label: '11.6 致癌性：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:致癌性)[：:]?)/i },
+    { key: 'reproductive_toxicity', label: '11.7 生殖毒性：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:生殖毒性)[：:]?)/i },
     { key: 'reproductive_fertility', label: '生育力', re: /(?:^|\n)\s*(?:生殖毒性[\/／]生育力)/i },
     { key: 'reproductive_teratogenicity', label: '致畸形', re: /(?:^|\n)\s*(?:生殖毒性[\/／]致畸形)/i },
     { key: 'in_vitro_genotoxicity', label: '体外遗传毒性', re: /(?:^|\n)\s*(?:体外遗传毒性)/i },
     { key: 'in_vivo_genotoxicity', label: '体内基因毒性', re: /(?:^|\n)\s*(?:体内基因毒性)/i },
-    { key: 'stot_single', label: '11.8 特异性靶器官系统毒性（一次接触/反复接触）：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:特异性靶器官系统毒性(?:（一次接触[\/／]反复接触）)?|STOT评估-一次性接触)[：:])/i },
-    { key: 'aspiration_hazard', label: '11.9 吸入危险：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:吸入危害|吸入危险)[：:])/i },
-    { key: 'additional_info', label: '11.10 附加信息：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:附加信息|其它信息|其他信息|CMR评估)[：:])/i },
+    { key: 'stot_single', label: '11.8 特异性靶器官系统毒性（一次接触/反复接触）：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:特异性靶器官系统毒性(?:（一次接触[\/／]反复接触）)?|STOT评估-一次性接触)[：:]?)/i },
+    { key: 'aspiration_hazard', label: '11.9 吸入危险：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:吸入危害|吸入危险)[：:]?)/i },
+    { key: 'additional_info', label: '11.10 附加信息：', re: /(?:^|\n)\s*(?:(?:11\.\d+\s*)?(?:附加信息|其它信息|其他信息|CMR评估)[：:]?)/i },
   ];
 
   let matchCount = 0;
@@ -1910,7 +1910,7 @@ export function runSmartMatching(inspectorRecords) {
     if (s === 3 && sourceRecord && sourceRecord.rows) {
       for (const row of sourceRecord.rows) {
         if (row.index === 0) continue;
-        const c0 = row.cells?.[0]?.text?.trim() || '';
+        const c0 = row.cells?.[0]?.text?.trim()?.split(/\r?\n/)[0]?.trim() || '';
         const c1 = row.cells?.[1]?.text?.trim() || '';
         const c2 = row.cells?.[2]?.text?.trim() || '';
 
@@ -3940,13 +3940,13 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
           const mainCompName = editorEngine?.records
             ?.find((r) => r.sectionNumber === 3)
             ?.rows?.slice(1)
-            ?.find((r) => r.cells?.[0]?.text && !/化学品名称|CAS编号|物质/i.test(r.cells[0].text))
-            ?.cells?.[0]?.text?.trim() || '';
+            ?.find((r) => r.cells?.[0]?.text && !/化学品名称|CAS编号|物质|产品类型|成分|3\.\d/i.test(r.cells[0].text))
+            ?.cells?.[0]?.text?.trim()?.split(/\r?\n/)[0]?.trim() || '';
 
           if (hasOECDStudies) {
             let part1 = (inVitroItem?.value || '').replace(/^体外遗传毒性\s*\n?/g, '').trim();
             let part2 = (mutItem?.value || '').replace(/^生殖细胞突变性\s*\n?/g, '').trim();
-            if (mainCompName && !part1.startsWith(mainCompName) && !part2.startsWith(mainCompName)) {
+            if (mainCompName && !part1.includes(mainCompName) && !part2.includes(mainCompName)) {
               combinedInVitroVal = mainCompName + '\n' + part1 + '\n' + part2;
             } else {
               combinedInVitroVal = (part1 + '\n' + part2).trim();

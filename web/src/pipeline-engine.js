@@ -1023,32 +1023,32 @@ export function parseSection2FromSource(srcEngine) {
       signalWord = p.match(/信号词[：:]\s*(危险|警告)/i)[1];
       continue;
     }
-    if (/^(?:危险性说明|危害性说明|危害说明|危险说明)[：:]?$/i.test(p)) {
+    if (/^(?:(?:2\.\d+\s*)?(?:危险性说明|危害性说明|危害说明|危险说明|Hazard statements?))[：:]?$/i.test(p)) {
       mode = 'h';
       continue;
     }
-    if (/^防范说明[：:]?$/i.test(p)) {
+    if (/^(?:(?:2\.\d+\s*)?(?:防范说明|Precautionary statements?))[：:]?$/i.test(p)) {
       mode = 'p';
       continue;
     }
-    if (/^预防措施[：:]?$/i.test(p)) {
+    if (/^(?:(?:2\.\d+\s*)?(?:预防措施|Prevention))[：:]?$/i.test(p)) {
       mode = 'p_prev';
       continue;
     }
-    if (/^事故响应[：:]?$/i.test(p)) {
+    if (/^(?:(?:2\.\d+\s*)?(?:事故响应|Response))[：:]?$/i.test(p)) {
       mode = 'p_resp';
       continue;
     }
-    if (/^安全储存[：:]?$|^安全存储[：:]?$/i.test(p)) {
+    if (/^(?:(?:2\.\d+\s*)?(?:安全储存|安全存储|Storage))[：:]?$/i.test(p)) {
       mode = 'p_store';
       continue;
     }
-    if (/^废弃处置[：:]?$/i.test(p)) {
+    if (/^(?:(?:2\.\d+\s*)?(?:废弃处置|Disposal))[：:]?$/i.test(p)) {
       mode = 'p_disp';
       continue;
     }
-    if (/2\.3\s*其他危险|其他危险/i.test(p)) {
-      otherHazards = p.startsWith('2.3') ? p : `2.3 ${p}`;
+    if (/(?:2\.\d+\s*)?(?:其他危[害险]|Other\s*hazards?)/i.test(p)) {
+      otherHazards = p.replace(/^2\.\d+\s*(?:其他危[害险]|Other\s*hazards?)[：:]?\s*/i, '');
       mode = 'other';
       continue;
     }
@@ -1295,12 +1295,14 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       }
       const cnSignal = (parsed.signalWord && parsed.signalWord !== '无') ? parsed.signalWord : '无';
       paragraphs.push(`信号词：${cnSignal}`);
+
+      let secIdx = 3;
       if (parsed.hazardStatements && parsed.hazardStatements.length > 0) {
-        paragraphs.push('危险性说明：', ...parsed.hazardStatements);
+        paragraphs.push(`2.${secIdx++} 危险性说明：`, ...parsed.hazardStatements);
       }
       const hasPrecaution = (parsed.prevention?.length || 0) + (parsed.response?.length || 0) + (parsed.storage?.length || 0) + (parsed.disposal?.length || 0) > 0;
       if (hasPrecaution) {
-        paragraphs.push('防范说明：');
+        paragraphs.push(`2.${secIdx++} 防范说明：`);
         if (parsed.prevention && parsed.prevention.length > 0) {
           paragraphs.push('预防措施：', ...parsed.prevention.map(p => p.trim()));
         }
@@ -1315,9 +1317,8 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         }
       }
       if (parsed.otherHazards) {
-        let cleanOther = parsed.otherHazards.trim();
-        cleanOther = cleanOther.replace(/^2\.3\s*(其他危险[:：]?\s*)?/, '2.3 其他危险：');
-        paragraphs.push(cleanOther);
+        let cleanOtherVal = parsed.otherHazards.trim().replace(/^(?:2\.\d+\s*)?(?:其他危[害险][:：]?\s*)?/i, '');
+        paragraphs.push(`2.${secIdx++} 其他危害：${cleanOtherVal}`);
       }
     } else {
       // 真实非危通栏组装 (遵循 INV-ZERO-EXOGENOUS 与源事实忠实公理)
@@ -1336,9 +1337,8 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         );
       }
       if (parsed?.otherHazards) {
-        let cleanOther = parsed.otherHazards.trim();
-        cleanOther = cleanOther.replace(/^2\.3\s*(其他危险[:：]?\s*)?/, '2.3 其他危险：');
-        paragraphs.push(cleanOther);
+        let cleanOtherVal = parsed.otherHazards.trim().replace(/^(?:2\.\d+\s*)?(?:其他危[害险][:：]?\s*)?/i, '');
+        paragraphs.push(`2.3 其他危害：${cleanOtherVal}`);
       }
     }
   } else {
@@ -1373,8 +1373,10 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       }
       const enSignal = parsed.signalWord === '危险' ? 'Danger' : (parsed.signalWord === '警告' ? 'Warning' : 'None');
       paragraphs.push(`Signal word: ${enSignal}`);
+
+      let secIdxEn = 3;
       if (parsed.hazardStatements && parsed.hazardStatements.length > 0) {
-        paragraphs.push('Hazard statements:');
+        paragraphs.push(`2.${secIdxEn++} Hazard statements:`);
         for (const h of parsed.hazardStatements) {
           const codeMatch = h.match(/^(H\d+)/);
           const code = codeMatch ? codeMatch[1] : '';
@@ -1383,7 +1385,7 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       }
       const hasPrecautionEn = (parsed.prevention?.length || 0) + (parsed.response?.length || 0) + (parsed.storage?.length || 0) + (parsed.disposal?.length || 0) > 0;
       if (hasPrecautionEn) {
-        paragraphs.push('Precautionary statements:');
+        paragraphs.push(`2.${secIdxEn++} Precautionary statements:`);
         if (parsed.prevention && parsed.prevention.length > 0) {
           paragraphs.push('Prevention:');
           for (const p of parsed.prevention) {
@@ -1410,15 +1412,17 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         }
       }
       if (parsed.otherHazards) {
-        let enOther = '2.3 Other hazards: No applicable information.';
-        if (/N[－-]甲基吡咯烷酮/i.test(parsed.otherHazards)) {
-          enOther = '2.3 Other hazards: Risk of cutaneous absorption of N-Methyl-2-pyrrolidone (NMP).';
-        } else if (/N,N[－-]二甲基乙酰胺/i.test(parsed.otherHazards)) {
-          enOther = '2.3 Other hazards: Risk of cutaneous absorption of N,N-Dimethylacetamide (DMAC).';
-        } else if (/无适用资料|无已知|无数据|无/i.test(parsed.otherHazards)) {
-          enOther = '2.3 Other hazards: No applicable information.';
+        const curIdx = secIdxEn++;
+        let cleanEnVal = parsed.otherHazards.trim().replace(/^(?:2\.\d+\s*)?(?:Other\s*hazards?[:：]?\s*|其他危[害险][:：]?\s*)/i, '');
+        let enOther = `2.${curIdx} Other hazards: No applicable information.`;
+        if (/N[－-]甲基吡咯烷酮/i.test(cleanEnVal)) {
+          enOther = `2.${curIdx} Other hazards: Risk of cutaneous absorption of N-Methyl-2-pyrrolidone (NMP).`;
+        } else if (/N,N[－-]二甲基乙酰胺/i.test(cleanEnVal)) {
+          enOther = `2.${curIdx} Other hazards: Risk of cutaneous absorption of N,N-Dimethylacetamide (DMAC).`;
+        } else if (!cleanEnVal || /无适用资料|无已知|无数据|无/i.test(cleanEnVal)) {
+          enOther = `2.${curIdx} Other hazards: No applicable information.`;
         } else {
-          enOther = `2.3 Other hazards: ${translateGhsPrecautionary(parsed.otherHazards.replace(/^2\.3\s*(其他危险[:：]?\s*)?/, '')) || 'No applicable information.'}`;
+          enOther = `2.${curIdx} Other hazards: ${translateGhsPrecautionary(cleanEnVal) || 'No applicable information.'}`;
         }
         paragraphs.push(enOther);
       }
@@ -2674,7 +2678,7 @@ export async function buildBaseEnglishEngine({
       modelCode: modelCode || '',
       drawingNodes: drawingNodes.length > 0 ? drawingNodes : facts.drawingNodes,
       srcEngine: baseCnEngine || facts.srcEngine,
-      section3ExemptionNotes: enValues['sec3.exemption_notes'] || extractSection3ExemptionNotes(baseCnEngine.records.find(r => r.sectionNumber === 3))
+      section3ExemptionNotes: enValues['sec3.exemption_notes'] || extractSection3ExemptionNotes(baseCnEngine?.records?.find(r => r.sectionNumber === 3))
     }, true);
     const isMultiComponent = modelCode === 'PA-3223' || Boolean(facts.isMultiComponentComposite);
     const cnS11ForCheck = baseCnEngine?.records?.find(r => r.sectionNumber === 11);

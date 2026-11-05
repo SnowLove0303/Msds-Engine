@@ -2912,6 +2912,11 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
         const jc = doc.createElementNS(W_NS, 'w:jc');
         jc.setAttributeNS(W_NS, 'w:val', 'left');
         pPr.appendChild(jc);
+        if (options.isSection2) {
+          const ind = doc.createElementNS(W_NS, 'w:ind');
+          ind.setAttributeNS(W_NS, 'w:left', '360');
+          pPr.appendChild(ind);
+        }
         pNode.appendChild(pPr);
         transferDrawingNodesToParagraph(pItem.srcEngine, options.targetEngine || record.engine, pItem.drawingNodes, pNode, pItem.overrideImageBytes, pItem.overrideExt);
         tcNode.appendChild(pNode);
@@ -2945,74 +2950,39 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
       if (options.isSection11 && isSecondComponentOrLater) {
         spacing.setAttributeNS(W_NS, 'w:before', '240');
       }
-      // Section 2 模块间保留一个空行间隔公理 (before="240"=12pt)：在各主要标签要素与危险性说明、防范说明、其他危险起始段落前注入
+      // Section 2 模块间保留一个空行间隔公理 (before="160"=8pt)：在各主要节标题（2.2、2.3、2.4、2.5）起始段落前注入
       if (options.isSection2) {
-        if (/^(?:(?:2\.\d+\s*)?(?:GHS\s*)?标签要素|Label elements|(?:2\.\d+\s*)?GHS Label Elements|危险性说明|Hazard statements|防范说明|Precautionary statements|(?:2\.\d+\s*)?(?:其他危害|其他危险)|(?:2\.\d+\s*)?Other\s*Hazards?)/i.test(trimmed)) {
+        if (/^(?:2\.[2-9]|(?:2\.\d+\s*)?(?:(?:GHS\s*)?标签要素|Label elements|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危害|其他危险|Other\s*Hazards?))/i.test(trimmed)) {
           spacing.setAttributeNS(W_NS, 'w:before', '160');
         }
       }
       pPr.appendChild(spacing);
 
-      // Section 2 专属 5 级缩进几何状态机 (完全对齐 PA-3223 与 PU-202A 通栏规范)
+      // Section 2 专属缩进几何状态机 (完全对齐父子层级统一规范：父级顶格、子标签统一 360 twips、P代码 720 twips、直接正文 360 twips)
       if (options.isSection2) {
-        // 关键防御：严格识别节标题行 (2.1 GHS危险性类别、2.2 GHS标签要素、2.3 其他危险等)，节标题绝不应用正文缩进！
-        const isSection2Header = /^(?:(?:2\.\d+\s*)?(?:GHS危险性类别|GHS\s*分类|物质或混合物的分类|GHS hazard classification|Classification of the substance or mixture|GHS\s*标签要素|Label elements|GHS Label Elements|其他危险|其他危害|Other\s*Hazards?)|2\.\d+)/i.test(trimmed);
-        if (!isSection2Header) {
-          if (options.isEnglish) {
-            // 英文版 Section 2 专属：标题与标题对齐 (left="480")，内容与内容对齐 (left="960")，换行首字对齐 (无 hanging)
-            if (/^(?:GHS\s*)?pictograms/i.test(trimmed)) {
-              const ind = doc.createElementNS(W_NS, 'w:ind');
-              ind.setAttributeNS(W_NS, 'w:left', '360'); // 激光精准对齐：360 twips (18pt) 精确对齐 2.2 之后的 GHS 首字
-              pPr.appendChild(ind);
-            } else if (/^(?:Not classified as a hazardous chemical|Not applicable)/i.test(trimmed)) {
-              const ind = doc.createElementNS(W_NS, 'w:ind');
-              ind.setAttributeNS(W_NS, 'w:left', '360');
-              pPr.appendChild(ind);
-            } else if (/^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable|Acute toxicity|Skin|Serious eye|Eye irritation|Reproductive|Specific target|Sensitisation|Sensitization|Aquatic|Hazardous to the aquatic)/i.test(trimmed) || /(?:Category|\(H\d+[A-Za-z]?\))/i.test(trimmed)) {
-              const ind = doc.createElementNS(W_NS, 'w:ind');
-              ind.setAttributeNS(W_NS, 'w:left', '480');
-              pPr.appendChild(ind);
-            } else if (/^(?:Prevention|Response|Storage|Disposal)[：:]/i.test(trimmed)) {
-              const ind = doc.createElementNS(W_NS, 'w:ind');
-              ind.setAttributeNS(W_NS, 'w:left', '480');
-              pPr.appendChild(ind);
-            } else if (/^P\d{3}/i.test(trimmed) || /^(?:Wear protective|Wash contact|Do not eat|Use only outdoors|If inhaled|Skin and eye|Ingestion|Spillage|Fire|Store in a cool|Empty containers)/i.test(trimmed)) {
-              const ind = doc.createElementNS(W_NS, 'w:ind');
-              ind.setAttributeNS(W_NS, 'w:left', '960');
-              pPr.appendChild(ind);
-            } else if (/^H\d{3}/i.test(trimmed)) {
-              const ind = doc.createElementNS(W_NS, 'w:ind');
-              ind.setAttributeNS(W_NS, 'w:left', '480');
-              pPr.appendChild(ind);
-            }
+        // 关键防御：严格识别父级节标题行 (2.1 GHS危险性类别、2.2 GHS标签要素、2.3 危险性说明、2.4 防范说明、2.5 其他危害等)，节标题绝不应用正文缩进！
+        const isParentHeader = /^(?:2\.\d+|GHS危险性类别|物质或混合物的分类|Classification of the substance or mixture|GHS\s*标签要素|Label elements|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危险|其他危害|Other\s*Hazards?)/i.test(trimmed);
+        if (!isParentHeader) {
+          // 子标签统一集合：GHS象形图、信号词、必须列在标签上的有害成份、预防措施、事故响应、安全储存、废弃处置 (中英文)
+          const isSubLabel = /^(?:(?:GHS\s*)?(?:象形图|pictograms)|(?:警告词|信号词|Signal word)|(?:必须列在标签上的有害成份|Hazardous components which must be listed on the label)|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal)[：:])/i.test(trimmed);
+          // P代码正则（子标签下的二级值行）
+          const isPCode = /^P\d{3}/i.test(trimmed) || /^(?:操作时穿戴|操作后彻底清洗|作业场所不得|在室外或通风良好处操作|吸入[：:]|眼睛|食入[：:]|泄露[：:]|灭火[：:]|请置于避光|装完整|使用后的空桶|Wear protective|Wash contact|Do not eat|Use only outdoors|If inhaled|Skin and eye|Ingestion|Spillage|Fire|Store in a cool|Empty containers)/i.test(trimmed);
+
+          if (isSubLabel) {
+            // 所有子标签：统一缩进 360 twips，首字绝对垂直对齐！
+            const ind = doc.createElementNS(W_NS, 'w:ind');
+            ind.setAttributeNS(W_NS, 'w:left', '360');
+            pPr.appendChild(ind);
+          } else if (isPCode) {
+            // P代码（防范说明子项下的二级值行）：缩进 720 twips (360 + 360)
+            const ind = doc.createElementNS(W_NS, 'w:ind');
+            ind.setAttributeNS(W_NS, 'w:left', '720');
+            pPr.appendChild(ind);
           } else {
-            // 中文版 Section 2 专属 5 级缩进几何状态机 (完全对齐 PA-3223 与 PU-202A 通栏规范)
-            if (/^(?:GHS\s*)?象形图/i.test(trimmed)) {
-              const ind = doc.createElementNS(W_NS, 'w:ind');
-              ind.setAttributeNS(W_NS, 'w:left', '360'); // 激光精准对齐：360 twips (18pt) 精确对齐 2.2 之后的 GHS 首字与中文首字
-              pPr.appendChild(ind);
-            } else if (/^根据\s*GHS\s*不属于危险物/i.test(trimmed)) {
-              const ind = doc.createElementNS(W_NS, 'w:ind');
-              ind.setAttributeNS(W_NS, 'w:left', '360');
-              pPr.appendChild(ind);
-            } else if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃|急性毒性|皮肤|严重眼睛|生殖毒性|特异性靶器官|对水环境|致敏)/i.test(trimmed) || /(?:类别|\(H\d+[A-Za-z]?\))/i.test(trimmed)) {
-              const ind = doc.createElementNS(W_NS, 'w:ind');
-              ind.setAttributeNS(W_NS, 'w:firstLine', '480');
-              ind.setAttributeNS(W_NS, 'w:right', '480');
-              pPr.appendChild(ind);
-            } else if (/^(?:预防措施|事故响应|安全存储|安全储存|废弃处置)[：:]/i.test(trimmed)) {
-              const ind = doc.createElementNS(W_NS, 'w:ind');
-              ind.setAttributeNS(W_NS, 'w:left', '480');
-              pPr.appendChild(ind);
-            } else if (/^H\d{3}/i.test(trimmed)) {
-              const ind = doc.createElementNS(W_NS, 'w:ind');
-              ind.setAttributeNS(W_NS, 'w:left', '480');
-              pPr.appendChild(ind);
-            } else if (/^P\d{3}/i.test(trimmed) || /^(?:操作时穿戴|操作后彻底清洗|作业场所不得|在室外或通风良好处操作|吸入[：:]|眼睛|食入[：:]|泄露[：:]|灭火[：:]|请置于避光|装完整|使用后的空桶)/i.test(trimmed)) {
-              const ind = doc.createElementNS(W_NS, 'w:ind');
-              ind.setAttributeNS(W_NS, 'w:left', '960');
-              pPr.appendChild(ind);
-            }
+            // 父级或子级下的直接正文值行 (2.1 分类描述、H代码、非危不属于危险物说明等)：统一缩进 360 twips
+            const ind = doc.createElementNS(W_NS, 'w:ind');
+            ind.setAttributeNS(W_NS, 'w:left', '360');
+            pPr.appendChild(ind);
           }
         }
       } else if (options.isSection11 && options.leftIndentTwips) {
@@ -3026,13 +2996,13 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
       // Section 2 细粒度加粗状态机 (精准分离标签加粗与常规体正文)
       let runSpecs = [];
       if (options.isSection2) {
-        // 关键防御：优先匹配键值对行与节标题行，确保 2.1 GHS危险性类别、2.2 GHS标签要素、2.3 其他危险等加粗，值常规体
-        const kvMatch = pText.match(/^(\s*(?:(?:2\.\d+\s*)?(?:GHS危险性类别|GHS hazard classification|物质或混合物的分类|Classification of the substance or mixture)|羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification|(?:2\.\d+\s*)?(?:GHS\s*)?标签要素|Label elements|(?:2\.\d+\s*)?GHS Label Elements|象形图|GHS\s*象形图|GHS pictograms|警告词|信号词|Signal word|危险性说明|Hazard statements|防范说明|Precautionary statements|物理化学危险|Physical and chemical hazards|健康危害|Health hazards|环境危害|Environmental hazards|(?:2\.\d+\s*)?(?:其他危害|其他危险)|(?:2\.\d+\s*)?Other\s*Hazards?))([:：]?)\s*(.*)$/i);
+        // 关键防御：优先匹配键值对行与节标题行，确保 2.1 GHS危险性类别、2.2 GHS标签要素、2.3 危险性说明、2.4 防范说明、2.5 其他危害等加粗，值常规体
+        const kvMatch = pText.match(/^(\s*(?:(?:2\.\d+\s*)?(?:GHS危险性类别|GHS hazard classification|物质或混合物的分类|Classification of the substance or mixture)|羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification|(?:2\.\d+\s*)?(?:GHS\s*)?标签要素|Label elements|(?:2\.\d+\s*)?GHS Label Elements|象形图|GHS\s*象形图|GHS pictograms|警告词|信号词|Signal word|(?:必须列在标签上的有害成份|Hazardous components which must be listed on the label)|(?:2\.\d+\s*)?(?:危险性说明|Hazard statements?(?:\s*\([a-zA-Z0-9]+\))?)|(?:2\.\d+\s*)?(?:防范说明|Precautionary statements?(?:\s*\([a-zA-Z0-9]+\))?)|物理化学危险|Physical and chemical hazards|健康危害|Health hazards|环境危害|Environmental hazards|(?:2\.\d+\s*)?(?:其他危害|其他危险)|(?:2\.\d+\s*)?Other\s*Hazards?))([:：]?)\s*(.*)$/i);
         if (kvMatch) {
           const label = kvMatch[1];
           const colon = kvMatch[2] || '';
           const val = kvMatch[3];
-          if (!val && (/标签要素|label elements|危险性类别|classification|危险性说明|hazard statements|象形图|pictograms/i.test(label))) {
+          if (!val && (/标签要素|label elements|危险性类别|classification|危险性说明|hazard statements|防范说明|precautionary statements|象形图|pictograms/i.test(label))) {
             runSpecs = [{ text: label + colon, bold: true }];
           } else if (label.includes('GHS危险性类别') && !options.isEnglish) {
             runSpecs = [{ text: label + colon, bold: true }];
