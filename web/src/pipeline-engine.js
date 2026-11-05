@@ -3744,6 +3744,23 @@ export async function executeEightDeliverablesPipeline({
         enforceTableStandardBorders(record);
       }
     }
+    // 表格行防跨页撕裂加固：为文档中所有表格的 w:tr 注入 <w:cantSplit/>
+    if (eng.documentXml) {
+      const allTables = Array.from(eng.documentXml.getElementsByTagNameNS(W_NS, 'tbl'));
+      for (const tbl of allTables) {
+        const trs = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
+        for (const tr of trs) {
+          let trPr = tr.getElementsByTagNameNS(W_NS, 'trPr')[0];
+          if (!trPr) {
+            trPr = tr.ownerDocument.createElementNS(W_NS, 'w:trPr');
+            tr.insertBefore(trPr, tr.firstChild);
+          }
+          if (trPr.getElementsByTagNameNS(W_NS, 'cantSplit').length === 0) {
+            trPr.appendChild(tr.ownerDocument.createElementNS(W_NS, 'w:cantSplit'));
+          }
+        }
+      }
+    }
     const s8Rec = eng.records.find(r => r.sectionNumber === 8);
     if (s8Rec) {
       // 1. Table 8 值格粗细与字阶规范 (INV-S8-03): Row 2..end 的 Cell 1 必须为常规细体五号字 (sz="21")，严禁加粗或超标放大 (sz="24")
@@ -4496,6 +4513,8 @@ function formatRowAsSectionHeader(row, W_NS) {
     if (/^(?:1\.?)*\s*Identification$/i.test(text)) {
       text = '1. Identification';
     }
+    // 英文 16 章节大标题统一补齐规范半角空格 (彻底消除编号与字母粘连，如 2.Hazards -> 2. Hazards)
+    text = text.replace(/^(\d{1,2})\.([A-Za-z])/g, '$1. $2');
     rebuildRunsWithTypography(p, text, {
       font: 'Arial',
       sizeVal: '22', // 11pt
