@@ -103,14 +103,14 @@ export function runSelfTest() {
   }
   console.log('✅ PASS: Intercepted Section 9 source fidelity false accusation (INV-S9-01)');
 
-  // Test Case 2.3: Section 2 GHS 象形图缺省显示 (必须拦截)
-  const falseCase23 = "缺陷：Section 2 GHS象形图为无属于外生捏造";
+  // Test Case 2.3: Section 2 零外生虚增守恒 (必须拦截将"未虚增象形图"误判为遗漏的假阳性)
+  const falseCase23 = "缺陷：忠实源文件未虚增象形图属于遗漏";
   const res23 = checkFindingForFalsePositive(falseCase23);
-  if (!res23.isFalsePositive || res23.matchedInvariant.id !== 'INV-S2-02') {
-    console.error('❌ FAILED: Did not intercept Section 2 default display false positive!');
+  if (!res23.isFalsePositive || res23.matchedInvariant.id !== 'INV-ZERO-EXOGENOUS') {
+    console.error('❌ FAILED: Did not intercept Section 2 zero exogenous fidelity false positive!');
     process.exit(1);
   }
-  console.log('✅ PASS: Intercepted Section 2 default display false accusation (INV-S2-02)');
+  console.log('✅ PASS: Intercepted Section 2 zero exogenous fidelity false accusation (INV-ZERO-EXOGENOUS)');
 
   // Test Case 3: 真缺陷 Section 5.4 漏空 (必须放行通过)
   const trueCase1 = "1. 缺陷 1：Section 5.4 保护设备整行漏空，文本错位串行至 5.3";
@@ -158,16 +158,14 @@ if (targetFile) {
       console.error(`❌ Line ${v.line}: "${v.text}"`);
       console.error(`   命中禁止指控词: [${v.keyword}]`);
       console.error(`   违反法定不变量: [${v.invariant.id}] ${v.invariant.title}`);
-      console.error(`   法定出处权威: ${v.invariant.authority}`);
-      console.error(`   法定正确规范: ${v.invariant.rule}\n`);
+      console.error(`   法定不变量要求: ${v.invariant.rule.split('\n')[0]}`);
     });
 
+    console.error(`\n[REJECTION CODE] AUDIT_FALSE_POSITIVE_DETECTED`);
+    console.error(`请根据《PROJECT_CONSTITUTION》纠正审计认知，移除上述错误指控后重新提请发布！\n`);
     process.exit(1);
   } else {
-    console.log(`✅ [AUDIT LINT PASS] 目标报告 ${targetFile} 未包含任何法定白名单误报指控。`);
+    console.log(`\n✅ [LINT:AUDIT:PASS] 报告经法定不变量 Oracle 严格检阅，未发现任何假阳性误报指控，准予交付发布！\n`);
     process.exit(0);
   }
-} else {
-  // 无参数默认跑自检
-  runSelfTest();
 }

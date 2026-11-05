@@ -426,6 +426,7 @@ export async function runMasterMsdsAudit(options = {}) {
 
   const cnDocx = await loadDocx(fs.readFileSync(cnGzDocx));
   const enDocx = await loadDocx(fs.readFileSync(enDocxPath));
+  const domCn = await loadDocXml(cnGzDocx);
 
   // Section 1: 标识
   const cnS1 = cnDocx.records.find(r => r.sectionNumber === 1);
@@ -489,41 +490,49 @@ export async function runMasterMsdsAudit(options = {}) {
         enS2Text.slice(0, 150),
         'Section 2 EN'
       );
-      // GHS 象形图与信号词缺省显式展示 (INV-S2-02)
-      assert(
-        /GHS\s*象形图[：:]\s*无|象形图[：:]\s*无/.test(cnS2Text),
-        '环3',
-        'Section 2 象形图缺省展示',
-        '非危品中文版默认显式展示“GHS象形图：无”',
-        cnS2Text.slice(0, 100),
-        'Section 2 CN',
-        ['GHS象形图为无属于外生捏造']
-      );
-      assert(
-        /GHS pictograms:\s*None|Pictograms:\s*None/i.test(enS2Text),
-        '环3',
-        'Section 2 英文象形图缺省展示',
-        '非危品英文版默认显式展示“GHS pictograms: None”',
-        enS2Text.slice(0, 100),
-        'Section 2 EN'
-      );
-      assert(
-        /信号词[：:]\s*无/.test(cnS2Text),
-        '环3',
-        'Section 2 信号词缺省展示',
-        '非危品中文版默认显式展示“信号词：无”',
-        cnS2Text.slice(0, 100),
-        'Section 2 CN',
-        ['信号词为无属于多余标签']
-      );
-      assert(
-        /Signal word:\s*None/i.test(enS2Text),
-        '环3',
-        'Section 2 英文信号词缺省展示',
-        '非危品英文版默认显式展示“Signal word: None”',
-        enS2Text.slice(0, 100),
-        'Section 2 EN'
-      );
+      // INV-ZERO-EXOGENOUS: 探查源文件是否载明象形图与信号词
+      let srcHasPictogram = false;
+      let srcHasSignal = false;
+      const effectiveSourcePath = sourceDocx || (fs.readdirSync(targetDir).find(f => /源文件留存|源文件|raw|source/i.test(f) && f.endsWith('.docx')) ? path.join(targetDir, fs.readdirSync(targetDir).find(f => /源文件留存|源文件|raw|source/i.test(f) && f.endsWith('.docx'))) : null);
+      if (effectiveSourcePath && fs.existsSync(effectiveSourcePath)) {
+        try {
+          const srcDocx = await loadDocx(fs.readFileSync(effectiveSourcePath));
+          const srcS2 = srcDocx.records.find(r => r.sectionNumber === 2);
+          if (srcS2) {
+            const srcS2Text = srcS2.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
+            srcHasPictogram = /象形图|pictogram/i.test(srcS2Text);
+            srcHasSignal = /信号词|警示词|signal word/i.test(srcS2Text);
+          }
+        } catch (e) {}
+      }
+
+      // 源文件零外生虚增最高公理断言
+      if (!srcHasPictogram) {
+        const hasExoPicCn = /GHS\s*象形图[：:]\s*无|象形图[：:]\s*无/.test(cnS2Text);
+        const hasExoPicEn = /GHS pictograms:\s*None|Pictograms:\s*None/i.test(enS2Text);
+        assert(
+          !hasExoPicCn && !hasExoPicEn,
+          '环3',
+          'Section 2 源文件零外生虚增(象形图)',
+          '源文档未提及象形图时，交付物严禁外生强塞“象形图：无”或“None”',
+          `CN外生=${hasExoPicCn}, EN外生=${hasExoPicEn}`,
+          'Section 2 CN/EN',
+          ['忠实源文件未虚增象形图属于遗漏']
+        );
+      }
+      if (!srcHasSignal) {
+        const hasExoSigCn = /信号词[：:]\s*无/.test(cnS2Text);
+        const hasExoSigEn = /Signal word:\s*None/i.test(enS2Text);
+        assert(
+          !hasExoSigCn && !hasExoSigEn,
+          '环3',
+          'Section 2 源文件零外生虚增(信号词)',
+          '源文档未提及信号词时，交付物严禁外生强塞“信号词：无”或“None”',
+          `CN外生=${hasExoSigCn}, EN外生=${hasExoSigEn}`,
+          'Section 2 CN/EN',
+          ['非危品源文件未提信号词未输出无属于缺陷']
+        );
+      }
     }
   }
 
@@ -631,7 +640,6 @@ export async function runMasterMsdsAudit(options = {}) {
       'Section 8 EN'
     );
     // 检查手部防护单元格字号必须与同章节一致为 24 (12pt 宋体加粗)
-    const domCn = await loadDocXml(cnGzDocx);
     const handRow = Array.from(domCn.getElementsByTagName('w:tr')).find(tr => tr.textContent.includes('手部防护'));
     if (handRow) {
       const c0Node = handRow.getElementsByTagName('w:tc')[0];
@@ -647,6 +655,16 @@ export async function runMasterMsdsAudit(options = {}) {
         `isSz24=${isSz24}, isBold=${isBold}`,
         'handRow Col 0'
       );
+      // 检查手部防护题头缩进：严禁异常悬挂缩进 (w:hanging="3373" / w:left="3864")，必须回归标准首行缩进
+      const hasBadHanging = /<w:ind[^>]*w:hanging="3373"/i.test(c0Xml) || /<w:ind[^>]*w:left="3864"/i.test(c0Xml);
+      assert(
+        !hasBadHanging,
+        '环3',
+        'Section 8 手部防护缩进规范',
+        '“手部防护：”严禁带有历史遗留的异常悬挂缩进 (hanging=3373)，必须为标准首行缩进',
+        hasBadHanging ? '存在异常悬挂缩进' : '标准首行缩进',
+        'handRow Col 0'
+      );
       const c1 = handRow.getElementsByTagName('w:tc')[1];
       const c1Text = (c1?.textContent || '').trim();
       assert(
@@ -657,6 +675,51 @@ export async function runMasterMsdsAudit(options = {}) {
         c1Text === '' ? '纯净空白' : `残留内容: ${c1Text}`,
         'handRow Col 1',
         ['父级标签留空判定为未剪枝缺陷']
+      );
+    }
+
+    // 检查英文版 Hand protection: 字号规范
+    const domEn = await loadDocXml(enDocxPath);
+    const handRowEn = Array.from(domEn.getElementsByTagName('w:tr')).find(tr => tr.textContent.includes('Hand protection'));
+    if (handRowEn) {
+      const c0EnNode = handRowEn.getElementsByTagName('w:tc')[0];
+      const serializer = new XmlSerializer();
+      const c0EnXml = c0EnNode ? serializer.serializeToString(c0EnNode) : '';
+      const isEnSz24 = /<w:sz\s+w:val="24"/.test(c0EnXml);
+      assert(
+        isEnSz24,
+        '环3',
+        'Section 8 英文手部防护字号规范',
+        '英文版“Hand protection:”字号必须统一为 w:sz w:val="24" (12pt 加粗)，严禁缩小为 sz=19',
+        isEnSz24 ? '统一 12pt (sz=24)' : '存在缩小字号 (sz=19)',
+        'handRowEn Col 0'
+      );
+    }
+
+    // 检查 Table 8 值格粗细隔离 (Value Cell Weight Isolation)：Row 2~11 的 Cell 1 必须为常规细体，严禁全加粗
+    const tablesCn = Array.from(domCn.getElementsByTagName('w:tbl'));
+    const t8 = tablesCn[7];
+    if (t8) {
+      const rows = Array.from(t8.getElementsByTagName('w:tr'));
+      let allBoldCount = 0;
+      for (let i = 2; i < rows.length; i++) {
+        const c1 = rows[i].getElementsByTagName('w:tc')[1];
+        if (c1) {
+          const serializer = new XmlSerializer();
+          const c1Xml = serializer.serializeToString(c1);
+          const hasText = (c1.textContent || '').trim().length > 0;
+          if (hasText && /<w:b(?:\s|\/|>)/.test(c1Xml) && !/<w:b\s+w:val="false"/.test(c1Xml)) {
+            allBoldCount++;
+          }
+        }
+      }
+      assert(
+        allBoldCount === 0,
+        '环3',
+        'Section 8 值格粗细隔离规范',
+        'Table 8 右侧内容单元格 (Cell 1) 必须保持常规细体 (Regular 10.5pt)，严禁全列加粗失控',
+        `违规加粗值格数: ${allBoldCount}`,
+        'Table 8 Cell 1'
       );
     }
   }
@@ -756,6 +819,29 @@ export async function runMasterMsdsAudit(options = {}) {
       `CN=${cnS13.rows.length}, EN=${enS13.rows.length}`,
       'Section 13'
     );
+    // 检查 Table 12 Row 3 Cell 1 废弃处置方法段落对齐：严禁两端分散对齐 (both)，必须为左对齐 (left)
+    const tablesCn = Array.from(domCn.getElementsByTagName('w:tbl'));
+    const t12 = tablesCn[11];
+    if (t12) {
+      const rows = Array.from(t12.getElementsByTagName('w:tr'));
+      const r3 = rows[2];
+      if (r3) {
+        const c1 = r3.getElementsByTagName('w:tc')[1];
+        if (c1) {
+          const serializer = new XmlSerializer();
+          const c1Xml = serializer.serializeToString(c1);
+          const isJustified = /<w:jc\s+w:val="both"/i.test(c1Xml);
+          assert(
+            !isJustified,
+            '环3',
+            'Section 13 段落对齐规范',
+            '废弃处置方法长段落必须使用纯左对齐 (w:jc w:val="left")，严禁两端对齐 (both) 导致字间拉伸',
+            isJustified ? '两端分散对齐(拉伸失真)' : '纯左对齐(规范)',
+            'Table 12 Row 3 Cell 1'
+          );
+        }
+      }
+    }
   }
 
   // Section 15: 法规信息 (正向演进国令 591 号 + GB 30000 系列)

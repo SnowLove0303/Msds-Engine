@@ -490,7 +490,8 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
         if (!val) continue;
 
         if (/外观/i.test(lbl)) {
-          if (/半透明.*乳液|乳液.*半透明/i.test(val)) sec9Facts.appearance = 'Translucent emulsion';
+          if (/乳白.*蓝光|蓝光.*乳液/i.test(val)) sec9Facts.appearance = 'Milky white emulsion with bluish tint';
+          else if (/半透明.*乳液|乳液.*半透明/i.test(val)) sec9Facts.appearance = 'Translucent emulsion';
           else if (/半透明/i.test(val)) sec9Facts.appearance = 'Translucent liquid';
           else if (/乳白/i.test(val)) sec9Facts.appearance = 'Milky white liquid';
           else if (/均质/i.test(val) && /微黄|淡黄/i.test(val)) sec9Facts.appearance = 'Light yellow homogeneous liquid';
@@ -568,6 +569,9 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
         else if (/外观/i.test(pattern)) {
           if (/无色.*微黄|微黄.*透明/i.test(val)) sec9Facts.appearance = 'Colorless to slightly yellow transparent liquid';
           else if (/无色.*淡黄|淡黄.*粘稠/i.test(val)) sec9Facts.appearance = 'Colorless to light yellow transparent viscous liquid';
+          else if (/乳白.*蓝光|蓝光.*乳液/i.test(val)) sec9Facts.appearance = 'Milky white emulsion with bluish tint';
+          else if (/乳白.*乳液/i.test(val)) sec9Facts.appearance = 'Milky white emulsion';
+          else if (/乳白/i.test(val)) sec9Facts.appearance = 'Milky white liquid';
           else sec9Facts.appearance = val;
         }
       }
@@ -2651,6 +2655,7 @@ export async function buildBaseEnglishEngine({
             let enName = cnName;
             if (/胺和环氧树脂的加合物|环氧.*胺.*加合物/i.test(cnName)) enName = 'Amine and epoxy resin adduct';
             else if (/封闭型脂肪族聚异氰酸酯/i.test(cnName)) enName = 'Blocked aliphatic polyisocyanate';
+            else if (/二丙二醇二甲醚/i.test(cnName)) enName = 'Dipropylene glycol dimethyl ether';
             else if (/六甲撑二异氰酸酯基均聚物|六亚甲基二异氰酸酯.*均聚物|HDI.*均聚物|HDI.*低聚物/i.test(cnName)) {
               if (/亲水/i.test(cnName)) enName = 'Hydrophilically modified hexamethylene diisocyanate homopolymer';
               else enName = 'Hexamethylene diisocyanate homopolymer';
