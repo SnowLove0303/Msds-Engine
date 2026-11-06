@@ -333,6 +333,17 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
         continue;
       }
 
+      // 跳过 Section 8 中的结构性题头行 (8.1 暴露控制 / 8.1 控制参数 / 8.1 Exposure controls / 工作场所组分控制参数)
+      if (sectionNumber === 8 && /^(?:8\.1\s*(?:暴露控制|控制参数|Exposure\s*controls?)|工作场所组分控制参数|Control parameters for workplace components)/i.test(rowText)) {
+        continue;
+      }
+
+      // Section 15 结构性子题头识别 (其它的规定 / 符合下列法规要求 / Other provisions / Complies with the following regulations)
+      const isS15Subheader = sectionNumber === 15 && (
+        /^(?:其它的规定|其它规定|其他规定|Other provisions|Other regulations)[：:]?/i.test(rowText) ||
+        /^(?:符合下列法规要求|Complies with the following regulations|Comply with the following)[：:]?/i.test(rowText)
+      );
+
       // 对所有值单元格（单列描述行或多列中 c >= 1 的列）强制投影标准 Design Tokens
       const startCol = (cells.length === 1) ? 0 : 1;
       for (let cIdx = startCol; cIdx < cells.length; cIdx++) {
@@ -409,13 +420,35 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
           rFonts.setAttribute('w:eastAsia', targetFont);
           rFonts.setAttribute('w:cs', targetFont);
 
-          // 2.3 粗细隔离：值格正文严禁加粗（除非是受控合法子标签如 "经口："）
-          const isSubLabel = /^(预防措施|事故响应|安全储存|废弃处置|经口|吸入|经皮|物种|分类|结果|重复剂量中毒|病理变化|致畸形|致畸性|致畸|生育力|Oral|Inhalation|Dermal|Species|Classification|Result|Repeated dose toxicity|Pathological changes|Teratogenicity|Fertility|Prevention|Response|Storage|Disposal)[：:]?$/i.test(runText) || /^[：:]$/.test(runText);
-          if (!isSubLabel) {
-            const bs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'b'));
-            bs.forEach(b => rPr.removeChild(b));
-            const bCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
-            bCss.forEach(b => rPr.removeChild(b));
+          // 2.3 粗细隔离与法定标签加粗保护 (INV-BOLD-S2-S15):
+          // - Section 15 结构性子题头 (其它的规定、符合下列法规要求) 强制加粗
+          // - Section 2 结构性节标题与子标签 (2.1-2.5 标题、象形图、信号词、防范四大块等) 强制加粗
+          // - 受控合法子标签 (如 "经口："、"预防措施：" 等) 保持加粗
+          // - 普通值格正文严禁加粗
+          const isS2Label = sectionNumber === 2 && (
+            /^(?:(?:2\.\d+\s*)?(?:GHS\s*危险性类别|GHS\s*分类|Classification of the substance or mixture|GHS\s*Classification|GHS\s*标签要素|Label elements|GHS\s*Label\s*Elements|危险性说明|危害性说明|Hazard\s*statements?|防范说明|Precautionary\s*statements?|其他危害|其他危险|Other\s*hazards?)|(?:GHS\s*)?(?:象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components which must be listed on the label)|(?:需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal))[：:]?$/i.test(runText) ||
+            /^[：:]$/.test(runText)
+          );
+
+          if (isS15Subheader || isS2Label) {
+            let b = rPr.getElementsByTagNameNS(W_NS, 'b')[0];
+            if (!b) {
+              b = doc.createElementNS(W_NS, 'w:b');
+              rPr.appendChild(b);
+            }
+            let bCs = rPr.getElementsByTagNameNS(W_NS, 'bCs')[0];
+            if (!bCs) {
+              bCs = doc.createElementNS(W_NS, 'w:bCs');
+              rPr.appendChild(bCs);
+            }
+          } else {
+            const isSubLabel = /^(预防措施|事故响应|安全储存|废弃处置|经口|吸入|经皮|物种|分类|结果|重复剂量中毒|病理变化|致畸形|致畸性|致畸|生育力|Oral|Inhalation|Dermal|Species|Classification|Result|Repeated dose toxicity|Pathological changes|Teratogenicity|Fertility|Prevention|Response|Storage|Disposal)[：:]?$/i.test(runText) || /^[：:]$/.test(runText);
+            if (!isSubLabel) {
+              const bs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'b'));
+              bs.forEach(b => rPr.removeChild(b));
+              const bCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
+              bCss.forEach(b => rPr.removeChild(b));
+            }
           }
         }
 

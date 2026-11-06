@@ -517,6 +517,47 @@ export async function runMasterMsdsAudit(options = {}) {
     const enS2Text = enS2.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
     const isNonHaz = /不属于危害|非危险|不属于危险|危险性类别[：:]\s*无|not classified/i.test(cnS2Text);
 
+    // INV-BOLD-S2-S15: Section 2 结构性标签加粗硬断言 (CN & EN)
+    const s2LabelsToCheckCn = ['2.1 GHS危险性类别：', '2.2 GHS标签要素：', '2.3 危险性说明：', '2.4 防范说明：', '2.5 其他危害：', '预防措施：', '废弃处置：'];
+    const s2LabelsToCheckEn = ['2.1 Classification of the substance or mixture:', '2.2 GHS Label Elements:', '2.3 Hazard statements:', '2.4 Precautionary statements:', '2.5 Other hazards:', 'Prevention:', 'Disposal:'];
+    
+    const checkS2Bolding = (docxRecord, labelsToCheck, langLabel) => {
+      if (!docxRecord || docxRecord.rows.length < 2) return { passed: false, missing: ['S2记录缺失'] };
+      const ps = docxRecord.rows[1].cells[0]?.paragraphs || [];
+      const missing = [];
+      for (const lbl of labelsToCheck) {
+        const p = ps.find(pItem => (pItem.text || '').trim().startsWith(lbl.replace(/[：:]$/, '')) || (pItem.text || '').trim().includes(lbl));
+        if (p) {
+          const run0 = p.runs?.[0];
+          const isBold = computeEffectiveBold(run0?.node, p.node);
+          if (!isBold) missing.push(lbl);
+        }
+      }
+      return { passed: missing.length === 0, missing };
+    };
+
+    const s2BoldCn = checkS2Bolding(cnS2, s2LabelsToCheckCn, 'CN');
+    assert(
+      s2BoldCn.passed,
+      '环3',
+      'Section 2 中文结构性标签加粗规范 (INV-BOLD-S2-S15)',
+      'Section 2 所有结构性节标题（2.1-2.5）与子标签（象形图、防范四大项等）必须加粗',
+      s2BoldCn.passed ? '全量加粗合规' : `缺失加粗: ${s2BoldCn.missing.join(', ')}`,
+      'Section 2 CN',
+      ['指控 Section 2 标签加粗为多余格式']
+    );
+
+    const s2BoldEn = checkS2Bolding(enS2, s2LabelsToCheckEn, 'EN');
+    assert(
+      s2BoldEn.passed,
+      '环3',
+      'Section 2 英文结构性标签加粗规范 (INV-BOLD-S2-S15)',
+      'Section 2 英文所有结构性节标题（2.1-2.5）与子标签（GHS pictograms, Precautionary 等）必须加粗',
+      s2BoldEn.passed ? '全量加粗合规' : `缺失加粗: ${s2BoldEn.missing.join(', ')}`,
+      'Section 2 EN',
+      ['指控 Section 2 标签加粗为多余格式']
+    );
+
     // INV-ZERO-EXOGENOUS: 探查源文件是否载明象形图与信号词 (全域通用门禁，危品与非危品统一适用)
     let srcHasPictogram = false;
     let srcHasSignal = false;
@@ -670,6 +711,21 @@ export async function runMasterMsdsAudit(options = {}) {
   // Section 8: 接触控制与个体防护 (最高发重灾区)
   const cnS8 = cnDocx.records.find(r => r.sectionNumber === 8);
   const enS8 = enDocx.records.find(r => r.sectionNumber === 8);
+  // Section 8.1 暴露控制与 8.2 工程控制结构题头排版断言
+  if (cnS8 && cnS8.rows.length >= 2) {
+    const r1Cell = cnS8.rows[1].cells[0];
+    const r1Runs = r1Cell?.paragraphs?.[0]?.runs || [];
+    const r0Bold = r1Runs[0] ? computeEffectiveBold(r1Runs[0]?.node, r1Cell?.paragraphs?.[0]?.node) : false;
+    assert(
+      r0Bold,
+      '环3',
+      'Section 8.1 题头加粗与序号字阶 (INV-S8-01)',
+      'Section 8.1 暴露控制：题头必须加粗，序号保持 Times New Roman 10.5pt 加粗',
+      r0Bold ? '加粗合规' : '加粗丢失',
+      'Section 8.1 CN'
+    );
+  }
+
   if (cnS8 && enS8) {
     const cnS8Text = cnS8.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
     const enS8Text = enS8.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
@@ -1139,6 +1195,46 @@ export async function runMasterMsdsAudit(options = {}) {
       enS15Text.includes('GB 30000') ? '已升级为 GB 30000' : '缺失 GB 30000',
       'Section 15 EN'
     );
+  }
+
+  // INV-BOLD-S2-S15: Section 15 法定结构性子题头加粗硬断言 (CN & EN)
+  const cnS15 = cnDocx.records.find(r => r.sectionNumber === 15);
+  if (cnS15) {
+    const checkS15Bolding = (s15Rec, subheaderRegexes, langLabel) => {
+      const missing = [];
+      for (const re of subheaderRegexes) {
+        const row = s15Rec.rows.find(r => re.test(r.cells[0]?.text || ''));
+        if (row) {
+          const run0 = row.cells[0]?.paragraphs?.[0]?.runs?.[0];
+          const p = row.cells[0]?.paragraphs?.[0];
+          const isBold = computeEffectiveBold(run0?.node, p?.node);
+          if (!isBold) missing.push(row.cells[0]?.text?.trim());
+        }
+      }
+      return { passed: missing.length === 0, missing };
+    };
+
+    const s15BoldCn = checkS15Bolding(cnS15, [/其它的规定/, /符合下列法规要求/], 'CN');
+    assert(
+      s15BoldCn.passed,
+      '环3',
+      'Section 15 中文结构性子题头加粗规范 (INV-BOLD-S2-S15)',
+      'Section 15 其它的规定：与符合下列法规要求：必须加粗',
+      s15BoldCn.passed ? '全量加粗合规' : `缺失加粗: ${s15BoldCn.missing.join(', ')}`,
+      'Section 15 CN'
+    );
+
+    if (enS15) {
+      const s15BoldEn = checkS15Bolding(enS15, [/Other provisions/i, /Complies with the following/i], 'EN');
+      assert(
+        s15BoldEn.passed,
+        '环3',
+        'Section 15 英文结构性子题头加粗规范 (INV-BOLD-S2-S15)',
+        'Section 15 Other provisions: 与 Complies with the following regulations: 必须加粗',
+        s15BoldEn.passed ? '全量加粗合规' : `缺失加粗: ${s15BoldEn.missing.join(', ')}`,
+        'Section 15 EN'
+      );
+    }
   }
 
   // ======================================================================

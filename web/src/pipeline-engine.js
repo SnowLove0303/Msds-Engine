@@ -3899,6 +3899,8 @@ export async function executeEightDeliverablesPipeline({
     }
     // 强制执行全文档跨章节设计令牌与底层排版投影 (INV-FONT-UNIFORMITY)
     applyGlobalTypographyProjection(eng, isEn);
+    // 强制执行结构性题头与标签加粗法定不变量加固 (INV-BOLD-S2-S15)
+    enforceStructuralTypographyInvariants(eng, isEn);
     const s8Rec = eng.records.find(r => r.sectionNumber === 8);
     if (s8Rec) {
       // 1. Table 8 值格字阶与字体全局统一性规范 (INV-FONT-UNIFORMITY):
@@ -4042,6 +4044,129 @@ export async function executeEightDeliverablesPipeline({
   };
 }
 
+
+/**
+ * 结构性题头与标签加粗法定不变量加固引擎 (INV-BOLD-S2-S15)
+ * 物理杜绝 Section 2 标签加粗丢失、Section 15 结构性题头加粗丢失与 Section 8.1 格式偏差
+ */
+export function enforceStructuralTypographyInvariants(eng, isEn = false) {
+  if (!eng?.documentXml) return;
+  const doc = eng.documentXml;
+  const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+
+  // 1. Section 2: 细粒度加粗与常规体分离校验 (INV-BOLD-S2-S15)
+  const s2Rec = eng.records.find(r => r.sectionNumber === 2);
+  if (s2Rec && s2Rec.rows.length >= 2) {
+    const c0 = s2Rec.rows[1].cells[0]?.node;
+    if (c0) {
+      const ps = Array.from(c0.getElementsByTagNameNS(W_NS, 'p'));
+      for (const p of ps) {
+        const fullText = (p.textContent || '').trim();
+        const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+        if (runs.length === 0) continue;
+
+        const isSectionHeader = /^(?:2\.\d+\s*)?(?:GHS\s*危险性类别|GHS\s*分类|Classification of the substance or mixture|GHS\s*Classification|GHS\s*标签要素|Label elements|GHS\s*Label\s*Elements|危险性说明|危害性说明|Hazard\s*statements?|防范说明|Precautionary\s*statements?|其他危害|其他危险|Other\s*hazards?)[：:]?/i.test(fullText);
+        const isSubLabelPrefix = /^(?:(?:GHS\s*)?(?:象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components which must be listed on the label)|(?:需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal))[：:]/i.test(fullText);
+
+        const setRunBold = (runNode, bold) => {
+          let rPr = runNode.getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');
+          if (!runNode.getElementsByTagNameNS(W_NS, 'rPr')[0]) runNode.insertBefore(rPr, runNode.firstChild);
+          const bs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'b'));
+          bs.forEach(b => rPr.removeChild(b));
+          const bCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
+          bCss.forEach(b => rPr.removeChild(b));
+          if (bold) {
+            rPr.appendChild(doc.createElementNS(W_NS, 'w:b'));
+            rPr.appendChild(doc.createElementNS(W_NS, 'w:bCs'));
+          }
+        };
+
+        if (isSectionHeader) {
+          if (/^(?:2\.\d+\s*)?(?:其他危害|其他危险|Other\s*hazards?)[：:]/i.test(fullText)) {
+            setRunBold(runs[0], true);
+            for (let i = 1; i < runs.length; i++) setRunBold(runs[i], false);
+          } else {
+            for (const r of runs) setRunBold(r, true);
+          }
+        } else if (isSubLabelPrefix) {
+          setRunBold(runs[0], true);
+          for (let i = 1; i < runs.length; i++) setRunBold(runs[i], false);
+        } else {
+          for (const r of runs) setRunBold(r, false);
+        }
+      }
+    }
+  }
+
+  // 2. Section 8.1 题头行与 Section 8.2 工程控制格式规范
+  const s8Rec = eng.records.find(r => r.sectionNumber === 8);
+  if (s8Rec && s8Rec.rows.length >= 2) {
+    const r1 = s8Rec.rows[1];
+    const c0 = r1.cells[0]?.node;
+    if (c0) {
+      const runs = Array.from(c0.getElementsByTagNameNS(W_NS, 'r'));
+      if (runs.length >= 1) {
+        let r0Pr = runs[0].getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');
+        if (!runs[0].getElementsByTagNameNS(W_NS, 'rPr')[0]) runs[0].insertBefore(r0Pr, runs[0].firstChild);
+        let b = r0Pr.getElementsByTagNameNS(W_NS, 'b')[0] || doc.createElementNS(W_NS, 'w:b');
+        if (!r0Pr.getElementsByTagNameNS(W_NS, 'b')[0]) r0Pr.appendChild(b);
+        let bCs = r0Pr.getElementsByTagNameNS(W_NS, 'bCs')[0] || doc.createElementNS(W_NS, 'w:bCs');
+        if (!r0Pr.getElementsByTagNameNS(W_NS, 'bCs')[0]) r0Pr.appendChild(bCs);
+        let sz = r0Pr.getElementsByTagNameNS(W_NS, 'sz')[0] || doc.createElementNS(W_NS, 'w:sz');
+        sz.setAttribute('w:val', '21');
+        if (!r0Pr.getElementsByTagNameNS(W_NS, 'sz')[0]) r0Pr.appendChild(sz);
+        let szCs = r0Pr.getElementsByTagNameNS(W_NS, 'szCs')[0] || doc.createElementNS(W_NS, 'w:szCs');
+        szCs.setAttribute('w:val', '21');
+        if (!r0Pr.getElementsByTagNameNS(W_NS, 'szCs')[0]) r0Pr.appendChild(szCs);
+        let rf = r0Pr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || doc.createElementNS(W_NS, 'w:rFonts');
+        rf.setAttribute('w:ascii', 'Times New Roman');
+        rf.setAttribute('w:hAnsi', 'Times New Roman');
+        if (!r0Pr.getElementsByTagNameNS(W_NS, 'rFonts')[0]) r0Pr.appendChild(rf);
+      }
+      if (runs.length >= 2) {
+        let r1Pr = runs[1].getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');
+        if (!runs[1].getElementsByTagNameNS(W_NS, 'rPr')[0]) runs[1].insertBefore(r1Pr, runs[1].firstChild);
+        let b = r1Pr.getElementsByTagNameNS(W_NS, 'b')[0] || doc.createElementNS(W_NS, 'w:b');
+        if (!r1Pr.getElementsByTagNameNS(W_NS, 'b')[0]) r1Pr.appendChild(b);
+        let bCs = r1Pr.getElementsByTagNameNS(W_NS, 'bCs')[0] || doc.createElementNS(W_NS, 'w:bCs');
+        if (!r1Pr.getElementsByTagNameNS(W_NS, 'bCs')[0]) r1Pr.appendChild(bCs);
+        let sz = r1Pr.getElementsByTagNameNS(W_NS, 'sz')[0] || doc.createElementNS(W_NS, 'w:sz');
+        sz.setAttribute('w:val', '24');
+        if (!r1Pr.getElementsByTagNameNS(W_NS, 'sz')[0]) r1Pr.appendChild(sz);
+        let szCs = r1Pr.getElementsByTagNameNS(W_NS, 'szCs')[0] || doc.createElementNS(W_NS, 'w:szCs');
+        szCs.setAttribute('w:val', '24');
+        if (!r1Pr.getElementsByTagNameNS(W_NS, 'szCs')[0]) r1Pr.appendChild(szCs);
+      }
+    }
+  }
+
+  // 3. Section 15: 法定结构性子题头加粗保护
+  const s15Rec = eng.records.find(r => r.sectionNumber === 15);
+  if (s15Rec) {
+    for (let rIdx = 1; rIdx < s15Rec.rows.length; rIdx++) {
+      const row = s15Rec.rows[rIdx];
+      const txt = (row.cells[0]?.text || '').trim();
+      const isSubheader = /^(?:其它的规定|其它规定|其他规定|Other provisions|Other regulations)[：:]?/i.test(txt) ||
+                          /^(?:符合下列法规要求|Complies with the following regulations|Comply with the following)[：:]?/i.test(txt);
+      const c0 = row.cells[0]?.node;
+      if (c0) {
+        const runs = Array.from(c0.getElementsByTagNameNS(W_NS, 'r'));
+        for (const r of runs) {
+          let rPr = r.getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');
+          if (!r.getElementsByTagNameNS(W_NS, 'rPr')[0]) r.insertBefore(rPr, r.firstChild);
+          const bs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'b'));
+          bs.forEach(b => rPr.removeChild(b));
+          const bCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
+          bCss.forEach(b => rPr.removeChild(b));
+          if (isSubheader) {
+            rPr.appendChild(doc.createElementNS(W_NS, 'w:b'));
+            rPr.appendChild(doc.createElementNS(W_NS, 'w:bCs'));
+          }
+        }
+      }
+    }
+  }
+}
 
 /**
  * 方案 A 标准英文工业级排版与“序号+标签”全量规范化引擎
