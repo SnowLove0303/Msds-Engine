@@ -115,6 +115,13 @@ async function buildSourceDocx(templateBuffer, cfg) {
   const r4 = trs[4];
   if (r4) {
     const parentTbl = r4.parentNode;
+    // 彻底清退底模中 r4 之后的所有历史残留行 (trs[5]及之后的所有旧组件行)
+    for (let i = 5; i < trs.length; i++) {
+      if (trs[i].parentNode === parentTbl) {
+        parentTbl.removeChild(trs[i]);
+      }
+    }
+
     const setRowCells = (rowNode, comp) => {
       const cells = Array.from(rowNode.getElementsByTagNameNS(W_NS, 'tc'));
       const setCellText = (cell, text) => {

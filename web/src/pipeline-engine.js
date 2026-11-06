@@ -993,6 +993,7 @@ export function parseSection2FromSource(srcEngine) {
   let mode = '';
   const categories = [];
   let signalWord = '';
+  let pictogramText = '';
   const hazardStatements = [];
   const prevention = [];
   const response = [];
@@ -1009,6 +1010,14 @@ export function parseSection2FromSource(srcEngine) {
     }
     if (/2\.2\s*GHS标签要素/i.test(p) || /^2\.2\s*标签要素/i.test(p) || /^标签要素/i.test(p) || /GHS[- ]?象形图/i.test(p)) {
       mode = 'label';
+      const m = p.match(/GHS[- ]?象形图[：:\s]*(.*)/i);
+      if (m && m[1].trim()) {
+        pictogramText = m[1].trim();
+      } else if (i + 1 < rawParas.length && !/^[1-9]\.|^GHS|^[A-Z]\d+|^防范|^危险|^警告|^信号/i.test(rawParas[i + 1])) {
+        if (!/危害性说明|防范说明|其他危险/i.test(rawParas[i + 1])) {
+          pictogramText = rawParas[i + 1].trim();
+        }
+      }
       continue;
     }
     if (/必须列在标签上的有害成[份分]|有害成[份分]/i.test(p)) {
@@ -1097,6 +1106,7 @@ export function parseSection2FromSource(srcEngine) {
     rawParas,
     isNonHazardous,
     categories,
+    pictogramText,
     signalWord,
     hazardStatements,
     prevention,
@@ -1287,6 +1297,8 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       if (facts.drawingNodes && facts.drawingNodes.length > 0) {
         paragraphs.push('GHS象形图：');
         paragraphs.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine });
+      } else if (parsed.pictogramText && parsed.pictogramText !== '无') {
+        paragraphs.push(`GHS象形图：${parsed.pictogramText}`);
       } else {
         paragraphs.push('GHS象形图：无');
       }
@@ -1359,6 +1371,12 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
           }
         } catch (e) {}
         paragraphs.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine, overrideImageBytes: cleanGhsBytes, overrideExt: 'png' });
+      } else if (parsed.pictogramText && parsed.pictogramText !== '无') {
+        let enPic = parsed.pictogramText;
+        if (/丙二醇甲醚|1-甲氧基-2-丙醇/i.test(enPic)) {
+          enPic = 'Propylene glycol monomethyl ether';
+        }
+        paragraphs.push(`GHS pictograms: ${enPic}`);
       } else {
         paragraphs.push('GHS pictograms: None');
       }
@@ -1669,15 +1687,97 @@ export async function buildBaseChineseEngine({
     }
   }
 
+function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
+  if (!cell?.node) return;
+  const p = cell.node.getElementsByTagNameNS(W_NS, 'p')[0];
+  if (!p) return;
+
+  const existingRuns = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+  existingRuns.forEach(r => p.removeChild(r));
+
+  const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+  if (pPr) {
+    const numPrs = Array.from(pPr.getElementsByTagNameNS(W_NS, 'numPr'));
+    numPrs.forEach(np => pPr.removeChild(np));
+  }
+
+  const doc = p.ownerDocument;
+
+  const r1 = doc.createElementNS(W_NS, 'w:r');
+  const rPr1 = doc.createElementNS(W_NS, 'w:rPr');
+  const rFonts1 = doc.createElementNS(W_NS, 'w:rFonts');
+  rFonts1.setAttributeNS(W_NS, 'w:hint', 'eastAsia');
+  rFonts1.setAttributeNS(W_NS, 'w:ascii', 'Times New Roman');
+  rFonts1.setAttributeNS(W_NS, 'w:hAnsi', 'Times New Roman');
+  rFonts1.setAttributeNS(W_NS, 'w:eastAsia', '宋体');
+  rFonts1.setAttributeNS(W_NS, 'w:cs', 'Times New Roman');
+  rPr1.appendChild(rFonts1);
+  const b1 = doc.createElementNS(W_NS, 'w:b');
+  rPr1.appendChild(b1);
+  const sz1 = doc.createElementNS(W_NS, 'w:sz');
+  sz1.setAttributeNS(W_NS, 'w:val', '21');
+  rPr1.appendChild(sz1);
+  r1.appendChild(rPr1);
+  const t1 = doc.createElementNS(W_NS, 'w:t');
+  t1.textContent = seqStr;
+  r1.appendChild(t1);
+  p.appendChild(r1);
+
+  const r2 = doc.createElementNS(W_NS, 'w:r');
+  const rPr2 = doc.createElementNS(W_NS, 'w:rPr');
+  const rFonts2 = doc.createElementNS(W_NS, 'w:rFonts');
+  rFonts2.setAttributeNS(W_NS, 'w:hint', 'eastAsia');
+  rPr2.appendChild(rFonts2);
+  const b2 = doc.createElementNS(W_NS, 'w:b');
+  rPr2.appendChild(b2);
+  const sz2 = doc.createElementNS(W_NS, 'w:sz');
+  sz2.setAttributeNS(W_NS, 'w:val', '21');
+  rPr2.appendChild(sz2);
+  r2.appendChild(rPr2);
+  const t2 = doc.createElementNS(W_NS, 'w:t');
+  t2.setAttribute('xml:space', 'preserve');
+  t2.textContent = '  ';
+  r2.appendChild(t2);
+  p.appendChild(r2);
+
+  const r3 = doc.createElementNS(W_NS, 'w:r');
+  const rPr3 = doc.createElementNS(W_NS, 'w:rPr');
+  const rFonts3 = doc.createElementNS(W_NS, 'w:rFonts');
+  rFonts3.setAttributeNS(W_NS, 'w:hint', 'eastAsia');
+  rPr3.appendChild(rFonts3);
+  const b3 = doc.createElementNS(W_NS, 'w:b');
+  rPr3.appendChild(b3);
+  const sz3 = doc.createElementNS(W_NS, 'w:sz');
+  sz3.setAttributeNS(W_NS, 'w:val', '24');
+  rPr3.appendChild(sz3);
+  r3.appendChild(rPr3);
+  const t3 = doc.createElementNS(W_NS, 'w:t');
+  t3.textContent = labelText;
+  r3.appendChild(t3);
+  p.appendChild(r3);
+
+  cell.text = `${seqStr}  ${labelText}`;
+  cell.labelNodes = [t3];
+}
+
   const s7Rec = engine.records.find(r => r.sectionNumber === 7);
   if (s7Rec) {
     for (const row of s7Rec.rows) {
       const lbl = (row.cells[0]?.text || '').trim();
-      if (/安全操作防范/i.test(lbl) && row.cells[1]) {
-        let val = (row.cells[1].text || '').trim();
-        if (val.includes('更换被污染或浸湿的衣物') && !val.includes('更换被污染或浸湿的衣物。')) {
-          val = val.replace(/更换被污染或浸湿的衣物(?![。])/g, '更换被污染或浸湿的衣物。');
-          safeWriteCellValue(row.cells[1], val);
+      if (/^(?:7\.1\s*)?安全操作防范/i.test(lbl)) {
+        if (row.cells[0]) {
+          formatSection7ChineseLabel(row.cells[0], '7.1', '安全操作防范：', W_NS);
+        }
+        if (row.cells[1]) {
+          let val = (row.cells[1].text || '').trim();
+          if (val.includes('更换被污染或浸湿的衣物') && !val.includes('更换被污染或浸湿的衣物。')) {
+            val = val.replace(/更换被污染或浸湿的衣物(?![。])/g, '更换被污染或浸湿的衣物。');
+            safeWriteCellValue(row.cells[1], val);
+          }
+        }
+      } else if (/^(?:7\.2\s*)?安全储存条件/i.test(lbl)) {
+        if (row.cells[0]) {
+          formatSection7ChineseLabel(row.cells[0], '7.2', '安全储存条件：', W_NS);
         }
       }
     }
@@ -4350,7 +4450,7 @@ function rebuildTabbedLabelWithTypography(p, seqStr, labelText, { font, sizeVal,
 
   const t1 = doc.createElementNS(W_NS, 'w:t');
   t1.setAttribute('xml:space', 'preserve');
-  t1.textContent = seqStr;
+  t1.textContent = seqStr ? (seqStr + '  ') : '';
   r1.appendChild(t1);
 
   const tab = doc.createElementNS(W_NS, 'w:tab');

@@ -1280,14 +1280,14 @@ export async function loadDocx(source, sourceName = 'document.docx') {
         record.engine = this;
       }
       this.headerFooterData = extractHeaderFooterData(this);
-      enableCrossPageBreaksForAllSections(this);
+      // enableCrossPageBreaksForAllSections(this);
       healAllTableTopologies(this.documentXml);
       return this;
     },
     async exportArrayBuffer() {
       suppressOversizedRowHeights(this);
       suppressTrailingDocumentParagraph(this);
-      enableCrossPageBreaksForAllSections(this);
+      // enableCrossPageBreaksForAllSections(this);
       const output = await JSZip.loadAsync(this.originalBytes);
       output.file('word/document.xml', serializer().serializeToString(this.documentXml));
       if (this.relsText) {
@@ -2078,15 +2078,8 @@ export function suppressTrailingDocumentParagraph(engine) {
 }
 
 export function enableCrossPageBreaksForAllSections(engine) {
-  if (!engine?.documentXml) return;
-  const cantSplits = Array.from(engine.documentXml.getElementsByTagNameNS(W_NS, 'cantSplit') || []);
-  for (const node of cantSplits) {
-    node.parentNode?.removeChild(node);
-  }
-  const localCantSplits = Array.from(engine.documentXml.getElementsByTagName('cantSplit') || []);
-  for (const node of localCantSplits) {
-    node.parentNode?.removeChild(node);
-  }
+  // @ANTIGRAVITY_INVARIANT_LOCK: 严禁在此处删除 <w:cantSplit/>，表格行防跨页撕裂属性必须严格保留！
+  return;
 }
 
 export function transferDrawingToCell(srcEngine, targetEngine, srcDrawingNodes, targetCell) {
