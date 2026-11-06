@@ -2897,6 +2897,9 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
   // 3. 填充段落内容 (严格对齐全局规范与 handcraft-typography 5 级缩进及加粗状态机)
   if (content !== undefined && content !== null) {
     const rawParagraphs = Array.isArray(content) ? content : String(content).split(/\r?\n/);
+    let currentS2Level = 1;
+    const s2BaseIndent = options.isEnglish ? '317' : '480';
+    const s2SubValueIndent = options.isEnglish ? '677' : '840';
     for (let pIdx = 0; pIdx < rawParagraphs.length; pIdx++) {
       const pItem = rawParagraphs[pIdx];
       if (pItem && typeof pItem === 'object' && pItem.isDrawing) {
@@ -2907,7 +2910,7 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
         pPr.appendChild(jc);
         if (options.isSection2) {
           const ind = doc.createElementNS(W_NS, 'w:ind');
-          ind.setAttributeNS(W_NS, 'w:left', '360');
+          ind.setAttributeNS(W_NS, 'w:left', s2SubValueIndent);
           pPr.appendChild(ind);
         }
         pNode.appendChild(pPr);
@@ -2951,30 +2954,28 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
       }
       pPr.appendChild(spacing);
 
-      // Section 2 专属缩进几何状态机 (完全对齐父子层级统一规范：父级顶格、子标签统一 360 twips、P代码 720 twips、直接正文 360 twips)
+      // Section 2 专属缩进几何状态机 (完全对齐父子层级统一规范：父级顶格、一级标题文本与二级子标签及直接值首字绝对垂直对齐、二级值文本向右层级缩进)
       if (options.isSection2) {
         // 关键防御：严格识别父级节标题行 (2.1 GHS危险性类别、2.2 GHS标签要素、2.3 危险性说明、2.4 防范说明、2.5 其他危害等)，节标题绝不应用正文缩进！
         const isParentHeader = /^(?:2\.\d+|GHS危险性类别|物质或混合物的分类|Classification of the substance or mixture|GHS\s*标签要素|Label elements|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危险|其他危害|Other\s*Hazards?)/i.test(trimmed);
-        if (!isParentHeader) {
-          // 子标签统一集合：GHS象形图、信号词、必须列在标签上的有害成份、预防措施、事故响应、安全储存、废弃处置 (中英文)
-          const isSubLabel = /^(?:(?:GHS\s*)?(?:象形图|pictograms)|(?:警告词|信号词|Signal word)|(?:必须列在标签上的有害成份|Hazardous components which must be listed on the label)|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal)[：:])/i.test(trimmed);
-          // P代码正则（子标签下的二级值行）
-          const isPCode = /^P\d{3}/i.test(trimmed) || /^(?:操作时穿戴|操作后彻底清洗|作业场所不得|在室外或通风良好处操作|吸入[：:]|眼睛|食入[：:]|泄露[：:]|灭火[：:]|请置于避光|装完整|使用后的空桶|Wear protective|Wash contact|Do not eat|Use only outdoors|If inhaled|Skin and eye|Ingestion|Spillage|Fire|Store in a cool|Empty containers)/i.test(trimmed);
+        if (isParentHeader) {
+          currentS2Level = 1;
+        } else {
+          // 子标签统一集合：GHS象形图、信号词、必须列在标签上的有害成份、需要注意的物质、预防措施、事故响应、安全存储、安全储存、废弃处置 (中英文)
+          const isSubLabel = /^(?:(?:GHS\s*)?(?:象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components which must be listed on the label)|(?:需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal)[：:])/i.test(trimmed);
 
           if (isSubLabel) {
-            // 所有子标签：统一缩进 360 twips，首字绝对垂直对齐！
+            currentS2Level = 2;
+            // 所有子标签：统一缩进 s2BaseIndent (中文 440 twips / 英文 360 twips)，首字绝对垂直对齐！
             const ind = doc.createElementNS(W_NS, 'w:ind');
-            ind.setAttributeNS(W_NS, 'w:left', '360');
-            pPr.appendChild(ind);
-          } else if (isPCode) {
-            // P代码（防范说明子项下的二级值行）：缩进 720 twips (360 + 360)
-            const ind = doc.createElementNS(W_NS, 'w:ind');
-            ind.setAttributeNS(W_NS, 'w:left', '720');
+            ind.setAttributeNS(W_NS, 'w:left', s2BaseIndent);
             pPr.appendChild(ind);
           } else {
-            // 父级或子级下的直接正文值行 (2.1 分类描述、H代码、非危不属于危险物说明等)：统一缩进 360 twips
+            // 正文值行：根据当前层级决定缩进
+            // 若在二级子标签下（P代码、象形图值、信号词值等），应用 s2SubValueIndent (中文 800 twips / 英文 720 twips) 靠右缩进；
+            // 若在一级直接条目下（2.1 分类描述、H代码、非危不属于危险物说明、2.5 其他危害值等），应用 s2BaseIndent，与上方一级标签文本首字绝对垂直对齐！
             const ind = doc.createElementNS(W_NS, 'w:ind');
-            ind.setAttributeNS(W_NS, 'w:left', '360');
+            ind.setAttributeNS(W_NS, 'w:left', currentS2Level === 2 ? s2SubValueIndent : s2BaseIndent);
             pPr.appendChild(ind);
           }
         }

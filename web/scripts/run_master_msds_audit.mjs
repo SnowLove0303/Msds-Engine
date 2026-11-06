@@ -558,6 +558,61 @@ export async function runMasterMsdsAudit(options = {}) {
       ['指控 Section 2 标签加粗为多余格式']
     );
 
+    // Section 2 阶梯排版几何对齐与缩进门禁 (一二级标签首字对齐，值右缩进)
+    const checkS2Indentation = (docxRecord, isEnglish) => {
+      if (!docxRecord || docxRecord.rows.length < 2) return { passed: false, detail: 'S2记录缺失' };
+      const ps = docxRecord.rows[1].cells[0]?.paragraphs || [];
+      const expectedBase = isEnglish ? '317' : '480';
+      const expectedSubVal = isEnglish ? '677' : '840';
+      let currentLevel = 1;
+      let errs = [];
+
+      for (const p of ps) {
+        const text = (p.text || '').trim();
+        if (!text) continue;
+        const ind = p.node?.getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'ind')[0];
+        const left = ind?.getAttribute('w:left') || '0';
+        
+        const isParentHeader = /^(?:2\.\d+|GHS危险性类别|物质或混合物的分类|Classification of the substance or mixture|GHS\s*标签要素|Label elements|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危险|其他危害|Other\s*Hazards?)/i.test(text);
+        if (isParentHeader) {
+          currentLevel = 1;
+          if (left !== '0' && left !== '') errs.push(`一级标题 "${text.slice(0, 15)}" 不应缩进 (实际 left=${left})`);
+        } else {
+          const isSubLabel = /^(?:(?:GHS\s*)?(?:象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components which must be listed on the label)|(?:需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal)[：:])/i.test(text);
+          if (isSubLabel) {
+            currentLevel = 2;
+            if (left !== expectedBase) errs.push(`二级标签 "${text.slice(0, 10)}" 缩进偏差: 期望 ${expectedBase}, 实际 ${left}`);
+          } else {
+            const exp = currentLevel === 2 ? expectedSubVal : expectedBase;
+            if (left !== exp) errs.push(`值内容 "${text.slice(0, 15)}" 缩进偏差: 期望 ${exp}, 实际 ${left}`);
+          }
+        }
+      }
+      return { passed: errs.length === 0, detail: errs.length > 0 ? errs.slice(0, 3).join('; ') : '几何层级阶梯对齐合规' };
+    };
+
+    const s2IndCn = checkS2Indentation(cnS2, false);
+    assert(
+      s2IndCn.passed,
+      '环3',
+      'Section 2 中文阶梯几何排版对齐规范',
+      'Section 2 一级标签文本与二级标签首字对齐(480 twips)，二级值靠右缩进(840 twips)',
+      s2IndCn.detail,
+      'Section 2 CN',
+      ['指控 Section 2 缩进阶梯为格式错误']
+    );
+
+    const s2IndEn = checkS2Indentation(enS2, true);
+    assert(
+      s2IndEn.passed,
+      '环3',
+      'Section 2 英文阶梯几何排版对齐规范',
+      'Section 2 英文一级标签文本与二级标签首字对齐(317 twips)，二级值靠右缩进(677 twips)',
+      s2IndEn.detail,
+      'Section 2 EN',
+      ['指控 Section 2 缩进阶梯为格式错误']
+    );
+
     // INV-ZERO-EXOGENOUS: 探查源文件是否载明象形图与信号词 (全域通用门禁，危品与非危品统一适用)
     let srcHasPictogram = false;
     let srcHasSignal = false;

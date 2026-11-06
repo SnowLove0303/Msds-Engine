@@ -1336,7 +1336,8 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       }
       if (parsed.otherHazards) {
         let cleanOtherVal = parsed.otherHazards.trim().replace(/^(?:2\.\d+\s*)?(?:其他危[害险][:：]?\s*)?/i, '');
-        paragraphs.push(`2.${secIdx++} 其他危害：${cleanOtherVal}`);
+        paragraphs.push(`2.${secIdx++} 其他危害：`);
+        paragraphs.push(cleanOtherVal || '无适用资料。');
       }
     } else {
       // 真实非危通栏组装 (遵循 INV-ZERO-EXOGENOUS 与源事实忠实公理)
@@ -1356,7 +1357,8 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       }
       if (parsed?.otherHazards) {
         let cleanOtherVal = parsed.otherHazards.trim().replace(/^(?:2\.\d+\s*)?(?:其他危[害险][:：]?\s*)?/i, '');
-        paragraphs.push(`2.3 其他危害：${cleanOtherVal}`);
+        paragraphs.push('2.3 其他危害：');
+        paragraphs.push(cleanOtherVal || '无适用资料。');
       }
     }
   } else {
@@ -1441,16 +1443,17 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       if (parsed.otherHazards) {
         const curIdx = secIdxEn++;
         let cleanEnVal = parsed.otherHazards.trim().replace(/^(?:2\.\d+\s*)?(?:Other\s*hazards?[:：]?\s*|其他危[害险][:：]?\s*)/i, '');
-        let enOther = `2.${curIdx} Other hazards: No applicable information.`;
+        let enOther = 'No applicable information.';
         if (/N[－-]甲基吡咯烷酮/i.test(cleanEnVal)) {
-          enOther = `2.${curIdx} Other hazards: Risk of cutaneous absorption of N-Methyl-2-pyrrolidone (NMP).`;
+          enOther = 'Risk of cutaneous absorption of N-Methyl-2-pyrrolidone (NMP).';
         } else if (/N,N[－-]二甲基乙酰胺/i.test(cleanEnVal)) {
-          enOther = `2.${curIdx} Other hazards: Risk of cutaneous absorption of N,N-Dimethylacetamide (DMAC).`;
+          enOther = 'Risk of cutaneous absorption of N,N-Dimethylacetamide (DMAC).';
         } else if (!cleanEnVal || /无适用资料|无已知|无数据|无/i.test(cleanEnVal)) {
-          enOther = `2.${curIdx} Other hazards: No applicable information.`;
+          enOther = 'No applicable information.';
         } else {
-          enOther = `2.${curIdx} Other hazards: ${translateGhsPrecautionary(cleanEnVal) || 'No applicable information.'}`;
+          enOther = translateGhsPrecautionary(cleanEnVal) || 'No applicable information.';
         }
+        paragraphs.push(`2.${curIdx} Other hazards:`);
         paragraphs.push(enOther);
       }
     } else {
@@ -1470,7 +1473,8 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         );
       }
       if (parsed?.otherHazards) {
-        paragraphs.push('2.3 Other hazards: No applicable information.');
+        paragraphs.push('2.3 Other hazards:');
+        paragraphs.push('No applicable information.');
       }
     }
   }
