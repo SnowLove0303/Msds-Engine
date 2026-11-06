@@ -482,6 +482,51 @@ export async function runMasterMsdsAudit(options = {}) {
     const enS2Text = enS2.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
     const isNonHaz = /不属于危害|非危险|不属于危险|危险性类别[：:]\s*无|not classified/i.test(cnS2Text);
 
+    // INV-ZERO-EXOGENOUS: 探查源文件是否载明象形图与信号词 (全域通用门禁，危品与非危品统一适用)
+    let srcHasPictogram = false;
+    let srcHasSignal = false;
+    const effectiveSourcePath = sourceDocx || (fs.readdirSync(targetDir).find(f => /源文件留存|源文件|raw|source/i.test(f) && f.endsWith('.docx')) ? path.join(targetDir, fs.readdirSync(targetDir).find(f => /源文件留存|源文件|raw|source/i.test(f) && f.endsWith('.docx'))) : null);
+    if (effectiveSourcePath && fs.existsSync(effectiveSourcePath)) {
+      try {
+        const srcDocx = await loadDocx(fs.readFileSync(effectiveSourcePath));
+        const srcS2 = srcDocx.records.find(r => r.sectionNumber === 2);
+        if (srcS2) {
+          const srcS2Text = srcS2.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
+          srcHasPictogram = /象形图|pictogram/i.test(srcS2Text);
+          srcHasSignal = /信号词|警示词|signal word/i.test(srcS2Text);
+        }
+      } catch (e) {}
+    }
+
+    // 源文件零外生虚增信号词最高公理硬断言 (危品与非危品全域覆盖)
+    if (!srcHasSignal) {
+      const hasExoSigCn = /信号词[：:]/.test(cnS2Text);
+      const hasExoSigEn = /Signal word[：:]/i.test(enS2Text);
+      assert(
+        !hasExoSigCn && !hasExoSigEn,
+        '环3',
+        'Section 2 源文件零外生虚增(信号词)',
+        '源文档未提及信号词时，交付物严禁外生强塞任何信号词条目（含“信号词：无”或“Signal word: None”）',
+        `CN包含信号词=${hasExoSigCn}, EN包含信号词=${hasExoSigEn}`,
+        'Section 2 CN/EN'
+      );
+    }
+
+    // 源文件零外生虚增象形图最高公理硬断言 (危品与非危品全域覆盖)
+    if (!srcHasPictogram) {
+      const hasExoPicCn = /GHS\s*象形图[：:]\s*无|象形图[：:]\s*无/.test(cnS2Text);
+      const hasExoPicEn = /GHS pictograms:\s*None|Pictograms:\s*None/i.test(enS2Text);
+      assert(
+        !hasExoPicCn && !hasExoPicEn,
+        '环3',
+        'Section 2 源文件零外生虚增(象形图)',
+        '源文档未提及象形图时，交付物严禁外生强塞“象形图：无”或“None”',
+        `CN外生=${hasExoPicCn}, EN外生=${hasExoPicEn}`,
+        'Section 2 CN/EN',
+        ['忠实源文件未虚增象形图属于遗漏']
+      );
+    }
+
     if (isNonHaz) {
       assert(
         !/H412|H315|Category|H332|H317/i.test(enS2Text),
@@ -491,49 +536,6 @@ export async function runMasterMsdsAudit(options = {}) {
         enS2Text.slice(0, 150),
         'Section 2 EN'
       );
-      // INV-ZERO-EXOGENOUS: 探查源文件是否载明象形图与信号词
-      let srcHasPictogram = false;
-      let srcHasSignal = false;
-      const effectiveSourcePath = sourceDocx || (fs.readdirSync(targetDir).find(f => /源文件留存|源文件|raw|source/i.test(f) && f.endsWith('.docx')) ? path.join(targetDir, fs.readdirSync(targetDir).find(f => /源文件留存|源文件|raw|source/i.test(f) && f.endsWith('.docx'))) : null);
-      if (effectiveSourcePath && fs.existsSync(effectiveSourcePath)) {
-        try {
-          const srcDocx = await loadDocx(fs.readFileSync(effectiveSourcePath));
-          const srcS2 = srcDocx.records.find(r => r.sectionNumber === 2);
-          if (srcS2) {
-            const srcS2Text = srcS2.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
-            srcHasPictogram = /象形图|pictogram/i.test(srcS2Text);
-            srcHasSignal = /信号词|警示词|signal word/i.test(srcS2Text);
-          }
-        } catch (e) {}
-      }
-
-      // 源文件零外生虚增最高公理断言
-      if (!srcHasPictogram) {
-        const hasExoPicCn = /GHS\s*象形图[：:]\s*无|象形图[：:]\s*无/.test(cnS2Text);
-        const hasExoPicEn = /GHS pictograms:\s*None|Pictograms:\s*None/i.test(enS2Text);
-        assert(
-          !hasExoPicCn && !hasExoPicEn,
-          '环3',
-          'Section 2 源文件零外生虚增(象形图)',
-          '源文档未提及象形图时，交付物严禁外生强塞“象形图：无”或“None”',
-          `CN外生=${hasExoPicCn}, EN外生=${hasExoPicEn}`,
-          'Section 2 CN/EN',
-          ['忠实源文件未虚增象形图属于遗漏']
-        );
-      }
-      if (!srcHasSignal) {
-        const hasExoSigCn = /信号词[：:]\s*无/.test(cnS2Text);
-        const hasExoSigEn = /Signal word:\s*None/i.test(enS2Text);
-        assert(
-          !hasExoSigCn && !hasExoSigEn,
-          '环3',
-          'Section 2 源文件零外生虚增(信号词)',
-          '源文档未提及信号词时，交付物严禁外生强塞“信号词：无”或“None”',
-          `CN外生=${hasExoSigCn}, EN外生=${hasExoSigEn}`,
-          'Section 2 CN/EN',
-          ['非危品源文件未提信号词未输出无属于缺陷']
-        );
-      }
       // 严禁非危品外生冒出“警告词：警告”或“Signal word: Warning”
       const hasFakeWarningCn = /警告词[：:]\s*警告/.test(cnS2Text);
       const hasFakeWarningEn = /Signal word:\s*Warning/i.test(enS2Text);
@@ -746,32 +748,160 @@ export async function runMasterMsdsAudit(options = {}) {
       );
     }
 
-    // 检查 Table 8 值格粗细隔离 (Value Cell Weight Isolation)：Row 2~11 的 Cell 1 必须为常规细体，严禁全加粗
+    // 检查 Table 8 值格字阶与字体全局统一性规范 (INV-FONT-UNIFORMITY)
+    // 中文版：Table 8 右侧内容单元格必须与全篇各章节值格保持高度一致，统一为小四号 12pt (sz="24") 宋体
+    // 英文版：Table 8 右侧内容单元格必须与全篇各章节值格保持高度一致，统一为五号 9.5pt (sz="19") Arial
     const tablesCn = Array.from(domCn.getElementsByTagName('w:tbl'));
-    const t8 = tablesCn[7];
-    if (t8) {
-      const rows = Array.from(t8.getElementsByTagName('w:tr'));
-      let allBoldCount = 0;
+    const t8Cn = tablesCn[7];
+    if (t8Cn) {
+      const rows = Array.from(t8Cn.getElementsByTagName('w:tr'));
+      let nonSz24Count = 0;
       for (let i = 2; i < rows.length; i++) {
         const c1 = rows[i].getElementsByTagName('w:tc')[1];
         if (c1) {
           const serializer = new XmlSerializer();
           const c1Xml = serializer.serializeToString(c1);
           const hasText = (c1.textContent || '').trim().length > 0;
-          if (hasText && /<w:b(?:\s|\/|>)/.test(c1Xml) && !/<w:b\s+w:val="false"/.test(c1Xml)) {
-            allBoldCount++;
+          if (hasText && !/<w:sz\s+w:val="24"/.test(c1Xml)) {
+            nonSz24Count++;
           }
         }
       }
       assert(
-        allBoldCount === 0,
+        nonSz24Count === 0,
         '环3',
-        'Section 8 值格粗细隔离规范',
-        'Table 8 右侧内容单元格 (Cell 1) 必须保持常规细体 (Regular 10.5pt)，严禁全列加粗失控',
-        `违规加粗值格数: ${allBoldCount}`,
-        'Table 8 Cell 1'
+        'Section 8 中文值格字阶全局统一性规范',
+        'Table 8 右侧内容单元格必须与全篇其他章节值格保持高度一致，统一为小四号 12pt (sz="24") 宋体，严禁孤立降级为 sz=21',
+        `异常字号值格数: ${nonSz24Count}`,
+        'Table 8 Cell 1 CN'
       );
     }
+
+    const tablesEn = Array.from(domEn.getElementsByTagName('w:tbl'));
+    const t8En = tablesEn[7];
+    if (t8En) {
+      const rows = Array.from(t8En.getElementsByTagName('w:tr'));
+      let nonSz19Count = 0;
+      for (let i = 2; i < rows.length; i++) {
+        const c1 = rows[i].getElementsByTagName('w:tc')[1];
+        if (c1) {
+          const serializer = new XmlSerializer();
+          const c1Xml = serializer.serializeToString(c1);
+          const hasText = (c1.textContent || '').trim().length > 0;
+          if (hasText && !/<w:sz\s+w:val="19"/.test(c1Xml)) {
+            nonSz19Count++;
+          }
+        }
+      }
+      assert(
+        nonSz19Count === 0,
+        '环3',
+        'Section 8 英文值格字阶全局统一性规范',
+        'Table 8 右侧内容单元格必须与全篇其他章节值格保持高度一致，统一为五号 9.5pt (sz="19") Arial，严禁异常放大为 sz=21',
+        `异常字号值格数: ${nonSz19Count}`,
+        'Table 8 Cell 1 EN'
+      );
+    }
+
+    // 检查全文档跨章节值格字体与字阶全局一致性零方差门禁 (INV-CROSS-SECTION-TYPOGRAPHY-ZERO-VARIANCE)
+    let crossSecBadSzCountCn = 0;
+    tablesCn.forEach((tbl, tIdx) => {
+      // 检查 Section 1..16 所有表格的值单元格
+      const rows = Array.from(tbl.getElementsByTagName('w:tr'));
+      for (let rIdx = 1; rIdx < rows.length; rIdx++) {
+        const cells = Array.from(rows[rIdx].getElementsByTagName('w:tc'));
+        if (cells.length < 2) continue;
+        const rowText = cells.map(c => (c.textContent || '').trim()).join(' ');
+        if (/化学品名称.*CAS编号|物质.*依据.*类型|Components.*Basis.*Type|Substance.*Basis.*Type/i.test(rowText)) continue;
+        for (let cIdx = 1; cIdx < cells.length; cIdx++) {
+          const cell = cells[cIdx];
+          const txt = (cell.textContent || '').trim();
+          if (!txt || /^(?:CAS编号|含量%（w\/w）|依据|类型|数值)$/i.test(txt)) continue;
+          const runs = Array.from(cell.getElementsByTagName('w:r'));
+          for (const r of runs) {
+            const rTxt = (r.textContent || '').trim();
+            if (!rTxt) continue;
+            const sz = r.getElementsByTagName('w:sz')[0]?.getAttribute('w:val');
+            if (sz && sz !== '24') crossSecBadSzCountCn++;
+          }
+        }
+      }
+    });
+
+    assert(
+      crossSecBadSzCountCn === 0,
+      '环3',
+      '全篇跨章节中文值格字阶零方差一致性断言 (INV-FONT-UNIFORMITY)',
+      '全篇所有章节（Section 1~16）中文值格字阶必须保持 100% 均一性，统一为小四号 12pt (sz="24")，零方差偏离',
+      `偏离 sz=24 的值格文本 Run 数: ${crossSecBadSzCountCn}`,
+      'Full Document CN Value Cells'
+    );
+
+    let crossSecBadSzCountEn = 0;
+    tablesEn.forEach((tbl, tIdx) => {
+      const rows = Array.from(tbl.getElementsByTagName('w:tr'));
+      for (let rIdx = 1; rIdx < rows.length; rIdx++) {
+        const cells = Array.from(rows[rIdx].getElementsByTagName('w:tc'));
+        if (cells.length < 2) continue;
+        const rowText = cells.map(c => (c.textContent || '').trim()).join(' ');
+        if (/Components.*Basis.*Type|Substance.*Basis.*Type/i.test(rowText)) continue;
+        for (let cIdx = 1; cIdx < cells.length; cIdx++) {
+          const cell = cells[cIdx];
+          const txt = (cell.textContent || '').trim();
+          if (!txt || /^(?:CAS NO\.|Concentration % \(w\/w\)|Basis|Type|Value)$/i.test(txt)) continue;
+          const runs = Array.from(cell.getElementsByTagName('w:r'));
+          for (const r of runs) {
+            const rTxt = (r.textContent || '').trim();
+            if (!rTxt) continue;
+            const sz = r.getElementsByTagName('w:sz')[0]?.getAttribute('w:val');
+            if (sz && sz !== '19') crossSecBadSzCountEn++;
+          }
+        }
+      }
+    });
+
+    assert(
+      crossSecBadSzCountEn === 0,
+      '环3',
+      '全篇跨章节英文值格字阶零方差一致性断言 (INV-FONT-UNIFORMITY)',
+      '全篇所有章节（Section 1~16）英文值格字阶必须保持 100% 均一性，统一为五号 9.5pt (sz="19")，零方差偏离',
+      `偏离 sz=19 的值格文本 Run 数: ${crossSecBadSzCountEn}`,
+      'Full Document EN Value Cells'
+    );
+
+    // 检查 Table 8 值文本排版格式与符号规范 (INV-TYPOGRAPHY-S8)
+    const hasBadGteSymbolCn = /[≧≦]/.test(cnS8Text);
+    const hasBadGteSymbolEn = /[≧≦]/.test(enS8Text);
+    assert(
+      !hasBadGteSymbolCn && !hasBadGteSymbolEn,
+      '环3',
+      'Section 8 符号标准规范(≥严禁≧)',
+      'Section 8 计量与比较符号必须使用标准西文 ≥/≤，严禁使用非标全角 ≧/≦',
+      `CN非标=${hasBadGteSymbolCn}, EN非标=${hasBadGteSymbolEn}`,
+      'Section 8 CN/EN'
+    );
+
+    // 检查手套值格数字与单位空格隔离 (如 0.4 mm、480 min)
+    const hasClumpedUnitCn = /(\d+(?:\.\d+)?)(mm|min)\b/.test(cnS8Text);
+    assert(
+      !hasClumpedUnitCn,
+      '环3',
+      'Section 8 值文本计量单位空格隔离规范',
+      '手套规格等物理参数必须在数值与计量单位间保留标准西文空格（如 0.4 mm、480 min），严禁黏连',
+      hasClumpedUnitCn ? '存在未隔离单位' : '标准空格隔离',
+      'Section 8 CN'
+    );
+
+    // 检查手套规格末尾不得带多余西文句点 (如 480 min.)
+    const hasTrailingDotCn = /(?:mm|min)\./.test(cnS8Text);
+    assert(
+      !hasTrailingDotCn,
+      '环3',
+      'Section 8 中文手套规格无末尾句点规范',
+      '中文手套规格参数末尾严禁携带多余西文句点 (如 min.)，保持纯净排版',
+      hasTrailingDotCn ? '存在末尾句点' : '纯净无句点',
+      'Section 8 CN'
+    );
   }
 
   // Section 9: 理化特性 (源文件底线保留与无数据存活)

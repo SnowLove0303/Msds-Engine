@@ -84,6 +84,10 @@ import {
   detectNonHazardousComposite,
   cleanSlateTemplate
 } from './smart-matching.js';
+import {
+  MSDS_DESIGN_TOKENS,
+  applyGlobalTypographyProjection
+} from './universal-editor-primitives.js';
 import { convertBatchDocxToPdf } from './pdf-converter.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1299,14 +1303,16 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         paragraphs.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine });
       } else if (parsed.pictogramText && parsed.pictogramText !== '无') {
         paragraphs.push(`GHS象形图：${parsed.pictogramText}`);
-      } else {
+      } else if (parsed.pictogramText === '无') {
         paragraphs.push('GHS象形图：无');
       }
       if (parsed.hazardousIngredients) {
         paragraphs.push(`必须列在标签上的有害成份：${parsed.hazardousIngredients}`);
       }
-      const cnSignal = (parsed.signalWord && parsed.signalWord !== '无') ? parsed.signalWord : '无';
-      paragraphs.push(`信号词：${cnSignal}`);
+      // 仅当源文件明确载明信号词时输出，严禁外生兜底虚增“信号词：无” (INV-ZERO-EXOGENOUS)
+      if (parsed.signalWord) {
+        paragraphs.push(`信号词：${parsed.signalWord}`);
+      }
 
       let secIdx = 3;
       if (parsed.hazardStatements && parsed.hazardStatements.length > 0) {
@@ -1377,7 +1383,7 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
           enPic = 'Propylene glycol monomethyl ether';
         }
         paragraphs.push(`GHS pictograms: ${enPic}`);
-      } else {
+      } else if (parsed.pictogramText === '无') {
         paragraphs.push('GHS pictograms: None');
       }
       if (parsed.hazardousIngredients) {
@@ -1389,8 +1395,11 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         }
         paragraphs.push(`Hazardous components which must be listed on the label: ${ingEn}`);
       }
-      const enSignal = parsed.signalWord === '危险' ? 'Danger' : (parsed.signalWord === '警告' ? 'Warning' : 'None');
-      paragraphs.push(`Signal word: ${enSignal}`);
+      // 仅当源文件明确载明信号词时输出英译，严禁捏造“Signal word: None” (INV-ZERO-EXOGENOUS)
+      if (parsed.signalWord) {
+        const enSignal = parsed.signalWord === '危险' ? 'Danger' : (parsed.signalWord === '警告' ? 'Warning' : parsed.signalWord);
+        paragraphs.push(`Signal word: ${enSignal}`);
+      }
 
       let secIdxEn = 3;
       if (parsed.hazardStatements && parsed.hazardStatements.length > 0) {
@@ -2002,14 +2011,41 @@ function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
           }
         }
       }
-      // 清理手套参数末尾多余西文句点
-      if (row.cells.length > 1 && row.cells[1]?.node) {
+      // 统一手套材料与参数值文本排版格式与 XML Run 纯净化 (INV-TYPOGRAPHY-S8)
+      if (row.cells.length > 1 && row.cells[1]?.node && /(?:氟化橡胶|丁基橡胶|丁腈橡胶|合适材料|手套)/i.test(lbl)) {
         const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
         const p = row.cells[1].node.getElementsByTagNameNS(W_NS, 'p')[0];
         if (p) {
-          const tNode = p.getElementsByTagNameNS(W_NS, 't')[0];
-          if (tNode && /(?:厚度|穿透时间|≧|mm|min)\.$/.test(tNode.textContent.trim())) {
-            tNode.textContent = tNode.textContent.trim().replace(/\.$/, '');
+          // 清理末尾无文本内容的空 <w:r> 节点，消除结构冗余
+          const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+          for (let rIdx = 1; rIdx < runs.length; rIdx++) {
+            const tNodes = Array.from(runs[rIdx].getElementsByTagNameNS(W_NS, 't'));
+            const textContent = tNodes.map(t => t.textContent).join('').trim();
+            if (!textContent) {
+              p.removeChild(runs[rIdx]);
+            }
+          }
+          // 对首个文本 Run 执行值文本排版规范化：
+          // 1. 全角≧/≦统一转换为标准西文≥/≤
+          // 2. 数值与计量单位之间必须插入标准西文半角空格（0.4 mm、480 min）
+          // 3. 规整分号与清除末尾孤立句点
+          const firstR = p.getElementsByTagNameNS(W_NS, 'r')[0];
+          if (firstR) {
+            const tNodes = Array.from(firstR.getElementsByTagNameNS(W_NS, 't'));
+            let fullText = tNodes.map(t => t.textContent).join('');
+            fullText = fullText
+              .replace(/≧/g, '≥')
+              .replace(/≦/g, '≤')
+              .replace(/(\d+(?:\.\d+)?)\s*(mm|min)/gi, '$1 $2')
+              .replace(/;\s*|；\s*/g, '；')
+              .replace(/\.$/, '')
+              .trim();
+            if (tNodes.length > 0) {
+              tNodes[0].textContent = fullText;
+              for (let tIdx = 1; tIdx < tNodes.length; tIdx++) {
+                tNodes[tIdx].textContent = '';
+              }
+            }
           }
         }
       }
@@ -3861,9 +3897,15 @@ export async function executeEightDeliverablesPipeline({
         }
       }
     }
+    // 强制执行全文档跨章节设计令牌与底层排版投影 (INV-FONT-UNIFORMITY)
+    applyGlobalTypographyProjection(eng, isEn);
     const s8Rec = eng.records.find(r => r.sectionNumber === 8);
     if (s8Rec) {
-      // 1. Table 8 值格粗细与字阶规范 (INV-S8-03): Row 2..end 的 Cell 1 必须为常规细体五号字 (sz="21")，严禁加粗或超标放大 (sz="24")
+      // 1. Table 8 值格字阶与字体全局统一性规范 (INV-FONT-UNIFORMITY):
+      // 中文版：值格统一为小四号 12pt (sz="24") 宋体常规体（严禁加粗）
+      // 英文版：值格统一为五号 9.5pt (sz="19") Arial 常规体
+      const targetSz = isEn ? '19' : '24';
+      const targetFont = isEn ? 'Arial' : '宋体';
       for (let r = 2; r < s8Rec.rows.length; r++) {
         const vCell = s8Rec.rows[r]?.cells?.[1];
         if (vCell?.node) {
@@ -3874,9 +3916,16 @@ export async function executeEightDeliverablesPipeline({
             const bCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
             bCss.forEach(b => rPr.removeChild(b));
             const szs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'sz'));
-            szs.forEach(sz => sz.setAttribute('w:val', '21'));
+            szs.forEach(sz => sz.setAttribute('w:val', targetSz));
             const szCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'szCs'));
-            szCss.forEach(szCs => szCs.setAttribute('w:val', '21'));
+            szCss.forEach(szCs => szCs.setAttribute('w:val', targetSz));
+            const rFontsList = Array.from(rPr.getElementsByTagNameNS(W_NS, 'rFonts'));
+            for (const rf of rFontsList) {
+              rf.setAttribute('w:ascii', targetFont);
+              rf.setAttribute('w:hAnsi', targetFont);
+              rf.setAttribute('w:eastAsia', targetFont);
+              rf.setAttribute('w:cs', targetFont);
+            }
           }
         }
       }

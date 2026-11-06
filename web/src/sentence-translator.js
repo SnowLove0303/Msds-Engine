@@ -47,7 +47,7 @@ export function splitEnglishSentences(text) {
     .replace(/(\d+)\.(\d+)/g, '$1__DECIMAL__$2');
 
   const rawParts = protectedText
-    .split(/(?<=[.!?;:\n])\s+/)
+    .split(/(?<=[.!?;:])\s+|\n+/)
     .map(s => s.trim())
     .filter(s => s.length > 0);
 
