@@ -59,6 +59,41 @@ export async function loadDocXml(filePath) {
 }
 
 /**
+ * 根据 OpenXML (ECMA-376) 标准精确计算 Run 节点的最终生效粗细 (Effective Computed Bold)
+ * 核心法则 (INV-EFFECTIVE-STYLE-OVER-AST):
+ * Run 级属性 (w:rPr) 绝对优先于段落级属性 (w:pPr/w:rPr)。
+ * 只有当 Run 未设置 w:b 时，才回退继承段落的 w:b。
+ * 若 Run 显式设置了 <w:b w:val="0"/> 或 <w:b w:val="false"/>，最终渲染结果恒为常规细体 (Regular)，严禁虚假判定为加粗！
+ */
+export function computeEffectiveBold(runNode, pNode) {
+  if (!runNode) return false;
+  const rPr = runNode.getElementsByTagName('w:rPr')[0];
+  if (rPr) {
+    const b = rPr.getElementsByTagName('w:b')[0];
+    if (b) {
+      const val = b.getAttribute('w:val');
+      if (val === '0' || val === 'false' || val === 'none') return false;
+      return true;
+    }
+  }
+  if (pNode) {
+    const pPr = pNode.getElementsByTagName('w:pPr')[0];
+    if (pPr) {
+      const pRPr = pPr.getElementsByTagName('w:rPr')[0];
+      if (pRPr) {
+        const b = pRPr.getElementsByTagName('w:b')[0];
+        if (b) {
+          const val = b.getAttribute('w:val');
+          if (val === '0' || val === 'false' || val === 'none') return false;
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+/**
  * 集中式主审计核心执行函数
  */
 export async function runMasterMsdsAudit(options = {}) {
