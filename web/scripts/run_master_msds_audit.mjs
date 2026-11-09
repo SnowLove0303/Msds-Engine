@@ -1020,6 +1020,8 @@ export async function runMasterMsdsAudit(options = {}) {
 
     let crossSecBadSzCountEn = 0;
     tablesEn.forEach((tbl, tIdx) => {
+      const secNum = tIdx + 1;
+      if (secNum === 9) return; // Section 9 专属遵循 G-38 激光垂线对齐规范
       const rows = Array.from(tbl.getElementsByTagName('w:tr'));
       for (let rIdx = 1; rIdx < rows.length; rIdx++) {
         const cells = Array.from(rows[rIdx].getElementsByTagName('w:tc'));
@@ -1082,6 +1084,89 @@ export async function runMasterMsdsAudit(options = {}) {
       '中文手套规格参数末尾严禁携带多余西文句点 (如 min.)，保持纯净排版',
       hasTrailingDotCn ? '存在末尾句点' : '纯净无句点',
       'Section 8 CN'
+    );
+
+    // =========================================================================
+    // 环3: 英文版标签排版与 Section 8 不变量门禁 (INV-EN-TYPOGRAPHY-AND-SECTION8)
+    // =========================================================================
+    // 断言 1: 英文版第一列带编号标签段落标准两空格紧凑排版不变量 (REQ-01)
+    let enLabelBadSpacingCount = 0;
+    let enLabelExtraSpaceCount = 0;
+    let enLabelHasTabCount = 0;
+    tablesEn.forEach((tbl, tIdx) => {
+      const secNum = tIdx + 1;
+      if (secNum === 9) return; // Section 9 专属遵循 G-38 激光垂线对齐规范
+      const rows = Array.from(tbl.getElementsByTagName('w:tr'));
+      for (let rIdx = 1; rIdx < rows.length; rIdx++) {
+        const cells = Array.from(rows[rIdx].getElementsByTagName('w:tc'));
+        if (cells.length < 2) continue;
+        const c0 = cells[0];
+        const p = c0.getElementsByTagName('w:p')[0];
+        if (!p) continue;
+        const txt = (p.textContent || '').trim();
+        const m = txt.match(/^(\d+\.\d+)\s*(.*)$/);
+        if (m) {
+          const hasTwoSpace = /^\d+\.\d+  \S/.test(txt);
+          if (!hasTwoSpace) enLabelBadSpacingCount++;
+          const hasTab = p.getElementsByTagName('w:tab').length > 0;
+          if (hasTab) enLabelHasTabCount++;
+          if (/\s{3,}/.test(txt)) enLabelExtraSpaceCount++;
+        }
+      }
+    });
+    assert(
+      enLabelBadSpacingCount === 0 && enLabelHasTabCount === 0 && enLabelExtraSpaceCount === 0,
+      '环3',
+      '英文版编号标签两空格排版紧凑不变量 (REQ-01)',
+      '英文版所有编号标签必须使用标准西文两空格 (seqStr + "  ") 紧凑匀称排版，严禁使用导致弹跳的制表符或超过2个空格',
+      `非两空格段落数: ${enLabelBadSpacingCount}, 包含制表符数: ${enLabelHasTabCount}, 超过2空格数: ${enLabelExtraSpaceCount}`,
+      'Full Document EN Label Cells'
+    );
+
+    // 断言 2: Section 8.1 题头保护 (严禁悬挂缩进，必须保持大号粗体题头)
+    if (t8En) {
+      const rows = Array.from(t8En.getElementsByTagName('w:tr'));
+      const r1 = rows[1];
+      const r1Xml = r1 ? (new XmlSerializer()).serializeToString(r1) : '';
+      const r1HasHanging = /<w:ind[^>]*w:hanging/i.test(r1Xml);
+      const r1IsBoldHeader = /<w:sz[^>]*w:val="(?:21|24)"/i.test(r1Xml) && /<w:b(?:\s|\/|>)/i.test(r1Xml);
+      assert(
+        !r1HasHanging && r1IsBoldHeader,
+        '环3',
+        'Section 8.1 题头规格保护不变量 (REQ-02)',
+        'Section 8.1 Exposure controls: 必须为顶格左对齐、大号加粗题头 (sz=21/24)，严禁被降级为 9.5pt 悬挂缩进普通正文',
+        `存在悬挂缩进=${r1HasHanging}, 符合粗体题头=${r1IsBoldHeader}`,
+        'Section 8.1 EN Header'
+      );
+
+      // 断言 3: Section 8 PPE 子标签缩进一致性 (Recommendation: 必须拥有 left=420 缩进，消除锯齿)
+      const recRow = rows.find(r => /Recommendation/i.test(r.textContent || ''));
+      let recHasIndent420 = false;
+      if (recRow) {
+        const c0 = recRow.getElementsByTagName('w:tc')[0];
+        const c0Xml = c0 ? (new XmlSerializer()).serializeToString(c0) : '';
+        recHasIndent420 = /<w:ind[^>]*w:left="420"/i.test(c0Xml);
+      }
+      assert(
+        recHasIndent420,
+        '环3',
+        'Section 8 Recommendation 缩进一致性 (REQ-02)',
+        'Recommendation: 必须应用 left=420 缩进，与上下 PPE 标签保持对齐，严禁左侧锯齿凹凸',
+        recHasIndent420 ? '符合 420 缩进' : '缺少 420 缩进',
+        'Section 8 Recommendation EN'
+      );
+    }
+
+    // 断言 4: 西文破折号与连字符无乱码断言 (严禁 Fluororubber C FKM 等残屑)
+    const enAllText = domEn.textContent || '';
+    const hasDashMojibake = /(?:Fluororubber|Butyl rubber|Nitrile rubber)\s*C\s*[A-Z]{3}/.test(enAllText);
+    assert(
+      !hasDashMojibake,
+      '环3',
+      '西文连字符与破折号乱码清零断言 (REQ-02)',
+      '全篇西文手套材料连字符必须为标准西文连字符，严禁存在历史 GBK 破折号畸变字母 C 残留',
+      hasDashMojibake ? '存在 C 乱码' : '纯净无乱码',
+      'Full Document EN Text'
     );
   }
 

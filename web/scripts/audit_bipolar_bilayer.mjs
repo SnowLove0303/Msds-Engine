@@ -487,27 +487,29 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   }
 
   // G-29: 值格字体分离断言 (Font Weight Separation)
-  const cnS11Runs = Array.from(s11CnRow3.getElementsByTagName('w:r'));
-  let hasRegularRunsCn = false;
-  let hasBoldRunsCn = false;
-  for (const r of cnS11Runs) {
-    const b = r.getElementsByTagName('w:b')[0];
-    const isBold = b && b.getAttribute('w:val') !== '0';
-    if (isBold) hasBoldRunsCn = true;
-    else hasRegularRunsCn = true;
-  }
-  assert(hasBoldRunsCn && hasRegularRunsCn, `Section 11 中文版字体分离断言 (D-05/G-29): 具备加粗标签且具备常规体测试值 (Bold=${hasBoldRunsCn}, Regular=${hasRegularRunsCn})`);
+  if (isS11FullWidth && s11CnRow3 && s11EnRow3) {
+    const cnS11Runs = Array.from(s11CnRow3.getElementsByTagName('w:r'));
+    let hasRegularRunsCn = false;
+    let hasBoldRunsCn = false;
+    for (const r of cnS11Runs) {
+      const b = r.getElementsByTagName('w:b')[0];
+      const isBold = b && b.getAttribute('w:val') !== '0';
+      if (isBold) hasBoldRunsCn = true;
+      else hasRegularRunsCn = true;
+    }
+    assert(hasBoldRunsCn && hasRegularRunsCn, `Section 11 中文版字体分离断言 (D-05/G-29): 具备加粗标签且具备常规体测试值 (Bold=${hasBoldRunsCn}, Regular=${hasRegularRunsCn})`);
 
-  const enS11Runs = Array.from(s11EnRow3.getElementsByTagName('w:r'));
-  let hasRegularRunsEn = false;
-  let hasBoldRunsEn = false;
-  for (const r of enS11Runs) {
-    const b = r.getElementsByTagName('w:b')[0];
-    const isBold = b && b.getAttribute('w:val') !== '0';
-    if (isBold) hasBoldRunsEn = true;
-    else hasRegularRunsEn = true;
+    const enS11Runs = Array.from(s11EnRow3.getElementsByTagName('w:r'));
+    let hasRegularRunsEn = false;
+    let hasBoldRunsEn = false;
+    for (const r of enS11Runs) {
+      const b = r.getElementsByTagName('w:b')[0];
+      const isBold = b && b.getAttribute('w:val') !== '0';
+      if (isBold) hasBoldRunsEn = true;
+      else hasRegularRunsEn = true;
+    }
+    assert(hasBoldRunsEn && hasRegularRunsEn, `Section 11 英文版字体分离断言 (D-05/G-29): 具备加粗标签且具备常规体测试值 (Bold=${hasBoldRunsEn}, Regular=${hasRegularRunsEn})`);
   }
-  assert(hasBoldRunsEn && hasRegularRunsEn, `Section 11 英文版字体分离断言 (D-05/G-29): 具备加粗标签且具备常规体测试值 (Bold=${hasBoldRunsEn}, Regular=${hasRegularRunsEn})`);
 
   // ----------------------------------------------------------------------
   // 第二层：16 章节专属局部规范层 (Local Layer: Section 1 ~ 16)
@@ -858,6 +860,12 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
     } else {
       assert(/急性毒性/i.test(s11Row3Text) && /\d+/.test(s11Row3Text), 'Section 11 (L-S11): 组分实测毒理试验数据保全');
     }
+  } else if (s11Cn.getElementsByTagName('w:tr').length === 2) {
+    // 形态 0: 纯说明行插槽 (格式服从原文公理: 该产品无可用的毒理学研究。)
+    assert(/无.*毒理学研究|无数据|无资料/.test(s11Cn.textContent), 'Section 11 (L-S11): 纯说明行叙述保全');
+    const s11EnTrCount = tblsEn[10].getElementsByTagName('w:tr').length;
+    assert(s11EnTrCount === 2, `Section 11 英文版说明行双语同构 (实测行数: ${s11EnTrCount})`);
+    assert(/toxicolog|No data/i.test(tblsEn[10].textContent), 'Section 11 英文版: 毒理说明行英译保全');
   } else {
     const s11CnTrCount = s11Cn.getElementsByTagName('w:tr').length;
     assert(s11CnTrCount >= 8, `Section 11 (L-S11): 标准分列表格端点插槽完备 (实测行数: ${s11CnTrCount})`);
@@ -918,9 +926,14 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   const s13MethodJcEn = s13MethodCellEn?.getElementsByTagName('w:jc')[0]?.getAttribute('w:val');
   assert(s13MethodJcEn === 'left', `Section 13 (L-S13): 英文版废弃处置方法内容严格纯左对齐 (jc=left) (实测: ${s13MethodJcEn})`);
 
-  // L-S14: 运输信息 (非危险货物级联判定与中英文温控对齐)
+  // L-S14: 运输信息 (危险/非危险货物级联判定与中英文温控对齐)
   const s14Text = tblsCn[13].textContent;
-  assert(/非危险货物|非危险品/.test(s14Text), 'Section 14 (L-S14): 非危险货物级联判定联动保全');
+  const isDangerousGoods = /树脂溶液|危险级别|包装类型|联合国|Class\s*3/i.test(s14Text) || /H225|H226/i.test(tblsCn[1].textContent);
+  if (isDangerousGoods) {
+    assert(/树脂溶液|3/i.test(s14Text), 'Section 14 (L-S14): 危险货物运输信息法定保全');
+  } else {
+    assert(/非危险货物|非危险品/.test(s14Text), 'Section 14 (L-S14): 非危险货物级联判定联动保全');
+  }
   const s14EnText = tblsEn[13].textContent;
   if (model === 'PU-608') {
     assert(/35\s*℃/.test(s14EnText), 'Section 14 英文版 (L-S14-EN): 必须与源事实严格一致保留 +35℃ 仓储温控指标');

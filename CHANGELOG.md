@@ -1,5 +1,29 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-09 编辑器底层排版与 Section 8 不变量加固 (INV-EN-TYPOGRAPHY-AND-SECTION8)] - 根治英文版标签制表位弹跳 720 dxa 错位缺陷、序号与正文采用标准西文双空格紧凑匀称排版、Section 8.1/8.2 粗体二级题头格式保护、Section 8 Recommendation 420 dxa 缩进对齐抹平锯齿、西文破折号 GBK 乱码清零、植入源码级防篡改封印与 5 项主审计自动化硬门禁
+
+### 一、 变更背景与用户明确指令
+在交付物认知审计中，用户明确指出：
+> “EN版产出文件的 标签对齐有大问题，序号与标签之间的空格过大，比如 1.3 Supplier information: 没有与 Name of supplier:对齐，以及8.1 的标签 文本格式出现了大问题，在格式和排版上没有严格按照我们之前规范那样做的”
+> “从编辑器底层 去解决并固定 格式和排版问题，防止后续产出篡改”
+
+### 二、 核心技术解法与底层不变量固化
+1. **重构制表位与序号间距逻辑 (REQ-01)**：
+   - 根除由于历史缺失 `<w:tabs>` 导致 `<w:tab/>` 强制弹跳至 Word 默认 720 dxa 制表位的严重错位问题；
+   - 在 `pipeline-engine.js` 的 `rebuildTabbedLabelWithTypography` 中采用标准西文两空格（`seqStr + '  '`），彻底杜绝制表位弹跳，确保序号与标签正文间距紧凑匀称；
+   - 保持未编号标签 `applyLeftIndentToP(420)`，使所有序号后标签正文与未编号标签首字在 420 dxa 基准线上实现严格 1:1 垂直对齐。
+2. **Section 8 题头保护与 Recommendation 缩进一致性 (REQ-02)**：
+   - 在 `standardizeEnglishTypographyAndLabels` 中建立 Section 8 题头专属拦截：`8.1  Exposure controls:` 与 `8.2  Engineering controls:` 严格保持顶格左对齐、Arial 10.5pt Bold / 12pt Bold 大号粗体样式，严禁被通用单格逻辑误降级为 9.5pt 普通文本；
+   - 彻底删除 `formatEnglishLabelCell` 中对 `Recommendation:` 的去缩进特判，统一应用 420 dxa 左缩进，与上下所有 PPE 标签保持整齐划一，消除左边缘凹凸锯齿；
+   - 全局文本清洗环中增加破折号归一化正则，将 `Fluororubber C FKM` 等历史 GBK 破折号畸变残屑彻底规范化为标准连字符 `Fluororubber - FKM:`。
+3. **源码级防篡改封印与主审计硬门禁 (REQ-03)**：
+   - 在 `pipeline-engine.js` 关键排版代码块打上 `@ANTIGRAVITY_INVARIANT_LOCK` 源码级保护封印；
+   - 在 `run_master_msds_audit.mjs` 中新增 5 项物理断言，对编号标签间距、未编号标签对齐、8.1 题头规格、Recommendation 缩进一致性及破折号无乱码进行全自动机械一票否决。
+4. **全量核销验证**：
+   - 针对样本 EP-1404 完整重新生成 8 格式交付物（4 DOCX + 4 PDF），同步至 `E:/冠志/TDS MSDS (2)/待处理文件/EP-1404/`；
+   - 运行全量中央主审计，153 项断言 100% 满分通过，进程退出码 0；OpenXML 抽样检查物理属性完全符合预期。
+
+
 ## [2026-11-09 MSDS MCP 覆写与审计全方法论 Zip 物理封装交付 (PKG-MSDS-MCP-ZIP-V6)] - 整理收敛 10 大 MCP 工具契约、标准 5 阶流水线 SOP、万能几何手术配方库（Recipe A~H）、三大最高法定不变量、3 大专用 Agent 角色定义并完成开箱即用 Zip 物理打包交付
 
 ### 一、 变更背景与用户明确指令
