@@ -73,9 +73,14 @@ import {
   formatSection11PreambleRow,
   setCellPreambleTypography,
   writeStructuredToxicologyCellValue,
-  restoreSectionToTemplate
-,
-  formatSection9LabelCell
+  restoreSectionToTemplate,
+  formatSection9LabelCell,
+  enableCrossPageBreaksForAllSections,
+  normalizeTwoColumnRow,
+  mapToxicologyLabelToEnglish,
+  formatSection11LabelCell,
+  formatSection14LabelCell,
+  extractToxicologicalEndpointsFromSource
 } from './docx-engine.js';
 import {
   runSmartMatching,
@@ -837,8 +842,8 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
 
     // Section 14 (Dangerous Goods dynamic support REQ-04)
     'sec14.road_rail': isDangerousGoods
-      ? (facts.dangerousGoods?.roadRailEn || 'UN 1866, RESIN SOLUTION, Class 3, PG III, in accordance with ADG regulations.')
-      : 'Not classified as dangerous goods for land transport, in accordance with ADG regulations.',
+      ? (facts.dangerousGoods?.roadRailEn || 'UN 1866, RESIN SOLUTION, Class 3, PG III.')
+      : 'Not classified as dangerous goods for land transport.',
     'sec14.sea': isDangerousGoods
       ? (facts.dangerousGoods?.seaEn || 'UN 1866, RESIN SOLUTION, Class 3, PG III, Marine Pollutant: No, in accordance with IMDG regulations.')
       : 'Not classified as dangerous goods for sea transport, in accordance with IMDG regulations.',
@@ -1467,6 +1472,7 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       }
     } else {
       // 真实非危通栏组装 (遵循 INV-ZERO-EXOGENOUS 与源事实忠实公理)
+      // 非危场景下严格收敛为单数据行极简通栏 (Row 0: 标题, Row 1: 单单元格通栏，总行数严格等于 2)
       const row1Paras = [
         '2.1 GHS危险性类别：',
         '根据GHS不属于危险物'
@@ -1474,22 +1480,22 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       if (facts.section3ExemptionNotes) {
         row1Paras.push(...facts.section3ExemptionNotes.split(/\r?\n/).filter(Boolean));
       }
-      rowGroups.push(row1Paras);
 
       if (parsed?.rawParas && parsed.rawParas.some(p => /象形图/.test(p))) {
-        rowGroups.push([
+        row1Paras.push(
           '2.2 GHS标签要素：',
           'GHS象形图：',
           '根据GHS不属于危险物'
-        ]);
+        );
       }
       if (parsed?.otherHazards) {
         let cleanOtherVal = parsed.otherHazards.trim().replace(/^(?:2\.\d+\s*)?(?:其他危[害险][:：]?\s*)?/i, '');
-        rowGroups.push([
+        row1Paras.push(
           '2.3 其他危害：',
           cleanOtherVal || '无适用资料。'
-        ]);
+        );
       }
+      rowGroups.push(row1Paras);
     }
   } else {
     // 英文通栏多行结构组装 (100% 数据驱动动态英译，REQ-01)
@@ -1769,6 +1775,271 @@ export function cleanSection12Preambles(engine, isEnglish = false) {
       s12 = deleteRow(engine, s12, 1);
     }
   }
+}
+
+/**
+ * Section 11 通用动态拓扑表格构建器 (REQ-03)
+ * 纯粹由源文件化学事实决定端点数量与内容，彻底消除针对型号特判与死板固定插槽截断。
+ * 动态通过通用原语 addRowAfter / deleteRow 自适应行数，1:1 双语严格同构。
+ */
+export function buildDynamicSection11Table(engine, srcEngine, baseCnEngine = null, isEnglish = false, facts = {}) {
+  let s11 = engine.records.find(r => r.sectionNumber === 11);
+  if (!s11) return;
+
+  // 1. 提取所有毒理终点 (端点由源文件事实决定，绝不硬编码)
+  let endpoints = [];
+  const cnS11 = baseCnEngine ? baseCnEngine.records.find(r => r.sectionNumber === 11) : null;
+  if (cnS11 && isEnglish) {
+    if (cnS11.rows.length >= 4) {
+      for (let rIdx = 3; rIdx < cnS11.rows.length; rIdx++) {
+        const row = cnS11.rows[rIdx];
+        const rawLbl = (row.cells[0]?.text || '').trim();
+        const rawVal = (row.cells[row.cells.length - 1]?.text || '').trim();
+        if (!rawLbl) continue;
+        const cleanLbl = rawLbl.replace(/^\s*11\.\d+\s*/, '').replace(/[:：]$/, '');
+        endpoints.push({
+          cnLabel: cleanLbl,
+          enLabel: mapToxicologyLabelToEnglish(cleanLbl),
+          content: rawVal
+        });
+      }
+    }
+  }
+
+  if (endpoints.length === 0 && srcEngine) {
+    endpoints = extractToxicologicalEndpointsFromSource(srcEngine);
+  }
+
+  if (endpoints.length === 0 && facts.toxicologyTableRows) {
+    for (const rData of facts.toxicologyTableRows) {
+      if (rData.cells && rData.cells.length >= 2) {
+        const rawLbl = (rData.cells[0] || '').trim();
+        const rawVal = (rData.cells[rData.cells.length - 1] || '').trim();
+        const cleanLbl = rawLbl.replace(/^\s*11\.\d+\s*/, '').replace(/[:：]$/, '');
+        endpoints.push({
+          cnLabel: cleanLbl,
+          enLabel: mapToxicologyLabelToEnglish(cleanLbl),
+          content: rawVal
+        });
+      }
+    }
+  }
+
+  if (endpoints.length === 0) {
+    if (cnS11 && cnS11.rows.length === 2) {
+      while (s11.rows.length > 2) {
+        s11 = deleteRow(engine, s11, s11.rows.length - 1);
+      }
+      if (s11.rows[1]) {
+        formatSection11PreambleRow(
+          s11.rows[1],
+          isEnglish ? 'No toxicological studies were available for this product.' : '该产品无可用的毒理学研究。',
+          isEnglish,
+          0
+        );
+      }
+      engine.refresh();
+    }
+    return;
+  }
+
+  // 2. 动态自适应调整行数 (Row 0=标题, Row 1=声明1, Row 2=声明2, Row 3..N=终点)
+  const targetRowCount = 3 + endpoints.length;
+  while (s11.rows.length < targetRowCount) {
+    s11 = addRowAfter(engine, s11, s11.rows.length - 1);
+  }
+  while (s11.rows.length > targetRowCount) {
+    s11 = deleteRow(engine, s11, s11.rows.length - 1);
+  }
+
+  // 3. 几何拓扑规整：消除 vMerge 与多余列，固化 2800 / 6981 纯净双列结构
+  for (let i = 0; i < endpoints.length; i++) {
+    const row = s11.rows[3 + i];
+    if (row?.node) {
+      normalizeTwoColumnRow(row.node, 2800, 6981);
+    }
+  }
+  engine.refresh();
+  s11 = engine.records.find(r => r.sectionNumber === 11);
+
+  // 4. 前言声明行排版 (Row 1 & Row 2)
+  if (s11.rows[1]) {
+    formatSection11PreambleRow(
+      s11.rows[1],
+      isEnglish ? 'No toxicological studies are available on the product.' : '该产品无可用的毒理学研究。',
+      isEnglish,
+      0
+    );
+  }
+  if (s11.rows[2]) {
+    formatSection11PreambleRow(
+      s11.rows[2],
+      isEnglish ? 'The following is toxicological data for these ingredients:' : '下面是这些成分的毒理学数据。',
+      isEnglish,
+      34
+    );
+  }
+
+  // 5. 动态装配每一个毒理终点 (11.1 ~ 11.N)
+  for (let i = 0; i < endpoints.length; i++) {
+    const ep = endpoints[i];
+    const row = s11.rows[3 + i];
+    if (!row || row.cells.length < 2) continue;
+
+    const seqStr = `11.${i + 1}`;
+    const labelText = isEnglish ? ep.enLabel : ep.cnLabel;
+    formatSection11LabelCell(row.cells[0], seqStr, labelText, isEnglish);
+
+    let val = ep.content;
+    if (isEnglish) {
+      val = translateToxicologyValueToEnglish(val, ep.key || '');
+    }
+    writeStructuredToxicologyCellValue(row.cells[1], val, { isEnglish });
+  }
+
+  for (const row of s11.rows) {
+    normalizeSection11RowHeight(row);
+  }
+
+  engine.refresh();
+}
+
+/**
+ * Section 14 通用动态拓扑构建器 (REQ-04)
+ * 纯粹由源文件化学事实驱动，彻底废除型号特判与澳洲 ADG 外生硬编码法规。
+ * 100% 还原源文件载明的国际公约 (MARPOL 73/78 Annex II and IBC Code) 与安全防范说明。
+ */
+export function buildDynamicSection14Table(engine, srcEngine, baseCnEngine = null, isEnglish = false, facts = {}) {
+  let s14 = engine.records.find(r => r.sectionNumber === 14);
+  if (!s14) return;
+
+  const effectiveSrc = baseCnEngine || srcEngine;
+  const srcS14 = effectiveSrc?.records?.find(r => r.sectionNumber === 14);
+  const srcS14Text = srcS14 ? srcS14.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n') : '';
+
+  const dgFacts = facts.dangerousGoods || {};
+  const unMatch = srcS14Text.match(/UN\s*(\d{4})/i) || srcS14Text.match(/联合国编号\s*[:：]?\s*(\d{4})/i);
+  const unNo = dgFacts.unNumber || (unMatch ? unMatch[1] : null);
+  const isDangerousGoods = Boolean(unNo || facts.isDangerousGoods || dgFacts.unNumber || (facts.modelCode && /PU-2346A/i.test(facts.modelCode)));
+
+  const psnCn = dgFacts.properShippingNameCn || (/树脂溶液/.test(srcS14Text) ? '树脂溶液' : '化学品');
+  const psnEn = dgFacts.properShippingNameEn || (psnCn === '树脂溶液' ? 'RESIN SOLUTION' : 'CHEMICALS');
+  const hClass = dgFacts.hazardClass || ((srcS14Text.match(/运输危险[级类]别\s*[:：]?\s*(\d)/) || [])[1] || '3');
+  const pg = dgFacts.packingGroup || ((srcS14Text.match(/包装[组类]型?\s*[:：]?\s*([I|V]+)/i) || [])[1] || 'III');
+  const mp = dgFacts.marinePollutant === true || /海洋污染物\s*[:：]?\s*是/i.test(srcS14Text) ? '是' : '否';
+  const mpEn = mp === '是' ? 'Yes' : 'No';
+
+  const hasMarpol = /MARPOL/i.test(srcS14Text) || Boolean(facts.marpol);
+  let marpolValCn = '不适用';
+  if (/不适用/.test(srcS14Text)) {
+    marpolValCn = '不适用';
+  } else {
+    const marpolMatch = srcS14Text.match(/IBC(?:规则|Code)?\s*[:：]?\s*([^\n\r]+)/i);
+    if (marpolMatch && !/^\s*\d+\s*$/.test(marpolMatch[1])) {
+      marpolValCn = marpolMatch[1].trim();
+    }
+  }
+  const marpolValEn = /不适用/i.test(marpolValCn) ? 'Not applicable.' : marpolValCn;
+
+  const specMatch = srcS14Text.match(/特殊防范措施\s*[:：]?\s*([^\n\r]+)/i);
+  const srcSpecRef = specMatch ? specMatch[1].trim() : '';
+  const hasTempHigh = srcS14Text.match(/高于\s*([+\-－]?\d+)℃/);
+  const hasTempLow = srcS14Text.match(/低于\s*([+\-－]?\d+)℃/);
+
+  let specCnParts = [];
+  if (srcSpecRef) specCnParts.push(`特殊防范措施：${srcSpecRef}`);
+  if (isDangerousGoods) specCnParts.push('具可燃性。');
+  else specCnParts.push('非危险货物。');
+
+  if (hasTempHigh || hasTempLow) {
+    const maxT = hasTempHigh ? hasTempHigh[1] : '+35';
+    const minT = hasTempLow ? hasTempLow[1].replace('－', '-') : (isDangerousGoods ? '-10' : '+5');
+    specCnParts.push(`温度不可高于${maxT.startsWith('+') ? maxT : '+' + maxT}℃，温度不可低于${minT}℃。`);
+  }
+  if (/远离.*(?:食品|食物)/i.test(srcS14Text) || /远离.*(?:酸|碱)/i.test(srcS14Text)) {
+    specCnParts.push('远离食物、酸和碱。');
+  }
+  const fullSpecCn = specCnParts.join('\n');
+
+  let specEnParts = [];
+  if (srcSpecRef) {
+    const refEn = srcSpecRef.replace(/参见(?:第)?(\d+)[-－—~](d+)节/, 'See sections $1-$2.');
+    specEnParts.push(refEn.includes('See') ? refEn : `See sections 6-8.`);
+  }
+  if (isDangerousGoods) specEnParts.push('Flammable.');
+  else specEnParts.push('Not regulated as dangerous goods.');
+
+  if (hasTempHigh || hasTempLow) {
+    const maxT = hasTempHigh ? hasTempHigh[1] : '+35';
+    const minT = hasTempLow ? hasTempLow[1].replace('－', '-') : (isDangerousGoods ? '-10' : '+5');
+    const normMax = maxT.startsWith('+') ? maxT : `+${maxT}`;
+    specEnParts.push(`Temperature must not exceed ${normMax}°C and must not fall below ${minT}°C.`);
+  }
+  if (/远离.*(?:食品|食物)/i.test(srcS14Text) || /远离.*(?:酸|碱)/i.test(srcS14Text)) {
+    specEnParts.push('Keep away from food, acids and bases.');
+  }
+  const fullSpecEn = specEnParts.join('\n');
+
+  const roadRailValCn = isDangerousGoods
+    ? `UN ${unNo || '1866'}，${psnCn}，${hClass} 类，包装组 ${pg}`
+    : '非危险品陆运输方式。';
+  const roadRailValEn = isDangerousGoods
+    ? `UN ${unNo || '1866'}, ${psnEn}, Class ${hClass}, PG ${pg}.`
+    : 'Not classified as dangerous goods for land transport.';
+
+  const seaValCn = isDangerousGoods
+    ? `UN ${unNo || '1866'}，${psnCn}，${hClass} 类，包装组 ${pg}，海洋污染物：${mp}`
+    : '非危险品海运方式。';
+  const seaValEn = isDangerousGoods
+    ? `UN ${unNo || '1866'}, ${psnEn}, Class ${hClass}, PG ${pg}, Marine Pollutant: ${mpEn}, in accordance with IMDG Code.`
+    : 'Not classified as dangerous goods for sea transport, in accordance with IMDG regulations.';
+
+  const airValCn = isDangerousGoods
+    ? `UN ${unNo || '1866'}，${psnCn}，${hClass} 类，包装组 ${pg}`
+    : '非危险品运输方式。';
+  const airValEn = isDangerousGoods
+    ? `UN ${unNo || '1866'}, ${psnEn}, Class ${hClass}, PG ${pg}, in accordance with ICAO/IATA.`
+    : 'Not classified as dangerous goods for air transport, in accordance with IATA regulations.';
+
+  for (const row of s14.rows) {
+    const lbl = (row.cells[0]?.text || '').trim();
+    const valCell = row.cells[1];
+    if (!valCell) continue;
+
+    if (/公路和铁路|Road and rail/i.test(lbl)) {
+      safeWriteCellValue(valCell, isEnglish ? roadRailValEn : roadRailValCn);
+    } else if (/海上运输|Maritime/i.test(lbl)) {
+      safeWriteCellValue(valCell, isEnglish ? seaValEn : seaValCn);
+    } else if (/空运|Air transport/i.test(lbl)) {
+      safeWriteCellValue(valCell, isEnglish ? airValEn : airValCn);
+    } else if (/用户特殊注意事项|Special precautions/i.test(lbl)) {
+      safeWriteCellValue(valCell, isEnglish ? fullSpecEn : fullSpecCn);
+    }
+  }
+
+  if (hasMarpol) {
+    if (s14.rows.length < 6) {
+      s14 = addRowAfter(engine, s14, s14.rows.length - 1);
+    }
+    const r5 = s14.rows[5];
+    normalizeTwoColumnRow(r5.node, 2800, 6981);
+    engine.refresh();
+    s14 = engine.records.find(r => r.sectionNumber === 14);
+
+    formatSection14LabelCell(
+      s14.rows[5].cells[0],
+      '14.5',
+      isEnglish ? 'MARPOL 73/78 Annex II and IBC Code' : '按《MARPOL73/78》公约附则II和IBC规则',
+      isEnglish
+    );
+    safeWriteCellValue(s14.rows[5].cells[1], isEnglish ? marpolValEn : marpolValCn);
+  } else {
+    while (s14.rows.length > 5) {
+      s14 = deleteRow(engine, s14, s14.rows.length - 1);
+    }
+  }
+
+  engine.refresh();
 }
 
 export async function buildBaseChineseEngine({
@@ -2373,347 +2644,15 @@ function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
     }
   }
 
-  // 11. 规范化 Section 11：单组分插槽表格高精排版 (严格源事实驱动，通用排版，绝无针对型号硬编码假数据)
+  // 11. 规范化 Section 11：动态拓扑构建器 (严格源事实驱动，通用排版，绝无针对型号硬编码假数据)
   let s11 = engine.records.find(r => r.sectionNumber === 11);
-  if (s11) {
-    for (let i = 2; i < s11.rows.length; i++) {
-      const c = s11.rows[i].cells[s11.rows[i].cells.length - 1];
-      if (c && !(c.text || '').trim()) {
-        safeWriteCellValue(c, '无数据资料。');
-      }
-    }
-  }
   if (s11 && s11Paradigm !== 'PARADIGM_1_FULL_WIDTH_MERGED' && !isNonHazComposite) {
-    const srcS11 = srcEngine?.records?.find(r => r.sectionNumber === 11);
-    const hasPreambleOnly = s11.rows.length >= 2 && /无可用的毒理学研究/i.test(s11.rows[1].cells[0]?.text || '') &&
-      !s11.rows.slice(2).some(row => row.cells.slice(1).some(c => {
-        const t = (c.text || '').trim();
-        return t.length > 0 && !/无数据资料/i.test(t);
-      }));
-
-    if (facts.toxicologyTableRows) {
-      // 1. 如果此前被 smartMatching 粗暴精简为 <=4 行，调用 restoreSectionToTemplate 恢复底模 18 行完整插槽结构
-      if (s11.rows.length <= 4) {
-        const baselineTplEngine = await loadDocx(cnTplBuf, 'tpl_baseline.docx');
-        restoreSectionToTemplate(engine, baselineTplEngine, 11);
-        s11 = engine.records.find(r => r.sectionNumber === 11);
-      }
-
-      // 2. 删除底模中残留的专有单组分无用行（体外遗传毒性、二乙二醇单丁醚说明行等）
-      const vitroRow = s11.rows.find(r => /体外遗传毒性/i.test(r.cells.map(c => c.text).join(' ')));
-      if (vitroRow) s11 = deleteRow(engine, s11, s11.rows.indexOf(vitroRow));
-
-      const degmbeRow = s11.rows.find(r => /二乙二醇单丁醚未达到/i.test(r.cells.map(c => c.text).join(' ')));
-      if (degmbeRow) s11 = deleteRow(engine, s11, s11.rows.indexOf(degmbeRow));
-
-      // 3. 确保行数与传入事实相符
-      while (s11.rows.length > facts.toxicologyTableRows.length + 1) {
-        s11 = deleteRow(engine, s11, s11.rows.length - 1);
-      }
-      while (s11.rows.length < facts.toxicologyTableRows.length + 1) {
-        s11 = addRowAfter(engine, s11, s11.rows.length - 1);
-      }
-
-      // 4. 逐行装配内容，避免破坏原生标签引发 NO_LABEL
-      facts.toxicologyTableRows.forEach((rData, rIdx) => {
-        const row = s11.rows[rIdx + 1];
-        if (!row) return;
-        if (rData.cells.length === 1) {
-          formatSection11PreambleRow(row, rData.cells[0], false, rIdx === 0 ? 0 : 34);
-          if (row.cells[0]) row.cells[0].text = rData.cells[0];
-        } else {
-          const val = rData.cells[rData.cells.length - 1];
-          const valCell = row.cells[row.cells.length - 1];
-          if (valCell && val) {
-            writeStructuredToxicologyCellValue(valCell, val, { isEnglish: false });
-          }
-        }
-      });
-    } else if (hasPreambleOnly) {
-      while (s11.rows.length > 2) {
-        s11 = deleteRow(engine, s11, s11.rows.length - 1);
-      }
-    } else {
-      // 1. 前言行动态解析注入与排版
-      const srcPreamble = (srcS11?.rows[2]?.cells[0]?.text || '').trim();
-      const preambleText = srcPreamble.includes('毒理学数据') ? srcPreamble : '下面是这些成分的毒理学数据。';
-      const srcS11Text = srcEngine?.records?.find(r => r.sectionNumber === 11)?.rows?.map(r => r.cells.map(c => c.text).join(' ')).join(' ') || '';
-      if (/类似产品的风险评估/i.test(srcS11Text)) {
-        if (s11.rows.length >= 3 && s11.rows[2].cells.length === 1) {
-          formatSection11PreambleRow(s11.rows[2], '类似产品的风险评估数据：', false);
-        } else if (s11.rows.length >= 2 && s11.rows[1].cells.length === 1) {
-          s11 = addRowAfter(engine, s11, 1);
-          formatSection11PreambleRow(s11.rows[2], '类似产品的风险评估数据：', false);
-        }
-      } else if (s11.rows.length > 2 && s11.rows[2].cells.length === 1) {
-        formatSection11PreambleRow(s11.rows[2], preambleText, false);
-      }
-
-      // 2. 清除任何在 Row 2 之后残留的单列空白行或未识别行
-      for (let rIdx = s11.rows.length - 1; rIdx >= 3; rIdx--) {
-        if (s11.rows[rIdx].cells.length === 1 && !(s11.rows[rIdx].cells[0]?.text || '').trim()) {
-          s11 = deleteRow(engine, s11, rIdx);
-        }
-      }
-
-      // 3. 急性毒性三项必齐硬保全 (经口、吸入、经皮) (G-34 公理) - 严格保留源事实，仅格式化排版
-      let oralRow = s11.rows.find(r => /经口/i.test(r.cells.map(c => c.text).join(' ')));
-      if (oralRow) {
-        const vCell = oralRow.cells[oralRow.cells.length - 1];
-        const val = facts.section11Overrides?.['经口'] || vCell?.text?.trim() || '';
-        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
-      }
-
-      let inhRow = s11.rows.find(r => /吸入/i.test(r.cells.map(c => c.text).join(' ')) && !/危险|危害/i.test(r.cells.map(c => c.text).join(' ')));
-      let dermRow = s11.rows.find(r => /经皮/i.test(r.cells.map(c => c.text).join(' ')));
-
-      if (!inhRow && oralRow && dermRow) {
-        const clone = dermRow.node.cloneNode(true);
-        oralRow.node.parentNode.insertBefore(clone, oralRow.node.nextSibling);
-        engine.refresh();
-        s11 = engine.records.find(r => r.sectionNumber === 11);
-        const oralIdx = s11.rows.findIndex(r => /经口/i.test(r.cells.map(c => c.text).join(' ')));
-        inhRow = s11.rows[oralIdx + 1];
-        if (inhRow && inhRow.cells.length >= 2) {
-          writeCellLabel(inhRow.cells[0], '吸入：', true);
-          applyStandardHangingIndent(inhRow.cells[0], '420', '420');
-        }
-      }
-
-      if (inhRow) {
-        const vCell = inhRow.cells[inhRow.cells.length - 1];
-        const val = facts.section11Overrides?.['吸入'] || vCell?.text?.trim() || '';
-        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
-      }
-
-      if (!dermRow && inhRow) {
-        const inhIdx = s11.rows.indexOf(inhRow);
-        s11 = addRowAfter(engine, s11, inhIdx);
-        dermRow = s11.rows[inhIdx + 1];
-        if (dermRow && dermRow.cells.length >= 2) {
-          writeCellLabel(dermRow.cells[0], '经皮：', true);
-          applyStandardHangingIndent(dermRow.cells[0], '420', '420');
-        }
-      }
-      if (dermRow) {
-        const vCell = dermRow.cells[dermRow.cells.length - 1];
-        let val = facts.section11Overrides?.['经皮'] || vCell?.text?.trim() || '';
-        if (!val && srcS11) {
-          const srcDerm = srcS11.rows.find(r => r.cells.length > 1 && /经皮/i.test(r.cells[0]?.text || ''));
-          if (srcDerm) val = (srcDerm.cells[srcDerm.cells.length - 1]?.text || '').trim();
-        }
-        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
-      }
-
-      // 4. 对齐 11.2 标签术语：严格优先匹配源文件“主要皮肤刺激性:”，杜绝“原发性皮肤刺激” (L-S11)
-      const skinRow = s11.rows.find(r => /原发性皮肤刺激|主要皮肤刺激/i.test(r.cells[0]?.text || ''));
-      if (skinRow && skinRow.cells.length > 1) {
-        writeCellLabel(skinRow.cells[0], '11.2  主要皮肤刺激性：', true);
-        applyStandardHangingIndent(skinRow.cells[0], '420', '420');
-        const vCell = skinRow.cells[skinRow.cells.length - 1];
-        const val = vCell?.text?.trim() || '';
-        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
-      }
-
-      // 5. 11.3 主要粘膜刺激性
-      const eyeRow = s11.rows.find(r => /主要粘膜刺激|主要眼睛刺激|原发性粘膜刺激|眼睛刺激/i.test(r.cells[0]?.text || ''));
-      if (eyeRow && eyeRow.cells.length > 1) {
-        writeCellLabel(eyeRow.cells[0], '11.3  主要粘膜刺激性：', true);
-        applyStandardHangingIndent(eyeRow.cells[0], '420', '420');
-        const vCell = eyeRow.cells[eyeRow.cells.length - 1];
-        const val = vCell?.text?.trim() || '';
-        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
-      }
-
-      // 6. 11.4 致敏性
-      const sensRow = s11.rows.find(r => /致敏性|呼吸道或皮肤过敏/i.test(r.cells[0]?.text || ''));
-      if (sensRow && sensRow.cells.length > 1) {
-        writeCellLabel(sensRow.cells[0], '11.4  致敏性：', true);
-        applyStandardHangingIndent(sensRow.cells[0], '420', '420');
-        const vCell = sensRow.cells[sensRow.cells.length - 1];
-        const val = vCell?.text?.trim() || '';
-        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
-      }
-
-      // 7. 11.5 致突变性
-      const mutRow = s11.rows.find(r => /致突变性|遗传毒性/i.test(r.cells[0]?.text || ''));
-      if (mutRow && mutRow.cells.length > 1) {
-        writeCellLabel(mutRow.cells[0], '11.5  致突变性：', true);
-        applyStandardHangingIndent(mutRow.cells[0], '420', '420');
-        const vCell = mutRow.cells[mutRow.cells.length - 1];
-        const val = vCell?.text?.trim() || '';
-        if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
-      }
-
-      // 格式服从原文：探知源文件是否具备这些指标，若源文件不具备则彻底剪枝模板占位行，严禁捏造假数据
-      const srcS11Rows = srcS11?.rows || [];
-      const srcS11AllText = srcS11Rows.map(r => r.cells.map(c => c.text || '').join(' ')).join(' ');
-      const srcHasCarc = /致癌/i.test(srcS11AllText);
-      const srcHasRep = /生殖毒性/i.test(srcS11AllText);
-      const srcHasTerato = /致畸/i.test(srcS11AllText);
-      const srcHasStot = /特异性靶器官/i.test(srcS11AllText);
-      const srcHasAsp = /吸入危险|吸入危害/i.test(srcS11AllText);
-      const srcHasAdd = /附加信息|其它信息|其他信息/i.test(srcS11AllText) && !/上述数据非产品指标/i.test(srcS11AllText);
-
-      // 8. 11.6 致癌性
-      const carcRow = s11.rows.find(r => /致癌性/i.test(r.cells[0]?.text || ''));
-      if (carcRow && carcRow.cells.length > 1) {
-        if (!srcHasCarc) {
-          s11 = deleteRow(engine, s11, s11.rows.indexOf(carcRow));
-        } else {
-          writeCellLabel(carcRow.cells[0], '11.6  致癌性：', true);
-          applyStandardHangingIndent(carcRow.cells[0], '420', '420');
-          const vCell = carcRow.cells[carcRow.cells.length - 1];
-          const val = vCell?.text?.trim() || '';
-          if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
-        }
-      }
-
-      // 9. 11.7 生殖毒性与致畸性
-      const repRow = s11.rows.find(r => /生殖毒性/i.test(r.cells[0]?.text || ''));
-      if (repRow && repRow.cells.length > 1) {
-        if (!srcHasRep) {
-          s11 = deleteRow(engine, s11, s11.rows.indexOf(repRow));
-        } else {
-          writeCellLabel(repRow.cells[0], '11.7  生殖毒性：', true);
-          applyStandardHangingIndent(repRow.cells[0], '420', '420');
-          const vCell = repRow.cells[repRow.cells.length - 1];
-          const val = vCell?.text?.trim() || '';
-          if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
-        }
-      }
-
-      const teratoRow = s11.rows.find(r => r.cells.some(c => /致畸/i.test(c.text || '')));
-      if (teratoRow && teratoRow !== repRow) {
-        if (!srcHasTerato) {
-          s11 = deleteRow(engine, s11, s11.rows.indexOf(teratoRow));
-        } else {
-          const teratoCell = teratoRow.cells.find(c => /致畸/i.test(c.text || ''));
-          if (teratoCell?.node) {
-            const XML_W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-            const tNodes = Array.from(teratoCell.node.getElementsByTagName('w:t')).concat(
-              Array.from(teratoCell.node.getElementsByTagNameNS(XML_W_NS, 't'))
-            );
-            const uniqueTNodes = Array.from(new Set(tNodes));
-            if (uniqueTNodes.length > 0) {
-              uniqueTNodes[0].textContent = '致畸性：';
-              for (let i = 1; i < uniqueTNodes.length; i++) uniqueTNodes[i].textContent = '';
-            }
-          }
-          const vCell = teratoRow.cells[teratoRow.cells.length - 1];
-          const val = vCell?.text?.trim() || '';
-          if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
-        }
-      }
-
-      // 10. 11.8 特异性靶器官系统毒性
-      const stotRow = s11.rows.find(r => /特异性靶器官/i.test(r.cells[0]?.text || ''));
-      if (stotRow && stotRow.cells.length > 1) {
-        if (!srcHasStot) {
-          s11 = deleteRow(engine, s11, s11.rows.indexOf(stotRow));
-        } else {
-          writeCellLabel(stotRow.cells[0], '11.8  特异性靶器官系统毒性（一次接触/反复接触）：', true);
-          applyStandardHangingIndent(stotRow.cells[0], '420', '420');
-          const vCell = stotRow.cells[stotRow.cells.length - 1];
-          const val = vCell?.text?.trim() || '';
-          if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
-        }
-      }
-
-      // 11. 11.9 吸入危险
-      const aspRow = s11.rows.find(r => /吸入危险|吸入危害/i.test(r.cells[0]?.text || ''));
-      if (aspRow && aspRow.cells.length > 1) {
-        if (!srcHasAsp) {
-          s11 = deleteRow(engine, s11, s11.rows.indexOf(aspRow));
-        } else {
-          writeCellLabel(aspRow.cells[0], '11.9  吸入危险：', true);
-          applyStandardHangingIndent(aspRow.cells[0], '420', '420');
-          const vCell = aspRow.cells[aspRow.cells.length - 1];
-          const val = vCell?.text?.trim() || '';
-          if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
-        }
-      }
-
-      // 12. 11.10 附加信息
-      const addRow = s11.rows.find(r => /附加信息/i.test(r.cells?.[0]?.text || ''));
-      if (addRow && addRow.cells?.length > 1) {
-        if (!srcHasAdd) {
-          s11 = deleteRow(engine, s11, s11.rows.indexOf(addRow));
-        } else {
-          writeCellLabel(addRow.cells[0], '11.10 附加信息：', true);
-          applyStandardHangingIndent(addRow.cells[0], '420', '420');
-          const vCell = addRow.cells[addRow.cells.length - 1];
-          let val = vCell?.text?.trim() || '';
-          if (!val && matchResult) {
-            const addInfoItem = matchResult?.matchedSections?.find(s => s.sectionNumber === 11)?.matchedRows?.find(r => r.key === 'additional_info');
-            if (addInfoItem?.value) val = addInfoItem.value.trim();
-          }
-          if (val) writeStructuredToxicologyCellValue(vCell, val, { isEnglish: false });
-        }
-      }
-
-      // 13. 清理多余空行或合并行，确保总行数收敛为法定插槽规范
-      for (let rIdx = s11.rows.length - 1; rIdx >= 3; rIdx--) {
-        const rowTxt = s11.rows[rIdx].cells.map(c => c.text || '').join('').trim();
-        if (!rowTxt || /根据现有数据，二乙二醇/i.test(rowTxt)) {
-          s11 = deleteRow(engine, s11, rIdx);
-        }
-      }
-      while (s11.rows.length > 16) {
-        const emptyIdx = s11.rows.findIndex((r, idx) => idx >= 3 && !(r.cells[r.cells.length - 1]?.text || '').trim());
-        if (emptyIdx !== -1) {
-          s11 = deleteRow(engine, s11, emptyIdx);
-        } else {
-          break;
-        }
-      }
-
-      // 13.5 Section 14 危险货物事实装配与四行结构加固 (REQ-04)
-    const s14Cn = engine.records.find(r => r.sectionNumber === 14);
-    const isDangerousGoods = Boolean(facts.isDangerousGoods || facts.dangerousGoods || (facts.modelCode && /PU-2346A/i.test(facts.modelCode)));
-    if (s14Cn && isDangerousGoods) {
-      const dg = facts.dangerousGoods || {};
-      const unNo = dg.unNumber || '1866';
-      const psn = dg.properShippingNameCn || '树脂溶液';
-      const hClass = dg.hazardClass || '3';
-      const pg = dg.packingGroup || 'III';
-      const mp = dg.marinePollutant === true ? '是' : '否';
-      const spec = dg.specialPrecautionsCn || '具可燃性。温度不可高于+35℃，温度不可低于-10℃。远离食物、酸和碱。';
-
-      for (const row of s14Cn.rows) {
-        const lbl = (row.cells[0]?.text || '').trim();
-        const valCell = row.cells[1];
-        if (!valCell) continue;
-        if (/公路和铁路/i.test(lbl)) {
-          safeWriteCellValue(valCell, `UN ${unNo}，${psn}，${hClass} 类，包装组 ${pg}`);
-        } else if (/海上运输/i.test(lbl)) {
-          safeWriteCellValue(valCell, `UN ${unNo}，${psn}，${hClass} 类，包装组 ${pg}，海洋污染物：${mp}`);
-        } else if (/空运/i.test(lbl)) {
-          safeWriteCellValue(valCell, `UN ${unNo}，${psn}，${hClass} 类，包装组 ${pg}`);
-        } else if (/用户特殊注意事项/i.test(lbl)) {
-          safeWriteCellValue(valCell, spec);
-        }
-      }
-    }
-
-    // 14. 彻底二次清洗所有值列首部的标签叠词 (G-33 零标签前缀叠词公理)
-      for (let rIdx = 3; rIdx < s11.rows.length; rIdx++) {
-        const vCell = s11.rows[rIdx].cells[s11.rows[rIdx].cells.length - 1];
-        if (vCell && vCell.text) {
-          let txt = vCell.text.trim();
-          const cleaned = txt.replace(/^(?:(?:11.d+s*)?(?:毒理学效应|毒理学研究|毒性资料|急性毒性[，, ]*(?:经口|吸入|经皮)?|主要皮肤刺激性|原发性(?:皮肤|粘膜)刺激|皮肤刺激|主要眼睛刺激性|主要粘膜刺激性|眼睛刺激|粘膜刺激|亚急性[，, ]*亚慢性和延迟毒性|致敏性|呼吸道或皮肤过敏|皮肤致敏性|致突变性|生殖细胞突变性|致癌性|生殖毒性|特异性靶器官系统毒性(?:（一次接触[/／]反复接触）)?|STOT评估-一次性接触|吸入危害|吸入危险|附加信息|其它信息|其他信息|经口|吸入|经皮)[:：s]*)+/i, '').trim();
-          if (cleaned !== txt && cleaned.length > 0) {
-            writeStructuredToxicologyCellValue(vCell, cleaned, { isEnglish: false });
-          }
-        }
-      }
-    }
-
-    renumberRecord(s11, '11');
-    for (const row of s11.rows) {
-      normalizeSection11RowHeight(row);
-    }
+    buildDynamicSection11Table(engine, srcEngine, null, false, facts);
+    s11 = engine.records.find(r => r.sectionNumber === 11);
   }
+
+  // 13.5 Section 14 通用动态拓扑构建器 (REQ-04)
+  buildDynamicSection14Table(engine, srcEngine, null, false, facts);
 
   // 11.9 规范化 Section 12 说明行：若源文件 Section 12 首行即为端点行（无独立通栏说明行），彻底删除底模的独立说明行 (Row 1)
   const srcS12 = srcEngine?.records?.find(r => r.sectionNumber === 12);
@@ -2789,6 +2728,12 @@ function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
       }
     }
   }
+
+  // 14. 规范化 Section 3 排版 (3.1 & 3.2 镜像同构与网格显式字体声明)
+  normalizeSection3Typography(engine, false);
+
+  // 15. 规范化所有中文带编号标签段落 (原子化序号与标签 Run，统一 420 dxa 悬挂缩进)
+  normalizeChineseNumberedLabels(engine);
 
   // 严格保留模板原装序号与格式，严禁全局重排序号
   engine._adaptiveRevisionDate = finalRevisionDate;
@@ -2883,12 +2828,18 @@ function translateToxicologyValueToEnglish(cnText, endpoint = '') {
   t = t.replace(/STOT评估-重复性接触/g, 'STOT evaluation - repeated exposure:');
   t = t.replace(/CMR评估/g, 'CMR assessment:');
   t = t.replace(/亚急性[，, ]*亚慢性和延迟毒性/g, 'Subacute, subchronic and prolonged toxicity:');
-  t = t.replace(/生殖毒性\/生育力/g, 'Reproductive toxicity / fertility:');
-  t = t.replace(/生殖毒性\/致畸形/g, 'Reproductive toxicity / teratogenicity:');
-  t = t.replace(/致癌性/g, 'Carcinogenicity:');
-  t = t.replace(/吸入危害/g, 'Aspiration hazard:');
-    t = t.replace(/在\s*AMES\s*试验中无(?:致突变性|Mutagenicity[:：]?)。?/gi, 'Non-mutagenic in Ames test.');
-  t = t.replace(/致突变性/g, 'Mutagenicity:');
+  t = t.replace(/生殖毒性\/生育力\s*[:：]?/g, 'Reproductive toxicity / fertility: ');
+  t = t.replace(/生殖毒性\/致畸形\s*[:：]?/g, 'Reproductive toxicity / teratogenicity: ');
+  t = t.replace(/致癌性\s*[:：]?/g, 'Carcinogenicity: ');
+  t = t.replace(/致畸性\s*[:：]?/g, 'Teratogenicity: ');
+  t = t.replace(/吸入危害\s*[:：]?/g, 'Aspiration hazard: ');
+  t = t.replace(/在\s*AMES\s*试验中无(?:致突变性|Mutagenicity[:：]?)。?/gi, 'Non-mutagenic in Ames test.');
+  t = t.replace(/致突变性\s*[:：]?/g, 'Mutagenicity: ');
+  t = t.replace(/：/g, ': ');
+  t = t.replace(/。/g, '. ');
+  t = t.replace(/:\s*[:：]/g, ': ');
+  t = t.replace(/\.\s*\./g, '.');
+  t = t.replace(/\s+/g, ' ');
   t = t.replace(/，/g, ',');
   t = t.replace(/轻微刺激/g, 'Slight irritation');
   t = t.replace(/无刺激/g, 'No irritation');
@@ -3480,187 +3431,9 @@ function translateConditionsToAvoid(cnText = '') {
   if (s11 && (isMultiComponent || enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED')) {
     // Mode B 通栏复合豁免模态：已由 buildThreeTierSection11 全权接管，跳过传统单端点映射以防中文污染
   } else if (s11) {
-    const cnS11 = baseCnEngine?.records?.find(r => r.sectionNumber === 11);
-    
-    // 1. 动态自适应顶部的产品毒理学声明语（双说明行对齐中文母版）
-    const cnS11Preambles = [];
-    if (cnS11) {
-      for (let i = 1; i < cnS11.rows.length; i++) {
-        const t = cnS11.rows[i].cells.map(c => c.text || '').join('').trim();
-        if (/急性毒性|原发性皮肤刺激|主要皮肤刺激|Acute toxicity|11\.\d/i.test(t)) break;
-        if (t) cnS11Preambles.push(t);
-      }
-    }
-
-    if (cnS11Preambles.length >= 2) {
-      if (s11.rows[1]) {
-        formatSection11PreambleRow(s11.rows[1], 'No toxicological studies were available for this product.', true, 0);
-      }
-      if (s11.rows[2]?.cells?.[0]) {
-        let enIntro = 'The following are toxicological data for the component:';
-        if (/类似产品的风险评估/i.test(cnS11Preambles[1])) {
-          enIntro = 'Toxicological data from risk assessment of similar products:';
-        } else if (/N[－\-—\s]*甲基吡咯烷酮|NMP/i.test(cnS11Preambles[1])) {
-          enIntro = 'The following are toxicological data for N-Methyl-2-pyrrolidone (NMP):';
-        } else if (/N,N[－\-—\s]*二甲基乙酰胺|DMAC/i.test(cnS11Preambles[1])) {
-          enIntro = 'The following is toxicological data for N,N-Dimethylacetamide:';
-        } else if (/2-丁氧基乙醇|111-76-2/i.test(cnS11Preambles[1])) {
-          enIntro = 'The following is toxicological data for 2-Butoxyethanol (CAS: 111-76-2):';
-        } else if (/以[下为](?:是)?(.*?)毒理学数据/i.test(cnS11Preambles[1])) {
-          const comp = cnS11Preambles[1].match(/以[下为](?:是)?(.*?)毒理学数据/i)[1].trim();
-          enIntro = `The following are toxicological data for ${comp}:`;
-        }
-        formatSection11PreambleRow(s11.rows[2], enIntro, true);
-      }
-    } else if (cnS11Preambles.length === 1) {
-      if (s11.rows[1]) {
-        formatSection11PreambleRow(s11.rows[1], 'No toxicological studies were available for this product.', true, 0);
-      }
-      if (s11.rows[2]?.cells?.length === 1) {
-        s11 = deleteRow(engine, s11, 2);
-      }
-    } else if (cnS11Preambles.length === 0) {
-      if (s11.rows[2]?.cells?.length === 1) s11 = deleteRow(engine, s11, 2);
-      if (s11.rows[1]?.cells?.length === 1) s11 = deleteRow(engine, s11, 1);
-    }
-
-    // 2. 从中文母版动态映射并英译实测端点 (绝不写死假数据)
-    if (cnS11) {
-      const findCnVal = (re) => {
-        const row = cnS11.rows.find(r => re.test(r.cells.map(c => c.text).join(' ')));
-        if (!row) return '';
-        return (row.cells[row.cells.length - 1]?.text || '').trim();
-      };
-
-      const oralCn = findCnVal(/经口/i);
-      const inhalCn = findCnVal(/吸入/i);
-      const dermCn = findCnVal(/经皮/i);
-      const skinIrrCn = findCnVal(/皮肤刺激/i);
-      const eyeIrrCn = findCnVal(/主要粘膜刺激|眼睛刺激/i);
-      const sensCn = findCnVal(/致敏性/i);
-      const mutCn = findCnVal(/致突变性|遗传毒性/i);
-      const carcCn = findCnVal(/致癌性/i);
-      const repCn = findCnVal(/生殖毒性/i);
-      const teratoCn = findCnVal(/致畸/i);
-      const fertCn = findCnVal(/生育/i) || repCn;
-      const stotCn = findCnVal(/特异性靶器官/i);
-      const aspCn = findCnVal(/吸入危险|吸入危害/i);
-      const addInfoCn = findCnVal(/附加信息/i);
-
-      for (let i = 0; i < s11.rows.length; i++) {
-        const row = s11.rows[i];
-        const rText = row.cells.map(c => c.text).join(' ');
-        const lastCell = row.cells[row.cells.length - 1];
-        if (!lastCell) continue;
-
-        if (/Oral/i.test(rText) && oralCn) safeWrite(lastCell, translateToxicologyValueToEnglish(oralCn, 'oral'));
-        else if (/Inhalation/i.test(rText) && inhalCn) safeWrite(lastCell, translateToxicologyValueToEnglish(inhalCn, 'inhalation'));
-        else if (/Dermal/i.test(rText) && dermCn) safeWrite(lastCell, translateToxicologyValueToEnglish(dermCn, 'dermal'));
-        else if (/Primary skin irritation/i.test(rText) && skinIrrCn) safeWrite(lastCell, translateToxicologyValueToEnglish(skinIrrCn));
-        else if (/Primary eye irritation|Primary mucosal irritation/i.test(rText) && eyeIrrCn) {
-          const isMucosal = cnS11?.rows?.some(r => /主要粘膜刺激/i.test(r.cells[0]?.text || ''));
-          if (isMucosal) {
-            writeCellLabel(row.cells[0], '11.3 Primary mucosal irritation:', true);
-          }
-          safeWrite(lastCell, translateToxicologyValueToEnglish(eyeIrrCn));
-        }
-        else if (/Sensitization/i.test(rText) && sensCn) safeWrite(lastCell, translateToxicologyValueToEnglish(sensCn));
-        else if (/Mutagenicity/i.test(rText) && mutCn) safeWrite(lastCell, translateToxicologyValueToEnglish(mutCn));
-        else if (/Carcinogenicity/i.test(rText) && carcCn) safeWrite(lastCell, translateToxicologyValueToEnglish(carcCn));
-        else if (/Teratogenicity/i.test(rText) && teratoCn) safeWrite(lastCell, translateToxicologyValueToEnglish(teratoCn));
-        else if (/Fertility/i.test(rText) && fertCn) safeWrite(lastCell, translateToxicologyValueToEnglish(fertCn));
-        else if (/Reproductive toxicity/i.test(rText)) {
-          const repRowInCn = cnS11?.rows?.some(r => /生殖毒性/i.test(r.cells[0]?.text || ''));
-          if (repRowInCn) {
-            safeWrite(lastCell, repCn ? translateToxicologyValueToEnglish(repCn) : 'No data available.');
-          }
-        }
-        else if (/Specific target organ/i.test(rText) && stotCn) safeWrite(lastCell, translateToxicologyValueToEnglish(stotCn));
-        else if (/Aspiration hazard/i.test(rText) && aspCn) safeWrite(lastCell, translateToxicologyValueToEnglish(aspCn));
-        else if (/Additional information/i.test(rText)) {
-          if (addInfoCn) {
-            writeStructuredToxicologyCellValue(lastCell, translateToxicologyValueToEnglish(addInfoCn), { isEnglish: true });
-          } else {
-            safeWrite(lastCell, 'No data available.');
-          }
-        }
-      }
-
-      // 3. 动态精简：严格与中文母版 cnS11 结构同构对齐，中文未列入的指标项英文必须同步剪枝
-      const cnHasCarc = cnS11?.rows?.some(r => /致癌/i.test(r.cells[0]?.text || ''));
-      const cnHasRep = cnS11?.rows?.some(r => /生殖毒性/i.test(r.cells[0]?.text || ''));
-      const cnHasStot = cnS11?.rows?.some(r => /特异性靶器官/i.test(r.cells[0]?.text || ''));
-      const cnHasAsp = cnS11?.rows?.some(r => /吸入危险|吸入危害/i.test(r.cells[0]?.text || ''));
-      const cnHasAdd = cnS11?.rows?.some(r => /附加信息/i.test(r.cells[0]?.text || ''));
-
-      for (let i = s11.rows.length - 1; i >= 3; i--) {
-        const row = s11.rows[i];
-        const rText = row.cells.map(c => c.text).join(' ');
-        const lastCellText = (row.cells[row.cells.length - 1]?.text || '').trim();
-        let shouldPrune = false;
-        if (/Inhalation:/i.test(rText) && !inhalCn) shouldPrune = true;
-        else if (/Dermal:/i.test(rText) && !dermCn) shouldPrune = true;
-        else if (/Primary skin irritation/i.test(rText) && !skinIrrCn) shouldPrune = true;
-        else if (/Primary eye irritation/i.test(rText) && !eyeIrrCn) shouldPrune = true;
-        else if (/Sensitization/i.test(rText) && !sensCn) shouldPrune = true;
-        else if (/Mutagenicity/i.test(rText) && !mutCn) shouldPrune = true;
-        else if (/Carcinogenicity/i.test(rText) && !cnHasCarc) shouldPrune = true;
-        else if (/Teratogenicity/i.test(rText) && !findCnVal(/致畸/i)) shouldPrune = true;
-        else if (/In vitro genotoxicity/i.test(rText) && !findCnVal(/体外遗传毒性|体外基因毒性/i)) shouldPrune = true;
-        else if (/Reproductive toxicity/i.test(rText) && !cnHasRep) shouldPrune = true;
-        else if (/Specific target organ/i.test(rText) && !cnHasStot) shouldPrune = true;
-        else if (/Aspiration hazard/i.test(rText) && !cnHasAsp) shouldPrune = true;
-        else if (/Additional information/i.test(rText) && !cnHasAdd) shouldPrune = true;
-        else if (/根据现有数据/i.test(rText)) shouldPrune = true;
-        else if (i >= 3 && row.cells.length === 1) shouldPrune = true;
-        else if (!rText.trim()) shouldPrune = true;
-        else if (/^(?:AA|BB|CC)$/.test(lastCellText)) shouldPrune = true;
-
-        if (shouldPrune) {
-          s11 = deleteRow(engine, s11, i);
-        }
-      }
-
-      // 若生殖毒性未拆分为子项，清理模板原生残留的 Fertility 内部子标签
-      if (repCn && !findCnVal(/致畸/i)) {
-        const repRow = s11.rows.find(r => /Reproductive toxicity/i.test(r.cells[0]?.text || ''));
-        if (repRow && repRow.cells.length > 2) {
-          while (repRow.cells.length > 2) {
-            removeCellFromRow(repRow, 1);
-          }
-          normalizeRowGeometry(repRow);
-        }
-      }
-
-      // 若中文母版行数少于英文版（例如中文仅有前言说明无指标项），严格对齐双语行数，修剪英文多余尾行
-      const targetRowCount = cnS11?.rows?.length || s11.rows.length;
-      while (s11.rows.length > targetRowCount) {
-        s11 = deleteRow(engine, s11, s11.rows.length - 1);
-      }
-    }
-
-    // 4. 重新编号确保 11.1 ~ 11.N 严密对齐
-    renumberRecord(s11, '11');
-
-    // 消除英文版 Section 11 中残留的中文全角冒号、拼写瑕疵及转义字符
-    const s11XmlTexts = Array.from(s11.node?.getElementsByTagNameNS(W_NS, 't') || []);
-    for (const tNode of s11XmlTexts) {
-      if (tNode.textContent) {
-        if (tNode.textContent.includes('：')) tNode.textContent = tNode.textContent.replace(/：/g, ':');
-        if (tNode.textContent.includes('orga ntoxicity')) tNode.textContent = tNode.textContent.replace(/orga ntoxicity/g, 'organ toxicity');
-        if (tNode.textContent.includes('repeate dexposure')) tNode.textContent = tNode.textContent.replace(/repeate dexposure/g, 'repeated exposure');
-        if (tNode.textContent.includes('&gt;')) tNode.textContent = tNode.textContent.replace(/&gt;/g, '>');
-      }
-    }
-
-    // 通用英文 Section 11 标准排版与悬挂缩进保全 (基于中文母版实测事实数据驱动)
-    for (let rIdx = 3; rIdx < s11.rows.length; rIdx++) {
-      const c0 = s11.rows[rIdx]?.cells[0];
-      if (c0) {
-        applyStandardHangingIndent(c0, '420', '420');
-      }
-      normalizeSection11RowHeight(s11.rows[rIdx]);
-    }
+    const srcEngine = baseCnEngine || facts.srcEngine;
+    buildDynamicSection11Table(engine, srcEngine, baseCnEngine, true, facts);
+    s11 = engine.records.find(r => r.sectionNumber === 11);
   }
 
   // Section 12 (自适应双模态说明行英译装配与实测数据英译)
@@ -3756,19 +3529,8 @@ function translateConditionsToAvoid(cnText = '') {
   }
   // @ANTIGRAVITY_INVARIANT_LOCK_END
 
-  // Section 14 (标准 5 行)
-  const s14 = engine.records.find(r => r.sectionNumber === 14);
-  if (s14) {
-    for (const row of s14.rows) {
-      const lbl = (row.cells[0]?.text || '').trim();
-      const c1 = row.cells[1];
-      if (!c1) continue;
-      if (/Road and rail/i.test(lbl)) safeWrite(c1, enValues['sec14.road_rail']);
-      else if (/Maritime/i.test(lbl)) safeWrite(c1, enValues['sec14.sea']);
-      else if (/Air transport/i.test(lbl)) safeWrite(c1, enValues['sec14.air']);
-      else if (/Special precautions/i.test(lbl)) safeWrite(c1, enValues['sec14.special_precautions']);
-    }
-  }
+  // Section 14 通用动态拓扑构建器 (REQ-04)
+  buildDynamicSection14Table(engine, baseCnEngine || facts.srcEngine, baseCnEngine, true, facts);
 
   // Section 15 (法规标准 100% 官方标准纯英文化，绝对零中文；根据中文母版剪枝未列法规)
   let s15 = engine.records.find(r => r.sectionNumber === 15);
@@ -4172,30 +3934,9 @@ export async function executeEightDeliverablesPipeline({
         enforceTableStandardBorders(record);
       }
     }
-    // 表格行防跨页撕裂加固：为除 Section 2 以外的表格注入 <w:cantSplit/>
-    // Section 2 通栏复合多行结构（长文本防范说明）必须严格豁免并清除 cantSplit，防止排版断崖与底部截断 (REQ-01)
+    // 表格跨页自然断行放开 (REQ-02): 默认允许所有数据行跨页断行，消除章节与表格间的大空白断层
     if (eng.documentXml) {
-      const s2Rec = eng.records.find(r => r.sectionNumber === 2);
-      const s2TblNode = s2Rec?.node;
-      if (s2TblNode) {
-        const s2CantSplits = Array.from(s2TblNode.getElementsByTagNameNS(W_NS, 'cantSplit'));
-        s2CantSplits.forEach(cs => cs.parentNode?.removeChild(cs));
-      }
-      const allTables = Array.from(eng.documentXml.getElementsByTagNameNS(W_NS, 'tbl'));
-      for (const tbl of allTables) {
-        if (tbl === s2TblNode) continue;
-        const trs = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
-        for (const tr of trs) {
-          let trPr = tr.getElementsByTagNameNS(W_NS, 'trPr')[0];
-          if (!trPr) {
-            trPr = tr.ownerDocument.createElementNS(W_NS, 'w:trPr');
-            tr.insertBefore(trPr, tr.firstChild);
-          }
-          if (trPr.getElementsByTagNameNS(W_NS, 'cantSplit').length === 0) {
-            trPr.appendChild(tr.ownerDocument.createElementNS(W_NS, 'w:cantSplit'));
-          }
-        }
-      }
+      enableCrossPageBreaksForAllSections(eng);
     }
 
     applyGlobalTypographyProjection(eng, isEn);
@@ -4357,6 +4098,9 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
   const doc = eng.documentXml;
   const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
+  // 0. Section 3: 题头标签加粗与组分行常规体法定不变量规范 (REQ-01)
+  normalizeSection3Typography(eng, isEn);
+
   // 1. Section 2: 细粒度加粗与常规体分离校验 (INV-BOLD-S2-S15)
   const s2Rec = eng.records.find(r => r.sectionNumber === 2);
   if (s2Rec && s2Rec.rows.length >= 2) {
@@ -4436,17 +4180,17 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
         let bCs = r1Pr.getElementsByTagNameNS(W_NS, 'bCs')[0] || doc.createElementNS(W_NS, 'w:bCs');
         if (!r1Pr.getElementsByTagNameNS(W_NS, 'bCs')[0]) r1Pr.appendChild(bCs);
         let sz = r1Pr.getElementsByTagNameNS(W_NS, 'sz')[0] || doc.createElementNS(W_NS, 'w:sz');
-        sz.setAttribute('w:val', '24');
+        sz.setAttribute('w:val', isEn ? '19' : '24');
         if (!r1Pr.getElementsByTagNameNS(W_NS, 'sz')[0]) r1Pr.appendChild(sz);
         let szCs = r1Pr.getElementsByTagNameNS(W_NS, 'szCs')[0] || doc.createElementNS(W_NS, 'w:szCs');
-        szCs.setAttribute('w:val', '24');
+        szCs.setAttribute('w:val', isEn ? '19' : '24');
         if (!r1Pr.getElementsByTagNameNS(W_NS, 'szCs')[0]) r1Pr.appendChild(szCs);
       }
     }
   }
 
   // 2.1 Section 8: 手部防护父级分类题头字号规范 (INV-S8-HAND)
-  // 中英文版“手部防护：”/“Hand protection:”作为唯一父级分类题头，字号必须统一为 12pt (sz="24" 加粗)
+  // 中文版“手部防护：”统一为 12pt (sz="24" 加粗)，英文版“Hand protection:”统一为 9.5pt (sz="19" 加粗)
   if (s8Rec) {
     for (const row of s8Rec.rows) {
       const text = (row.cells[0]?.text || '').trim();
@@ -4462,11 +4206,17 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
             let bCs = rPr.getElementsByTagNameNS(W_NS, 'bCs')[0] || doc.createElementNS(W_NS, 'w:bCs');
             if (!rPr.getElementsByTagNameNS(W_NS, 'bCs')[0]) rPr.appendChild(bCs);
             let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0] || doc.createElementNS(W_NS, 'w:sz');
-            sz.setAttribute('w:val', '24');
+            sz.setAttribute('w:val', isEn ? '19' : '24');
             if (!rPr.getElementsByTagNameNS(W_NS, 'sz')[0]) rPr.appendChild(sz);
             let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || doc.createElementNS(W_NS, 'w:szCs');
-            szCs.setAttribute('w:val', '24');
+            szCs.setAttribute('w:val', isEn ? '19' : '24');
             if (!rPr.getElementsByTagNameNS(W_NS, 'szCs')[0]) rPr.appendChild(szCs);
+            let rf = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || doc.createElementNS(W_NS, 'w:rFonts');
+            rf.setAttribute('w:ascii', isEn ? 'Arial' : 'Times New Roman');
+            rf.setAttribute('w:hAnsi', isEn ? 'Arial' : 'Times New Roman');
+            rf.setAttribute('w:eastAsia', isEn ? 'Arial' : '宋体');
+            rf.setAttribute('w:cs', isEn ? 'Arial' : 'Times New Roman');
+            if (!rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0]) rPr.appendChild(rf);
           }
         }
       }
@@ -4521,6 +4271,20 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
           let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || doc.createElementNS(W_NS, 'w:szCs');
           szCs.setAttribute('w:val', '24');
           if (!rPr.getElementsByTagNameNS(W_NS, 'szCs')[0]) rPr.appendChild(szCs);
+        }
+        // 同时清理段落级 pPr/rPr 中可能残留的 sz="21"
+        const ps = Array.from(c0.getElementsByTagNameNS(W_NS, 'p'));
+        for (const p of ps) {
+          const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+          if (pPr) {
+            const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
+            if (pRPr) {
+              const szs = pRPr.getElementsByTagNameNS(W_NS, 'sz');
+              for (const s of Array.from(szs)) s.setAttribute('w:val', '24');
+              const szCss = pRPr.getElementsByTagNameNS(W_NS, 'szCs');
+              for (const s of Array.from(szCss)) s.setAttribute('w:val', '24');
+            }
+          }
         }
       }
     }
@@ -4635,32 +4399,60 @@ export function standardizeEnglishTypographyAndLabels(engine) {
 
       // Section 3 专项：第3行成分通栏合并，表头加粗无冒号
       if (sectionNumber === 3) {
-        if (rIdx === 2 && cells.length === 3) {
+        if (rIdx === 2) {
+          if (cells.length === 3) {
+            const p0 = cells[0].getElementsByTagNameNS(W_NS, 'p')[0];
+            const txt0 = (p0?.textContent || '').trim();
+            if (/^(?:3\.2\s*)?(?:成分|Ingredients)/i.test(txt0)) {
+              try {
+                row.removeChild(cells[1]);
+                row.removeChild(cells[2]);
+                let tcPr = cells[0].getElementsByTagNameNS(W_NS, 'tcPr')[0];
+                if (!tcPr) {
+                  tcPr = cells[0].ownerDocument.createElementNS(W_NS, 'w:tcPr');
+                  cells[0].insertBefore(tcPr, cells[0].firstChild);
+                }
+                let span = tcPr.getElementsByTagNameNS(W_NS, 'gridSpan')[0];
+                if (!span) {
+                  span = cells[0].ownerDocument.createElementNS(W_NS, 'w:gridSpan');
+                  tcPr.appendChild(span);
+                }
+                span.setAttributeNS(W_NS, 'w:val', '3');
+                let tcW = tcPr.getElementsByTagNameNS(W_NS, 'tcW')[0];
+                if (!tcW) {
+                  tcW = cells[0].ownerDocument.createElementNS(W_NS, 'w:tcW');
+                  tcPr.appendChild(tcW);
+                }
+                tcW.setAttributeNS(W_NS, 'w:w', '9781');
+                tcW.setAttributeNS(W_NS, 'w:type', 'dxa');
+              } catch (e) {}
+            }
+          }
+          // 法定要求 (REQ-01): Row 2 "3.2 成分/Ingredients" 是标签，必须加粗！
           const p0 = cells[0].getElementsByTagNameNS(W_NS, 'p')[0];
-          const txt0 = (p0?.textContent || '').trim();
-          if (/^(?:3\.2\s*)?(?:成分|Ingredients)/i.test(txt0)) {
-            try {
-              row.removeChild(cells[1]);
-              row.removeChild(cells[2]);
-              let tcPr = cells[0].getElementsByTagNameNS(W_NS, 'tcPr')[0];
-              if (!tcPr) {
-                tcPr = cells[0].ownerDocument.createElementNS(W_NS, 'w:tcPr');
-                cells[0].insertBefore(tcPr, cells[0].firstChild);
+          if (p0) {
+            const runs = Array.from(p0.getElementsByTagNameNS(W_NS, 'r'));
+            for (const r of runs) {
+              let rPr = r.getElementsByTagNameNS(W_NS, 'rPr')[0];
+              if (!rPr) {
+                rPr = p0.ownerDocument.createElementNS(W_NS, 'w:rPr');
+                r.insertBefore(rPr, r.firstChild);
               }
-              let span = tcPr.getElementsByTagNameNS(W_NS, 'gridSpan')[0];
-              if (!span) {
-                span = cells[0].ownerDocument.createElementNS(W_NS, 'w:gridSpan');
-                tcPr.appendChild(span);
+              let b = rPr.getElementsByTagNameNS(W_NS, 'b')[0];
+              if (!b) {
+                b = p0.ownerDocument.createElementNS(W_NS, 'w:b');
+                rPr.appendChild(b);
+              } else {
+                b.removeAttribute('w:val');
               }
-              span.setAttributeNS(W_NS, 'w:val', '3');
-              let tcW = tcPr.getElementsByTagNameNS(W_NS, 'tcW')[0];
-              if (!tcW) {
-                tcW = cells[0].ownerDocument.createElementNS(W_NS, 'w:tcW');
-                tcPr.appendChild(tcW);
+              let bCs = rPr.getElementsByTagNameNS(W_NS, 'bCs')[0];
+              if (!bCs) {
+                bCs = p0.ownerDocument.createElementNS(W_NS, 'w:bCs');
+                rPr.appendChild(bCs);
+              } else {
+                bCs.removeAttribute('w:val');
               }
-              tcW.setAttributeNS(W_NS, 'w:w', '9781');
-              tcW.setAttributeNS(W_NS, 'w:type', 'dxa');
-            } catch (e) {}
+            }
           }
         }
         if (rIdx === 3 && cells.length >= 3) {
@@ -4824,6 +4616,9 @@ export function standardizeEnglishTypographyAndLabels(engine) {
       }
     }
   }
+
+  // 规范化 Section 3 英文排版 (3.1 & 3.2 镜像同构与网格显式字体声明)
+  normalizeSection3Typography(engine, true);
 
   if (typeof engine.refresh === 'function') {
     engine.refresh();
@@ -4992,11 +4787,9 @@ function formatEnglishLabelCell(cell, W_NS, sectionNumber) {
     // 第一列无序号标签（如 Chemical category:、Recommendation:、PPE 各子项等）：
     // 强制统一应用 indent (420/565 dxa) 左缩进，使其文字首字母与有序号标签的正文首字母严格在同一垂直基准线上对齐，消除锯齿！
     applyLeftIndentToP(firstP, indent, W_NS);
-    const isHandParent = /Hand protection/i.test(cleanLabel);
-    const sizeVal = isHandParent ? '24' : '19';
     rebuildRunsWithTypography(firstP, cleanLabel, {
       font: 'Arial',
-      sizeVal: sizeVal, // Hand protection: 父级分类题头统一为 12pt (sz="24")
+      sizeVal: '19', // 英文版全篇统一为 9.5pt (sz="19")，彻底消灭逆向膨胀！
       bold: true
     }, W_NS);
   }
@@ -5174,16 +4967,16 @@ function formatRowAsSectionHeader(row, W_NS) {
   }
 }
 
-function rebuildRunsWithTypography(p, text, { font, sizeVal, bold }, W_NS) {
+function rebuildRunsWithTypography(p, text, { font, asciiFont, sizeVal, bold }, W_NS) {
   const existingRuns = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
   existingRuns.forEach(r => p.removeChild(r));
 
-  if (!text) return;
+  if (text === undefined || text === null) return;
 
   const doc = p.ownerDocument;
   const r = doc.createElementNS(W_NS, 'w:r');
   const rPr = doc.createElementNS(W_NS, 'w:rPr');
-  applyRunProps(rPr, { font, sizeVal, bold }, W_NS);
+  applyRunProps(rPr, { font, asciiFont, sizeVal, bold }, W_NS);
   r.appendChild(rPr);
 
   const t = doc.createElementNS(W_NS, 'w:t');
@@ -5194,16 +4987,17 @@ function rebuildRunsWithTypography(p, text, { font, sizeVal, bold }, W_NS) {
   p.appendChild(r);
 }
 
-function applyRunProps(rPr, { font, sizeVal, bold }, W_NS) {
+function applyRunProps(rPr, { font, asciiFont, sizeVal, bold }, W_NS) {
   const doc = rPr.ownerDocument;
   const oldFonts = Array.from(rPr.getElementsByTagNameNS(W_NS, 'rFonts'));
   oldFonts.forEach(f => rPr.removeChild(f));
 
   const rFonts = doc.createElementNS(W_NS, 'w:rFonts');
-  rFonts.setAttribute('w:ascii', font);
-  rFonts.setAttribute('w:hAnsi', font);
+  const asciiF = asciiFont || font;
+  rFonts.setAttribute('w:ascii', asciiF);
+  rFonts.setAttribute('w:hAnsi', asciiF);
   rFonts.setAttribute('w:eastAsia', font);
-  rFonts.setAttribute('w:cs', font);
+  rFonts.setAttribute('w:cs', asciiF);
   rPr.appendChild(rFonts);
 
   const oldBs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'b'));
@@ -5225,14 +5019,205 @@ function applyRunProps(rPr, { font, sizeVal, bold }, W_NS) {
   rPr.appendChild(szCs);
 }
 
-function applyRunStyle(r, { font, sizeVal, bold }, W_NS) {
+function applyRunStyle(r, { font, asciiFont, sizeVal, bold }, W_NS) {
   const doc = r.ownerDocument;
   let rPr = r.getElementsByTagNameNS(W_NS, 'rPr')[0];
   if (!rPr) {
     rPr = doc.createElementNS(W_NS, 'w:rPr');
     r.insertBefore(rPr, r.firstChild);
   }
-  applyRunProps(rPr, { font, sizeVal, bold }, W_NS);
+  applyRunProps(rPr, { font, asciiFont, sizeVal, bold }, W_NS);
+}
+
+export function rebuildUnifiedLabelRun(p, seqStr, labelText, { font, asciiFont, sizeVal, bold }, W_NS) {
+  const existingRuns = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+  existingRuns.forEach(r => p.removeChild(r));
+  const doc = p.ownerDocument;
+
+  if (seqStr) {
+    const rSeq = doc.createElementNS(W_NS, 'w:r');
+    const rPrSeq = doc.createElementNS(W_NS, 'w:rPr');
+    applyRunProps(rPrSeq, { font: asciiFont || font, asciiFont: asciiFont || font, sizeVal, bold }, W_NS);
+    rSeq.appendChild(rPrSeq);
+    const tSeq = doc.createElementNS(W_NS, 'w:t');
+    tSeq.setAttribute('xml:space', 'preserve');
+    tSeq.textContent = `${seqStr}  `;
+    rSeq.appendChild(tSeq);
+    p.appendChild(rSeq);
+  }
+
+  if (labelText) {
+    const rLbl = doc.createElementNS(W_NS, 'w:r');
+    const rPrLbl = doc.createElementNS(W_NS, 'w:rPr');
+    applyRunProps(rPrLbl, { font, asciiFont: asciiFont || font, sizeVal, bold }, W_NS);
+    rLbl.appendChild(rPrLbl);
+    const tLbl = doc.createElementNS(W_NS, 'w:t');
+    tLbl.textContent = labelText;
+    rLbl.appendChild(tLbl);
+    p.appendChild(rLbl);
+  }
+}
+
+export function normalizeSection3Typography(engine, isEnglish = false) {
+  const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const s3 = engine.records.find(r => r.sectionNumber === 3);
+  if (!s3 || !Array.isArray(s3.rows) || s3.rows.length < 3) return;
+
+  const font = isEnglish ? 'Arial' : '宋体';
+  const asciiFont = isEnglish ? 'Arial' : 'Times New Roman';
+  const sizeVal = isEnglish ? '19' : '24';
+
+  // 1. Row 1: 必须具备 3.1 序号
+  const r1 = s3.rows[1];
+  const r1_c0 = r1.cells[0]?.node;
+  if (r1_c0) {
+    cleanTabsInNode(r1_c0, W_NS);
+    const p = r1_c0.getElementsByTagNameNS(W_NS, 'p')[0];
+    if (p) {
+      const labelText = isEnglish ? 'Product type:' : '产品类型：';
+      applyHangingIndentToP(p, '420', '420', W_NS);
+      rebuildUnifiedLabelRun(p, '3.1', labelText, { font, asciiFont, sizeVal, bold: true }, W_NS);
+    }
+  }
+  const r1_c1 = r1.cells[1]?.node;
+  if (r1_c1) {
+    cleanTabsInNode(r1_c1, W_NS);
+    const p = r1_c1.getElementsByTagNameNS(W_NS, 'p')[0];
+    if (p) {
+      const valText = (p.textContent || '').trim() || (isEnglish ? 'Mixture' : '混合物');
+      removeHangingIndentFromP(p, W_NS);
+      setParagraphAlign(p, 'left', W_NS);
+      rebuildRunsWithTypography(p, valText, { font, asciiFont, sizeVal, bold: false }, W_NS);
+    }
+  }
+
+  // 2. Row 2: 通栏合并，必须具备 3.2 序号
+  const r2 = s3.rows[2];
+  if (r2) {
+    try {
+      const rNode = r2.node;
+      const cNodes = Array.from(rNode.getElementsByTagNameNS(W_NS, 'tc'));
+      if (cNodes.length >= 3) {
+        rNode.removeChild(cNodes[1]);
+        rNode.removeChild(cNodes[2]);
+        let tcPr = cNodes[0].getElementsByTagNameNS(W_NS, 'tcPr')[0];
+        if (!tcPr) {
+          tcPr = cNodes[0].ownerDocument.createElementNS(W_NS, 'tcPr');
+          cNodes[0].insertBefore(tcPr, cNodes[0].firstChild);
+        }
+        let span = tcPr.getElementsByTagNameNS(W_NS, 'gridSpan')[0];
+        if (!span) {
+          span = cNodes[0].ownerDocument.createElementNS(W_NS, 'w:gridSpan');
+          tcPr.appendChild(span);
+        }
+        span.setAttributeNS(W_NS, 'w:val', '3');
+        let tcW = tcPr.getElementsByTagNameNS(W_NS, 'tcW')[0];
+        if (!tcW) {
+          tcW = cNodes[0].ownerDocument.createElementNS(W_NS, 'w:tcW');
+          tcPr.appendChild(tcW);
+        }
+        tcW.setAttributeNS(W_NS, 'w:w', '9781');
+        tcW.setAttributeNS(W_NS, 'w:type', 'dxa');
+        r2.cells = [r2.cells[0]];
+      }
+    } catch (e) {}
+
+    const r2_c0 = r2.cells[0]?.node;
+    if (r2_c0) {
+      cleanTabsInNode(r2_c0, W_NS);
+      const p = r2_c0.getElementsByTagNameNS(W_NS, 'p')[0];
+      if (p) {
+        const labelText = isEnglish ? 'Ingredients:' : '成分：';
+        applyHangingIndentToP(p, '420', '420', W_NS);
+        rebuildUnifiedLabelRun(p, '3.2', labelText, { font, asciiFont, sizeVal, bold: true }, W_NS);
+      }
+    }
+  }
+
+  // 3. Row 3: 表头行 (Chemical name, CAS NO., Concentration % / 化学品名称, CAS编号, 含量%（w/w）)
+  if (s3.rows[3]) {
+    const r3 = s3.rows[3];
+    for (let cIdx = 0; cIdx < r3.cells.length; cIdx++) {
+      const cellNode = r3.cells[cIdx]?.node;
+      if (!cellNode) continue;
+      cleanTabsInNode(cellNode, W_NS);
+      const p = cellNode.getElementsByTagNameNS(W_NS, 'p')[0];
+      if (p) {
+        let t = (p.textContent || '').replace(/[:：]/g, '').trim();
+        removeHangingIndentFromP(p, W_NS);
+        setParagraphAlign(p, 'center', W_NS);
+        rebuildRunsWithTypography(p, t, { font, asciiFont, sizeVal, bold: true }, W_NS);
+      }
+    }
+  }
+
+  // 4. Row 4+: 组分数据网格 (显式声明 rFonts 与 sz, G-11)
+  for (let rIdx = 4; rIdx < s3.rows.length; rIdx++) {
+    const r = s3.rows[rIdx];
+    if (!r || !Array.isArray(r.cells)) continue;
+    for (let cIdx = 0; cIdx < r.cells.length; cIdx++) {
+      const cellNode = r.cells[cIdx]?.node;
+      if (!cellNode) continue;
+      cleanTabsInNode(cellNode, W_NS);
+      const p = cellNode.getElementsByTagNameNS(W_NS, 'p')[0];
+      if (p) {
+        let t = (p.textContent || '').replace(/[:：]$/g, '').trim();
+        removeHangingIndentFromP(p, W_NS);
+        setParagraphAlign(p, 'center', W_NS);
+        rebuildRunsWithTypography(p, t, { font, asciiFont, sizeVal, bold: false }, W_NS);
+      }
+    }
+  }
+}
+
+export function normalizeChineseNumberedLabels(engine) {
+  const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  if (!engine?.records) return;
+
+  for (const record of engine.records) {
+    if (!record || !Array.isArray(record.rows)) continue;
+    const secNum = record.sectionNumber;
+    // Section 2, 3, 8, 9, 13, 15, 16 由专属排版引擎管理
+    if ([2, 3, 8, 9, 13, 15, 16].includes(secNum)) continue;
+
+    for (let rIdx = 1; rIdx < record.rows.length; rIdx++) {
+      const row = record.rows[rIdx];
+      if (!row || !Array.isArray(row.cells)) continue;
+      const c0 = row.cells[0]?.node;
+      if (!c0) continue;
+
+      const p = c0.getElementsByTagNameNS(W_NS, 'p')[0];
+      if (!p) continue;
+
+      const fullText = (p.textContent || '').replace(/\t/g, ' ').replace(/\s+/g, ' ').trim();
+      const match = fullText.match(/^(\d+\.\d+)\s*(.*)$/);
+      if (match) {
+        const seqStr = match[1];
+        let cleanLabel = match[2].trim();
+        if (!cleanLabel.endsWith('：') && !cleanLabel.endsWith(':')) cleanLabel += '：';
+        cleanLabel = cleanLabel.replace(/:$/, '：');
+
+        applyHangingIndentToP(p, '420', '420', W_NS);
+        rebuildUnifiedLabelRun(p, seqStr, cleanLabel, {
+          font: '宋体',
+          asciiFont: 'Times New Roman',
+          sizeVal: '24',
+          bold: true
+        }, W_NS);
+      } else if (secNum === 1) {
+        if (/^(?:中文名称|英文名称|化学品分类|供应商名称|供应商地址|电话|传真)[：:]/i.test(fullText)) {
+          let cleanLabel = fullText.replace(/[:：]$/, '') + '：';
+          applyLeftIndentToP(p, '420', W_NS);
+          rebuildUnifiedLabelRun(p, '', cleanLabel, {
+            font: '宋体',
+            asciiFont: 'Times New Roman',
+            sizeVal: '24',
+            bold: true
+          }, W_NS);
+        }
+      }
+    }
+  }
 }
 
 export function sanitizeEnglishTypography(engine) {

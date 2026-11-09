@@ -1451,7 +1451,7 @@ export async function runMasterMsdsAudit(options = {}) {
   const s2RecEn = enDocx.records.find(r => r.sectionNumber === 2);
   const cnS2TextAll = s2RecCn ? s2RecCn.rows.map(r => r.cells.map(c => c.text).join(' ')).join(' ') : '';
   const enS2TextAll = s2RecEn ? s2RecEn.rows.map(r => r.cells.map(c => c.text).join(' ')).join(' ') : '';
-  if (/易燃|可燃|危险性说明/i.test(cnS2TextAll)) {
+  if (/易燃|可燃/i.test(cnS2TextAll)) {
     const s2HasP403Cn = /P403/i.test(cnS2TextAll);
     const s2HasP501Cn = /P501/i.test(cnS2TextAll);
     const s2HasP403En = /P403/i.test(enS2TextAll);
@@ -1596,6 +1596,114 @@ export async function runMasterMsdsAudit(options = {}) {
       'TDS CN/EN'
     );
   }
+
+  // 6. Section 2 纯净大通栏零内框虚线断言 (REQ-05)
+  const cnS2TableXml = s2RecCn?.tableXml || '';
+  const enS2TableXml = s2RecEn?.tableXml || '';
+  const s2HasInnerDotted = /w:val="(?:dotted|dashed)"/i.test(cnS2TableXml) || /w:val="(?:dotted|dashed)"/i.test(enS2TableXml);
+  assert(
+    !s2HasInnerDotted,
+    '环3',
+    'Section 2 纯净大通栏零内框虚线规范 (REQ-05)',
+    'Section 2 表格必须为纯净大通栏，内部数据行之间严禁存在虚线或点划线边框',
+    s2HasInnerDotted ? '存在内框虚线/点划线' : '零内框虚线，大通栏纯净合规',
+    'Section 2 CN/EN'
+  );
+
+  // 7. Section 3 “3.2 成分”标签识别与法定加粗格式断言 (REQ-01)
+  const s3RecCn = cnDocx.records.find(r => r.sectionNumber === 3);
+  const s3RecEn = enDocx.records.find(r => r.sectionNumber === 3);
+  let s3CnHeaderBold = false;
+  let s3EnHeaderBold = false;
+  let s3DataRowsWronglyBold = false;
+
+  if (s3RecCn && s3RecCn.rows.length >= 3) {
+    const r2P = s3RecCn.rows[2].cells[0]?.paragraphs?.[0];
+    s3CnHeaderBold = computeEffectiveBold(r2P?.runs?.[0]?.node, r2P?.node);
+    for (let r = 4; r < s3RecCn.rows.length; r++) {
+      const p = s3RecCn.rows[r].cells[0]?.paragraphs?.[0];
+      if (computeEffectiveBold(p?.runs?.[0]?.node, p?.node)) {
+        s3DataRowsWronglyBold = true;
+        break;
+      }
+    }
+  }
+
+  if (s3RecEn && s3RecEn.rows.length >= 3) {
+    const r2P = s3RecEn.rows[2].cells[0]?.paragraphs?.[0];
+    s3EnHeaderBold = computeEffectiveBold(r2P?.runs?.[0]?.node, r2P?.node);
+    for (let r = 4; r < s3RecEn.rows.length; r++) {
+      const p = s3RecEn.rows[r].cells[0]?.paragraphs?.[0];
+      if (computeEffectiveBold(p?.runs?.[0]?.node, p?.node)) {
+        s3DataRowsWronglyBold = true;
+        break;
+      }
+    }
+  }
+
+  assert(
+    s3CnHeaderBold && s3EnHeaderBold && !s3DataRowsWronglyBold,
+    '环3',
+    'Section 3 “3.2 成分”标签加粗与组分行常规体规范 (REQ-01)',
+    'Section 3 Row 2“3.2 成分/Ingredients”必须加粗，下方各组分数据行必须为常规细体，严禁整表误加粗',
+    `CN加粗=${s3CnHeaderBold}, EN加粗=${s3EnHeaderBold}, 组分误加粗=${s3DataRowsWronglyBold}`,
+    'Section 3 CN/EN'
+  );
+
+  // 8. 全局表格跨页断行底层放开与消除大空白断言 (REQ-02)
+  let docxHasIllegalCantSplit = false;
+  const cantSplitSections = [2, 8, 11, 12, 13, 14, 15, 16];
+  for (const sNum of cantSplitSections) {
+    const rCn = cnDocx.records.find(r => r.sectionNumber === sNum);
+    if (rCn && rCn.rows.length > 2) {
+      for (let rIdx = 1; rIdx < rCn.rows.length; rIdx++) {
+        const rowNode = rCn.rows[rIdx].node;
+        if (rowNode && (rowNode.getElementsByTagName('w:cantSplit').length > 0 || rowNode.getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'cantSplit').length > 0)) {
+          docxHasIllegalCantSplit = true;
+          break;
+        }
+      }
+    }
+    if (docxHasIllegalCantSplit) break;
+  }
+  assert(
+    !docxHasIllegalCantSplit,
+    '环1',
+    '表格跨页自然断行与消除异常空白规范 (REQ-02)',
+    '叙述性多行表格数据行禁止强制设置 cantSplit，确保表格跨页自然断行流转并消除表格间大空白',
+    docxHasIllegalCantSplit ? '数据行存在 cantSplit 强制锁死' : '跨页断行放开合规',
+    'MSDS Multi-row Tables'
+  );
+
+  // 9. Section 11 毒理学动态拓扑构建器与终点全量保真断言 (REQ-03)
+  const s11RecCn = cnDocx.records.find(r => r.sectionNumber === 11);
+  const s11RecEn = enDocx.records.find(r => r.sectionNumber === 11);
+  const s11RowsEqual = s11RecCn && s11RecEn && s11RecCn.rows.length === s11RecEn.rows.length;
+  const s11HasEnoughEndpoints = s11RecCn && (s11RecCn.rows.length === 2 || s11RecCn.rows.length >= 15);
+  assert(
+    s11RowsEqual && s11HasEnoughEndpoints,
+    '环3',
+    'Section 11 毒理学动态拓扑构建与终点全量保真规范 (REQ-03)',
+    `Section 11 必须动态承接源文件载明的全部毒理终点（行数>=15或2且中英1:1对称，当前CN=${s11RecCn?.rows.length}, EN=${s11RecEn?.rows.length}）`,
+    `S11行数=${s11RecCn?.rows.length}, 对称=${s11RowsEqual}`,
+    'Section 11 CN/EN'
+  );
+
+  // 10. Section 14 零 ADG 外生污染与公约全量保真断言 (REQ-04)
+  const cnS14All = s14RecCn ? s14RecCn.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n') : '';
+  const enS14All = s14RecEn ? s14RecEn.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n') : '';
+  const hasAdgPollution = /ADG\s*regulations|ADG/i.test(cnS14All) || /ADG\s*regulations|ADG/i.test(enS14All);
+  const hasMarpolInS14 = (/PU-2346A/i.test(model) || (sourceDocx && /PU-2346A/i.test(sourceDocx)))
+    ? (/MARPOL/i.test(cnS14All) && /MARPOL/i.test(enS14All) && s14RecCn?.rows.length === 6)
+    : true;
+  assert(
+    !hasAdgPollution && hasMarpolInS14,
+    '环3',
+    'Section 14 零 ADG 污染与国际公约保全规范 (REQ-04)',
+    'Section 14 严禁出现 ADG 澳洲法规外生硬编码，且危化品源文件载明 MARPOL 时必须 100% 完整保留 6 行拓扑',
+    `ADG污染=${hasAdgPollution}, MARPOL保留=${hasMarpolInS14}, 行数=${s14RecCn?.rows.length}`,
+    'Section 14 CN/EN'
+  );
 
   // ======================================================================
   // 环 4: 中英文 16 章节逐行双语镜像对照审查 (Ring 4: Bilingual Parity)

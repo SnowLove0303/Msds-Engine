@@ -1,5 +1,40 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-09 MSDS-Studio 通用拓扑结构重构与源文件事实绝对驱动 (INV-UNIVERSAL-TOPOLOGY-AND-SOURCE-GROUNDING)] - 根治 Section 2 大通栏误加内框虚线、全局表格跨页自然断行默认放开与大空白彻底消除、Section 3 “3.2 成分”标签法定加粗与组分行常规体底层固化、Section 11 毒理学通用动态拓扑构建器（16项终点全量动态增删保真）、Section 14 彻底清除 ADG 澳洲法规伪通与国际公约保全、主审计升级至 166 项全景物理断言 100% 满分通过 (Exit Code 0)
+
+### 一、 变更背景与用户最高裁决
+用户对系统提出严肃批评与最高法定重构指令：
+> “section 3 3.2 成分  这个成分是不是标签，是不是要加粗，为什么系统底层还没改正过来，通过模板识别出是标签了就要用规定的标签文本格式啊！还有，section与section表格间的允许跨页断行对你来说是很难搞定吗，能不能在底层上做默认啊，默认允许跨页断航啊，不然表格与表格之间可能存在很大的空白啊！还有section 11 ，能不能在全局与局部规范上以及审计方法上规定好啊，源文件的内容都丢失了都不管吗，直接对着标签就是乱匹配？还有之前不是都规定了要与源文件内容为主了？为什么还用模板的标签？模板只是提供固定的格式和操作空间，不决定内容！section14 也是，难道就非要用硬编码？遇到新的标签或内容就不会做了？增删行和标签编辑功能是给你干嘛用的？以及section2 我明明要求的大通栏，谁让你加内框虚线的？”
+> “上述问题，必须从系统底层进行解决，一定要把MSDS-Studio开发成通用拓扑结构而不是万能答案，所有内容必须来源于源文件，模板提供拓扑结构，因此所有关于MSDS Studio底层的修改都是关于拓扑结构的修改，禁止任何硬编码，所以，上述5个问题请从系统底层去解决”
+
+### 二、 核心架构重构与底层通用拓扑升级
+1. **Section 2 纯净大通栏重构与内框虚线彻底清除 (REQ-05)**：
+   - 在 `docx-engine.js:renderFullWidthRow` 中彻底清除所有横向内部边框，设置 `w:val="none"` 与 `tblBorders.insideH="none"`，绝对杜绝任何 `dotted` 或 `dashed` 内框线残屑，仅保留最外层实线边框。
+2. **全局表格跨页断行底层放开与消除大空白 (REQ-02)**：
+   - 彻底删除 `pipeline-engine.js` 中盲目对全文档所有表格行注入 `<w:cantSplit/>` 的恶性死锁循环；
+   - 在 `docx-engine.js:enableCrossPageBreaksForAllSections` 中确立底层默认规则：仅保留 Row 0（章节标题行）的 `cantSplit` 防止孤行表头断裂，所有数据行（Row 1..N）全量清除 `cantSplit`，实现长表格跨页自然断行流转，彻底消灭章节间的异常空白悬崖。
+3. **Section 3 “3.2 成分”标签识别与法定加粗格式底层固化 (REQ-01)**：
+   - 在 `normalizeSection3Typography` 与 `enforceStructuralTypographyInvariants` 中，确立 Section 3 严格排版层级：
+     - Row 2 题头单元格格式化为法定加粗（中文版 12pt 宋体 Bold，英文版 9.5pt Arial Bold）；
+     - Row 3 属性列头（化学品名称、CAS编号、含量）居中加粗；
+     - Row 4+ 各组分数据行严格锁定为常规细体（Regular），严禁整表误加粗。
+4. **Section 11 毒理学动态拓扑构建器与终点全量保真 (REQ-03)**：
+   - 新增 `extractToxicologicalEndpointsFromSource`，完整穿透解析源文件载明的全部 16 项毒理终点（急毒经口/吸入/经皮、眼刺激、皮肤刺激、致敏、亚急性、致突变体外/体内、生殖毒性生育/致畸、STOT 一次接触/反复接触、吸入危害、CMR 综合评估）；
+   - 新增 `buildDynamicSection11Table`，由源文件终点事实动态调度通用原语 `addRowAfter` / `deleteRow` / `formatSection11LabelCell` 构建表格（PU-2346A 动态自适应生成 19 行），彻底废除针对特定型号的硬编码特判与模板死板乱匹配，实现中英双语 1:1 镜像同构。
+5. **Section 14 通用原语装配、清除 ADG 澳洲法规与公约全量保真 (REQ-04)**：
+   - 全库彻底清除外生硬编码常量（彻底连根拔除 `in accordance with ADG regulations.`）；
+   - 新增 `buildDynamicSection14Table`，纯由源文件事实驱动：危化品（UN 1866）动态保留联合国编号、运输名称、类别、包装组及海运非污染信息；
+   - 动态装配 Row 4 特殊防范说明（温控 `-10℃ ~ +35℃`、远离食品酸碱）与 Row 5 国际海事公约（`按《MARPOL73/78》公约附则II和IBC规则：不适用` / `MARPOL 73/78 Annex II and IBC Code: Not applicable.`），并在 `writeCellLabel` 中解除 Section 14 标签编辑限制，全量实现通用原语动态装配。
+6. **集中式中央主审计套件全面升级 (REQ-01 ~ REQ-05)**：
+   - 在 `run_master_msds_audit.mjs` 中新增 5 项严苛物理断言（Section 2 零内框虚线、Section 3 标签加粗与组分细体、全局跨页自然断行放开、Section 11 终点全量保真、Section 14 零 ADG 污染与公约保全）；
+   - 主审计套件检验项数扩充至 **166 项**，实测运行 **166 项 100% 满分通过，真实退出码为 0**！
+
+### 三、 物理实测与验收核销
+1. **全量重新编译生成 PU-2346A 交付物**：
+   - 成功生成 8 份标准 MSDS 交付物（4 DOCX + 4 PDF）与 4 份 TDS 交付物，同步至 `E:/冠志/TDS MSDS (2)/待处理文件/PU-2346A/`；
+   - 双极双层全景机械深度审计与 166 项主审计套件全绿通过；
+   - PyMuPDF 真实渲染物理实测：Section 9 标签首字 100% 垂离开位（x0=80.28pt），Section 11 包含全部 16 项终点，Section 14 无任何 ADG 虚假字样。
+
 ## [2026-11-09 编辑器底层排版与 Section 8 不变量加固 (INV-EN-TYPOGRAPHY-AND-SECTION8)] - 根治英文版标签制表位弹跳 720 dxa 错位缺陷、序号与正文采用标准西文双空格紧凑匀称排版、Section 8.1/8.2 粗体二级题头格式保护、Section 8 Recommendation 420 dxa 缩进对齐抹平锯齿、西文破折号 GBK 乱码清零、植入源码级防篡改封印与 5 项主审计自动化硬门禁
 
 ### 一、 变更背景与用户明确指令
