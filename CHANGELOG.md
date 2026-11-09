@@ -1,5 +1,37 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-09 系统核心目录绝对只读与 MCP 唯一执行通道架构落地 (INV-SYSTEM-READONLY-AND-MCP-GATEWAY)] - 落实最高用户指令：未获允许严禁修改系统目录、封印 Producer Agent 写入权、构建轻量 MCP 网关驱动器作为唯一执行通道、设立底座缺陷停机升级规程
+
+### 一、 治理背景与最高用户指令
+针对既往生产 Agent 为达成特定型号交付物指标，频繁通过就地修改系统目录（`web/src/`、`web/scripts/`）核心逻辑或自编 ad-hoc 脚本绕过引擎的根本性顽疾，用户下达最高立法不变量指令：
+> “我们来研究一下，为了从根源上防止硬编码，：1.讨论是否只要执行覆写产出工作时，对MSDS-Studio 只读；2.设立MCP 为唯一执行通道”
+> “执行，没有我允许的情况下，没有系统目录的写权”
+
+### 二、 核心架构防线与立法实施
+1. **系统核心目录物理与契约级绝对只读封印 (SYS-01 / SYS-02 / SYS-03)**：
+   - 在 `.agents/agents/msds-overwrite-producer/agent.md` 与 `msds-studio-producer/agent.md` 中注入最高只读硬约束：
+     - 受控系统只读目录：`web/src/`（核心引擎）、`web/templates/`（官方模板）、`web/scripts/`（核心审计与导出脚本）；
+     - 生产 Agent 仅拥有当前任务型号的工作区目录（`算法训练材料/TDS MSDS 重写版/...`）的写权限；
+     - 未经用户显式书面授权，任何尝试对受控系统目录的文件新增、修改或删除操作将被物理拦截并触发违规告警。
+2. **官方 MCP 工具链唯一执行通道公理 (MCP-01 / MCP-02 / MCP-03)**：
+   - 确立 `web/src/mcp-server.js` 及其 10 大标准原子工具（`msds_recognize_source`, `msds_extract_section_facts`, `msds_compare_source_with_output`, `msds_register_template`, `msds_get_template_schema`, `msds_peek_cell_or_row`, `msds_plan_audit_targets`, `msds_execute_editor_ops`, `msds_batch_export_eight`, `msds_audit_deliverables`）为 MSDS 识别、比对、编辑与导出的**唯一法定执行通道**；
+   - 构建轻量化、纯净的标准 MCP 网关驱动器 `web/scripts/msds_mcp_gateway.mjs`，以标准 JSON-RPC 2.0 协议直接驱动 `mcp-server.js`，彻底终结手写 ad-hoc 临时脚本的历史陋习；
+   - 全面支持 CLI 命令行传参及 `--argsFile=<pathToJson>` 复杂载荷注入，与 Antigravity / Agent 架构深度解耦同构。
+3. **底座通用缺陷安全停机与申报升级规程 (ROL-01 / ROL-02)**：
+   - 在 `docs/MSDS_OVERWRITE_PRODUCER_SOP_MANUAL.md` 与生产 Agent 系统提示词中设立《系统底座通用缺陷申报单》制度；
+   - 生产 Agent 遇到未知化工分类、英译缺失或规则不适配时，**严禁自行就地硬编码修补**，必须立即挂起停机，出具包含型号、缺陷章节、源事实、当前引擎行为及通用建议的结构化报告，呈报治理 Agent / 人工用户裁决。
+
+### 三、 物理实测与双向核销
+1. **MCP 网关连通性与 10 大工具端到端调用自测**：
+   - `node web/scripts/msds_mcp_gateway.mjs --list-tools`：完整列出 10 项原子工具元数据，退出码 0；
+   - `node web/scripts/msds_mcp_gateway.mjs --tool=msds_get_template_schema --args='{"templateKey":"正式模板_MSDS_CN_冠志"}'`：标准获取模板模式定义，退出码 0；
+   - `node web/scripts/msds_mcp_gateway.mjs --tool=msds_recognize_source --argsFile=...`：在 EP-1404 基准型号上成功穿透提取 16 大章节事实结构，退出码 0。
+2. **集中式主审计套件 150 项全绿回归**：
+   - 运行集中式主审计：`node web/scripts/run_master_msds_audit.mjs --model=EP-1404 --targetDir="..."`；
+   - 实测结果：**总检验项数: 150 | 通过: 150 | 缺陷: 0 | 判定: 🏆 AUDIT_PASSED (退出码 0)**！
+3. **系统目录零污染验证**：
+   - 验证在执行识别与全量审计过程中，`web/src/` 与 `web/templates/` 目录哈希未发生任何变动，未产生任何临时侵入性补丁。
+
 ## [2026-11-09 生产 Agent 行为与权限隔离重构与源事实保真流水线落地 (INV-PRODUCER-ISOLATION-AND-FACT-FIDELITY)] - 确立生产 Agent 权限隔离与无权篡改底座公理 (SEC-01/02)、根除通用化工品类武断硬编码、实现标签语义全角/半角空格归一化、增补主审计物理事实硬断言 (AUD-01 149项全绿)、EP-1404 8 格式交付物无水环氧高保真验收
 
 ### 一、 业务背景与用户最高裁决
