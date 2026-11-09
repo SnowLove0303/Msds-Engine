@@ -1,5 +1,24 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-09 MSDS MCP 覆写与审计全方法论 Zip 物理封装交付 (PKG-MSDS-MCP-ZIP-V6)] - 整理收敛 10 大 MCP 工具契约、标准 5 阶流水线 SOP、万能几何手术配方库（Recipe A~H）、三大最高法定不变量、3 大专用 Agent 角色定义并完成开箱即用 Zip 物理打包交付
+
+### 一、 变更背景与用户明确指令
+在完成 MCP 工作流体系化整理并升级 `msds-studio` v6.0-ENTERPRISE 技能后，为便于向其他协作系统、团队或新 Agent 快速分发开箱即用的方法论套件，用户下达明确指令：
+> “将调用说明+skill等 用于给Agent正确调用MCP 执行覆写与审计的全方法论打包成Zip给我”
+
+### 二、 核心成果与物理打包交付
+1. **模块化分层目录规划 (`dist/msds-mcp-methodology-package/`)**：
+   - `README.md`：全方法论快速上手与 Agent 接入总纲；
+   - `skills/msds-studio/SKILL.md`：官方 `msds-studio` v6.0-ENTERPRISE 技能主干；
+   - `docs/`：包含《覆写生产 SOP 手册与停机申报规程》、《五大核心难题复盘与万能原语方法论》及《新一代 MCP 驱动白皮书》；
+   - `gateway/`：标准 JSON-RPC 2.0 MCP 网关驱动器（`msds_mcp_gateway.mjs`）与调用参数样例（`args_recognize_example.json`, `args_audit_example.json`）；
+   - `agents/`：包含三大专用智能体（生产覆写 Producer、Studio 原语专家、独立敌手 Auditor）的完整系统提示词与权限白名单约束配置。
+2. **物理 Zip 压缩包输出与事实指纹**：
+   - 物理绝对路径：`F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\dist\MSDS_MCP_Overwrite_And_Audit_Methodology_v6.0.zip`
+   - 文件大小：56,463 字节 (约 55.1 KB)
+   - SHA-256 事实指纹：`868832D01F3C3E275C9725B47030619692F84CB93B4B7B1D982BE01065A01A10`
+   - 沙箱自解压校验：解压 11 个核心资产文件，文件计数与结构 100% 对齐，退出码 0。
+
 ## [2026-11-09 MSDS Studio MCP 工作流体系与工业级技能资产封装交付 (SKILL-MSDS-STUDIO-V6)] - 整理收敛 10 大原子 MCP 工具契约、标准 5 阶作业流水线 SOP、万能几何手术配方库（Recipe A~H）、注入三大最高法定不变量、实现全局与本地多环境技能 100% 物理哈希对齐
 
 ### 一、 变更背景与用户明确指令
