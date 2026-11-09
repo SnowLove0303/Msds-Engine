@@ -577,8 +577,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
       assert(pFirstLine1200Count === 0, `Section 2 通栏严禁 firstLine="1200" 导致换行回缩顶格 (实测违规数: ${pFirstLine1200Count})`);
       assert(otherDangerBoldPass, 'Section 2 通栏 "其他危险" 法定标签加粗格式继承断言 (<w:b/> 存在)');
 
-      const s2EnRow1 = tblsEn[1].getElementsByTagName('w:tr')[1];
-      const s2EnText = s2EnRow1?.textContent || '';
+      const s2EnText = Array.from(tblsEn[1].getElementsByTagName('w:tr')).slice(1).map(r => r.textContent).join(' ');
       assert(/Classification of the substance|Acute toxicity/i.test(s2EnText), 'Section 2 (L-S2 EN): 英文 GHS 分类通栏完备');
       assert(/Signal word:\s*Danger/i.test(s2EnText), 'Section 2 (L-S2 EN): 英文信号词 Danger 准确');
       assert(/Precautionary statements|Prevention|Response/i.test(s2EnText), 'Section 2 (L-S2 EN): 英文防范说明通栏完备');
@@ -590,8 +589,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
         assert(/其他危险[：:].*N[－-]甲基吡咯烷酮/.test(s2Text), `Section 2 (L-S2): ${model} NMP 透皮吸收其他危险通栏完备`);
       }
 
-      const s2EnRow1 = tblsEn[1].getElementsByTagName('w:tr')[1];
-      const s2EnText = s2EnRow1?.textContent || '';
+      const s2EnText = Array.from(tblsEn[1].getElementsByTagName('w:tr')).slice(1).map(r => r.textContent).join(' ');
       assert(/Reproductive toxicity/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文生殖毒性通栏完备`);
       assert(/Signal word:\s*Danger/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文信号词 Danger 准确`);
       assert(/Precautionary statements|Prevention|Response/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文防范说明通栏完备`);
@@ -632,8 +630,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
         }
       }
 
-      const s2EnRow1 = tblsEn[1].getElementsByTagName('w:tr')[1];
-      const s2EnText = s2EnRow1?.textContent || '';
+      const s2EnText = Array.from(tblsEn[1].getElementsByTagName('w:tr')).slice(1).map(r => r.textContent).join(' ');
       assert(/aquatic/i.test(s2EnText) && /H412/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文水环境危害分类 H412 保全`);
       assert(/Harmful to aquatic life with long lasting effects/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文 H412 语句保全`);
       assert(/P273/i.test(s2EnText) && /Avoid release to the environment/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文 P273 语句保全`);

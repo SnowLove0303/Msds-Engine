@@ -470,6 +470,7 @@ export async function runMasterMsdsAudit(options = {}) {
   let srcAppearance = '';
   let srcCnName = '';
   let srcCnCategory = '';
+  let srcS11Rows = 0;
   const effectiveSourcePath = sourceDocx || (fs.readdirSync(targetDir).find(f => /源文件留存|源文件|raw|source/i.test(f) && f.endsWith('.docx')) ? path.join(targetDir, fs.readdirSync(targetDir).find(f => /源文件留存|源文件|raw|source/i.test(f) && f.endsWith('.docx'))) : null);
   if (effectiveSourcePath && fs.existsSync(effectiveSourcePath)) {
     try {
@@ -488,6 +489,10 @@ export async function runMasterMsdsAudit(options = {}) {
       const srcS9 = srcDocx.records.find(r => r.sectionNumber === 9);
       if (srcS9) {
         srcAppearance = srcS9.rows.find(r => /外\s*观/i.test(r.cells[0]?.text || ''))?.cells[1]?.text?.trim() || '';
+      }
+      const srcS11 = srcDocx.records.find(r => r.sectionNumber === 11);
+      if (srcS11) {
+        srcS11Rows = srcS11.rows.length;
       }
     } catch (e) {}
   }
@@ -1679,12 +1684,12 @@ export async function runMasterMsdsAudit(options = {}) {
   const s11RecCn = cnDocx.records.find(r => r.sectionNumber === 11);
   const s11RecEn = enDocx.records.find(r => r.sectionNumber === 11);
   const s11RowsEqual = s11RecCn && s11RecEn && s11RecCn.rows.length === s11RecEn.rows.length;
-  const s11HasEnoughEndpoints = s11RecCn && (s11RecCn.rows.length === 2 || s11RecCn.rows.length >= 15);
+  const s11HasEnoughEndpoints = s11RecCn && (s11RecCn.rows.length === 2 || s11RecCn.rows.length >= 15 || (srcS11Rows > 0 && s11RecCn.rows.length === srcS11Rows));
   assert(
     s11RowsEqual && s11HasEnoughEndpoints,
     '环3',
     'Section 11 毒理学动态拓扑构建与终点全量保真规范 (REQ-03)',
-    `Section 11 必须动态承接源文件载明的全部毒理终点（行数>=15或2且中英1:1对称，当前CN=${s11RecCn?.rows.length}, EN=${s11RecEn?.rows.length}）`,
+    `Section 11 必须动态承接源文件载明的全部毒理终点（行数>=15、或=2、或与源文件一致(src=${srcS11Rows})且中英1:1对称，当前CN=${s11RecCn?.rows.length}, EN=${s11RecEn?.rows.length}）`,
     `S11行数=${s11RecCn?.rows.length}, 对称=${s11RowsEqual}`,
     'Section 11 CN/EN'
   );

@@ -1618,21 +1618,21 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       if (facts.section3ExemptionNotes) {
         row1Paras.push(...facts.section3ExemptionNotes.split(/\r?\n/).filter(Boolean));
       }
-      rowGroups.push(row1Paras);
 
       if (parsed?.rawParas && parsed.rawParas.some(p => /象形图|pictogram/i.test(p))) {
-        rowGroups.push([
+        row1Paras.push(
           '2.2 GHS Label Elements:',
           'GHS pictograms:',
           'Not applicable.'
-        ]);
+        );
       }
       if (parsed?.otherHazards) {
-        rowGroups.push([
+        row1Paras.push(
           '2.3 Other hazards:',
           'No applicable information.'
-        ]);
+        );
       }
+      rowGroups.push(row1Paras);
     }
   }
 
@@ -4206,10 +4206,10 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
             let bCs = rPr.getElementsByTagNameNS(W_NS, 'bCs')[0] || doc.createElementNS(W_NS, 'w:bCs');
             if (!rPr.getElementsByTagNameNS(W_NS, 'bCs')[0]) rPr.appendChild(bCs);
             let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0] || doc.createElementNS(W_NS, 'w:sz');
-            sz.setAttribute('w:val', isEn ? '19' : '24');
+            sz.setAttribute('w:val', '24');
             if (!rPr.getElementsByTagNameNS(W_NS, 'sz')[0]) rPr.appendChild(sz);
             let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || doc.createElementNS(W_NS, 'w:szCs');
-            szCs.setAttribute('w:val', isEn ? '19' : '24');
+            szCs.setAttribute('w:val', '24');
             if (!rPr.getElementsByTagNameNS(W_NS, 'szCs')[0]) rPr.appendChild(szCs);
             let rf = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || doc.createElementNS(W_NS, 'w:rFonts');
             rf.setAttribute('w:ascii', isEn ? 'Arial' : 'Times New Roman');
