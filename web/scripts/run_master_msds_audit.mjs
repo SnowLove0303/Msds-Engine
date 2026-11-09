@@ -572,7 +572,7 @@ export async function runMasterMsdsAudit(options = {}) {
     
     const checkS2Bolding = (docxRecord, labelsToCheck, langLabel) => {
       if (!docxRecord || docxRecord.rows.length < 2) return { passed: false, missing: ['S2记录缺失'] };
-      const ps = docxRecord.rows[1].cells[0]?.paragraphs || [];
+      const ps = docxRecord.rows.slice(1).flatMap(r => r.cells[0]?.paragraphs || []);
       const missing = [];
       for (const lbl of labelsToCheck) {
         const p = ps.find(pItem => (pItem.text || '').trim().startsWith(lbl.replace(/[：:]$/, '')) || (pItem.text || '').trim().includes(lbl));
@@ -610,7 +610,7 @@ export async function runMasterMsdsAudit(options = {}) {
     // Section 2 阶梯排版几何对齐与缩进门禁 (一二级标签首字对齐，值右缩进)
     const checkS2Indentation = (docxRecord, isEnglish) => {
       if (!docxRecord || docxRecord.rows.length < 2) return { passed: false, detail: 'S2记录缺失' };
-      const ps = docxRecord.rows[1].cells[0]?.paragraphs || [];
+      const ps = docxRecord.rows.slice(1).flatMap(r => r.cells[0]?.paragraphs || []);
       const expectedBase = isEnglish ? '317' : '480';
       const expectedSubVal = isEnglish ? '677' : '840';
       let currentLevel = 1;
@@ -1440,6 +1440,161 @@ export async function runMasterMsdsAudit(options = {}) {
         'Section 15 EN'
       );
     }
+  }
+
+  // ======================================================================
+  // 环 3 新增：Section 2/8/14 与 TDS 深度法定不变量断言 (REQ-01 ~ REQ-06)
+  // ======================================================================
+  
+  // 1. Section 2 防范说明完整性断言 (REQ-01 / DEF-03)
+  const s2RecCn = cnDocx.records.find(r => r.sectionNumber === 2);
+  const s2RecEn = enDocx.records.find(r => r.sectionNumber === 2);
+  const cnS2TextAll = s2RecCn ? s2RecCn.rows.map(r => r.cells.map(c => c.text).join(' ')).join(' ') : '';
+  const enS2TextAll = s2RecEn ? s2RecEn.rows.map(r => r.cells.map(c => c.text).join(' ')).join(' ') : '';
+  if (/易燃|可燃|危险性说明/i.test(cnS2TextAll)) {
+    const s2HasP403Cn = /P403/i.test(cnS2TextAll);
+    const s2HasP501Cn = /P501/i.test(cnS2TextAll);
+    const s2HasP403En = /P403/i.test(enS2TextAll);
+    const s2HasP501En = /P501/i.test(enS2TextAll);
+    assert(
+      s2HasP403Cn && s2HasP501Cn,
+      '环3',
+      'Section 2 中文防范说明完整性 (REQ-01)',
+      'Section 2 必须完整包含 P403 与 P501 防范说明，严禁因跨页溢出被物理截断',
+      `P403=${s2HasP403Cn}, P501=${s2HasP501Cn}`,
+      'Section 2 CN'
+    );
+    assert(
+      s2HasP403En && s2HasP501En,
+      '环3',
+      'Section 2 英文防范说明完整性 (REQ-01)',
+      'Section 2 英文版必须完整包含 P403 与 P501 防范说明，严禁被物理截断',
+      `P403=${s2HasP403En}, P501=${s2HasP501En}`,
+      'Section 2 EN'
+    );
+  }
+
+  // 2. Section 14 危险货物事实一致性断言 (REQ-04 / DEF-05 & DEF-06)
+  const s14RecCn = cnDocx.records.find(r => r.sectionNumber === 14);
+  const s14RecEn = enDocx.records.find(r => r.sectionNumber === 14);
+  const isDangerousModel = /PU-2346A/i.test(model) || (sourceDocx && /PU-2346A/i.test(sourceDocx));
+  if (isDangerousModel && s14RecCn && s14RecEn) {
+    const cnS14Text = s14RecCn.rows.map(r => r.cells.map(c => c.text).join(' ')).join(' ');
+    const enS14Text = s14RecEn.rows.map(r => r.cells.map(c => c.text).join(' ')).join(' ');
+    const cnHasUn1866 = /1866/.test(cnS14Text) && /树脂溶液/.test(cnS14Text);
+    const enHasUn1866 = /1866/.test(enS14Text) && /RESIN SOLUTION/i.test(enS14Text);
+    const enHasFalseNotReg = /Not classified as dangerous goods|Not regulated as dangerous goods/i.test(enS14Text);
+    const cnHasMangledText = /3III否/.test(cnS14Text);
+
+    assert(
+      cnHasUn1866 && !cnHasMangledText,
+      '环3',
+      'Section 14 中文危险货物分类合规 (REQ-04)',
+      'Section 14 中文版必须包含 UN 1866 与树脂溶液，严禁 14.1~14.3 开天窗或粘连乱码',
+      `UN1866=${cnHasUn1866}, 乱码=${cnHasMangledText}`,
+      'Section 14 CN'
+    );
+    assert(
+      enHasUn1866 && !enHasFalseNotReg,
+      '环3',
+      'Section 14 英文危险货物法律合规 (REQ-04)',
+      'Section 14 英文版必须载明 UN 1866 RESIN SOLUTION Class 3，绝对严禁谎报为非危险货物',
+      `UN1866=${enHasUn1866}, 虚假非危=${enHasFalseNotReg}`,
+      'Section 14 EN'
+    );
+  }
+
+  // 3. 中文第 0 列标签字号统一性断言 (REQ-02 / DEF-11)
+  const docxCnRaw = await loadDocXml(path.join(targetDir, `${model} msds_CN 冠志.docx`));
+  const tblsCn = docxCnRaw.getElementsByTagName('w:tbl');
+  let cnCell0HasSz21 = false;
+  for (let t = 0; t < tblsCn.length; t++) {
+    const tblText = tblsCn[t].textContent || '';
+    if (tblText.includes('物理和化学特性') || tblText.includes('理化特性')) continue; // Section 9 遵循 G-38 激光垂线对齐豁免 (序号 10.5pt, 标签 12pt)
+    const trs = tblsCn[t].getElementsByTagName('w:tr');
+    for (let r = 1; r < trs.length; r++) {
+      const c0 = trs[r].getElementsByTagName('w:tc')[0];
+      if (!c0 || !c0.textContent.trim()) continue;
+      const szs = c0.getElementsByTagName('w:sz');
+      for (let s = 0; s < szs.length; s++) {
+        if (szs[s].getAttribute('w:val') === '21') {
+          cnCell0HasSz21 = true;
+          break;
+        }
+      }
+      if (cnCell0HasSz21) break;
+    }
+    if (cnCell0HasSz21) break;
+  }
+  assert(
+    !cnCell0HasSz21,
+    '环1',
+    '中文标签第 0 列字阶均一性规范 (REQ-02 / DEF-11)',
+    '中文表格第 0 列标签必须全量统一为法定小四 12pt (sz="24")，严禁西文数字降级 sz="21" 导致大小头跳字',
+    cnCell0HasSz21 ? '存在 sz="21" 跳字缺陷' : '全量统一为 sz="24"',
+    'MSDS CN Tables'
+  );
+
+  // 4. 英文 Section 8 标签五号字号断言 (REQ-02 / DEF-12)
+  const docxEnRaw = await loadDocXml(path.join(targetDir, `${model} msds_EN Guanzhi.docx`));
+  const s8RecEn = enDocx.records.find(r => r.sectionNumber === 8);
+  let enS8LabelOverlarge = false;
+  if (s8RecEn && s8RecEn.rows.length >= 3) {
+    for (let r = 2; r < s8RecEn.rows.length; r++) {
+      const c0Text = (s8RecEn.rows[r]?.cells?.[0]?.text || '').trim();
+      if (/Hand protection/i.test(c0Text)) continue; // Hand protection: 父级分类题头依法统一为 12pt (sz="24")，小标签保持 9.5pt (sz="19")
+      const c0 = s8RecEn.rows[r]?.cells?.[0]?.node;
+      if (c0) {
+        const szs = c0.getElementsByTagName('w:sz');
+        for (let s = 0; s < szs.length; s++) {
+          if (szs[s].getAttribute('w:val') === '24') {
+            enS8LabelOverlarge = true;
+            break;
+          }
+        }
+      }
+      if (enS8LabelOverlarge) break;
+    }
+  }
+  assert(
+    !enS8LabelOverlarge,
+    '环1',
+    '英文 Section 8 标签五号标准规范 (REQ-02 / DEF-12)',
+    '英文 Section 8 表格小标签必须为标准 9.5pt (sz="19")，严禁失控暴增至 12pt (sz="24") 造成层级倒挂',
+    enS8LabelOverlarge ? '存在 sz="24" 异常放大' : '全量符合 9.5pt (sz="19")',
+    'Section 8 EN'
+  );
+
+  // 5. TDS 树脂中和剂与 pH 事实断言 (REQ-06 / DEF-10)
+  const tdsCnPath = path.join(targetDir, `${model} tds_CN 冠志.docx`);
+  const tdsEnPath = path.join(targetDir, `${model} tds_EN Guanzhi.docx`);
+  if (fs.existsSync(tdsCnPath) && fs.existsSync(tdsEnPath) && /PU-2346A/i.test(model)) {
+    const zipTdsCn = await JSZip.loadAsync(fs.readFileSync(tdsCnPath));
+    const xmlTdsCn = await zipTdsCn.file('word/document.xml').async('text');
+    const zipTdsEn = await JSZip.loadAsync(fs.readFileSync(tdsEnPath));
+    const xmlTdsEn = await zipTdsEn.file('word/document.xml').async('text');
+
+    const cnTdsHasTea = xmlTdsCn.includes('三乙胺') && !xmlTdsCn.includes('二甲基乙醇胺');
+    const enTdsHasTea = /triethylamine/i.test(xmlTdsEn) && !/dimethylethanolamine|DMEA/i.test(xmlTdsEn);
+    const cnTdsHasPh710 = xmlTdsCn.includes('7-10');
+    const enTdsHasPh710 = xmlTdsEn.includes('7-10');
+
+    assert(
+      cnTdsHasTea && enTdsHasTea,
+      '环3',
+      'TDS 树脂中和剂事实保真 (REQ-06 / DEF-10)',
+      'TDS 树脂中和剂必须严格锁定为三乙胺 (Triethylamine)，严禁篡改为二甲基乙醇胺 (DMEA)',
+      `CN(三乙胺)=${cnTdsHasTea}, EN(Triethylamine)=${enTdsHasTea}`,
+      'TDS CN/EN'
+    );
+    assert(
+      cnTdsHasPh710 && enTdsHasPh710,
+      '环3',
+      'TDS 出厂质量指标 pH 保真 (REQ-06 / DEF-10)',
+      'TDS 出厂质量标准 pH 必须保真为 7-10，严禁与 MSDS 混淆误篡改为 6-9',
+      `CN(7-10)=${cnTdsHasPh710}, EN(7-10)=${enTdsHasPh710}`,
+      'TDS CN/EN'
+    );
   }
 
   // ======================================================================

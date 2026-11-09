@@ -9,7 +9,7 @@ export const MSDS_DESIGN_TOKENS = Object.freeze({
   CN: Object.freeze({
     SECTION_HEADER: Object.freeze({ font: '宋体', sz: '24', sizePt: 12, bold: true }),
     LABEL_BOLD: Object.freeze({ font: '宋体', sz: '24', sizePt: 12, bold: true }),
-    LABEL_SEQ: Object.freeze({ font: 'Times New Roman', sz: '21', sizePt: 10.5, bold: true }),
+    LABEL_SEQ: Object.freeze({ font: 'Times New Roman', sz: '24', sizePt: 12, bold: true }),
     TABLE_VALUE: Object.freeze({ font: '宋体', sz: '24', sizePt: 12, bold: false }), // 全局 16 章节值格恒为小四号 12pt 宋体常规体
     TABLE_HEADER: Object.freeze({ font: '宋体', sz: '24', sizePt: 12, bold: true }),
     PREAMBLE: Object.freeze({ font: '宋体', sz: '24', sizePt: 12, bold: false }),
@@ -463,10 +463,16 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
               .replace(/\b(min|mm)\.\s*$/gi, '$1');
             if (isEnglish) {
               tc = tc.replace(/；/g, '; ');
+              // 消除西文连词粘连 (如 (SCBA)Do -> (SCBA) Do, equipmentEnsure -> equipment. Ensure)
+              tc = tc.replace(/([.!?\)])([A-Za-z])/g, '$1 $2');
+              // 仅非缩写且长度大于15个字符的完整英文陈述句，末尾保留或自动补齐句号 (DEF-14)
+              if (tc.length > 15 && !/[.!?:]$/.test(tc) && !/\b(?:min|mm|CAS|EC|No|N\/A|None)\.?$/i.test(tc)) {
+                tc = tc + '.';
+              }
             } else {
               tc = tc.replace(/;\s*|；\s*/g, '；');
+              tc = tc.replace(/\.$/, '');
             }
-            tc = tc.replace(/\.$/, '');
             t.textContent = tc;
           }
         }
