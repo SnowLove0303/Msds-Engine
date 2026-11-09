@@ -464,6 +464,34 @@ export async function runMasterMsdsAudit(options = {}) {
   const enDocx = await loadDocx(fs.readFileSync(enDocxPath));
   const domCn = await loadDocXml(cnGzDocx);
 
+  // 预读源文档关键事实，驱动全篇事实保真微观对账 (INV-FACT-GROUNDED-AUDIT)
+  let srcHasPictogram = false;
+  let srcHasSignal = false;
+  let srcAppearance = '';
+  let srcCnName = '';
+  let srcCnCategory = '';
+  const effectiveSourcePath = sourceDocx || (fs.readdirSync(targetDir).find(f => /源文件留存|源文件|raw|source/i.test(f) && f.endsWith('.docx')) ? path.join(targetDir, fs.readdirSync(targetDir).find(f => /源文件留存|源文件|raw|source/i.test(f) && f.endsWith('.docx'))) : null);
+  if (effectiveSourcePath && fs.existsSync(effectiveSourcePath)) {
+    try {
+      const srcDocx = await loadDocx(fs.readFileSync(effectiveSourcePath));
+      const srcS1 = srcDocx.records.find(r => r.sectionNumber === 1);
+      if (srcS1) {
+        srcCnName = srcS1.rows.find(r => /中文名称|品名|产品名称/i.test(r.cells[0]?.text || ''))?.cells[1]?.text?.trim() || '';
+        srcCnCategory = srcS1.rows.find(r => /化学品分类|类别|分类/i.test(r.cells[0]?.text || ''))?.cells[1]?.text?.trim() || '';
+      }
+      const srcS2 = srcDocx.records.find(r => r.sectionNumber === 2);
+      if (srcS2) {
+        const srcS2Text = srcS2.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
+        srcHasPictogram = /象形图|pictogram/i.test(srcS2Text);
+        srcHasSignal = /信号词|警示词|signal word/i.test(srcS2Text);
+      }
+      const srcS9 = srcDocx.records.find(r => r.sectionNumber === 9);
+      if (srcS9) {
+        srcAppearance = srcS9.rows.find(r => /外\s*观/i.test(r.cells[0]?.text || ''))?.cells[1]?.text?.trim() || '';
+      }
+    } catch (e) {}
+  }
+
   // Section 1: 标识
   const cnS1 = cnDocx.records.find(r => r.sectionNumber === 1);
   const enS1 = enDocx.records.find(r => r.sectionNumber === 1);
@@ -505,6 +533,27 @@ export async function runMasterMsdsAudit(options = {}) {
         '固化剂英文品名必须为 curing agent / hardener / crosslinker，绝对严禁降级或误译为乳液 (emulsion)',
         enS1.rows[1]?.cells[1]?.text || '',
         'Section 1 EN Row 1'
+      );
+    }
+
+    // 无水环氧化工专业定性与防乳液串流门禁 (AUD-01)
+    const isAnhydrousEpoxy = /无水.*环氧|非水.*环氧|无溶剂.*环氧|环氧.*无水/i.test(cnS1Text) || /无水.*环氧|非水.*环氧|无溶剂.*环氧|环氧.*无水/i.test(srcCnName + ' ' + srcCnCategory);
+    if (isAnhydrousEpoxy) {
+      assert(
+        !/waterborne\s+epoxy\s+emulsion|epoxy\s+water\s+dispersion/i.test(enS1Text),
+        '环3',
+        'Section 1.1 无水环氧品名与分类保真',
+        '源文档载明为无水环氧时，英文交付物严禁错误串流套用水性环氧乳液/分散体模板 (Waterborne epoxy emulsion / Epoxy water dispersion)',
+        enS1Text.slice(0, 150),
+        'Section 1.1 EN'
+      );
+      assert(
+        /Anhydrous epoxy resin/i.test(enS1Text),
+        '环3',
+        'Section 1.1 无水环氧英译准确性',
+        '源文档载明为无水环氧时，英文品名与分类必须保真翻译为 Anhydrous epoxy resin',
+        enS1Text.slice(0, 150),
+        'Section 1.1 EN'
       );
     }
   }
@@ -613,21 +662,7 @@ export async function runMasterMsdsAudit(options = {}) {
       ['指控 Section 2 缩进阶梯为格式错误']
     );
 
-    // INV-ZERO-EXOGENOUS: 探查源文件是否载明象形图与信号词 (全域通用门禁，危品与非危品统一适用)
-    let srcHasPictogram = false;
-    let srcHasSignal = false;
-    const effectiveSourcePath = sourceDocx || (fs.readdirSync(targetDir).find(f => /源文件留存|源文件|raw|source/i.test(f) && f.endsWith('.docx')) ? path.join(targetDir, fs.readdirSync(targetDir).find(f => /源文件留存|源文件|raw|source/i.test(f) && f.endsWith('.docx'))) : null);
-    if (effectiveSourcePath && fs.existsSync(effectiveSourcePath)) {
-      try {
-        const srcDocx = await loadDocx(fs.readFileSync(effectiveSourcePath));
-        const srcS2 = srcDocx.records.find(r => r.sectionNumber === 2);
-        if (srcS2) {
-          const srcS2Text = srcS2.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
-          srcHasPictogram = /象形图|pictogram/i.test(srcS2Text);
-          srcHasSignal = /信号词|警示词|signal word/i.test(srcS2Text);
-        }
-      } catch (e) {}
-    }
+    // INV-ZERO-EXOGENOUS: 源文件象形图与信号词状态已在顶部预载 (srcHasSignal: ${srcHasSignal}, srcHasPictogram: ${srcHasPictogram})
 
     // 源文件零外生虚增信号词最高公理硬断言 (危品与非危品全域覆盖)
     if (!srcHasSignal) {
@@ -1074,6 +1109,36 @@ export async function runMasterMsdsAudit(options = {}) {
         'Section 9.1 外观蓝光乳液地道英译',
         '中文外观含蓝光乳液时，英文必须地道译为 with bluish tint，严禁漏译',
         enS9AllText.slice(0, 120),
+        'Section 9.1 EN'
+      );
+    }
+
+    // Section 9.1 外观源文件保真门禁 (AUD-01)
+    const cnS9Row0 = cnItems[0]?.cells[1]?.text || '';
+    const enS9Row0 = enItems[0]?.cells[1]?.text || '';
+    if (/微黄|淡黄|透明/.test(srcAppearance) || /微黄|淡黄|透明/.test(cnS9Row0)) {
+      assert(
+        !/乳白/.test(cnS9Row0),
+        '环3',
+        'Section 9.1 中文外观保真门禁',
+        '源文档载明为微黄/透明时，中文交付物绝对严禁被篡改为乳白液体',
+        cnS9Row0,
+        'Section 9.1 CN'
+      );
+      assert(
+        !/milky/i.test(enS9Row0),
+        '环3',
+        'Section 9.1 英文外观保真门禁',
+        '源文档载明为微黄/透明时，英文交付物绝对严禁被篡改为 Milky white liquid',
+        enS9Row0,
+        'Section 9.1 EN'
+      );
+      assert(
+        /light yellow|transparent|yellowish/i.test(enS9Row0),
+        '环3',
+        'Section 9.1 英文外观准确性',
+        '源文档载明为微黄/透明时，英文交付物必须准确反映 Light yellow / transparent',
+        enS9Row0,
         'Section 9.1 EN'
       );
     }

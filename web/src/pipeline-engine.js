@@ -241,8 +241,17 @@ export function translateChemicalCategoryToEnglish(cnCategory, cnName = '') {
   if (/聚氨酯/i.test(combined)) {
     return 'Waterborne polyurethane resin dispersion';
   }
-  if (/环氧/i.test(combined)) {
+  if (/无水.*环氧|非水.*环氧|无溶剂.*环氧|环氧.*无水/i.test(combined)) {
+    return 'Anhydrous epoxy resin';
+  }
+  if (/环氧.*固化剂|固化剂.*环氧/i.test(combined)) {
+    return 'Waterborne epoxy curing agent';
+  }
+  if (/水性.*环氧|环氧.*乳液|环氧.*水分散/i.test(combined)) {
     return 'Epoxy water dispersion';
+  }
+  if (/环氧/i.test(combined)) {
+    return 'Epoxy resin';
   }
   if (/高密度聚乙烯蜡/i.test(combined)) {
     return 'High density polyethylene wax emulsion';
@@ -355,8 +364,8 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
 
   // 1. Section 1 动态派生 (严格对齐算法训练材料 PU-1003 等规范)
   let prodName = facts.productNameEn;
-  let categoryEn = facts.chemicalCategoryEn;
-  let useEn = facts.recommendedUseEn || 'Raw material for industrial coatings';
+  let categoryEn = facts.chemicalCategoryEn || facts.categoryEn;
+  let useEn = facts.recommendedUseEn || facts.useEn || 'Raw material for industrial coatings';
 
   if (baseCnEngine) {
     const s1 = baseCnEngine.records.find(r => r.sectionNumber === 1);
@@ -387,10 +396,14 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
           } else {
             prodName = `Waterborne curing agent ${modelCode}`;
           }
+        } else if (/无水.*环氧|非水.*环氧|无溶剂.*环氧|环氧.*无水/i.test(cnName + ' ' + cnCategory)) {
+          prodName = `Anhydrous epoxy resin ${modelCode}`;
         } else if (/聚氨酯/i.test(cnName + ' ' + cnCategory)) {
           prodName = `Waterborne polyurethane dispersion ${modelCode}`;
-        } else if (/环氧/i.test(cnName + ' ' + cnCategory)) {
+        } else if (/水性.*环氧|环氧.*乳液|环氧.*分散体/i.test(cnName + ' ' + cnCategory)) {
           prodName = `Waterborne epoxy emulsion ${modelCode}`;
+        } else if (/环氧/i.test(cnName + ' ' + cnCategory)) {
+          prodName = `Epoxy resin ${modelCode}`;
         } else if (/蜡/i.test(cnName + ' ' + cnCategory)) {
           prodName = `Waterborne wax emulsion ${modelCode}`;
         } else if (/丙烯酸/i.test(cnName + ' ' + cnCategory)) {
@@ -489,7 +502,8 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     const s9 = baseCnEngine.records.find(r => r.sectionNumber === 9);
     if (s9) {
       for (const row of s9.rows) {
-        const lbl = (row.cells[0]?.text || '').trim();
+        const rawLbl = row.cells[0]?.text || '';
+        const lbl = rawLbl.replace(/[\s\u3000]+/g, '').replace(/[：:]$/, '');
         const val = (row.cells[1]?.text || '').trim();
         if (!val) continue;
 
@@ -563,6 +577,9 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
         }
       }
     }
+    if (facts.appearanceEn) {
+      sec9Facts.appearance = facts.appearanceEn;
+    }
     if (facts.viscosityOverride) {
       sec9Facts.viscosity = facts.viscosityOverride;
     }
@@ -571,8 +588,9 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
         if (/粘度|动力粘度/i.test(pattern)) sec9Facts.viscosity = val;
         else if (/固体含量|固含/i.test(pattern)) sec9Facts.solids = val;
         else if (/密度/i.test(pattern)) sec9Facts.density = val.replace(/约\s*/g, 'Approx. ');
-        else if (/外观/i.test(pattern)) {
-          if (/无色.*微黄|微黄.*透明/i.test(val)) sec9Facts.appearance = 'Colorless to slightly yellow transparent liquid';
+        else if (/外\s*观/i.test(pattern)) {
+          if (/无色.*微黄|无色.*淡黄/i.test(val)) sec9Facts.appearance = 'Colorless to slightly yellow transparent liquid';
+          else if (/微黄.*透明|淡黄.*透明|透明.*微黄|透明.*淡黄/i.test(val)) sec9Facts.appearance = 'Light yellow transparent liquid';
           else if (/无色.*淡黄|淡黄.*粘稠/i.test(val)) sec9Facts.appearance = 'Colorless to light yellow transparent viscous liquid';
           else if (/乳白.*蓝光|蓝光.*乳液/i.test(val)) sec9Facts.appearance = 'Milky white emulsion with bluish tint';
           else if (/乳白.*乳液/i.test(val)) sec9Facts.appearance = 'Milky white emulsion';
@@ -1178,7 +1196,8 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
     else if (/半透明/i.test(cnVal)) enVal = 'Translucent liquid';
     else if (/乳白/i.test(cnVal)) enVal = 'Milky white liquid';
     else if (/无色.*淡黄|淡黄.*粘稠/i.test(cnVal)) enVal = 'Colourless to light yellow transparent viscous liquid';
-    else if (/无色.*微黄|微黄.*透明/i.test(cnVal)) enVal = 'Colorless to slightly yellow transparent liquid';
+    else if (/无色.*微黄|无色.*淡黄/i.test(cnVal)) enVal = 'Colorless to slightly yellow transparent liquid';
+    else if (/微黄.*透明|淡黄.*透明|透明.*微黄|透明.*淡黄/i.test(cnVal)) enVal = 'Light yellow transparent liquid';
     else if (/无色透明/i.test(cnVal)) enVal = 'Colourless transparent liquid';
     else if (/微黄|淡黄/i.test(cnVal)) enVal = 'Slightly yellowish liquid';
     else if (/均质/i.test(cnVal)) enVal = 'Homogeneous liquid';
@@ -1847,8 +1866,8 @@ function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
           val = viscosityOverride || facts.section9Overrides?.['粘度|动力粘度'];
         } else if (/固体含量|固含/i.test(coreLabel) && (facts.solidsOverride || facts.section9Overrides?.['固体含量|固含'])) {
           val = facts.solidsOverride || facts.section9Overrides?.['固体含量|固含'];
-        } else if (/外观/i.test(coreLabel) && (facts.appearanceOverride || facts.section9Overrides?.['外观'])) {
-          val = facts.appearanceOverride || facts.section9Overrides?.['外观'];
+        } else if (/外\s*观/i.test(coreLabel) && (facts.appearanceOverride || facts.section9Overrides?.['外观'] || facts.section9Overrides?.['外 观'])) {
+          val = facts.appearanceOverride || facts.section9Overrides?.['外观'] || facts.section9Overrides?.['外 观'];
         } else if (/NCO/i.test(coreLabel) && (facts.ncoOverride || facts.section9Overrides?.['NCO'] || facts.section9Overrides?.['NCO|NCO含量'])) {
           val = facts.ncoOverride || facts.section9Overrides?.['NCO'] || facts.section9Overrides?.['NCO|NCO含量'];
         }
@@ -2772,11 +2791,15 @@ export async function buildBaseEnglishEngine({
       if (!cell.editable) cell.editable = true;
       let finalVal = val;
       if (typeof finalVal === 'string') {
-        const trimmed = finalVal.trim();
-        if (/^不适用$/i.test(trimmed)) finalVal = 'Not applicable';
-        else if (/^无数据(?:资料)?[。.]?$/i.test(trimmed)) finalVal = 'No data available.';
-        else if (/^未测定$/i.test(trimmed)) finalVal = 'Not determined';
-        else if (/^商业机密|商业秘密$/i.test(trimmed)) finalVal = 'Trade secret';
+        let trimmed = finalVal.trim();
+        if (/^不适用$/i.test(trimmed)) trimmed = 'Not applicable';
+        else if (/^无数据(?:资料)?[。.]?$/i.test(trimmed)) trimmed = 'No data available.';
+        else if (/^未测定$/i.test(trimmed)) trimmed = 'Not determined';
+        else if (/^商业机密|商业秘密$/i.test(trimmed)) trimmed = 'Trade secret';
+
+        // ENG-03: Ensure space after punctuation followed by English letters (e.g. "(SCBA)Do" -> "(SCBA) Do")
+        trimmed = trimmed.replace(/([.!?\)])([A-Za-z])/g, '$1 $2');
+        finalVal = trimmed;
       }
       writeCellValue(cell, finalVal);
       normalizeCellEnglishFonts(cell);

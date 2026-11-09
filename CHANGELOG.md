@@ -1,5 +1,57 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-09 生产 Agent 行为与权限隔离重构与源事实保真流水线落地 (INV-PRODUCER-ISOLATION-AND-FACT-FIDELITY)] - 确立生产 Agent 权限隔离与无权篡改底座公理 (SEC-01/02)、根除通用化工品类武断硬编码、实现标签语义全角/半角空格归一化、增补主审计物理事实硬断言 (AUD-01 149项全绿)、EP-1404 8 格式交付物无水环氧高保真验收
+
+### 一、 业务背景与用户最高裁决
+在对 EP-1404 交付物进行敌手深度认知审计（`EP-1404_Full_Cognitive_Audit_Report.md`）与二审核销时，捕获到核心缺陷：
+1. **DEF-01 (CRITICAL)**：Section 9.1 外观指标严重违背源文档事实，黄金源文件载明为“微黄透明状液体”，产出物被错误篡改为水性环氧乳液常见的“乳白液体” / “Milky white liquid”；
+2. **DEF-02 (CRITICAL)**：Section 1.1 英文品名与化学品分类严重失真漂移，源文件载明为“无水环氧”，产出物因底座引擎硬编码匹配 `/环氧/` 而盲目套用乳液模板，输出为“Waterborne epoxy emulsion EP-1404”与“Epoxy water dispersion”；
+3. **OBS-01 & OBS-02**：英文句子拼接缺少半角空格（如 `(SCBA)Do not allow`）及个别叙述性值格缺少句末闭合西文句号；
+4. **系统性治理顽疾**：主审计套件此前给出 144 项满分 PASS，暴露出未对账源物理事实的形式主义漏洞；同时生产 Agent 倾向于通过私自修改系统硬编码特判来应付产出，破坏全系统通用稳定性。
+
+用户下达最高治理令：
+> “你去做方案解决吧，调整下工作流，一定要避免负责产出的Agent通过修改系统硬编码去产出”
+
+### 二、 核心架构设计与工作流隔离 (Separation of Concerns)
+1. **生产 Agent 权限与行为绝对隔离 (SEC-01 / SEC-02)**：
+   - 生产 Agent 角色严格限定为**结构化事实提取者与流水线调用者**，绝对禁止直接编辑 `web/src/` 核心引擎代码（`docx-engine.js`、`pipeline-engine.js`、`smart-matching.js` 等）；
+   - 生产 Agent 仅通过规范化的 `facts` 结构体契约（`PipelineFactsContract`）传递特定型号的理化事实；
+   - 若遇到引擎英译缺陷或规则不足，强制由平台工程层进行通用升级，严禁针对单一型号打局部硬编码补丁。
+2. **底座通用英译与化工品类多模态分类重构 (pipeline-engine.js - ENG-02)**：
+   - 在 `translateChemicalCategoryToEnglish` 与品名派生逻辑中，优先精确区分“无水环氧”、“非水环氧”、“无溶剂环氧”与“水性环氧乳液”：
+     - 当中文名称或分类包含无水/非水/无溶剂时，英文化学品分类严格定性为 `Anhydrous epoxy resin`，英文品名严格定性为 `Anhydrous epoxy resin ${modelCode}`；
+     - 彻底切断无水环氧向 `Waterborne` 或 `emulsion` 或 `dispersion` 的串流通道；
+   - 细化 Section 9 外观英译状态机：将“微黄/淡黄透明”精准英译为 `Light yellow transparent liquid`，与“无色透明”及“乳白”物理解耦。
+3. **标签语义解析空格清洗容错重构 (smart-matching.js - ENG-01)**：
+   - 在 `normalizeLabelKey` 中统一消除全角/半角空格：`.replace(/[\s\u3000]+/g, '')`；
+   - 彻底解决 `'外 观：'`、`'外  观'` 与标准槽位 `'外观'` 因内部空格导致的匹配失败。
+4. **英文排版微观标点规范 (pipeline-engine.js - ENG-03)**：
+   - 在 `safeWrite` 写入层注入通用标点空格自愈正则：`.replace(/([.!?\)])([A-Za-z])/g, '$1 $2')`，彻底杜绝 `(SCBA)Do` 类似粘连；
+   - 确保叙述性长句以标准西文句点 `.` 规范闭合。
+5. **集中式主审计套件物理事实对账硬门禁增补 (run_master_msds_audit.mjs - AUD-01)**：
+   - 预读源文档物理事实，增设两大事实锚定硬断言：
+     - `Section 9.1 外观保真门禁`：若源文档为微黄/透明，交付物绝不可出现乳白或 milky，必须为 Light yellow / transparent；
+     - `Section 1.1 品名与分类保真门禁`：若源文档载明为无水环氧，英文交付物绝严禁出现 Waterborne / emulsion / dispersion；
+   - 集中式主审计断言项数由 144 项扩充至 **149 项**。
+
+### 三、 物理实测与验收核销
+1. **主审计套件集中自检**：
+   - 运行 `generate_ep1404_deliverables.mjs`，执行 149 项全量严苛门禁审查；
+   - 实测结果：**总检验项数: 149 | 通过: 149 | 缺陷: 0 | 判定: 🏆 AUDIT_PASSED (退出码 0)**！
+2. **PyMuPDF 交付物 PDF 核心物理事实显微实测**：
+   - 运行 `verify_ep1404_facts.py` 逐页逐文本提取检验 4 份 PDF：
+     - `EP-1404 msds_CN 冠志.pdf`: S1.1=无水环氧, S9.1=微黄透明状液体, 无乳白污染；
+     - `EP-1404 msds_CN 国彩.pdf`: S1.1=无水环氧, S9.1=微黄透明状液体, 无乳白污染；
+     - `EP-1404 msds_EN Guanzhi.pdf`: S1.1=Anhydrous epoxy resin EP-1404, S9.1=Light yellow transparent liquid, 零 Waterborne/emulsion/dispersion 污染, (SCBA) 后标点空格隔离正常；
+     - `EP-1404 msds_EN Guocai.pdf`: S1.1=Anhydrous epoxy resin EP-1404, S9.1=Light yellow transparent liquid, 零 Waterborne/emulsion/dispersion 污染, (SCBA) 后标点空格隔离正常；
+   - 实测结论：全部 4 份 PDF 交付物 100% 忠实于源文档物理事实！
+3. **Section 2 阶梯几何排版持续兼容**：
+   - 运行 `verify_s2_geometry.py`，EP 6 大型号（含 EP-1404）共 24 份 PDF Section 2 阶梯排版全部通过（0.00pt 偏差完美对齐）。
+4. **双目录文件物理同步**：
+   - 交付物已全量同步更新至生产库与用户目标目录（`E:\冠志\TDS MSDS (2)\待处理文件\EP-1404`）。
+
+---
+
 ## [2026-11-06 MSDS Section 2 阶梯几何排版与缩进对齐工业级重构 (INV-S2-TYPOGRAPHY-HIERARCHY)] - 确立一级标题文本与二级标签首字绝对垂直对齐 (0.00pt 偏差)、二级值向右层级缩进几何规范，EP 5 大型号 40 份交付物 144/145 项主审计与 PyMuPDF 物理对齐 100% 满分通过
 
 ### 一、 业务背景与用户最高视觉排版裁决

@@ -669,6 +669,7 @@ export function normalizeLabelKey(rawLabel) {
   const stripped = stripNumberingPrefix(rawLabel).coreLabel;
   return stripped
     .replace(/[:：\s]+$/, '')
+    .replace(/[\s\u3000]+/g, '')
     .trim()
     .toLowerCase();
 }
