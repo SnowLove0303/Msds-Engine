@@ -1,5 +1,23 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-09 MSDS Studio MCP 工作流体系与工业级技能资产封装交付 (SKILL-MSDS-STUDIO-V6)] - 整理收敛 10 大原子 MCP 工具契约、标准 5 阶作业流水线 SOP、万能几何手术配方库（Recipe A~H）、注入三大最高法定不变量、实现全局与本地多环境技能 100% 物理哈希对齐
+
+### 一、 变更背景与用户明确指令
+在完成系统目录只读封印与 MCP 专属网关建设后，为了将散落于多份文档与 OpenSpec 变更中的作业规范彻底标准化、资产化，用户下达明确指令：
+> “现在给我整理一下MCP 工作流体系，以技能的方式交付给我”
+
+### 二、 核心资产成果与技能封装
+1. **统一权威技能发布 (`msds-studio` v6.0-ENTERPRISE)**：
+   - 完整收录并精准定义 10 大官方原子 MCP 工具契约（`msds_recognize_source`, `msds_extract_section_facts`, `msds_compare_source_with_output`, `msds_register_template`, `msds_get_template_schema`, `msds_peek_cell_or_row`, `msds_plan_audit_targets`, `msds_execute_editor_ops`, `msds_batch_export_eight`, `msds_audit_deliverables`）；
+   - 标准化收敛 5 阶段完整流水线 SOP（阶段 1：零损耗源感知与透视 $\rightarrow$ 阶段 2：语义决策与几何预演 $\rightarrow$ 阶段 3：万能手术原语批量执行 $\rightarrow$ 阶段 4：标准 8 格式批处理导出 $\rightarrow$ 阶段 5：150 项主审计核销）；
+   - 体系化收录万能几何手术配方库（Recipe A~H：三列转两列消除、通栏说明合并、克隆增行、冗余行精准剔除、富文本与化学式下标、激光垂直对齐、历史脏数据前置清零、单节母版几何恢复）；
+   - 强制固化三大最高法定不变量（`INV-SYSTEM-READONLY`、`INV-MCP-EXCLUSIVE-GATEWAY`、`INV-SAFE-HALT-AND-ESCALATION`）及版式几何公理（Section 2 阶梯排版、Section 9 外观保真、无水环氧品名解耦等）；
+   - 提供标准《系统底座通用缺陷申报单》Markdown 模板与 `--argsFile` 防转义安全调用模式。
+2. **多环境部署与物理对齐**：
+   - 全局技能路径：`C:\Users\Administrator\.gemini\config\skills\msds-studio\SKILL.md`；
+   - 项目本地路径：`F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\.agents\skills\msds-studio\SKILL.md`；
+   - 经实测，全局与本地两份技能文件的 SHA-256 哈希值均为 `F6B0EBB198974CE28E7896B0B0168CF119DDB9BAFEB7E80B78F81ECBF2075815`，100% 物理哈希对齐！
+
 ## [2026-11-09 系统核心目录绝对只读与 MCP 唯一执行通道架构落地 (INV-SYSTEM-READONLY-AND-MCP-GATEWAY)] - 落实最高用户指令：未获允许严禁修改系统目录、封印 Producer Agent 写入权、构建轻量 MCP 网关驱动器作为唯一执行通道、设立底座缺陷停机升级规程
 
 ### 一、 治理背景与最高用户指令
