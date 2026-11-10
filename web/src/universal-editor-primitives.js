@@ -538,10 +538,6 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
         }
       }
 
-      // 判定当前行是否属于子级标签行 (REQ-SUBVAL-RIGHT-INDENT)
-      const labelText0 = (cells.length > 1 ? cells[0].textContent || '' : '').trim();
-      const isSubLabelRow = (cells.length > 1) && !/^(\d+\.\d+(?:\.\d+)?)\b/.test(labelText0) && !/^(?:化学品名称|CAS编号|物质|依据|Substance|Basis)/i.test(labelText0);
-
       // 对所有值单元格（单列描述行或多列中 c >= 1 的列）强制投影标准 Design Tokens
       const startCol = (cells.length === 1) ? 0 : 1;
       for (let cIdx = startCol; cIdx < cells.length; cIdx++) {
@@ -553,25 +549,22 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
         // 1. 清理段落级 pPr -> rPr，消除从模板继承的加粗与残留字号污染
         const ps = Array.from(cell.getElementsByTagNameNS(W_NS, 'p'));
         for (const p of ps) {
-          // 子级标签对应值单元格向右阶梯缩进 (REQ-SUBVAL-RIGHT-INDENT: 注入 w:left="240")
-          if (isSubLabelRow && cIdx === 1) {
-            let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
-            if (!pPr) {
-              pPr = doc.createElementNS(W_NS, 'w:pPr');
-              p.insertBefore(pPr, p.firstChild);
+          // 多列表格值单元格（cells.length > 1 && cIdx >= 1）纯净左对齐 (REQ-TOPOLOGY-B)
+          // 彻底清除人为注入或模板继承的多余段落级左缩进，顶齐单元格内左边距
+          if (cells.length > 1 && cIdx >= 1) {
+            const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+            if (pPr) {
+              const ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
+              if (ind) {
+                ind.removeAttribute('w:left');
+                ind.removeAttributeNS(W_NS, 'left');
+                ind.removeAttribute('w:leftChars');
+                ind.removeAttributeNS(W_NS, 'leftChars');
+                if (!ind.hasAttribute('w:firstLine') && !ind.hasAttribute('w:hanging')) {
+                  pPr.removeChild(ind);
+                }
+              }
             }
-            let ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
-            if (!ind) {
-              ind = doc.createElementNS(W_NS, 'w:ind');
-              pPr.appendChild(ind);
-            }
-            ind.setAttribute('w:left', '240');
-            ind.removeAttribute('w:hanging');
-            ind.removeAttribute('w:firstLine');
-            ind.removeAttribute('w:firstLineChars');
-            ind.removeAttribute('w:leftChars');
-            ind.removeAttributeNS(W_NS, 'leftChars');
-            ind.setAttributeNS(W_NS, 'w:leftChars', '0');
           }
 
           // 全局物理清除段落级自动编号定义 (REQ-S3-DUP-PURGE)

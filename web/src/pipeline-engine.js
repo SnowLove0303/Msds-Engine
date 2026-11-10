@@ -1918,16 +1918,23 @@ export function buildDynamicSection14Table(engine, srcEngine, baseCnEngine = nul
   const srcS14Text = srcS14 ? srcS14.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n') : '';
 
   const dgFacts = facts.dangerousGoods || {};
-  const unMatch = srcS14Text.match(/UN\s*(\d{4})/i) || srcS14Text.match(/联合国编号\s*[:：]?\s*(\d{4})/i);
+  const unMatch = srcS14Text.match(/UN\s*(\d{4})/i) || srcS14Text.match(/联合国编号\s*[:：]?\s*(\d{4})/i) || srcS14Text.match(/14\.1[^\d]*(\d{4})/);
   const unNo = dgFacts.unNumber || (unMatch ? unMatch[1] : null);
   const isDangerousGoods = Boolean(unNo || facts.isDangerousGoods || dgFacts.unNumber || (facts.modelCode && /PU-2346A/i.test(facts.modelCode)));
 
-  const psnCn = dgFacts.properShippingNameCn || (/树脂溶液/.test(srcS14Text) ? '树脂溶液' : '化学品');
+  const psnMatch = srcS14Text.match(/联合国运输名称\s*[:：]?\s*([^\n\r]+)/i);
+  const psnCn = dgFacts.properShippingNameCn || (psnMatch ? psnMatch[1].trim() : (/树脂溶液/.test(srcS14Text) ? '树脂溶液' : '化学品'));
   const psnEn = dgFacts.properShippingNameEn || (psnCn === '树脂溶液' ? 'RESIN SOLUTION' : 'CHEMICALS');
-  const hClass = dgFacts.hazardClass || ((srcS14Text.match(/运输危险[级类]别\s*[:：]?\s*(\d)/) || [])[1] || '3');
-  const pg = dgFacts.packingGroup || ((srcS14Text.match(/包装[组类]型?\s*[:：]?\s*([I|V]+)/i) || [])[1] || 'III');
-  const mp = dgFacts.marinePollutant === true || /海洋污染物\s*[:：]?\s*是/i.test(srcS14Text) ? '是' : '否';
-  const mpEn = mp === '是' ? 'Yes' : 'No';
+
+  const hClassMatch = srcS14Text.match(/运输危险[级类]别\s*[:：]?\s*(\d)/) || srcS14Text.match(/14\.3[^\d]*(\d)/);
+  const hClass = dgFacts.hazardClass || (hClassMatch ? hClassMatch[1] : '3');
+
+  const pgMatch = srcS14Text.match(/包装[组类]型?\s*[:：]?\s*([I|V]+)/i) || srcS14Text.match(/14\.4[^\w]*([I|V]+)/i);
+  const pg = dgFacts.packingGroup || (pgMatch ? pgMatch[1] : 'III');
+
+  const envMatch = srcS14Text.match(/环境危险\s*[:：]?\s*([是|否|无])/i) || srcS14Text.match(/海洋污染物\s*[:：]?\s*([是|否])/i);
+  const envCn = envMatch ? envMatch[1] : (dgFacts.marinePollutant ? '是' : '否');
+  const envEn = envCn === '是' ? 'Yes' : 'No';
 
   const hasMarpol = /MARPOL/i.test(srcS14Text) || Boolean(facts.marpol);
   let marpolValCn = '不适用';
@@ -1948,6 +1955,7 @@ export function buildDynamicSection14Table(engine, srcEngine, baseCnEngine = nul
 
   let specCnParts = [];
   if (srcSpecRef) specCnParts.push(`特殊防范措施：${srcSpecRef}`);
+  else if (/参见/i.test(srcS14Text)) specCnParts.push('参见6-8节。');
   if (isDangerousGoods) specCnParts.push('具可燃性。');
   else specCnParts.push('非危险货物。');
 
@@ -1963,8 +1971,10 @@ export function buildDynamicSection14Table(engine, srcEngine, baseCnEngine = nul
 
   let specEnParts = [];
   if (srcSpecRef) {
-    const refEn = srcSpecRef.replace(/参见(?:第)?(\d+)[-－—~](d+)节/, 'See sections $1-$2.');
-    specEnParts.push(refEn.includes('See') ? refEn : `See sections 6-8.`);
+    const refEn = srcSpecRef.replace(/参见(?:第)?(\d+)[-－—~](\d+)节/, 'See sections $1-$2.');
+    specEnParts.push(refEn.includes('See') ? refEn : 'See sections 6-8.');
+  } else if (/参见/i.test(srcS14Text) || /See sections/i.test(srcS14Text)) {
+    specEnParts.push('See sections 6-8.');
   }
   if (isDangerousGoods) specEnParts.push('Flammable.');
   else specEnParts.push('Not regulated as dangerous goods.');
@@ -1980,63 +1990,130 @@ export function buildDynamicSection14Table(engine, srcEngine, baseCnEngine = nul
   }
   const fullSpecEn = specEnParts.join('\n');
 
-  const roadRailValCn = isDangerousGoods
-    ? `UN ${unNo || '1866'}，${psnCn}，${hClass} 类，包装组 ${pg}`
-    : '非危险品陆运输方式。';
-  const roadRailValEn = isDangerousGoods
-    ? `UN ${unNo || '1866'}, ${psnEn}, Class ${hClass}, PG ${pg}.`
-    : 'Not classified as dangerous goods for land transport.';
-
-  const seaValCn = isDangerousGoods
-    ? `UN ${unNo || '1866'}，${psnCn}，${hClass} 类，包装组 ${pg}，海洋污染物：${mp}`
-    : '非危险品海运方式。';
-  const seaValEn = isDangerousGoods
-    ? `UN ${unNo || '1866'}, ${psnEn}, Class ${hClass}, PG ${pg}, Marine Pollutant: ${mpEn}, in accordance with IMDG Code.`
-    : 'Not classified as dangerous goods for sea transport, in accordance with IMDG regulations.';
-
-  const airValCn = isDangerousGoods
-    ? `UN ${unNo || '1866'}，${psnCn}，${hClass} 类，包装组 ${pg}`
-    : '非危险品运输方式。';
-  const airValEn = isDangerousGoods
-    ? `UN ${unNo || '1866'}, ${psnEn}, Class ${hClass}, PG ${pg}, in accordance with ICAO/IATA.`
-    : 'Not classified as dangerous goods for air transport, in accordance with IATA regulations.';
-
-  for (const row of s14.rows) {
-    const lbl = (row.cells[0]?.text || '').trim();
-    const valCell = row.cells[1];
-    if (!valCell) continue;
-
-    if (/公路和铁路|Road and rail/i.test(lbl)) {
-      safeWriteCellValue(valCell, isEnglish ? roadRailValEn : roadRailValCn);
-    } else if (/海上运输|Maritime/i.test(lbl)) {
-      safeWriteCellValue(valCell, isEnglish ? seaValEn : seaValCn);
-    } else if (/空运|Air transport/i.test(lbl)) {
-      safeWriteCellValue(valCell, isEnglish ? airValEn : airValCn);
-    } else if (/用户特殊注意事项|Special precautions/i.test(lbl)) {
-      safeWriteCellValue(valCell, isEnglish ? fullSpecEn : fullSpecCn);
+  // 构建标准行结构（REQ-S14-SOVEREIGNTY: 参考模板写法与几何规范构建源文件内容，绝不以源文件去适配模板预设标签）
+  const ghsRows = [
+    {
+      seq: '14.1',
+      labelCn: '联合国编号',
+      labelEn: 'UN number',
+      valCn: unNo || '1866',
+      valEn: unNo || '1866'
+    },
+    {
+      seq: '14.2',
+      labelCn: '联合国运输名称',
+      labelEn: 'UN proper shipping name',
+      valCn: psnCn,
+      valEn: psnEn
+    },
+    {
+      seq: '14.3',
+      labelCn: '运输危险类别',
+      labelEn: 'Transport hazard class',
+      valCn: hClass,
+      valEn: hClass
+    },
+    {
+      seq: '14.4',
+      labelCn: '包装组',
+      labelEn: 'Packing group',
+      valCn: pg,
+      valEn: pg
+    },
+    {
+      seq: '14.5',
+      labelCn: '环境危害',
+      labelEn: 'Environmental hazards',
+      valCn: envCn,
+      valEn: envEn
+    },
+    {
+      seq: '14.6',
+      labelCn: '用户特殊防范措施',
+      labelEn: 'Special precautions for user',
+      valCn: fullSpecCn,
+      valEn: fullSpecEn
+    },
+    {
+      seq: '14.7',
+      labelCn: '按《MARPOL73/78》公约附则II和IBC规则',
+      labelEn: 'MARPOL 73/78 Annex II and IBC Code',
+      valCn: marpolValCn,
+      valEn: marpolValEn
     }
+  ];
+
+  const modeRows = [
+    {
+      seq: '14.1',
+      labelCn: '公路和铁路运输',
+      labelEn: 'Road and rail transport',
+      valCn: '非危险品陆运输方式。',
+      valEn: 'Not classified as dangerous goods for land transport.'
+    },
+    {
+      seq: '14.2',
+      labelCn: '海上运输',
+      labelEn: 'Maritime transport',
+      valCn: '非危险品海运方式。',
+      valEn: 'Not classified as dangerous goods for sea transport, in accordance with IMDG regulations.'
+    },
+    {
+      seq: '14.3',
+      labelCn: '空运',
+      labelEn: 'Air transport',
+      valCn: '非危险品运输方式。',
+      valEn: 'Not classified as dangerous goods for air transport, in accordance with IATA regulations.'
+    },
+    {
+      seq: '14.4',
+      labelCn: '用户特殊注意事项',
+      labelEn: 'Special precautions for user',
+      valCn: fullSpecCn || '非危险货物。',
+      valEn: fullSpecEn || 'Not regulated as dangerous goods.'
+    }
+  ];
+  if (hasMarpol) {
+    modeRows.push({
+      seq: '14.5',
+      labelCn: '按《MARPOL73/78》公约附则II和IBC规则',
+      labelEn: 'MARPOL 73/78 Annex II and IBC Code',
+      valCn: marpolValCn,
+      valEn: marpolValEn
+    });
   }
 
-  if (hasMarpol) {
-    if (s14.rows.length < 6) {
-      s14 = addRowAfter(engine, s14, s14.rows.length - 1);
-    }
-    const r5 = s14.rows[5];
-    normalizeTwoColumnRow(r5.node, 2800, 6981);
+  const rowsToApply = isDangerousGoods ? ghsRows : modeRows;
+  const targetTotalRowCount = rowsToApply.length + 1; // 1 header row + data rows
+
+  while (s14.rows.length < targetTotalRowCount) {
+    s14 = addRowAfter(engine, s14, s14.rows.length - 1);
+  }
+  while (s14.rows.length > targetTotalRowCount) {
+    s14 = deleteRow(engine, s14, s14.rows.length - 1);
+  }
+  engine.refresh();
+  s14 = engine.records.find(r => r.sectionNumber === 14);
+
+  for (let idx = 0; idx < rowsToApply.length; idx++) {
+    const item = rowsToApply[idx];
+    const row = s14.rows[idx + 1];
+    if (!row) continue;
+    normalizeTwoColumnRow(row.node, 2800, 6981);
     engine.refresh();
     s14 = engine.records.find(r => r.sectionNumber === 14);
+    const refreshedRow = s14.rows[idx + 1];
 
     formatSection14LabelCell(
-      s14.rows[5].cells[0],
-      '14.5',
-      isEnglish ? 'MARPOL 73/78 Annex II and IBC Code' : '按《MARPOL73/78》公约附则II和IBC规则',
+      refreshedRow.cells[0],
+      item.seq,
+      isEnglish ? item.labelEn : item.labelCn,
       isEnglish
     );
-    safeWriteCellValue(s14.rows[5].cells[1], isEnglish ? marpolValEn : marpolValCn);
-  } else {
-    while (s14.rows.length > 5) {
-      s14 = deleteRow(engine, s14, s14.rows.length - 1);
-    }
+    safeWriteCellValue(
+      refreshedRow.cells[1],
+      isEnglish ? item.valEn : item.valCn
+    );
   }
 
   engine.refresh();

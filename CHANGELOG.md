@@ -1,5 +1,53 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-10 MSDS Studio 全 16 章节多列表格值单元格纯净左对齐、通栏层级缩进保全与 Section 14 源文件主权动态重构工程 (INV-TOPOLOGY-FLUSH-LEFT-AND-S14-SOVEREIGNTY)] - 彻底清除多列表格值单元格多余段落缩进确立纯净左对齐、通栏 (Section 2) 树状层级阶梯缩进完好保全、Section 14 彻底告别生硬塞入“公路运输”预设标签转向以母版写法构建源文件 7 大标准危化品运输要素动态表格、中央主审计 170 项全景全绿满分核销 (Exit Code 0)
+
+### 一、 变更背景与用户最高指令
+用户下达两项最高法定排版与内容主权架构指令：
+> 1. “还需要调整下底层逻辑，section2 是通栏的情况下，值需要用缩进，但是多列表格的情况下，值一般是左对齐，懂我意思？比如section2 的预防措施及其对应的值的排版就做的很好，但是像section1 因为是表格的情况下就没必要做缩进，第二列值统一用左对齐就行了，其他section 同理，要调整一下全局16个section的底层逻辑”
+> 2. “《Ps-openspec 规格立法与施工图纸》（Step 2 门禁 2 呈报） 在这基础上补充内容：section14仍然没有遵循内容源于源文件的准则：底层模板拓扑只提供参考和格式等固定的东西，但不代表模板已有内容、标签等就是标准唯一正确项，核心是参考模板写法，去构建源文件的内容，而不是以源文件的内容去适配模板的内容，懂我意思？”
+
+### 二、 核心架构根因穿透与系统底层解法
+1. **多列表格值单元格纯净左对齐底层解耦 (REQ-TOPOLOGY-B)**：
+   - **根因穿透**：上一阶段在处理层级缩进时，`universal-editor-primitives.js` 中将没有序号的前置标签行判定为 `isSubLabelRow` 并向第 1 列值单元格注入了 `w:left="240"`。然而在多列表格（如 Section 1、Section 8 等）中，第 1 列本身已经是独立列，再注入段落左缩进会导致单元格内部文字“二次悬空右缩”，破坏了表格整体对齐的美感。
+   - **底层通用解法**：在 `universal-editor-primitives.js:applyGlobalTypographyProjection` 中，彻底移除 `isSubLabelRow` 的误加缩进逻辑；对所有多列表格（`cells.length > 1`）中的值单元格（`cIdx >= 1`），段落统一清理残留的 `w:left` 与 `w:leftChars` 属性，确立多列表格值单元格首字严格贴齐单元格内左边距（纯净左对齐 Flush Left）。
+2. **通栏单列布局 (Section 2) 层级阶梯缩进完好保全与封印 (REQ-TOPOLOGY-A)**：
+   - **架构设计**：单列通栏（`cells.length === 1` 或 `gridSpan > 1`）不同于多列表格，其标签与措施值均容纳在同一通栏内，必须依靠段落缩进来建立父子层级关系。
+   - **底层保全**：严格保护并封印 `docx-engine.js:renderFullWidthRow` 中经过精心设计的 5 级缩进状态机与 `s2SubValueIndent`（中文 840 dxa / 英文 677 dxa），确保 Section 2 内部的“预防措施”、“事故响应”等条款保持完美的树状阶梯缩进，主从分明。
+3. **Section 14 内容主权动态重构：参考模板写法构建源文件事实 (REQ-S14-SOVEREIGNTY)**：
+   - **根因穿透**：底层模板原先预设了 4 行运输方式（`14.1 公路和铁路运输`、`14.2 海上运输`、`14.3 空运`、`14.4 用户特殊注意事项`）。原逻辑试图将源文件载明的 UN GHS 危化品 7 大要素（UN 1866、树脂溶液、3 类、包装组 III、环境危害 否等）强行填充进“公路和铁路运输”等标签中，犯了“以源文件内容去适配模板预设内容”的削足适履错误。
+   - **底层通用解法**：重构 `pipeline-engine.js:buildDynamicSection14Table`。确立“模板提供排版写法与几何参考，源文件主导内容与结构”的法理体系：
+     - 若源文件为危化品 UN GHS 要素模式（如 PU-2346A）：动态组装 7 行标准 GHS 表格：
+       - `14.1 联合国编号` / `14.1 UN number`
+       - `14.2 联合国运输名称` / `14.2 UN proper shipping name`
+       - `14.3 运输危险类别` / `14.3 Transport hazard class`
+       - `14.4 包装组` / `14.4 Packing group`
+       - `14.5 环境危害` / `14.5 Environmental hazards`
+       - `14.6 用户特殊防范措施` / `14.6 Special precautions for user`
+       - `14.7 按《MARPOL73/78》公约附则II和IBC规则` / `14.7 MARPOL 73/78 Annex II and IBC Code`
+     - 若源文件为普通非危品运输方式模式：参考模板动态生成 4 行运输方式表格；
+     - 每一行严格套用母版 2800 dxa / 6981 dxa 列宽、420 dxa 悬挂缩进 + `<w:tab/>` 黄金锚点以及纯净左对齐值单元格；中英文双语行数与结构实现 1:1 绝对镜像同构！
+4. **集中式中央主审计套件同步核销 (REQ-01 ~ REQ-06)**：
+   - 同步更新 `run_master_msds_audit.mjs` 中的 Item 151（Section 14 危化品 8 行拓扑保全）与 Item 155（多列表格纯净左对齐且通栏阶梯缩进完好）；
+   - 运行结果：**170/170 项全绿通过，真实退出码 0**。
+
+### 三、 物理实测与对账核销清单
+- **目标交付目录**：`E:\冠志\TDS MSDS (2)\待处理文件\PU-2346A\`
+- **生成交付物清单 (8 份全部最新同步)**：
+  1. `PU-2346A msds_CN 冠志.docx` (42,783 bytes)
+  2. `PU-2346A msds_CN 冠志.pdf` (272,746 bytes)
+  3. `PU-2346A msds_CN 国彩.docx` (42,773 bytes)
+  4. `PU-2346A msds_CN 国彩.pdf` (272,543 bytes)
+  5. `PU-2346A msds_EN Guanzhi.docx` (31,109 bytes)
+  6. `PU-2346A msds_EN Guanzhi.pdf` (158,155 bytes)
+  7. `PU-2346A msds_EN Guocai.docx` (31,076 bytes)
+  8. `PU-2346A msds_EN Guocai.pdf` (156,357 bytes)
+- **Central Master Audit 套件核销**：**170 / 170 100% 满分通过，退出码 0**。
+
+---
+
+
+
 ## [2026-11-10 MSDS Studio 全 16 章节黄金基准对齐 (9.1 外观标尺) 与层级树拓扑工程 (INV-GLOBAL-GOLDEN-ANCHOR-ALIGNMENT)] - 彻底根除 Section 3 `<w:numPr>` 自动编号叠加导致序号重复 (3.1 3.1)、全 16 章节统一采用 9.1 外观黄金标尺 (80.28pt 激光铅垂共线对齐)、消除长标签折行第二行回缩缺陷 (11.7 “性：”与“亚”绝对垂线对齐)、子标签对应值单元格向右阶梯缩进 (left=240)、彻底清除 w:leftChars 字符单位漂移、双位数序号自适应字阶防制表位跳步、主审计扩充至 170 项全绿满分核销 (Exit Code 0)
 
 ### 一、 变更背景与用户最高指令

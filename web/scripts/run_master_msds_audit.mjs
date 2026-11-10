@@ -1715,13 +1715,13 @@ export async function runMasterMsdsAudit(options = {}) {
   const enS14All = s14RecEn ? s14RecEn.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n') : '';
   const hasAdgPollution = /ADG\s*regulations|ADG/i.test(cnS14All) || /ADG\s*regulations|ADG/i.test(enS14All);
   const hasMarpolInS14 = (/PU-2346A/i.test(model) || (sourceDocx && /PU-2346A/i.test(sourceDocx)))
-    ? (/MARPOL/i.test(cnS14All) && /MARPOL/i.test(enS14All) && s14RecCn?.rows.length === 6)
+    ? (/MARPOL/i.test(cnS14All) && /MARPOL/i.test(enS14All) && s14RecCn?.rows.length === 8)
     : true;
   assert(
     !hasAdgPollution && hasMarpolInS14,
     '环3',
     'Section 14 零 ADG 污染与国际公约保全规范 (REQ-04)',
-    'Section 14 严禁出现 ADG 澳洲法规外生硬编码，且危化品源文件载明 MARPOL 时必须 100% 完整保留 6 行拓扑',
+    'Section 14 严禁出现 ADG 澳洲法规外生硬编码，且危化品源文件载明 7 大 UN GHS 要素时必须 100% 完整保留 8 行标准拓扑 (含表头)',
     `ADG污染=${hasAdgPollution}, MARPOL保留=${hasMarpolInS14}, 行数=${s14RecCn?.rows.length}`,
     'Section 14 CN/EN'
   );
@@ -1790,24 +1790,56 @@ export async function runMasterMsdsAudit(options = {}) {
     'PDF Golden Anchor Coordinates'
   );
 
-  // 14. 子级标签对应值单元格向右阶梯缩进断言 (REQ-SUBVAL-RIGHT-INDENT)
-  let subValIndentPass = false;
-  const s8CheckRec = cnDocx.records.find(r => r.sectionNumber === 8);
-  if (s8CheckRec && s8CheckRec.rows.length >= 5) {
-    // 检查 Row 2 (呼吸系统防护) 或 Row 4 (防护手套的合适材料) 对应值单元格
-    const valCell = s8CheckRec.rows[2].cells[1]?.node || s8CheckRec.rows[4].cells[1]?.node;
-    if (valCell) {
-      const inds = Array.from(valCell.getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'ind'));
-      subValIndentPass = inds.some(ind => ind.getAttribute('w:left') === '240' || ind.getAttributeNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'left') === '240');
+  // 14. 多列表格值单元格纯净左对齐与通栏值层级缩进规范 (REQ-TOPOLOGY-B & REQ-TOPOLOGY-A)
+  let multiColFlushLeftPass = true;
+  let multiColDetail = '';
+  // 检查 Section 1 与 Section 8 的第 1 列值单元格：绝不能有非零的 w:left 缩进
+  for (const sNum of [1, 8]) {
+    const rec = cnDocx.records.find(r => r.sectionNumber === sNum);
+    if (!rec) continue;
+    for (let rIdx = 1; rIdx < rec.rows.length; rIdx++) {
+      const row = rec.rows[rIdx];
+      if (row.cells.length > 1) {
+        const valCellNode = row.cells[1]?.node;
+        if (!valCellNode) continue;
+        const ps = Array.from(valCellNode.getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'p'));
+        for (const p of ps) {
+          const inds = Array.from(p.getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'ind'));
+          for (const ind of inds) {
+            const leftVal = ind.getAttribute('w:left') || ind.getAttributeNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'left');
+            if (leftVal && leftVal !== '0') {
+              multiColFlushLeftPass = false;
+              multiColDetail = `Section ${sNum} Row ${rIdx} Column 1 残留 left="${leftVal}"`;
+              break;
+            }
+          }
+        }
+      }
     }
   }
+
+  // 同时核销 Section 2 通栏值必须保持层级缩进 (s2SubValueIndent: 840 twips)
+  let s2HierarchicalIndentPass = false;
+  const s2Rec = cnDocx.records.find(r => r.sectionNumber === 2);
+  if (s2Rec && s2Rec.rows.length > 1) {
+    const s2CellNode = s2Rec.rows[1]?.cells[0]?.node;
+    if (s2CellNode) {
+      const inds = Array.from(s2CellNode.getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'ind'));
+      s2HierarchicalIndentPass = inds.some(ind => {
+        const leftVal = ind.getAttribute('w:left') || ind.getAttributeNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'left');
+        return leftVal === '840' || leftVal === '480';
+      });
+    }
+  }
+
+  const topologyPass = multiColFlushLeftPass && s2HierarchicalIndentPass;
   assert(
-    subValIndentPass,
+    topologyPass,
     '环3',
-    '子级标签对应值单元格向右阶梯缩进规范 (REQ-SUBVAL-RIGHT-INDENT)',
-    'Section 8 等无序号子级标签对应的值单元格段落必须显式注入 w:left="240"，形成清晰的树状阶梯视觉层次',
-    subValIndentPass ? '子值向右缩进生效 (left=240)' : '缺少 left=240 缩进',
-    'Section 8 Sub-values Indentation'
+    '多列表格纯净左对齐与通栏值层级缩进规范 (REQ-TOPOLOGY-B & REQ-TOPOLOGY-A)',
+    '多列表格（Sec 1, Sec 8）第 1 列值单元格段落必须纯净左对齐（无多余左缩进），Section 2 通栏值段落必须保持 840 twips 阶梯缩进',
+    topologyPass ? '多列表格纯净左对齐且通栏阶梯缩进完好' : (multiColDetail || 'Section 2 缺少层级缩进'),
+    'Multi-Col Flush Left & Full-Width Indentation'
   );
 
   // ======================================================================
