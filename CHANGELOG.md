@@ -1,5 +1,27 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-10 MSDS Studio 双语翻译逐行逐句细节零遗漏执行层机械硬门禁与 Section 12.2 细节补齐 (INV-TRANS-ZERO-OMISSION)] - 执行层主审计 Ring 4 机械门禁下沉与降解实验参数无损精细化翻译
+
+### 一、 用户明确指令与背景
+用户在审阅全文档 16 章节逐行中英文对照后，下达法定要求：
+> “补充细节，加个执行层的审计规则，以后涉及到翻译的，必须逐行对照审计，并逐句检查，要求不准漏任何细节”
+
+### 二、 核心根因深潜与解法 (5-Whys & Engineering Solution)
+1. **翻译细节精细度不足根因 (Translation Detail Attrition Pathology)**：
+   - 原 pipeline-engine.js:translatePersistenceValueToEnglish 中，遇到“不易生物降解”模式时直接短路返回“The product is not readily biodegradable.”，导致源文档中前置的降解率数值（＜60%）、测试周期（28d）、检测方法导则（OECD 301D）以及类似产品研究说明被直接抹平。
+   - **解法**：在 translatePersistenceValueToEnglish 中废除粗暴短路逻辑，全面支持多句复合表达式解析，将降解率、测试天数、定性结论、OECD 导则编号与类似产品研究逐句 100% 精确翻译为：`Biodegradability: < 60%, 28 d, the product is not readily biodegradable. Method: OECD Test Guideline 301D. Studies on a similar product.`。
+2. **执行层硬阻断审计门禁立法 (INV-TRANS-ZERO-OMISSION)**：
+   - 遵照用户“以后涉及到翻译的，必须逐行对照审计，并逐句检查，要求不准漏任何细节”之指示，在 run_master_msds_audit.mjs 的 Ring 4 中增加执行层双语细节零遗漏机械硬门禁：
+     - 自动提取中文文档中的 OECD 导则号（如 OECD 301D、401、403、404、405、406、423、429、471、473 等），断言英文对应章节必须 100% 具备相应导则声明；
+     - 自动检测核心实验数值（如 60%、28 d），断言英文版严禁遗漏任何数值参数；
+     - 若英文版漏译任何导则号或实验数值，审计直接判为 FAIL 并以退出码 1 阻断发布。
+
+### 三、 集中式主审计与静态 Lint 验证
+- **静态 Lint**：npm run lint（10 大源码架构门禁 + 反假阳性检测）-> 0 errors, 0 warnings (退出码 0)；
+- **171 项中央主审计**：node web/scripts/run_master_msds_audit.mjs -> **171/171 项全绿通过 (退出码 0)**；
+- **交付物生成与同步**：重新编译 PU-2346A 8 份标准交付物，全量覆盖同步至用户工作目录 E:\冠志\TDS MSDS (2)\待处理文件\PU-2346A\。
+
+
 ## [2026-11-10 MSDS Studio Section 11 空行高度精准校准与急性毒性吸入数据科学分流 (INV-S11-LINE-HEIGHT-AND-INHALATION-RECLASSIFICATION)] - 结构化毒理单元格空白段落行高精准等高控制 (w:lineRule="exact", 中文240dxa/12pt, 英文190dxa/9.5pt) 与源文档急性毒性吸入数据向 11.3 科学分流合并
 
 ### 一、 用户明确指令与背景

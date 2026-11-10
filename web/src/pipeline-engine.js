@@ -3062,18 +3062,35 @@ export function translateEcotoxicityValueToEnglish(cnText) {
 
 export function translatePersistenceValueToEnglish(cnText) {
   if (!cnText) return 'The product is not readily biodegradable.';
-  if (/无数据/i.test(cnText)) return 'No data available.';
-  if (/不易生物降解|难生物降解|难降解|不属于易降解/i.test(cnText)) return 'The product is not readily biodegradable.';
-  if (/易生物降解/i.test(cnText)) {
-    let t = cnText;
-    t = t.replace(/生物降解性[：:]/g, 'Biodegradability: ');
-    t = t.replace(/，即易生物降解[。.]?/g, ', readily biodegradable.');
-    t = t.replace(/易生物降解[。.]?/g, 'Readily biodegradable.');
-    t = t.replace(/，/g, ', ');
-    return t.trim();
+  let t = cnText.trim();
+  if (!t || /^无数据(?:资料)?[.。]?$/i.test(t)) return 'No data available.';
+
+  // 1. 若仅有纯定性声明而无数值细节
+  if (/^(?:该产品)?(?:不易生物降解|难生物降解|难降解|不属于易降解|非生物降解|不降解)[.。]?$/i.test(t)) {
+    return 'The product is not readily biodegradable.';
   }
-  if (/不易生物降解|不属于易降解/i.test(cnText)) return 'The product is not readily biodegradable.';
-  return 'The product is not readily biodegradable.';
+  if (/^(?:该产品)?易生物降解[.。]?$/i.test(t)) {
+    return 'The product is readily biodegradable.';
+  }
+
+  // 2. 逐句/逐成分精细化翻译保留细节 (REQ-TRANS-01)
+  t = t.replace(/生物降解(?:性)?\s*[：:]\s*/g, 'Biodegradability: ');
+  t = t.replace(/＜/g, '< ');
+  t = t.replace(/＞/g, '> ');
+  t = t.replace(/(\d+)\s*d\b/g, '$1 d');
+  t = t.replace(/该产品不易生物降解/g, 'the product is not readily biodegradable');
+  t = t.replace(/不易生物降解/g, 'not readily biodegradable');
+  t = t.replace(/该产品易生物降解/g, 'the product is readily biodegradable');
+  t = t.replace(/易生物降解/g, 'readily biodegradable');
+  t = t.replace(/方法\s*[：:]\s*/g, 'Method: ');
+  t = t.replace(/OECD\s*(?:化学品测试指南|测试导则)?\s*(\d+[A-Za-z]?)/gi, 'OECD Test Guideline $1. ');
+  t = t.replace(/对类似产品(?:的)?(?:毒理学|生态学)?研究/g, 'Studies on a similar product');
+  t = t.replace(/，/g, ', ');
+  t = t.replace(/。/g, '. ');
+  t = t.replace(/\s+/g, ' ').replace(/\s*\.\s*/g, '. ').trim();
+  if (t && !t.endsWith('.')) t += '.';
+
+  return t;
 }
 
 export async function buildBaseEnglishEngine({
