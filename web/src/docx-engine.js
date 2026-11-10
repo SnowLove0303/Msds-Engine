@@ -1575,8 +1575,11 @@ function createRegularRun(doc, text, isEnglish = false) {
   b.setAttributeNS(W_NS, 'w:val', '0');
   rPr.appendChild(b);
   const sz = doc.createElementNS(W_NS, 'w:sz');
-  sz.setAttributeNS(W_NS, 'w:val', '24');
+  sz.setAttributeNS(W_NS, 'w:val', isEnglish ? '19' : '24');
   rPr.appendChild(sz);
+  const szCs = doc.createElementNS(W_NS, 'w:szCs');
+  szCs.setAttributeNS(W_NS, 'w:val', isEnglish ? '19' : '24');
+  rPr.appendChild(szCs);
   r.appendChild(rPr);
   const t = doc.createElementNS(W_NS, 'w:t');
   t.setAttribute('xml:space', 'preserve');
@@ -1659,8 +1662,16 @@ export function writeStructuredToxicologyCellValue(cell, value, options = {}) {
     const p = doc.createElementNS(W_NS, 'w:p');
     const pPr = doc.createElementNS(W_NS, 'w:pPr');
     const spacing = doc.createElementNS(W_NS, 'w:spacing');
-    spacing.setAttributeNS(W_NS, 'w:line', '300');
-    spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
+    if (itemText) {
+      spacing.setAttributeNS(W_NS, 'w:line', '300');
+      spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
+    } else {
+      // 空白段落高度校准为值规定字号等高：中文 12pt (240 dxa)，英文 9.5pt (190 dxa) (REQ-LH-01)
+      spacing.setAttributeNS(W_NS, 'w:before', '0');
+      spacing.setAttributeNS(W_NS, 'w:after', '0');
+      spacing.setAttributeNS(W_NS, 'w:line', isEnglish ? '190' : '240');
+      spacing.setAttributeNS(W_NS, 'w:lineRule', 'exact');
+    }
     pPr.appendChild(spacing);
     const ind = doc.createElementNS(W_NS, 'w:ind');
     ind.setAttributeNS(W_NS, 'w:right', '480');
@@ -1672,6 +1683,9 @@ export function writeStructuredToxicologyCellValue(cell, value, options = {}) {
     const pSz = doc.createElementNS(W_NS, 'w:sz');
     pSz.setAttributeNS(W_NS, 'w:val', isEnglish ? '19' : '24');
     pRPr.appendChild(pSz);
+    const pSzCs = doc.createElementNS(W_NS, 'w:szCs');
+    pSzCs.setAttributeNS(W_NS, 'w:val', isEnglish ? '19' : '24');
+    pRPr.appendChild(pSzCs);
     pPr.appendChild(pRPr);
     p.appendChild(pPr);
 
@@ -2807,6 +2821,36 @@ export function formatSection14LabelCell(cell, numberStr, labelText, isEnglish =
 /**
  * 从源文件中 1:1 物理提取所有毒理学终点 (自适应多行表格与叙述性通栏单单元格)
  */
+/**
+ * 全局数据归类科学纠偏 (REQ-LH-02):
+ * 识别误归类至急性经口毒性中的吸入毒性实测数据 (如乙醇 LC50 吸入测试)，
+ * 科学分流剥离并追加合并至 11.3 急性毒性，吸入
+ */
+function applyInhalationReclassification(endpoints) {
+  if (!Array.isArray(endpoints)) return;
+  const oralEp = endpoints.find(e => e.key === 'acute_oral' || /急性毒性.*经口|经口/i.test(e.cnLabel));
+  const inhEp = endpoints.find(e => e.key === 'acute_inhalation' || /急性毒性.*吸入|吸入/i.test(e.cnLabel));
+
+  if (oralEp && inhEp && oralEp.content) {
+    // 探测是否含有 LC50 吸入测试数据块及紧随的方法/导则说明 (REQ-LH-02)
+    const inhBlockRegex = /(?:\n\s*)?((?:LC50|半数致死浓度)\s*[（(]?\s*吸入[^\n]*(?:\n\s*(?:[(（]OECD[^\n]+|方法[^\n]+|Method[^\n]+))?)/i;
+    const match = oralEp.content.match(inhBlockRegex);
+    if (match && match[1]) {
+      const extractedInhData = match[1].trim();
+      oralEp.content = oralEp.content.replace(match[0], '').trim();
+
+      const componentNameMatch = oralEp.content.match(/(乙醇|Ethanol)/i);
+      const componentHeader = componentNameMatch ? `${componentNameMatch[1]}\n` : '';
+
+      if (inhEp.content) {
+        inhEp.content = `${inhEp.content.trim()}\n\n${componentHeader}${extractedInhData}`.trim();
+      } else {
+        inhEp.content = `${componentHeader}${extractedInhData}`.trim();
+      }
+    }
+  }
+}
+
 export function extractToxicologicalEndpointsFromSource(srcEngine) {
   const s11Src = srcEngine?.records?.find(r => r.sectionNumber === 11);
   if (!s11Src) return [];
@@ -2826,7 +2870,10 @@ export function extractToxicologicalEndpointsFromSource(srcEngine) {
         content: rawVal
       });
     }
-    if (endpoints.length > 0) return endpoints;
+    if (endpoints.length > 0) {
+      applyInhalationReclassification(endpoints);
+      return endpoints;
+    }
   }
 
   // 2. 若源文件为叙述性单单元格大文本块
@@ -2875,6 +2922,7 @@ export function extractToxicologicalEndpointsFromSource(srcEngine) {
       content: body
     });
   }
+  applyInhalationReclassification(endpoints);
   return endpoints;
 }
 

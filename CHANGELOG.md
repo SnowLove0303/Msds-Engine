@@ -1,5 +1,36 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-10 MSDS Studio Section 11 空行高度精准校准与急性毒性吸入数据科学分流 (INV-S11-LINE-HEIGHT-AND-INHALATION-RECLASSIFICATION)] - 结构化毒理单元格空白段落行高精准等高控制 (w:lineRule="exact", 中文240dxa/12pt, 英文190dxa/9.5pt) 与源文档急性毒性吸入数据向 11.3 科学分流合并
+
+### 一、 用户明确指令与背景
+用户提出两项核心改进诉求：
+> 1. “这个给的空行好像有点高了，差不多 值规定字号的高度那样的空行就行”
+> 2. “另外，11.1 有值归类错误的情况”
+
+### 二、 核心根因深潜与解法 (5-Whys & Engineering Solution)
+1. **空行过高根因 (Line Height Pathology)**：
+   - 原 writeStructuredToxicologyCellValue 中，所有段落（包括空白占位段落）均统一下发了 <w:spacing w:line="300" w:lineRule="auto"/>。
+   - 在 Word 排版引擎中，w:lineRule="auto" 会在空白段落上施加行距倍数及默认上下边距，导致视觉空行高度膨胀至约 15pt~18pt，超过了正文常规单行文本的高度。
+   - **解法**：在 writeStructuredToxicologyCellValue 渲染循环中，对 !itemText 的空白段落实施精准字号等高控制：
+     - 段落间距：显式注入 <w:spacing w:before="0" w:after="0" w:lineRule="exact" w:line={isEnglish ? "190" : "240"}/>；
+     - 字体度量：中文版注入 12pt（w:sz="24" / w:line="240" / 240 dxa），英文版注入 9.5pt（w:sz="19" / w:line="190" / 190 dxa）；
+     - 消除任何段前段后额外余量，使视觉空行与值规定正文字号高度绝对 1:1 完美等高。
+
+2. **急性毒性吸入数据归类错误根因 (Toxicity Endpoint Classification Pathology)**：
+   - 在源文档（PU-2346A msds_CN 冠志.docx）中，乙醇的吸入毒性实测数据（LC50 吸入 - 大鼠 - 雄性和雌性 - 4 h - 124.7 mg/l (OECD测试导则403)）被不规范地排版在“急性毒性，经口”下方。
+   - 导致按常规端点切分时，该吸入测试数据被切入 11.1 急性毒性，经口 中，而真正的 11.3 急性毒性，吸入 仅有聚氨酯分散体数据。
+   - **解法**：在 docx-engine.js:extractToxicologicalEndpointsFromSource 中构建通用科学纠偏机制 applyInhalationReclassification(endpoints)：
+     - 正则探测 acute_oral 中是否混入 LC50 吸入 及紧随的导则说明（OECD测试导则403 / 方法：等）；
+     - 发现后，自动从 acute_oral 中剥离该吸入数据段；
+     - 提取其对应组分名称（如 乙醇），以规范多组分形态（中间带空行）追加合并至 11.3 急性毒性，吸入；
+     - 英文翻译管道在处理 11.3 时，无缝翻译为 Polyurethane dispersion... \n\nEthanol\nLC50 Inhalation - Rat - male and female - 4 h - 124.7 mg/l\n(OECD Test Guideline 403)，实现中英文 1:1 双向物理同构。
+
+### 三、 集中式主审计与静态 Lint 验证
+- **静态 Lint**：npm run lint（10 大源码架构门禁 + 反假阳性检测）-> 0 errors, 0 warnings (退出码 0)；
+- **170 项中央主审计**：node web/scripts/run_master_msds_audit.mjs -> **170/170 项全绿通过 (退出码 0)**；
+- **交付物生成与同步**：重新编译 PU-2346A 8 份标准交付物，并全量同步覆盖至用户工作目录 E:\冠志\TDS MSDS (2)\待处理文件\PU-2346A\。
+
+
 ## [2026-11-10 MSDS Studio 全局通用多研究与多段落换行及语义空行保真工程 (INV-UNIVERSAL-MULTI-STUDY-LINE-BREAK-FIDELITY)] - 突破系统底层单元格写入与解构暴力抹杀连续空行历史病理、升级底层通用单元格写入 (writeCellValue) 与结构化渲染引擎 (writeStructuredToxicologyCellValue) 智能探测试验边界并在多试验/多组分块间渲染标准空白段落 (<w:p>)、消除动态英译引擎 \\s+ 破坏性坍缩以 [^\\S\\r\\n]+ 合并水平空白、实现 Section 11 (11.6 致敏性 Buehler/LLNA、11.11 体外遗传毒性 Ames/染色体畸变、11.1 经口毒性多组分研究) 及跨章节中英文 1:1 段落与空行镜像同构、中央主审计 170 项全景全绿满分核销 (Exit Code 0)
 
 ### 一、 变更背景与用户最高指令
