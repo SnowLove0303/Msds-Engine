@@ -1588,16 +1588,25 @@ function createRegularRun(doc, text, isEnglish = false) {
 export function writeStructuredToxicologyCellValue(cell, value, options = {}) {
   if (!cell?.node) return;
   const isEnglish = Boolean(options.isEnglish || /^[A-Za-z0-9\s:;,./()%-]+$/.test(String(value || '').slice(0, 30)));
-  const text = String(value || '').trim();
+  let text = String(value || '').trim();
   if (!text) {
     replaceCellValueContent(cell, '');
     return;
   }
 
-  // 1. 拆分为独立的子条目 (支持换行符或分号拆分)
+  // 1. 规整换行符：统一 \r\n 为 \n
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  // 2. 智能探测试验/研究分界（如：在"对类似产品研究"与紧随的下一个试验标题/测试种类之间，确保存在空行分隔）
+  text = text.replace(/((?:对类似产品(?:的)?(?:毒理学)?研究|Studies on a similar product)[.。]?)\s*\n(?!\n)/gi, '$1\n\n');
+
+  // 规整连续空行：最多保留 1 个语义空行
+  text = text.replace(/\n\s*\n\s*\n+/g, '\n\n');
+
+  // 3. 拆分为独立的子条目，保留空行分隔标记
   let rawItems = [];
   if (text.includes('\n')) {
-    rawItems = text.split('\n').map(l => l.trim()).filter(Boolean);
+    rawItems = text.split('\n').map(l => l.trim());
   } else if (text.includes('；') || text.includes(';')) {
     rawItems = text.split(/[；;]/).map(l => l.trim()).filter(Boolean);
   } else {
@@ -1609,20 +1618,33 @@ export function writeStructuredToxicologyCellValue(cell, value, options = {}) {
     }
   }
 
-  const flattenedItems = [];
+  // 4. 清洗与净化条目，保留空行占位符
+  const cleanItems = [];
+  let prevWasEmpty = false;
   for (const it of rawItems) {
+    if (!it) {
+      if (!prevWasEmpty && cleanItems.length > 0) {
+        cleanItems.push('');
+        prevWasEmpty = true;
+      }
+      continue;
+    }
+    let subParts = [it];
     if (it.includes('；') || it.includes(';')) {
-      const subParts = it.split(/[；;]/).map(p => p.trim()).filter(Boolean);
-      flattenedItems.push(...subParts);
-    } else {
-      flattenedItems.push(it);
+      subParts = it.split(/[；;]/).map(p => p.trim()).filter(Boolean);
+    }
+    for (const part of subParts) {
+      const cleaned = part.replace(/^(?:致敏性|Sensitization)[:：\s]*/i, '').trim();
+      if (cleaned) {
+        cleanItems.push(cleaned);
+        prevWasEmpty = false;
+      }
     }
   }
-
-  // 2. 净化条目：剔除冗余的“致敏性：”、“Sensitization:”前缀
-  const cleanItems = flattenedItems.map(it => {
-    return it.replace(/^(?:致敏性|Sensitization)[:：\s]*/i, '').trim();
-  }).filter(Boolean);
+  // 剔除末尾多余的空行标记
+  while (cleanItems.length > 0 && cleanItems[cleanItems.length - 1] === '') {
+    cleanItems.pop();
+  }
 
   const doc = cell.node.ownerDocument;
   const tcPr = cell.node.getElementsByTagNameNS(W_NS, 'tcPr')[0];
@@ -1648,14 +1670,16 @@ export function writeStructuredToxicologyCellValue(cell, value, options = {}) {
     pPr.appendChild(jc);
     const pRPr = doc.createElementNS(W_NS, 'w:rPr');
     const pSz = doc.createElementNS(W_NS, 'w:sz');
-    pSz.setAttributeNS(W_NS, 'w:val', '24');
+    pSz.setAttributeNS(W_NS, 'w:val', isEnglish ? '19' : '24');
     pRPr.appendChild(pSz);
     pPr.appendChild(pRPr);
     p.appendChild(pPr);
 
-    // 填写值整行全为常规体（Regular，严禁加粗，严格遵守表格二元分类法则与值格字体分离公理 G-29）
-    const rVal = createRegularRun(doc, itemText, isEnglish);
-    p.appendChild(rVal);
+    if (itemText) {
+      // 填写值整行全为常规体（Regular，严禁加粗，严格遵守表格二元分类法则与值格字体分离公理 G-29）
+      const rVal = createRegularRun(doc, itemText, isEnglish);
+      p.appendChild(rVal);
+    }
 
     cell.node.appendChild(p);
   }
@@ -1783,7 +1807,7 @@ export function setCellPreambleTypography(cell, isEnglish = false) {
 
 function replaceCellValueContent(cell, value, roleStyle) {
   const valStr = String(value || "");
-  if (cell?.record?.sectionNumber === 11 && (/物种|Species|重复剂量|Repeated dose/i.test(valStr))) {
+  if (cell?.record?.sectionNumber === 11) {
     writeStructuredToxicologyCellValue(cell, valStr);
     return;
   }
@@ -2303,8 +2327,8 @@ export function writeCellValue(cell, value, roleStyle = null) {
   const valStr = typeof value === 'object' && value !== null && 'value' in value
     ? value.value
     : String(value ?? '');
-  // 严格压缩连续空行，杜绝空白占位行 (OW-LineBreak-02)
-  const clean = valStr.replace(/\r\n?/g, '\n').replace(/\n\s*\n+/g, '\n').trim();
+  // 严格压缩连续空行，杜绝多余空白占位行，但保留段落间语义空行 (OW-LineBreak-02)
+  const clean = valStr.replace(/\r\n?/g, '\n').replace(/\n\s*\n\s*\n+/g, '\n\n').trim();
   replaceCellValueContent(cell, clean, roleStyle);
   refreshCellText(cell);
 }

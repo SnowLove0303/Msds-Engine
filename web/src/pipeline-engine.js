@@ -2949,7 +2949,10 @@ function translateToxicologyValueToEnglish(cnText, endpoint = '') {
   t = t.replace(/。/g, '. ');
   t = t.replace(/:\s*[:：]/g, ': ');
   t = t.replace(/\.\s*\./g, '.');
-  t = t.replace(/\s+/g, ' ');
+  t = t.replace(/[^\S\r\n]+/g, ' ');
+  t = t.split('\n').map(l => l.trim()).join('\n');
+  t = t.replace(/\n\s*\n\s*\n+/g, '\n\n');
+  t = t.replace(/((?:Studies on a similar product|对类似产品(?:的)?(?:毒理学)?研究)[.。]?)\s*\n(?!\n)/gi, '$1\n\n');
   t = t.replace(/，/g, ',');
   t = t.replace(/轻微刺激/g, 'Slight irritation');
   t = t.replace(/无刺激/g, 'No irritation');
@@ -3054,7 +3057,7 @@ export function translateEcotoxicityValueToEnglish(cnText) {
   en = en.replace(/对水蚤及其他水生无脊椎动物的毒性[：:]/g, 'Toxicity to daphnia and other aquatic invertebrates:\n');
   en = en.replace(/对藻类的毒性[：:]/g, 'Toxicity to algae:\n');
   en = en.replace(/对微生物的毒性[：:]/g, 'Toxicity to microorganisms:\n');
-  return en.replace(/\n\s*\n+/g, '\n').trim();
+  return en.replace(/\n\s*\n\s*\n+/g, '\n\n').trim();
 }
 
 export function translatePersistenceValueToEnglish(cnText) {

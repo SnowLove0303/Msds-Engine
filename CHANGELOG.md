@@ -1,5 +1,65 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-10 MSDS Studio 全局通用多研究与多段落换行及语义空行保真工程 (INV-UNIVERSAL-MULTI-STUDY-LINE-BREAK-FIDELITY)] - 突破系统底层单元格写入与解构暴力抹杀连续空行历史病理、升级底层通用单元格写入 (writeCellValue) 与结构化渲染引擎 (writeStructuredToxicologyCellValue) 智能探测试验边界并在多试验/多组分块间渲染标准空白段落 (<w:p>)、消除动态英译引擎 \\s+ 破坏性坍缩以 [^\\S\\r\\n]+ 合并水平空白、实现 Section 11 (11.6 致敏性 Buehler/LLNA、11.11 体外遗传毒性 Ames/染色体畸变、11.1 经口毒性多组分研究) 及跨章节中英文 1:1 段落与空行镜像同构、中央主审计 170 项全景全绿满分核销 (Exit Code 0)
+
+### 一、 变更背景与用户最高指令
+用户在审查产出物后下达关于多试验研究换行与全局通用思路的法定最高指令：
+> “还有瑕疵，就是关于注意换行问题，需要在优化一下执行层，比如遇到11.6 致敏性：中，聚氨酯分散体\r\n根据 Buehler（经皮试验）皮肤致敏性：\r\n物种：豚鼠\r\n结果：阴性\r\n分类：不引起皮肤过敏\r\n方法：OECD 化学品测试指南 406\r\n对类似产品研究   和  “皮肤致敏性（局部淋巴结试验（LLNA））\r\n物种：小鼠\r\n结果：阴性\r\n分类：不引起皮肤过敏\r\n方法：OECD 化学品测试指南 429\r\n对类似产品研究”  明显是分开的，因此尽管都属于11.6 ，但是我建议内容与内容间应该空一行，原文也是有空行的，明白我意思，其他地方也是同理，只是section11 此类问题比较普遍”  
+> “执行，请务必不要局限于section11 ，我希望你能以全局通用的思路去解决问题”
+
+### 二、 核心架构根因穿透与全局通用系统底层解法
+1. **多层过度压缩历史病理根因穿透 (The Destructive Line-Break Stripping Pathology)**：
+   - **底层通用写入层 (`docx-engine.js:writeCellValue`)**：原先使用 `valStr.replace(/\r\n?/g, '\n').replace(/\n\s*\n+/g, '\n')`，将全系统所有表格单元格中的 `\n\n` 暴力压缩为单个 `\n`，使得任何章节需要通过空行分隔独立段落或内容的场景均被全局抹杀；
+   - **底层通用解构层 (`smart-matching.js:decomposeCellPairToFacts`)**：原先使用 `ps1.map(p => p.text.trim()).filter(Boolean).join('\n')`，将源文档中用作段落隔离的空白段落节点无差别剔除；
+   - **多段结构化渲染层 (`docx-engine.js:writeStructuredToxicologyCellValue`)**：原先两次执行 `.filter(Boolean)`，不仅丢弃所有 `""` 空行标记，且段落生成循环只针对非空字符串生成 `<w:p>`，导致两个独立试验被紧密拼贴在一起，丢失了源文件的空行间隔；
+   - **动态英译引擎层 (`pipeline-engine.js:translateToxicologyValueToEnglish`)**：原先第 2952 行执行全局正则 `t = t.replace(/\s+/g, ' ')`，将包含换行符（`\r\n` / `\n`）在内的所有空白坍缩为单个半角空格，导致英文端点文本在传递给单元格渲染器之前就已经失去了所有段落与空行结构，退化为一段单行长句。
+2. **全局通用多段落换行与语义空行保真体系 (Universal Multi-Study & Multi-Paragraph Fidelity)**：
+   - **通用单元格写入层升级**：将 `writeCellValue` 的正则升级为 `replace(/\n\s*\n\s*\n+/g, '\n\n')`，仅压缩 3 个及以上的多余空行，全局放开并保护 2 个连续换行（即 1 个语义空行）的合法存在；
+   - **通用单元格对解构层升级**：在 `decomposeCellPairToFacts` 中保护连续段落间的首个空段落标记，不再无差别 `filter(Boolean)` 抹杀；
+   - **结构化多段渲染引擎升级 (`writeStructuredToxicologyCellValue`)**：
+     - 规整换行符（统一 `\r\n` 为 `\n`）；
+     - 智能探测试验分界：在 `对类似产品研究` / `Studies on a similar product` 试验结论与后续试验标题（`皮肤致敏性` / `测试种类` / `Local lymph node assay` / `Buehler` / `Species:`）之间自动确立 `\n\n` 空行分界；
+     - 当遍历到空行标记 `""` 时，渲染合规的标准空白段落 `<w:p><w:pPr><w:spacing w:line="300" w:lineRule="auto"/><w:ind w:right="480"/><w:jc w:val="left"/><w:rPr><w:sz w:val="..."/></w:rPr></w:pPr></w:p>`，在 Word 与 PDF 中呈现标准的视觉空行；
+   - **动态英译引擎换行保真升级**：
+     - 废除破坏性 `\s+` 坍缩，采用非换行水平空格合并正则 `[^\S\r\n]+`，确保所有换行符结构与多试验空行在英译过程中 100% 留存；
+     - 在 `translateEcotoxicityValueToEnglish` 等生态毒理英译函数中同步升级空行压缩逻辑为 `replace(/\n\s*\n\s*\n+/g, '\n\n')`，跨 Section 11 与 Section 12 全面保持通用一致。
+3. **中央主审计套件与 PU-2346A 重新编译全绿核销**：
+   - 重新编译 PU-2346A 8 份交付物并同步至 `E:\冠志\TDS MSDS (2)\待处理文件\PU-2346A\`；
+   - 实测 Section 11.6 致敏性单元格在中英文 DOCX 中均严格拥有 14 个段落（P0~P6 为 Buehler 试验，P7 为空白段落 `<w:p>`，P8~P13 为 LLNA 试验），实现 1:1 双语完美对称！
+   - 实测 Section 11.1 急性毒性经口（聚氨酯分散体与乙醇之间包含空行）、Section 11.11 体外遗传毒性（Ames 试验与染色体畸变试验之间包含空行）；
+   - 实测 Section 14 9 行拓扑、420 dxa 缩进、MARPOL 公约、危化品类别 3 完整无缺；
+   - 运行结果：**170/170 项全绿通过，真实退出码 0**；`npm run lint` 0 errors, 0 warnings。
+
+### 三、 物理实测与对账核销清单
+- **目标交付目录**：`E:\冠志\TDS MSDS (2)\待处理文件\PU-2346A\` 与 `MSDS-Engine\算法训练材料\TDS MSDS 重写版\01-1 单组份水性聚氨酯树脂 PU\PU-2346A\`
+- **生成交付物清单 (8 份全部最新同步)**：
+  1. `PU-2346A msds_CN 冠志.docx`
+  2. `PU-2346A msds_CN 冠志.pdf`
+  3. `PU-2346A msds_CN 国彩.docx`
+  4. `PU-2346A msds_CN 国彩.pdf`
+  5. `PU-2346A msds_EN Guanzhi.docx`
+  6. `PU-2346A msds_EN Guanzhi.pdf`
+  7. `PU-2346A msds_EN Guocai.docx`
+  8. `PU-2346A msds_EN Guocai.pdf`
+- **Section 11.6 致敏性中英文段落 1:1 对账实测 (14 段落完全对称)**：
+  - P0: `聚氨酯分散体` / `Polyurethane dispersion.`
+  - P1: `根据Buehler（经皮试验）皮肤致敏性：` / `Buehler Test (dermal):`
+  - P2: `物种：豚鼠` / `Species: Guinea pig.`
+  - P3: `结果：阴性` / `Result: Negative.`
+  - P4: `分类：不引起皮肤过敏` / `Classification: Did not cause skin sensitization.`
+  - P5: `方法：OECD化学品测试指南406` / `Method: OECD Test Guideline 406.`
+  - P6: `对类似产品研究` / `Studies on a similar product.`
+  - **P7: 空白换行段落 `<w:p>` / Empty blank line `<w:p>`**
+  - P8: `皮肤致敏性（局部淋巴结试验（LLNA））` / `Local lymph node assay (LLNA):`
+  - P9: `物种：小鼠` / `Species: Mouse`
+  - P10: `结果：阴性` / `Result: Negative.`
+  - P11: `分类：不引起皮肤过敏` / `Classification: Did not cause skin sensitization.`
+  - P12: `方法：OECD化学品测试指南429` / `Method: OECD Test Guideline 429.`
+  - P13: `对类似产品研究` / `Studies on a similar product.`
+- **Central Master Audit 套件核销**：**170 / 170 100% 满分通过，退出码 0**。
+
+---
+
 ## [2026-11-10 MSDS Studio 底层通用多段落单元格键值对解构原语与 Section 14.6 主值与附加信息独立子行动态装配工程 (INV-UNIVERSAL-MULTI-PARAGRAPH-RECOGNITION)] - 突破全系统底层多段落单元格 .filter(Boolean) 行数比对失效历史瓶颈、建立跨 16 章节通用多段对齐与子标签解构原语 (decomposeCellPairToFacts)、精准识别 Section 14.6 主值“参见6-8节”与“附加信息”温控隔离事实、动态生成双语独立对称 9 行规范结构 (左缩进 420 dxa)、中央主审计 170 项全景全绿满分核销 (Exit Code 0)
 
 ### 一、 变更背景与用户最高指令

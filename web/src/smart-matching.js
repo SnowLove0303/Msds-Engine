@@ -1627,8 +1627,8 @@ export function decoupleSection11ToxicologyBlocks(cellText, rowObj = null) {
     if (['acute_toxicity_oral', 'acute_toxicity_inhalation', 'acute_toxicity_dermal', 'subacute_chronic_toxicity', 'skin_corrosion', 'eye_damage', 'aspiration_hazard', 'reproductive_fertility', 'reproductive_teratogenicity', 'carcinogenicity', 'stot_single', 'additional_info'].includes(current.ep.key)) {
       chunk = chunk.replace(/^(?:(?:11\.\d+\s*)?(?:毒理学效应|毒理学研究|毒性资料|急性毒性[，, ]*(?:经口|吸入|经皮)?|主要皮肤刺激性|原发性(?:皮肤|粘膜)刺激|皮肤刺激|主要眼睛刺激性|主要粘膜刺激性|眼睛刺激|粘膜刺激|亚急性[，, ]*亚慢性和延迟毒性|致敏性|呼吸道或皮肤过敏|皮肤致敏性|致突变性|生殖细胞突变性|致癌性|生殖毒性[\/／]?(?:生育力|致畸形)?|[\/／]?(?:生育力|致畸形)|特异性靶器官系统毒性(?:（一次接触[\/／]反复接触）)?|STOT评估-一次性接触|吸入危害|吸入危险|附加信息|其它信息|其他信息|经口|吸入|经皮)[:：\s]*)+/i, '').trim();
     }
-    if (current.ep.key === 'sensitization') {
-      chunk = chunk.replace(/(对类似产品(?:的)?(?:毒理学)?研究)\s*\n(?=皮肤致敏性|局部淋巴结试验)/, '$1\n\n');
+    if (current.ep.key === 'sensitization' || /sensitization|mutagenicity|toxicity/i.test(current.ep.key)) {
+      chunk = chunk.replace(/(对类似产品(?:的)?(?:毒理学)?研究)\s*\n(?=皮肤致敏性|局部淋巴结试验|测试种类|沙门氏菌|体外染色体|乙醇|大鼠|小鼠)/gi, '$1\n\n');
     }
 
     results.push({
@@ -1820,7 +1820,10 @@ export function decomposeCellPairToFacts(cell0, cell1, row = null, sectionNumber
   const cs0 = safeColonSplit(cell0Txt);
   const label = cs0.hasColon ? cs0.label : cell0Txt;
   const inlineVal = cs0.hasColon && cs0.value ? cs0.value : '';
-  const cell1Txt = ps1.map(p => p.text.trim()).filter(Boolean).join('\n');
+  const cell1Txt = ps1.map(p => (p.text || '').trim()).filter((line, idx, arr) => {
+    if (!line && idx > 0 && !arr[idx - 1]) return false;
+    return true;
+  }).join('\n').trim();
   const finalVal = inlineVal ? `${inlineVal} ${cell1Txt}`.trim() : cell1Txt;
 
   pairs.push({
