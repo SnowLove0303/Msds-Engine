@@ -1893,7 +1893,13 @@ export function harmonizeTableLabels(engine) {
           primaryP.insertBefore(pPr, primaryP.firstChild);
         }
 
-        const existingInds = Array.from(pPr.getElementsByTagNameNS(W_NS, 'ind'));
+        // 物理清除任何继承的自动编号属性 (numPr)，杜绝 Word/WPS 动态编号与静态序号双重渲染 (REQ-S3-DUP-PURGE)
+  const existingNumPrs = Array.from(pPr.getElementsByTagNameNS(W_NS, 'numPr'));
+  existingNumPrs.forEach(node => pPr.removeChild(node));
+  const localNumPrs = Array.from(pPr.getElementsByTagName('numPr'));
+  localNumPrs.forEach(node => pPr.removeChild(node));
+
+  const existingInds = Array.from(pPr.getElementsByTagNameNS(W_NS, 'ind'));
         existingInds.forEach((n) => pPr.removeChild(n));
         const ind = primaryP.ownerDocument.createElementNS(W_NS, 'w:ind');
         ind.setAttributeNS(W_NS, 'w:left', '457');
@@ -2362,6 +2368,16 @@ function replaceSequence(cell, sectionNumber, itemNumber) {
  */
 export function healAllTableTopologies(docXml) {
   if (!docXml) return;
+  // 全局物理清除所有表格内的 <w:numPr> 自动编号属性 (REQ-S3-DUP-PURGE)
+  // 杜绝从原始母版残留的列表定义在 Word 中触发自动编号叠加导致序号重复 (如 3.1 3.1)
+  const numPrs = Array.from(docXml.getElementsByTagNameNS(W_NS, 'numPr'));
+  for (const np of numPrs) {
+    np.parentNode?.removeChild(np);
+  }
+  const localNumPrs = Array.from(docXml.getElementsByTagName('numPr'));
+  for (const np of localNumPrs) {
+    np.parentNode?.removeChild(np);
+  }
   const tbls = Array.from(docXml.getElementsByTagNameNS(W_NS, 'tbl'));
   for (const tbl of tbls) {
     const gridCols = Array.from(tbl.getElementsByTagNameNS(W_NS, 'gridCol'));
@@ -2589,14 +2605,17 @@ export function mapToxicologyLabelToEnglish(cnLabel) {
 }
 
 /**
- * 格式化 Section 11 标签单元格 (法定悬挂缩进 565/565、字号、加粗)
+ * 格式化 Section 11 标签单元格 (统一 9.1 外观黄金基准 420/420、激光垂直对齐、字号、加粗)
  */
 export function formatSection11LabelCell(cell, numberStr, labelText, isEnglish = false) {
   if (!cell?.node) return;
-  applyStandardHangingIndent(cell, '565', '565');
+  // 9.1 外观黄金几何标尺：420 dxa 悬挂缩进 + <w:tab/> 激光垂直对齐 (REQ-GOLDEN-ANCHOR)
+  applyStandardHangingIndent(cell, '420', '420');
   const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
   if (ps.length === 0) return;
   const p = ps[0];
+  const pNumPrs = Array.from(p.getElementsByTagNameNS(W_NS, 'numPr'));
+  pNumPrs.forEach(n => n.parentNode?.removeChild(n));
   for (let i = 1; i < ps.length; i++) {
     ps[i].parentNode?.removeChild(ps[i]);
   }
@@ -2611,45 +2630,71 @@ export function formatSection11LabelCell(cell, numberStr, labelText, isEnglish =
     if (!cleanLabel.endsWith('：')) cleanLabel += '：';
   }
 
-  const fullText = `${numberStr}  ${cleanLabel}`;
+  // Run 1: 序号 Run + <w:tab/>
+  const r1 = p.ownerDocument.createElementNS(W_NS, 'w:r');
+  const rPr1 = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
+  const rFonts1 = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+  rFonts1.setAttributeNS(W_NS, 'w:ascii', isEnglish ? 'Arial' : 'Times New Roman');
+  rFonts1.setAttributeNS(W_NS, 'w:hAnsi', isEnglish ? 'Arial' : 'Times New Roman');
+  rFonts1.setAttributeNS(W_NS, 'w:eastAsia', isEnglish ? 'Arial' : '宋体');
+  rFonts1.setAttributeNS(W_NS, 'w:cs', isEnglish ? 'Arial' : 'Times New Roman');
+  rPr1.appendChild(rFonts1);
+  const b1 = p.ownerDocument.createElementNS(W_NS, 'w:b');
+  rPr1.appendChild(b1);
+  const seqSz = !isEnglish ? (numberStr.length >= 5 ? '19' : '21') : (numberStr.length >= 5 ? '15' : '18');
+  const sz1 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
+  sz1.setAttributeNS(W_NS, 'w:val', seqSz);
+  rPr1.appendChild(sz1);
+  const szCs1 = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
+  szCs1.setAttributeNS(W_NS, 'w:val', seqSz);
+  rPr1.appendChild(szCs1);
+  r1.appendChild(rPr1);
 
-  const r = p.ownerDocument.createElementNS(W_NS, 'w:r');
-  const rPr = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
-  const rFonts = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
-  rFonts.setAttributeNS(W_NS, 'w:ascii', isEnglish ? 'Arial' : 'Times New Roman');
-  rFonts.setAttributeNS(W_NS, 'w:hAnsi', isEnglish ? 'Arial' : 'Times New Roman');
-  rFonts.setAttributeNS(W_NS, 'w:eastAsia', isEnglish ? 'Arial' : '宋体');
-  rFonts.setAttributeNS(W_NS, 'w:cs', isEnglish ? 'Arial' : 'Times New Roman');
-  rPr.appendChild(rFonts);
+  const t1 = p.ownerDocument.createElementNS(W_NS, 'w:t');
+  t1.textContent = numberStr;
+  r1.appendChild(t1);
+  const tab = p.ownerDocument.createElementNS(W_NS, 'w:tab');
+  r1.appendChild(tab);
+  p.appendChild(r1);
 
-  const b = p.ownerDocument.createElementNS(W_NS, 'w:b');
-  const bCs = p.ownerDocument.createElementNS(W_NS, 'w:bCs');
-  rPr.appendChild(b);
-  rPr.appendChild(bCs);
+  // Run 2: 标签 Run
+  const r2 = p.ownerDocument.createElementNS(W_NS, 'w:r');
+  const rPr2 = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
+  const rFonts2 = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+  rFonts2.setAttributeNS(W_NS, 'w:ascii', isEnglish ? 'Arial' : 'Times New Roman');
+  rFonts2.setAttributeNS(W_NS, 'w:hAnsi', isEnglish ? 'Arial' : 'Times New Roman');
+  rFonts2.setAttributeNS(W_NS, 'w:eastAsia', isEnglish ? 'Arial' : '宋体');
+  rFonts2.setAttributeNS(W_NS, 'w:cs', isEnglish ? 'Arial' : 'Times New Roman');
+  rPr2.appendChild(rFonts2);
+  const b2 = p.ownerDocument.createElementNS(W_NS, 'w:b');
+  rPr2.appendChild(b2);
+  const targetLblSz = isEnglish ? '19' : '24';
+  const sz2 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
+  sz2.setAttributeNS(W_NS, 'w:val', targetLblSz);
+  rPr2.appendChild(sz2);
+  const szCs2 = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
+  szCs2.setAttributeNS(W_NS, 'w:val', targetLblSz);
+  rPr2.appendChild(szCs2);
+  r2.appendChild(rPr2);
 
-  const szVal = isEnglish ? '19' : '24';
-  const sz = p.ownerDocument.createElementNS(W_NS, 'w:sz');
-  sz.setAttributeNS(W_NS, 'w:val', szVal);
-  const szCs = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
-  szCs.setAttributeNS(W_NS, 'w:val', szVal);
-  rPr.appendChild(sz);
-  rPr.appendChild(szCs);
-
-  r.appendChild(rPr);
-  const t = p.ownerDocument.createElementNS(W_NS, 'w:t');
-  t.textContent = fullText;
-  r.appendChild(t);
-  p.appendChild(r);
+  const t2 = p.ownerDocument.createElementNS(W_NS, 'w:t');
+  t2.textContent = cleanLabel;
+  r2.appendChild(t2);
+  p.appendChild(r2);
 }
 
 /**
- * 格式化 Section 14 标签单元格 (加粗、法定字号)
+ * 格式化 Section 14 标签单元格 (统一 9.1 外观黄金基准 420/420、加粗、法定字号)
  */
 export function formatSection14LabelCell(cell, numberStr, labelText, isEnglish = false) {
   if (!cell?.node) return;
+  // 9.1 外观黄金几何标尺：420 dxa 悬挂缩进 + <w:tab/> 激光垂直对齐 (REQ-GOLDEN-ANCHOR)
+  applyStandardHangingIndent(cell, '420', '420');
   const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
   if (ps.length === 0) return;
   const p = ps[0];
+  const pNumPrs = Array.from(p.getElementsByTagNameNS(W_NS, 'numPr'));
+  pNumPrs.forEach(n => n.parentNode?.removeChild(n));
   for (let i = 1; i < ps.length; i++) {
     ps[i].parentNode?.removeChild(ps[i]);
   }
@@ -2664,35 +2709,57 @@ export function formatSection14LabelCell(cell, numberStr, labelText, isEnglish =
     if (!cleanLabel.endsWith('：')) cleanLabel += '：';
   }
 
-  const fullText = `${numberStr}  ${cleanLabel}`;
+  // Run 1: 序号 Run + <w:tab/>
+  const r1 = p.ownerDocument.createElementNS(W_NS, 'w:r');
+  const rPr1 = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
+  const rFonts1 = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+  rFonts1.setAttributeNS(W_NS, 'w:ascii', isEnglish ? 'Arial' : 'Times New Roman');
+  rFonts1.setAttributeNS(W_NS, 'w:hAnsi', isEnglish ? 'Arial' : 'Times New Roman');
+  rFonts1.setAttributeNS(W_NS, 'w:eastAsia', isEnglish ? 'Arial' : '宋体');
+  rFonts1.setAttributeNS(W_NS, 'w:cs', isEnglish ? 'Arial' : 'Times New Roman');
+  rPr1.appendChild(rFonts1);
+  const b1 = p.ownerDocument.createElementNS(W_NS, 'w:b');
+  rPr1.appendChild(b1);
+  const seqSz = !isEnglish ? (numberStr.length >= 5 ? '19' : '21') : (numberStr.length >= 5 ? '15' : '18');
+  const sz1 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
+  sz1.setAttributeNS(W_NS, 'w:val', seqSz);
+  rPr1.appendChild(sz1);
+  const szCs1 = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
+  szCs1.setAttributeNS(W_NS, 'w:val', seqSz);
+  rPr1.appendChild(szCs1);
+  r1.appendChild(rPr1);
 
-  const r = p.ownerDocument.createElementNS(W_NS, 'w:r');
-  const rPr = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
-  const rFonts = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
-  rFonts.setAttributeNS(W_NS, 'w:ascii', isEnglish ? 'Arial' : 'Times New Roman');
-  rFonts.setAttributeNS(W_NS, 'w:hAnsi', isEnglish ? 'Arial' : 'Times New Roman');
-  rFonts.setAttributeNS(W_NS, 'w:eastAsia', isEnglish ? 'Arial' : '宋体');
-  rFonts.setAttributeNS(W_NS, 'w:cs', isEnglish ? 'Arial' : 'Times New Roman');
-  rPr.appendChild(rFonts);
+  const t1 = p.ownerDocument.createElementNS(W_NS, 'w:t');
+  t1.textContent = numberStr;
+  r1.appendChild(t1);
+  const tab = p.ownerDocument.createElementNS(W_NS, 'w:tab');
+  r1.appendChild(tab);
+  p.appendChild(r1);
 
-  const b = p.ownerDocument.createElementNS(W_NS, 'w:b');
-  const bCs = p.ownerDocument.createElementNS(W_NS, 'w:bCs');
-  rPr.appendChild(b);
-  rPr.appendChild(bCs);
+  // Run 2: 标签 Run
+  const r2 = p.ownerDocument.createElementNS(W_NS, 'w:r');
+  const rPr2 = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
+  const rFonts2 = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+  rFonts2.setAttributeNS(W_NS, 'w:ascii', isEnglish ? 'Arial' : 'Times New Roman');
+  rFonts2.setAttributeNS(W_NS, 'w:hAnsi', isEnglish ? 'Arial' : 'Times New Roman');
+  rFonts2.setAttributeNS(W_NS, 'w:eastAsia', isEnglish ? 'Arial' : '宋体');
+  rFonts2.setAttributeNS(W_NS, 'w:cs', isEnglish ? 'Arial' : 'Times New Roman');
+  rPr2.appendChild(rFonts2);
+  const b2 = p.ownerDocument.createElementNS(W_NS, 'w:b');
+  rPr2.appendChild(b2);
+  const targetLblSz = isEnglish ? '19' : '24';
+  const sz2 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
+  sz2.setAttributeNS(W_NS, 'w:val', targetLblSz);
+  rPr2.appendChild(sz2);
+  const szCs2 = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
+  szCs2.setAttributeNS(W_NS, 'w:val', targetLblSz);
+  rPr2.appendChild(szCs2);
+  r2.appendChild(rPr2);
 
-  const szVal = isEnglish ? '19' : '24';
-  const sz = p.ownerDocument.createElementNS(W_NS, 'w:sz');
-  sz.setAttributeNS(W_NS, 'w:val', szVal);
-  const szCs = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
-  szCs.setAttributeNS(W_NS, 'w:val', szVal);
-  rPr.appendChild(sz);
-  rPr.appendChild(szCs);
-
-  r.appendChild(rPr);
-  const t = p.ownerDocument.createElementNS(W_NS, 'w:t');
-  t.textContent = fullText;
-  r.appendChild(t);
-  p.appendChild(r);
+  const t2 = p.ownerDocument.createElementNS(W_NS, 'w:t');
+  t2.textContent = cleanLabel;
+  r2.appendChild(t2);
+  p.appendChild(r2);
 }
 
 /**
@@ -2776,6 +2843,9 @@ export function formatSection9LabelCell(cell, numberStr, labelText, isEnglish = 
   const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
   if (ps.length === 0) return;
   const p = ps[0];
+  // 清除段落上残留的 numPr 自动编号定义 (REQ-S3-DUP-PURGE)
+  const pNumPrs = Array.from(p.getElementsByTagNameNS(W_NS, 'numPr'));
+  pNumPrs.forEach(n => n.parentNode?.removeChild(n));
   // 物理清除第一段之外的所有多余段落（如模板中原有的折行段落，彻底切断残留重复词链条）
   for (let i = 1; i < ps.length; i++) {
     ps[i].parentNode?.removeChild(ps[i]);

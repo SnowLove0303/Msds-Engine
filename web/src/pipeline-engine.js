@@ -2435,12 +2435,14 @@ function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
           const inds = Array.from(lblCell.node.getElementsByTagNameNS(W_NS, 'ind'));
           if (inds.length > 0) {
             inds.forEach(ind => {
-              ind.setAttributeNS(W_NS, 'w:firstLine', '482');
-              ind.setAttributeNS(W_NS, 'w:firstLineChars', '200');
-              ind.removeAttributeNS(W_NS, 'w:left');
+              ind.setAttributeNS(W_NS, 'w:left', '420');
+              ind.removeAttributeNS(W_NS, 'w:firstLine');
+              ind.removeAttributeNS(W_NS, 'w:firstLineChars');
               ind.removeAttributeNS(W_NS, 'w:hanging');
-              ind.removeAttributeNS(W_NS, 'w:leftChars');
               ind.removeAttributeNS(W_NS, 'w:hangingChars');
+              ind.removeAttributeNS(W_NS, 'w:leftChars');
+              ind.removeAttribute('w:leftChars');
+              ind.setAttributeNS(W_NS, 'w:leftChars', '0');
             });
           }
           const ps = Array.from(lblCell.node.getElementsByTagNameNS(W_NS, 'p'));
@@ -2449,8 +2451,7 @@ function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
             const pPr = firstP.getElementsByTagNameNS(W_NS, 'pPr')[0];
             if (pPr && pPr.getElementsByTagNameNS(W_NS, 'ind').length === 0) {
               const ind = firstP.ownerDocument.createElementNS(W_NS, 'w:ind');
-              ind.setAttributeNS(W_NS, 'w:firstLine', '482');
-              ind.setAttributeNS(W_NS, 'w:firstLineChars', '200');
+              ind.setAttributeNS(W_NS, 'w:left', '420');
               pPr.appendChild(ind);
             }
             for (let i = 1; i < ps.length; i++) {
@@ -3972,18 +3973,20 @@ export async function executeEightDeliverablesPipeline({
           }
         }
       }
-      // 2. Section 8 中文手部防护缩进规范: 严禁异常悬挂缩进 (hanging=3373)，必须为标准首行缩进 482
+      // 2. Section 8 中文手部防护缩进规范: 统一采用 420 dxa 左缩进，与 8.1 暴字与 9.1 外观绝对铅垂对齐 (REQ-SUB-PARENT-ALIGN)
       const handRowCn = s8Rec.rows.find(row => /手部防护/i.test(row.cells[0]?.text || ''));
       if (handRowCn && handRowCn.cells[0]?.node) {
         const c0 = handRowCn.cells[0].node;
         const inds = Array.from(c0.getElementsByTagNameNS(W_NS, 'ind'));
         inds.forEach(ind => {
-          ind.setAttribute('w:firstLine', '482');
-          ind.setAttribute('w:firstLineChars', '200');
-          ind.removeAttribute('w:left');
+          ind.setAttribute('w:left', '420');
+          ind.removeAttribute('w:firstLine');
+          ind.removeAttribute('w:firstLineChars');
           ind.removeAttribute('w:hanging');
-          ind.removeAttribute('w:leftChars');
           ind.removeAttribute('w:hangingChars');
+          ind.removeAttribute('w:leftChars');
+          ind.removeAttributeNS(W_NS, 'leftChars');
+          ind.setAttributeNS(W_NS, 'w:leftChars', '0');
         });
       }
       // 3. Section 8 英文标签题头统一字号规范: 全量统一为 w:sz="19" (9.5pt 加粗)，彻底废除 24 局部放大 (DEF-12)
@@ -4145,44 +4148,24 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
   }
   }
 
-  // 2. Section 8.1 题头行与 Section 8.2 工程控制格式规范
+  // 2. Section 8.1 题头行与 Section 8.2 工程控制格式规范 (9.1 外观黄金基准对齐 REQ-GOLDEN-ANCHOR)
   const s8Rec = eng.records.find(r => r.sectionNumber === 8);
   if (s8Rec && s8Rec.rows.length >= 2) {
     const r1 = s8Rec.rows[1];
     const c0 = r1.cells[0]?.node;
     if (c0) {
-      const runs = Array.from(c0.getElementsByTagNameNS(W_NS, 'r'));
-      if (runs.length >= 1) {
-        let r0Pr = runs[0].getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');
-        if (!runs[0].getElementsByTagNameNS(W_NS, 'rPr')[0]) runs[0].insertBefore(r0Pr, runs[0].firstChild);
-        let b = r0Pr.getElementsByTagNameNS(W_NS, 'b')[0] || doc.createElementNS(W_NS, 'w:b');
-        if (!r0Pr.getElementsByTagNameNS(W_NS, 'b')[0]) r0Pr.appendChild(b);
-        let bCs = r0Pr.getElementsByTagNameNS(W_NS, 'bCs')[0] || doc.createElementNS(W_NS, 'w:bCs');
-        if (!r0Pr.getElementsByTagNameNS(W_NS, 'bCs')[0]) r0Pr.appendChild(bCs);
-        let sz = r0Pr.getElementsByTagNameNS(W_NS, 'sz')[0] || doc.createElementNS(W_NS, 'w:sz');
-        sz.setAttribute('w:val', isEn ? '19' : '24');
-        if (!r0Pr.getElementsByTagNameNS(W_NS, 'sz')[0]) r0Pr.appendChild(sz);
-        let szCs = r0Pr.getElementsByTagNameNS(W_NS, 'szCs')[0] || doc.createElementNS(W_NS, 'w:szCs');
-        szCs.setAttribute('w:val', isEn ? '19' : '24');
-        if (!r0Pr.getElementsByTagNameNS(W_NS, 'szCs')[0]) r0Pr.appendChild(szCs);
-        let rf = r0Pr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || doc.createElementNS(W_NS, 'w:rFonts');
-        rf.setAttribute('w:ascii', 'Times New Roman');
-        rf.setAttribute('w:hAnsi', 'Times New Roman');
-        if (!r0Pr.getElementsByTagNameNS(W_NS, 'rFonts')[0]) r0Pr.appendChild(rf);
-      }
-      if (runs.length >= 2) {
-        let r1Pr = runs[1].getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');
-        if (!runs[1].getElementsByTagNameNS(W_NS, 'rPr')[0]) runs[1].insertBefore(r1Pr, runs[1].firstChild);
-        let b = r1Pr.getElementsByTagNameNS(W_NS, 'b')[0] || doc.createElementNS(W_NS, 'w:b');
-        if (!r1Pr.getElementsByTagNameNS(W_NS, 'b')[0]) r1Pr.appendChild(b);
-        let bCs = r1Pr.getElementsByTagNameNS(W_NS, 'bCs')[0] || doc.createElementNS(W_NS, 'w:bCs');
-        if (!r1Pr.getElementsByTagNameNS(W_NS, 'bCs')[0]) r1Pr.appendChild(bCs);
-        let sz = r1Pr.getElementsByTagNameNS(W_NS, 'sz')[0] || doc.createElementNS(W_NS, 'w:sz');
-        sz.setAttribute('w:val', isEn ? '19' : '24');
-        if (!r1Pr.getElementsByTagNameNS(W_NS, 'sz')[0]) r1Pr.appendChild(sz);
-        let szCs = r1Pr.getElementsByTagNameNS(W_NS, 'szCs')[0] || doc.createElementNS(W_NS, 'w:szCs');
-        szCs.setAttribute('w:val', isEn ? '19' : '24');
-        if (!r1Pr.getElementsByTagNameNS(W_NS, 'szCs')[0]) r1Pr.appendChild(szCs);
+      const p = c0.getElementsByTagNameNS(W_NS, 'p')[0];
+      if (p) {
+        const text = (p.textContent || '').trim();
+        const m = text.match(/^8\.1\s*(.*)$/);
+        const lbl = (m && m[1]) ? m[1].replace(/^[:：]/, '').trim() : (isEn ? 'Exposure controls:' : '控制参数：');
+        applyHangingIndentToP(p, '420', '420', W_NS);
+        rebuildUnifiedLabelRun(p, '8.1', lbl.endsWith('：') || lbl.endsWith(':') ? lbl : (lbl + (isEn ? ':' : '：')), {
+          font: isEn ? 'Arial' : '宋体',
+          asciiFont: isEn ? 'Arial' : 'Times New Roman',
+          sizeVal: isEn ? '19' : '24',
+          bold: true
+        }, W_NS);
       }
     }
   }
@@ -4249,7 +4232,7 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
   }
 
   // 4. 全局中文标签单元格字号均一性加固 (INV-FONT-UNIFORMITY, DEF-11):
-  // 统一所有章节第 0 列标签中运行区为法定小四号 12pt (sz="24")，彻底清除序号 sz="21" 混排断层
+  // 统一所有章节第 0 列标签中运行区为法定小四号 12pt (sz="24")，序号为 10.5pt (sz="21") / 9.5pt (sz="19")
   if (!isEn) {
     const allTables = Array.from(doc.getElementsByTagNameNS(W_NS, 'tbl'));
     for (const tbl of allTables) {
@@ -4261,35 +4244,35 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
         if (!c0) continue;
         const runs = Array.from(c0.getElementsByTagNameNS(W_NS, 'r'));
         for (const run of runs) {
+          const runText = (run.textContent || '').trim();
+          const hasTab = run.getElementsByTagNameNS(W_NS, 'tab').length > 0 || run.getElementsByTagName('tab').length > 0;
+          const isSeqRun = hasTab || /^(\d+\.\d+(?:\.\d+)?)\s*$/.test(runText);
+          const targetSz = isSeqRun ? ((runText.length >= 5) ? '19' : '21') : '24';
+
           let rPr = run.getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');
           if (!run.getElementsByTagNameNS(W_NS, 'rPr')[0]) run.insertBefore(rPr, run.firstChild);
           let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0] || doc.createElementNS(W_NS, 'w:sz');
-          sz.setAttribute('w:val', '24');
+          sz.setAttribute('w:val', targetSz);
           if (!rPr.getElementsByTagNameNS(W_NS, 'sz')[0]) rPr.appendChild(sz);
           let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || doc.createElementNS(W_NS, 'w:szCs');
-          szCs.setAttribute('w:val', '24');
+          szCs.setAttribute('w:val', targetSz);
           if (!rPr.getElementsByTagNameNS(W_NS, 'szCs')[0]) rPr.appendChild(szCs);
         }
-        // 同时清理段落级 pPr/rPr 中可能残留的 sz="21"
-        const ps = Array.from(c0.getElementsByTagNameNS(W_NS, 'p'));
-        for (const p of ps) {
-          const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
-          if (pPr) {
-            const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
-            if (pRPr) {
-              const szs = pRPr.getElementsByTagNameNS(W_NS, 'sz');
-              for (const s of Array.from(szs)) s.setAttribute('w:val', '24');
-              const szCss = pRPr.getElementsByTagNameNS(W_NS, 'szCs');
-              for (const s of Array.from(szCss)) s.setAttribute('w:val', '24');
-            }
+        // 清理 leftChars 污染
+        const inds = Array.from(c0.getElementsByTagNameNS(W_NS, 'ind'));
+        inds.forEach(ind => {
+          if (ind.getAttribute('w:left') === '420') {
+            ind.removeAttribute('w:leftChars');
+            ind.removeAttributeNS(W_NS, 'leftChars');
+            ind.setAttributeNS(W_NS, 'w:leftChars', '0');
           }
-        }
+        });
       }
     }
   }
 
   // 5. 全局英文标签单元格字号均一性加固 (INV-FONT-UNIFORMITY, DEF-12):
-  // 统一所有章节第 0 列小标签为法定五号 9.5pt (sz="19") Arial 加粗，彻底清除 12pt (sz="24") 异常放大
+  // 统一所有章节第 0 列小标签为法定五号 9.5pt (sz="19") Arial 加粗，序号为 9pt (sz="18") / 7.5pt (sz="15")
   if (isEn) {
     const allTables = Array.from(doc.getElementsByTagNameNS(W_NS, 'tbl'));
     for (const tbl of allTables) {
@@ -4303,13 +4286,18 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
 
         const runs = Array.from(c0.getElementsByTagNameNS(W_NS, 'r'));
         for (const run of runs) {
+          const runText = (run.textContent || '').trim();
+          const hasTab = run.getElementsByTagNameNS(W_NS, 'tab').length > 0 || run.getElementsByTagName('tab').length > 0;
+          const isSeqRun = hasTab || /^(\d+\.\d+(?:\.\d+)?)\s*$/.test(runText);
+          const targetSz = isSeqRun ? ((runText.length >= 5) ? '15' : '18') : '19';
+
           let rPr = run.getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');
           if (!run.getElementsByTagNameNS(W_NS, 'rPr')[0]) run.insertBefore(rPr, run.firstChild);
           let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0] || doc.createElementNS(W_NS, 'w:sz');
-          sz.setAttribute('w:val', '19');
+          sz.setAttribute('w:val', targetSz);
           if (!rPr.getElementsByTagNameNS(W_NS, 'sz')[0]) rPr.appendChild(sz);
           let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || doc.createElementNS(W_NS, 'w:szCs');
-          szCs.setAttribute('w:val', '19');
+          szCs.setAttribute('w:val', targetSz);
           if (!rPr.getElementsByTagNameNS(W_NS, 'szCs')[0]) rPr.appendChild(szCs);
 
           let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || doc.createElementNS(W_NS, 'w:rFonts');
@@ -4319,20 +4307,15 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
           rFonts.setAttribute('w:cs', 'Arial');
           if (!rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0]) rPr.appendChild(rFonts);
         }
-        // 同时清理段落级 pPr/rPr 中可能残留的 sz="24"
-        const ps = Array.from(c0.getElementsByTagNameNS(W_NS, 'p'));
-        for (const p of ps) {
-          const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
-          if (pPr) {
-            const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
-            if (pRPr) {
-              const szs = pRPr.getElementsByTagNameNS(W_NS, 'sz');
-              for (const s of Array.from(szs)) s.setAttribute('w:val', '19');
-              const szCss = pRPr.getElementsByTagNameNS(W_NS, 'szCs');
-              for (const s of Array.from(szCss)) s.setAttribute('w:val', '19');
-            }
+        // 清理 leftChars 污染
+        const inds = Array.from(c0.getElementsByTagNameNS(W_NS, 'ind'));
+        inds.forEach(ind => {
+          if (ind.getAttribute('w:left') === '420') {
+            ind.removeAttribute('w:leftChars');
+            ind.removeAttributeNS(W_NS, 'leftChars');
+            ind.setAttributeNS(W_NS, 'w:leftChars', '0');
           }
-        }
+        });
       }
     }
   }
@@ -4384,9 +4367,9 @@ export function standardizeEnglishTypographyAndLabels(engine) {
           cleanTabsInNode(c0, W_NS);
           const p = c0.getElementsByTagNameNS(W_NS, 'p')[0];
           if (p) {
-            removeHangingIndentFromP(p, W_NS);
+            applyHangingIndentToP(p, '420', '420', W_NS);
             setParagraphAlign(p, 'left', W_NS);
-            rebuildRunsWithTypography(p, '8.1  Exposure controls:', { font: 'Arial', sizeVal: '21', bold: true }, W_NS);
+            rebuildUnifiedLabelRun(p, '8.1', 'Exposure controls:', { font: 'Arial', asciiFont: 'Arial', sizeVal: '19', bold: true }, W_NS);
           }
           if (cells.length > 1) {
             for (let ci = 1; ci < cells.length; ci++) formatValueCell(cells[ci], W_NS);
@@ -4398,11 +4381,11 @@ export function standardizeEnglishTypographyAndLabels(engine) {
           cleanTabsInNode(c0, W_NS);
           const p0 = c0.getElementsByTagNameNS(W_NS, 'p')[0];
           if (p0) {
-            removeHangingIndentFromP(p0, W_NS);
+            applyHangingIndentToP(p0, '420', '420', W_NS);
             setParagraphAlign(p0, 'left', W_NS);
             const m = (c0.textContent || '').match(/^8\.2\s*(.*?)(?:[:：])?$/);
             const subTitle = (m && m[1].trim()) ? m[1].trim() : 'Engineering controls';
-            rebuildRunsWithTypography(p0, `8.2  ${subTitle}:`, { font: 'Arial', sizeVal: '21', bold: true }, W_NS);
+            rebuildUnifiedLabelRun(p0, '8.2', `${subTitle}:`, { font: 'Arial', asciiFont: 'Arial', sizeVal: '19', bold: true }, W_NS);
           }
           if (cells.length > 1) {
             for (let ci = 1; ci < cells.length; ci++) formatValueCell(cells[ci], W_NS);
@@ -4677,6 +4660,8 @@ function cleanTabsInNode(node, W_NS) {
   tabs.forEach(t => t.parentNode?.removeChild(t));
   const tabRuns = Array.from(node.getElementsByTagNameNS(W_NS, 'tab'));
   tabRuns.forEach(t => t.parentNode?.removeChild(t));
+  const numPrs = Array.from(node.getElementsByTagNameNS(W_NS, 'numPr'));
+  numPrs.forEach(n => n.parentNode?.removeChild(n));
 }
 
 function applyHangingIndentToP(p, left = '420', hanging = '420', W_NS) {
@@ -4689,6 +4674,8 @@ function applyHangingIndentToP(p, left = '420', hanging = '420', W_NS) {
   inds.forEach(i => pPr.removeChild(i));
   const oldTabs = Array.from(pPr.getElementsByTagNameNS(W_NS, 'tabs'));
   oldTabs.forEach(t => pPr.removeChild(t));
+  const numPrs = Array.from(pPr.getElementsByTagNameNS(W_NS, 'numPr'));
+  numPrs.forEach(n => pPr.removeChild(n));
 
   // 依据全局纯度门禁 (G-09 EN)，表格内零非法注入 <w:tabs>；仅下沉标准悬挂缩进几何
   const ind = p.ownerDocument.createElementNS(W_NS, 'w:ind');
@@ -4711,6 +4698,9 @@ function applyLeftIndentToP(p, left = '420', W_NS) {
   }
   const inds = Array.from(pPr.getElementsByTagNameNS(W_NS, 'ind'));
   inds.forEach(i => pPr.removeChild(i));
+
+  const numPrs = Array.from(pPr.getElementsByTagNameNS(W_NS, 'numPr'));
+  numPrs.forEach(n => pPr.removeChild(n));
 
   const ind = p.ownerDocument.createElementNS(W_NS, 'w:ind');
   ind.setAttributeNS(W_NS, 'w:left', left);
@@ -4759,8 +4749,8 @@ function setParagraphAlign(p, jcVal, W_NS) {
 function formatEnglishLabelCell(cell, W_NS, sectionNumber) {
   const ps = Array.from(cell.getElementsByTagNameNS(W_NS, 'p'));
   if (ps.length === 0) return;
-  // 方案 2：Section 11 包含 11.10（5字符宽约452 dxa），悬挂缩进统一采用 565 dxa，防止制表符弹飞；其余章节采用 420 dxa
-  const indent = (sectionNumber === 11 ? '565' : '420');
+  // 9.1 外观黄金几何标尺：全 16 章节父级标签统一采用 420 dxa 悬挂缩进与 <w:tab/> 激光对齐 (REQ-GOLDEN-ANCHOR)
+  const indent = '420';
 
   const fullText = ps.map(p => p.textContent || '').join(' ').replace(/\s+/g, ' ').trim();
   const seqMatch = fullText.match(/^(\d+\.\d+)\s*(.*)$/);
@@ -4824,19 +4814,21 @@ function formatEnglishLabelCell(cell, W_NS, sectionNumber) {
   }
 
   if (hasSeq) {
-    applyHangingIndentToP(firstP, indent, indent, W_NS);
-    rebuildTabbedLabelWithTypography(firstP, seqStr, cleanLabel, {
+    applyHangingIndentToP(firstP, '420', '420', W_NS);
+    rebuildUnifiedLabelRun(firstP, seqStr, cleanLabel, {
       font: 'Arial',
+      asciiFont: 'Arial',
       sizeVal: '19', // 9.5pt
       bold: true
     }, W_NS);
   } else {
-    // 第一列无序号标签（如 Chemical category:、Recommendation:、PPE 各子项等）：
-    // 强制统一应用 indent (420/565 dxa) 左缩进，使其文字首字母与有序号标签的正文首字母严格在同一垂直基准线上对齐，消除锯齿！
-    applyLeftIndentToP(firstP, indent, W_NS);
-    rebuildRunsWithTypography(firstP, cleanLabel, {
+    // 第一列无序号子级标签（如 Chemical category:、Recommendation:、PPE 各子项等）：
+    // 强制统一应用 420 dxa 左缩进，使其首字与有序号父级标签的正文首字严格垂直共线 (REQ-SUB-PARENT-ALIGN)
+    applyLeftIndentToP(firstP, '420', W_NS);
+    rebuildUnifiedLabelRun(firstP, '', cleanLabel, {
       font: 'Arial',
-      sizeVal: '19', // 英文版全篇统一为 9.5pt (sz="19")，彻底消灭逆向膨胀！
+      asciiFont: 'Arial',
+      sizeVal: '19',
       bold: true
     }, W_NS);
   }
@@ -5079,17 +5071,29 @@ function applyRunStyle(r, { font, asciiFont, sizeVal, bold }, W_NS) {
 export function rebuildUnifiedLabelRun(p, seqStr, labelText, { font, asciiFont, sizeVal, bold }, W_NS) {
   const existingRuns = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
   existingRuns.forEach(r => p.removeChild(r));
+  const numPrs = Array.from(p.getElementsByTagNameNS(W_NS, 'numPr'));
+  numPrs.forEach(n => n.parentNode?.removeChild(n));
   const doc = p.ownerDocument;
 
   if (seqStr) {
     const rSeq = doc.createElementNS(W_NS, 'w:r');
     const rPrSeq = doc.createElementNS(W_NS, 'w:rPr');
-    applyRunProps(rPrSeq, { font: asciiFont || font, asciiFont: asciiFont || font, sizeVal, bold }, W_NS);
+    // 黄金标尺适配：5 字符序号（如 11.10~11.16）字号自适应为 10pt (sz=20)，确保宽度严格 < 420 dxa 制表停靠线
+    let seqSz = sizeVal;
+    if (font === '宋体') {
+      seqSz = (seqStr.length >= 5) ? '20' : '21';
+    } else {
+      seqSz = (seqStr.length >= 5) ? '18' : '19';
+    }
+    applyRunProps(rPrSeq, { font: asciiFont || (font === '宋体' ? 'Times New Roman' : 'Arial'), asciiFont: asciiFont || (font === '宋体' ? 'Times New Roman' : 'Arial'), sizeVal: seqSz, bold }, W_NS);
     rSeq.appendChild(rPrSeq);
     const tSeq = doc.createElementNS(W_NS, 'w:t');
-    tSeq.setAttribute('xml:space', 'preserve');
-    tSeq.textContent = `${seqStr}  `;
+    tSeq.textContent = seqStr;
     rSeq.appendChild(tSeq);
+
+    // 黄金基准锚点：注入法定 <w:tab/>，配合 420 dxa 悬挂缩进，强制正文首字严格停靠在 420 dxa (REQ-GOLDEN-ANCHOR)
+    const tab = doc.createElementNS(W_NS, 'w:tab');
+    rSeq.appendChild(tab);
     p.appendChild(rSeq);
   }
 
@@ -5109,6 +5113,12 @@ export function normalizeSection3Typography(engine, isEnglish = false) {
   const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
   const s3 = engine.records.find(r => r.sectionNumber === 3);
   if (!s3 || !Array.isArray(s3.rows) || s3.rows.length < 3) return;
+
+  // 物理清除 Section 3 表格内残留的所有自动编号节点 (REQ-S3-DUP-PURGE)
+  if (s3.node) {
+    const s3NumPrs = Array.from(s3.node.getElementsByTagNameNS(W_NS, 'numPr'));
+    s3NumPrs.forEach(n => n.parentNode?.removeChild(n));
+  }
 
   const font = isEnglish ? 'Arial' : '宋体';
   const asciiFont = isEnglish ? 'Arial' : 'Times New Roman';

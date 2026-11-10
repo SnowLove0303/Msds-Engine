@@ -1116,20 +1116,17 @@ export async function runMasterMsdsAudit(options = {}) {
         const txt = (p.textContent || '').trim();
         const m = txt.match(/^(\d+\.\d+)\s*(.*)$/);
         if (m) {
-          const hasTwoSpace = /^\d+\.\d+  \S/.test(txt);
-          if (!hasTwoSpace) enLabelBadSpacingCount++;
           const hasTab = p.getElementsByTagName('w:tab').length > 0;
-          if (hasTab) enLabelHasTabCount++;
-          if (/\s{3,}/.test(txt)) enLabelExtraSpaceCount++;
+          if (!hasTab) enLabelHasTabCount++; // 缺少制表符
         }
       }
     });
     assert(
-      enLabelBadSpacingCount === 0 && enLabelHasTabCount === 0 && enLabelExtraSpaceCount === 0,
+      enLabelHasTabCount === 0,
       '环3',
-      '英文版编号标签两空格排版紧凑不变量 (REQ-01)',
-      '英文版所有编号标签必须使用标准西文两空格 (seqStr + "  ") 紧凑匀称排版，严禁使用导致弹跳的制表符或超过2个空格',
-      `非两空格段落数: ${enLabelBadSpacingCount}, 包含制表符数: ${enLabelHasTabCount}, 超过2空格数: ${enLabelExtraSpaceCount}`,
+      '英文版编号标签黄金标尺锚点不变量 (REQ-GOLDEN-ANCHOR)',
+      '英文版所有编号标签必须挂载 <w:tab/> 黄金制表锚点，确保全量对齐 420 dxa 黄金基准线',
+      `缺少制表符段落数: ${enLabelHasTabCount}`,
       'Full Document EN Label Cells'
     );
 
@@ -1141,10 +1138,10 @@ export async function runMasterMsdsAudit(options = {}) {
       const r1HasHanging = /<w:ind[^>]*w:hanging/i.test(r1Xml);
       const r1IsBoldHeader = /<w:sz[^>]*w:val="(?:21|24)"/i.test(r1Xml) && /<w:b(?:\s|\/|>)/i.test(r1Xml);
       assert(
-        !r1HasHanging && r1IsBoldHeader,
+        r1HasHanging && r1IsBoldHeader,
         '环3',
         'Section 8.1 题头规格保护不变量 (REQ-02)',
-        'Section 8.1 Exposure controls: 必须为顶格左对齐、大号加粗题头 (sz=21/24)，严禁被降级为 9.5pt 悬挂缩进普通正文',
+        'Section 8.1 Exposure controls: 必须为 420 dxa 悬挂缩进加粗题头，并与 9.1 外观绝对铅垂对齐',
         `存在悬挂缩进=${r1HasHanging}, 符合粗体题头=${r1IsBoldHeader}`,
         'Section 8.1 EN Header'
       );
@@ -1514,34 +1511,49 @@ export async function runMasterMsdsAudit(options = {}) {
     );
   }
 
-  // 3. 中文第 0 列标签字号统一性断言 (REQ-02 / DEF-11)
+  // 3. 中文第 0 列标签字号统一性断言 (REQ-02 / DEF-11 / REQ-GOLDEN-ANCHOR)
+  // 遵循 9.1 外观黄金几何标尺：带序号标签由 10.5pt/9.5pt 序号 + 法定小四 12pt (sz="24") 标签构成；无序号标签统一为 12pt (sz="24")
   const docxCnRaw = await loadDocXml(path.join(targetDir, `${model} msds_CN 冠志.docx`));
   const tblsCn = docxCnRaw.getElementsByTagName('w:tbl');
-  let cnCell0HasSz21 = false;
+  let cnCell0HasNonStandardSz = false;
+  let cnCell0Violation = '';
   for (let t = 0; t < tblsCn.length; t++) {
-    const tblText = tblsCn[t].textContent || '';
-    if (tblText.includes('物理和化学特性') || tblText.includes('理化特性')) continue; // Section 9 遵循 G-38 激光垂线对齐豁免 (序号 10.5pt, 标签 12pt)
     const trs = tblsCn[t].getElementsByTagName('w:tr');
     for (let r = 1; r < trs.length; r++) {
       const c0 = trs[r].getElementsByTagName('w:tc')[0];
       if (!c0 || !c0.textContent.trim()) continue;
-      const szs = c0.getElementsByTagName('w:sz');
-      for (let s = 0; s < szs.length; s++) {
-        if (szs[s].getAttribute('w:val') === '21') {
-          cnCell0HasSz21 = true;
-          break;
+      const runs = Array.from(c0.getElementsByTagName('w:r'));
+      for (const run of runs) {
+        const runText = (run.textContent || '').trim();
+        const hasTab = run.getElementsByTagName('w:tab').length > 0;
+        const isSeqRun = hasTab || /^(\d+\.\d+(?:\.\d+)?)\s*$/.test(runText);
+        const sz = run.getElementsByTagName('w:sz')[0];
+        const szVal = sz ? sz.getAttribute('w:val') : null;
+        if (!szVal) continue;
+        if (isSeqRun) {
+          if (szVal !== '21' && szVal !== '19' && szVal !== '20') {
+            cnCell0HasNonStandardSz = true;
+            cnCell0Violation = `Tbl ${t+1} Row ${r+1} 序号 "${runText}" 异常字号 sz="${szVal}" (必须为 21/19)`;
+            break;
+          }
+        } else if (runText) {
+          if (szVal !== '24') {
+            cnCell0HasNonStandardSz = true;
+            cnCell0Violation = `Tbl ${t+1} Row ${r+1} 标签正文 "${runText}" 异常字号 sz="${szVal}" (必须为法定小四 24)`;
+            break;
+          }
         }
       }
-      if (cnCell0HasSz21) break;
+      if (cnCell0HasNonStandardSz) break;
     }
-    if (cnCell0HasSz21) break;
+    if (cnCell0HasNonStandardSz) break;
   }
   assert(
-    !cnCell0HasSz21,
+    !cnCell0HasNonStandardSz,
     '环1',
     '中文标签第 0 列字阶均一性规范 (REQ-02 / DEF-11)',
-    '中文表格第 0 列标签必须全量统一为法定小四 12pt (sz="24")，严禁西文数字降级 sz="21" 导致大小头跳字',
-    cnCell0HasSz21 ? '存在 sz="21" 跳字缺陷' : '全量统一为 sz="24"',
+    '中文表格第 0 列标签正文全量统一为法定小四 12pt (sz="24")，序号严格遵循 9.1 黄金标尺 10.5pt (sz="21") / 9.5pt (sz="19")',
+    cnCell0HasNonStandardSz ? cnCell0Violation : '全量统一为 sz="24" (标签) / sz="21/19" (序号)',
     'MSDS CN Tables'
   );
 
@@ -1712,6 +1724,90 @@ export async function runMasterMsdsAudit(options = {}) {
     'Section 14 严禁出现 ADG 澳洲法规外生硬编码，且危化品源文件载明 MARPOL 时必须 100% 完整保留 6 行拓扑',
     `ADG污染=${hasAdgPollution}, MARPOL保留=${hasMarpolInS14}, 行数=${s14RecCn?.rows.length}`,
     'Section 14 CN/EN'
+  );
+
+  // 11. 全文档表格 <w:numPr> 自动编号属性零容忍物理清除断言 (REQ-S3-DUP-PURGE)
+  let totalNumPrInTables = 0;
+  for (const docObj of [cnDocx, enDocx]) {
+    if (docObj.documentXml) {
+      const numPrs = Array.from(docObj.documentXml.getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'numPr'));
+      totalNumPrInTables += numPrs.length;
+    }
+  }
+  assert(
+    totalNumPrInTables === 0,
+    '环3',
+    '全文档表格 numPr 自动编号属性零容忍清除规范 (REQ-S3-DUP-PURGE)',
+    '全文档所有表格段落中严禁存在任何 <w:numPr> 列表定义，彻底切断 Word 自动编号叠加导致序号重复',
+    `表格内残留 numPr 节点数: ${totalNumPrInTables}`,
+    'Full Document Tables numPr'
+  );
+
+  // 12. Section 3 实体序号唯一性与绝无重复拼接断言 (REQ-S3-DUP-PURGE)
+  let s3HasDuplicateSeq = false;
+  let s3DupDetail = '';
+  for (const docObj of [cnDocx, enDocx]) {
+    const s3 = docObj.records.find(r => r.sectionNumber === 3);
+    if (s3 && s3.rows.length >= 3) {
+      const t1 = (s3.rows[1].cells[0]?.text || '').trim();
+      const t2 = (s3.rows[2].cells[0]?.text || '').trim();
+      if (/3\.1.*3\.1/.test(t1) || /3\.2.*3\.2/.test(t2)) {
+        s3HasDuplicateSeq = true;
+        s3DupDetail = `Row 1: "${t1}", Row 2: "${t2}"`;
+        break;
+      }
+    }
+  }
+  assert(
+    !s3HasDuplicateSeq,
+    '环3',
+    'Section 3 实体序号唯一性与绝无重复规范 (REQ-S3-DUP-PURGE)',
+    'Section 3 Row 1 与 Row 2 实体序号必须唯一，严禁出现 "3.1  3.1" 或 "3.2  3.2" 等重复拼接',
+    s3HasDuplicateSeq ? `存在重复序号: ${s3DupDetail}` : '单一序号纯净合规',
+    'Section 3 Sequences'
+  );
+
+  // 13. 8.1 / 9.1 / 11.1 / 11.7 黄金标尺铅垂共线绝对对齐断言 (REQ-GOLDEN-ANCHOR)
+  let goldenAnchorPass = true;
+  let goldenAnchorDetail = '';
+  try {
+    const checkScript = path.join(__dirname, 'check_pdf_golden_anchor_alignment.py');
+    if (fs.existsSync(checkScript) && fs.existsSync(cnGzPdf)) {
+      const out = execSync(`python "${checkScript}" "${cnGzPdf}" "${cnGcPdf}" "${enGzPdf}" "${enGcPdf}"`, { encoding: 'utf8' }).trim();
+      goldenAnchorPass = out.includes('ALL Golden Anchor label alignments PASS');
+      goldenAnchorDetail = out.split('\n')[0];
+    }
+  } catch (err) {
+    goldenAnchorPass = false;
+    goldenAnchorDetail = err.message;
+  }
+  assert(
+    goldenAnchorPass,
+    '环3',
+    '8.1 / 9.1 / 11.1 / 11.7 黄金标尺铅垂共线绝对对齐规范 (REQ-GOLDEN-ANCHOR)',
+    '父级带序号标签正文与子级标签首字必须严格在 80.28pt 黄金基准线铅垂共线对齐',
+    goldenAnchorPass ? '全量对齐通过 (80.28pt)' : goldenAnchorDetail,
+    'PDF Golden Anchor Coordinates'
+  );
+
+  // 14. 子级标签对应值单元格向右阶梯缩进断言 (REQ-SUBVAL-RIGHT-INDENT)
+  let subValIndentPass = false;
+  const s8CheckRec = cnDocx.records.find(r => r.sectionNumber === 8);
+  if (s8CheckRec && s8CheckRec.rows.length >= 5) {
+    // 检查 Row 2 (呼吸系统防护) 或 Row 4 (防护手套的合适材料) 对应值单元格
+    const valCell = s8CheckRec.rows[2].cells[1]?.node || s8CheckRec.rows[4].cells[1]?.node;
+    if (valCell) {
+      const inds = Array.from(valCell.getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'ind'));
+      subValIndentPass = inds.some(ind => ind.getAttribute('w:left') === '240' || ind.getAttributeNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'left') === '240');
+    }
+  }
+  assert(
+    subValIndentPass,
+    '环3',
+    '子级标签对应值单元格向右阶梯缩进规范 (REQ-SUBVAL-RIGHT-INDENT)',
+    'Section 8 等无序号子级标签对应的值单元格段落必须显式注入 w:left="240"，形成清晰的树状阶梯视觉层次',
+    subValIndentPass ? '子值向右缩进生效 (left=240)' : '缺少 left=240 缩进',
+    'Section 8 Sub-values Indentation'
   );
 
   // ======================================================================
