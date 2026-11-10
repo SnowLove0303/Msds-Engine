@@ -1,7 +1,7 @@
 # universal-topology Specification
 
 ## Purpose
-TBD - created by archiving change msds-studio-universal-topology-and-source-grounding. Update Purpose after archive.
+Defines universal 16-section table topology, alignment, hierarchical indentation, dynamic Section 14 source-sovereign construction, and typography projection rules across all MSDS deliverables.
 
 ## Requirements
 
