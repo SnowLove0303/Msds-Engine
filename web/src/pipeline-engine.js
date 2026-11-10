@@ -4338,7 +4338,7 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
         // 清理 leftChars 污染
         const inds = Array.from(c0.getElementsByTagNameNS(W_NS, 'ind'));
         inds.forEach(ind => {
-          if (ind.getAttribute('w:left') === '420') {
+          if (ind.getAttribute('w:left') === '420' || ind.getAttribute('w:left') === '560') {
             ind.removeAttribute('w:leftChars');
             ind.removeAttributeNS(W_NS, 'leftChars');
             ind.setAttributeNS(W_NS, 'w:leftChars', '0');
@@ -4387,7 +4387,7 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
         // 清理 leftChars 污染
         const inds = Array.from(c0.getElementsByTagNameNS(W_NS, 'ind'));
         inds.forEach(ind => {
-          if (ind.getAttribute('w:left') === '420') {
+          if (ind.getAttribute('w:left') === '420' || ind.getAttribute('w:left') === '560') {
             ind.removeAttribute('w:leftChars');
             ind.removeAttributeNS(W_NS, 'leftChars');
             ind.setAttributeNS(W_NS, 'w:leftChars', '0');
@@ -4823,11 +4823,34 @@ function setParagraphAlign(p, jcVal, W_NS) {
 }
 
 // @ANTIGRAVITY_INVARIANT_LOCK_START: 英文版标签严格 420 dxa 制表位对齐与 Section 8 题头排版不变量 (REQ-01 & REQ-02)
-function formatEnglishLabelCell(cell, W_NS, sectionNumber) {
+function formatEnglishLabelCell(cell, W_NS, sectionNumber, customIndent) {
   const ps = Array.from(cell.getElementsByTagNameNS(W_NS, 'p'));
   if (ps.length === 0) return;
-  // 9.1 外观黄金几何标尺：全 16 章节父级标签统一采用 420 dxa 悬挂缩进与 <w:tab/> 激光对齐 (REQ-GOLDEN-ANCHOR)
-  const indent = '420';
+  // 9.1 外观黄金几何标尺：Tier A (<=3位数字如 9.1) 为 420 dxa (21pt, 80.28pt)；Tier B (>=4位数字如 Section 11) 为 560 dxa (28pt, 87.28pt) (REQ-TIER-4DIGIT-SPACING-ALIGN)
+  let indent = customIndent;
+  if (!indent) {
+    if (sectionNumber === 11) {
+      indent = '560';
+    } else {
+      let table = cell;
+      while (table && table.tagName !== 'w:tbl' && table.localName !== 'tbl') {
+        table = table.parentNode;
+      }
+      let isTierB = false;
+      if (table) {
+        const tc0s = Array.from(table.getElementsByTagNameNS(W_NS, 'tc'));
+        for (const tc of tc0s) {
+          const txt = (tc.textContent || '').trim();
+          const m = txt.match(/^(\d+\.\d+)/);
+          if (m && m[1].replace(/\D/g, '').length >= 4) {
+            isTierB = true;
+            break;
+          }
+        }
+      }
+      indent = isTierB ? '560' : '420';
+    }
+  }
 
   const fullText = ps.map(p => p.textContent || '').join(' ').replace(/\s+/g, ' ').trim();
   const seqMatch = fullText.match(/^(\d+\.\d+)\s*(.*)$/);
@@ -4891,7 +4914,7 @@ function formatEnglishLabelCell(cell, W_NS, sectionNumber) {
   }
 
   if (hasSeq) {
-    applyHangingIndentToP(firstP, '420', '420', W_NS);
+    applyHangingIndentToP(firstP, indent, indent, W_NS);
     rebuildUnifiedLabelRun(firstP, seqStr, cleanLabel, {
       font: 'Arial',
       asciiFont: 'Arial',
@@ -4900,8 +4923,8 @@ function formatEnglishLabelCell(cell, W_NS, sectionNumber) {
     }, W_NS);
   } else {
     // 第一列无序号子级标签（如 Chemical category:、Recommendation:、PPE 各子项等）：
-    // 强制统一应用 420 dxa 左缩进，使其首字与有序号父级标签的正文首字严格垂直共线 (REQ-SUB-PARENT-ALIGN)
-    applyLeftIndentToP(firstP, '420', W_NS);
+    // 强制统一应用对应阶梯左缩进，使其首字与有序号父级标签的正文首字严格垂直共线 (REQ-SUB-PARENT-ALIGN)
+    applyLeftIndentToP(firstP, indent, W_NS);
     rebuildUnifiedLabelRun(firstP, '', cleanLabel, {
       font: 'Arial',
       asciiFont: 'Arial',
@@ -4942,7 +4965,9 @@ function formatSingleCellRow(cell, W_NS) {
     const seqStr = seqMatch[1];
     let cleanLabel = seqMatch[2].replace(/：/g, ':').trim();
     if (!cleanLabel.endsWith(':')) cleanLabel += ':';
-    applyHangingIndentToP(p, '420', '420', W_NS);
+    const isTierB = seqStr.replace(/\D/g, '').length >= 4;
+    const indent = isTierB ? '560' : '420';
+    applyHangingIndentToP(p, indent, indent, W_NS);
     rebuildTabbedLabelWithTypography(p, seqStr, cleanLabel, {
       font: 'Arial',
       sizeVal: '19', // 9.5pt
@@ -5331,7 +5356,9 @@ export function normalizeChineseNumberedLabels(engine) {
         if (!cleanLabel.endsWith('：') && !cleanLabel.endsWith(':')) cleanLabel += '：';
         cleanLabel = cleanLabel.replace(/:$/, '：');
 
-        applyHangingIndentToP(p, '420', '420', W_NS);
+        const isTierB = (secNum === 11) || (seqStr.replace(/\D/g, '').length >= 4);
+        const indent = isTierB ? '560' : '420';
+        applyHangingIndentToP(p, indent, indent, W_NS);
         rebuildUnifiedLabelRun(p, seqStr, cleanLabel, {
           font: '宋体',
           asciiFont: 'Times New Roman',

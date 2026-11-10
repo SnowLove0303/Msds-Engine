@@ -319,6 +319,26 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
     const secMatch = r0Text.match(/^(\d+)\./);
     if (secMatch) sectionNumber = parseInt(secMatch[1], 10);
 
+    // 探测当前章节最大序号位数 (REQ-TIER-DISCOVERY)
+    // 遍历当前表格 Column 0 中的所有序号，统计数字位数
+    let maxSeqDigitCount = 0;
+    for (const r of rows) {
+      const c0 = r.getElementsByTagNameNS(W_NS, 'tc')[0];
+      if (!c0) continue;
+      const c0Text = (c0.textContent || '').trim();
+      const mSeq = c0Text.match(/^(\d+\.\d+(?:\.\d+)?)/);
+      if (mSeq) {
+        const digitsOnly = mSeq[1].replace(/\D/g, '');
+        if (digitsOnly.length > maxSeqDigitCount) {
+          maxSeqDigitCount = digitsOnly.length;
+        }
+      }
+    }
+    // 层级判定：若最大序号包含 4 位及以上数字（如 11.10 ~ 11.16 为 4 位），归入 Tier B (4 位数扩展层级: 560 dxa)；
+    // 否则（如 8.1, 9.1..9.24 为 2~3 位数字）归入 Tier A (3 位数标准层级: 420 dxa)
+    const isTierB = (maxSeqDigitCount >= 4) || (sectionNumber === 11);
+    const targetIndent = isTierB ? '560' : '420';
+
     for (let rIdx = 0; rIdx < rows.length; rIdx++) {
       const row = rows[rIdx];
       const cells = Array.from(row.getElementsByTagNameNS(W_NS, 'tc'));
@@ -387,8 +407,8 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
                   ind = doc.createElementNS(W_NS, 'w:ind');
                   pPr.appendChild(ind);
                 }
-                ind.setAttribute('w:left', '420');
-                ind.setAttribute('w:hanging', '420');
+                ind.setAttribute('w:left', targetIndent);
+                ind.setAttribute('w:hanging', targetIndent);
                 ind.removeAttribute('w:firstLine');
                 ind.removeAttribute('w:firstLineChars');
                 ind.removeAttribute('w:hangingChars');
@@ -408,7 +428,9 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
                   // Run 1: 序号
                   const r1 = doc.createElementNS(W_NS, 'w:r');
                   const rPr1 = doc.createElementNS(W_NS, 'w:rPr');
-                  const seqSz = !isEnglish ? (seqStr.length >= 5 ? '19' : '21') : (seqStr.length >= 5 ? '15' : '18');
+                  const seqSz = isTierB
+                    ? (!isEnglish ? '21' : '18')
+                    : (!isEnglish ? (seqStr.length >= 5 ? '19' : '21') : (seqStr.length >= 5 ? '15' : '18'));
                   const rf1 = doc.createElementNS(W_NS, 'w:rFonts');
                   rf1.setAttribute('w:ascii', targetLblAscii);
                   rf1.setAttribute('w:hAnsi', targetLblAscii);
@@ -459,13 +481,13 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
                   }
                 }
               } else {
-                // 子级无序号标签：必须显式注入 w:left="420"（清除 hanging 与 firstLine）
-                // 使首字绝对平齐 420 dxa (80.28pt) 黄金基准线 (REQ-SUB-PARENT-ALIGN)
+                // 子级无序号标签：必须显式注入 w:left=targetIndent（清除 hanging 与 firstLine）
+                // 使首字绝对平齐该章节所属层级基准线 (Tier A: 420 dxa / Tier B: 560 dxa) (REQ-SUB-PARENT-ALIGN)
                 if (!ind) {
                   ind = doc.createElementNS(W_NS, 'w:ind');
                   pPr.appendChild(ind);
                 }
-                ind.setAttribute('w:left', '420');
+                ind.setAttribute('w:left', targetIndent);
                 ind.removeAttribute('w:hanging');
                 ind.removeAttribute('w:hangingChars');
                 ind.removeAttribute('w:firstLine');

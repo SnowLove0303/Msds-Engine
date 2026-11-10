@@ -1784,9 +1784,9 @@ export async function runMasterMsdsAudit(options = {}) {
   assert(
     goldenAnchorPass,
     '环3',
-    '8.1 / 9.1 / 11.1 / 11.7 黄金标尺铅垂共线绝对对齐规范 (REQ-GOLDEN-ANCHOR)',
-    '父级带序号标签正文与子级标签首字必须严格在 80.28pt 黄金基准线铅垂共线对齐',
-    goldenAnchorPass ? '全量对齐通过 (80.28pt)' : goldenAnchorDetail,
+    '基于章节最大序号位数自适应分层对齐规范 (REQ-TIER-DISCOVERY & REQ-TIER-4DIGIT-SPACING-ALIGN)',
+    'Tier A (3位数: 8, 9, 10, 14) 严格对齐 80.28pt 黄金基准；Tier B (4位数: 11) 严格对齐 87.28pt 专属舒适基准且折行第二行绝对垂直共线',
+    goldenAnchorPass ? '全量分层对齐通过 (Tier A: 80.28pt, Tier B: 87.28pt)' : goldenAnchorDetail,
     'PDF Golden Anchor Coordinates'
   );
 

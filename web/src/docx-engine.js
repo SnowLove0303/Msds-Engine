@@ -2609,8 +2609,8 @@ export function mapToxicologyLabelToEnglish(cnLabel) {
  */
 export function formatSection11LabelCell(cell, numberStr, labelText, isEnglish = false) {
   if (!cell?.node) return;
-  // 9.1 外观黄金几何标尺：420 dxa 悬挂缩进 + <w:tab/> 激光垂直对齐 (REQ-GOLDEN-ANCHOR)
-  applyStandardHangingIndent(cell, '420', '420');
+  // 4 位数扩展层级专属标尺：560 dxa 悬挂缩进 + <w:tab/> 激光垂直对齐与舒适呼吸间距 (REQ-TIER-4DIGIT-SPACING-ALIGN)
+  applyStandardHangingIndent(cell, '560', '560');
   const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
   if (ps.length === 0) return;
   const p = ps[0];
@@ -2641,7 +2641,7 @@ export function formatSection11LabelCell(cell, numberStr, labelText, isEnglish =
   rPr1.appendChild(rFonts1);
   const b1 = p.ownerDocument.createElementNS(W_NS, 'w:b');
   rPr1.appendChild(b1);
-  const seqSz = !isEnglish ? (numberStr.length >= 5 ? '19' : '21') : (numberStr.length >= 5 ? '15' : '18');
+  const seqSz = !isEnglish ? '21' : '18';
   const sz1 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
   sz1.setAttributeNS(W_NS, 'w:val', seqSz);
   rPr1.appendChild(sz1);
@@ -4563,7 +4563,7 @@ export function renderThreeColumnVMergeSubRows(record, mainRowIndex, subRowIndex
 
   // 1. 构建 mainRow (3 列)
   const mCell0 = createCell(3519, 1, 'restart');
-  appendPara(mCell0, config.mainLabel || (isEn ? '11.7  Reproductive toxicity:' : '11.7  生殖毒性：'), true, { left: '420', hanging: '420' });
+  appendPara(mCell0, config.mainLabel || (isEn ? '11.7  Reproductive toxicity:' : '11.7  生殖毒性：'), true, { left: '560', hanging: '560' });
   mainRow.node.appendChild(mCell0);
 
   const mCell1 = createCell(1311, 1, null);

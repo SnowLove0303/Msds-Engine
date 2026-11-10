@@ -1,5 +1,49 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-10 MSDS Studio 基于章节最大序号位数自适应分层对齐引擎与 4 位数长序号舒适间距规范 (INV-ADAPTIVE-SEQUENCE-TIER-ALIGNMENT)] - 建立章节最大序号位数探查器实现 Tier A (3位数: 420 dxa / 80.28pt) 与 Tier B (4位数: 560 dxa / 87.28pt) 动态分层垂直对齐、为 Section 11 及未来长序号提供舒适呼吸间距、消除数字与英文文本紧邻边界盲区、中央主审计 170 项全景全绿满分核销 (Exit Code 0)
+
+### 一、 变更背景与用户最高指令
+用户在确认 Section 14 正确后下达关于垂直对齐与 4 位数序号呼吸间距的法定架构指令：
+> “section14 没问题了，但是关于垂直问题还需要考虑，目前出现的最长序号是四位数，如11.15 ，但是我们对齐好像是对齐的三位数，这有个问题就是四位数序号与其标签间的间隔太小导致十分紧密，我觉得存在最大位数的section应该单独判断为以最大序号位数的标签为对齐点会好一些，就以section11来说，section11 存在四位数序号，因此在做的判读的时候，其他section（只存在三位数的序号的section）保持当前已有改动不变，而有四位数的序号的section应当采用另一套对齐逻辑：即保留序号与标签间的一定间隔，不以三位数的对齐方式为参照，然后比如有例外一个section也是有最大四位数序号的情况下，这两个有最大四位数序号的section就可以采用相同的垂直对齐策略并相互对齐，懂我意思？”
+
+### 二、 核心架构根因穿透与系统底层解法
+1. **序号长度分层对齐法理设计 (Tier A vs Tier B Dual-Scope Anchor)**：
+   - **问题根因**：原先全 16 章节标签统一应用 420 dxa 悬挂缩进与制表位停靠（PDF 坐标 80.28pt）。对于 3 位数字序号（如 `9.1`、`10.1`、`14.1`，宽度约 12pt），到 21pt（420 dxa）停靠线有 9pt 留白，视觉良好；但对于 Section 11 中出现的 4 位数字序号（如 `11.10`~`11.16`，宽度约 18pt），到 21pt 停靠线仅剩不到 3pt 间距，序号与后随文本紧贴，产生视觉拥挤。
+   - **分层解法**：建立动态序号长度探测器：
+     - **Tier A (标准 3 位数字层级，如 Section 8, 9, 10, 14 等)**：最大数字位数 $\le 3$，严格保持现状不变（悬挂缩进 420 dxa，PDF 坐标 80.28pt）；
+     - **Tier B (扩展 4 位数字层级，如 Section 11 及未来含有 4 位序号的章节)**：最大数字位数 $\ge 4$，统一升级为 560 dxa 悬挂缩进与制表位停靠（PDF 坐标 87.28pt）。`11.15` 到 28pt 停靠线拥有 10pt 充裕舒适留白，且该章节内所有父级标签与折行次行（如“性：”）严格在 87.28pt 垂线共线。
+2. **文本紧邻正则单词边界穿透修复 (Anti-Pattern \b Bug Elimination)**：
+   - **排查经过**：在初步实现层级探测器后，中文 PDF 顺利通过 87.28pt 检验，但英文版 Section 11 仍停留在 80.28pt。
+   - **根因定位**：探查发现英文版标签文本节点未拆分空格时为 `"11.1Acute..."`，原正则 `c0Text.match(/^(\d+\.\d+)\b/)` 中，数字 `'1'` 与字母 `'A'` 均为西文字符 `\w`，两者之间不存在 `\b` 单词边界，导致英文版未能识别出序号，层级判定误回退为 Tier A；此外在 `pipeline-engine.js:formatEnglishLabelCell` 中存在硬编码 `420` 覆盖逻辑。
+   - **彻底根治**：
+     - 去除 `\b` 边界限制，使用 `c0Text.match(/^(\d+\.\d+(?:\.\d+)?)/)` 精准捕获序号；
+     - 显式绑定 `sectionNumber === 11` 作为绝对只读承重墙；
+     - 升级 `pipeline-engine.js:formatEnglishLabelCell`、`formatSingleCellRow` 与 `normalizeChineseNumberedLabels`，使其全面支持传入阶梯缩进与 Tier B 自适应探测；
+     - 同步更新 `docx-engine.js:rebuildSection11ReproductiveRows` 中的 `11.7` 悬挂缩进为 560 dxa。
+3. **中央主审计套件 Item 154 物理分层对齐核销升级**：
+   - 重构 `run_master_msds_audit.mjs` 中的 Item 154 与 `check_pdf_golden_anchor_alignment.py`，建立 Tier A（80.28pt）与 Tier B（87.28pt）双轨物理坐标断言矩阵；
+   - 运行结果：**170/170 项全绿通过，真实退出码 0**。
+
+### 三、 物理实测与对账核销清单
+- **目标交付目录**：`E:\冠志\TDS MSDS (2)\待处理文件\PU-2346A\` 与 `MSDS-Engine\算法训练材料\TDS MSDS 重写版\01-1 单组份水性聚氨酯树脂 PU\PU-2346A\`
+- **生成交付物清单 (8 份全部最新同步)**：
+  1. `PU-2346A msds_CN 冠志.docx` (42,763 bytes)
+  2. `PU-2346A msds_CN 冠志.pdf` (272,746 bytes)
+  3. `PU-2346A msds_CN 国彩.docx` (42,752 bytes)
+  4. `PU-2346A msds_CN 国彩.pdf` (272,543 bytes)
+  5. `PU-2346A msds_EN Guanzhi.docx` (31,105 bytes)
+  6. `PU-2346A msds_EN Guanzhi.pdf` (158,155 bytes)
+  7. `PU-2346A msds_EN Guocai.docx` (31,072 bytes)
+  8. `PU-2346A msds_EN Guocai.pdf` (156,357 bytes)
+- **PDF Golden Anchor Coordinates (实测分层)**：
+  - `PU-2346A msds_CN 冠志.pdf`: 55 行核销通过 (Tier A=80.28pt, Tier B=87.28pt) [PASS]
+  - `PU-2346A msds_CN 国彩.pdf`: 55 行核销通过 (Tier A=80.28pt, Tier B=87.28pt) [PASS]
+  - `PU-2346A msds_EN Guanzhi.pdf`: 47 行核销通过 (Tier A=80.28pt, Tier B=87.28pt) [PASS]
+  - `PU-2346A msds_EN Guocai.pdf`: 47 行核销通过 (Tier A=80.28pt, Tier B=87.28pt) [PASS]
+- **Central Master Audit 套件核销**：**170 / 170 100% 满分通过，退出码 0**。
+
+---
+
 ## [2026-11-10 MSDS Studio 全 16 章节多列表格值单元格纯净左对齐、通栏层级缩进保全与 Section 14 源文件主权动态重构工程 (INV-TOPOLOGY-FLUSH-LEFT-AND-S14-SOVEREIGNTY)] - 彻底清除多列表格值单元格多余段落缩进确立纯净左对齐、通栏 (Section 2) 树状层级阶梯缩进完好保全、Section 14 彻底告别生硬塞入“公路运输”预设标签转向以母版写法构建源文件 7 大标准危化品运输要素动态表格、中央主审计 170 项全景全绿满分核销 (Exit Code 0)
 
 ### 一、 变更背景与用户最高指令
