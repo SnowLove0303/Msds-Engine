@@ -344,6 +344,119 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
         /^(?:符合下列法规要求|Complies with the following regulations|Comply with the following)[：:]?/i.test(rowText)
       );
 
+      // 0. 对第 0 列标签单元格（多列表格中 c === 0）强制投影标准 Label Design Tokens 与折行对齐规范 (REQ-03, REQ-04, REQ-05)
+      if (cells.length > 1) {
+        const labelCell = cells[0];
+        const labelText = (labelCell.textContent || '').trim();
+        const isHeader = /^(?:化学品名称|CAS编号|含量%（w\/w）|Chemical\s*name|CAS\s*NO\.|Concentration\s*%\s*\(w\/w\)|物质|依据|类型|数值|Substance|Basis|Type|Value)$/i.test(labelText);
+        if (!isHeader && labelText) {
+          const targetLblSz = isEnglish ? '19' : '24';
+          const targetLblFont = isEnglish ? 'Arial' : '宋体';
+          const targetLblAscii = isEnglish ? 'Arial' : 'Times New Roman';
+          const isS9Chinese = (!isEnglish && sectionNumber === 9);
+
+          const ps = Array.from(labelCell.getElementsByTagNameNS(W_NS, 'p'));
+          for (const p of ps) {
+            const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+            if (pPr) {
+              const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
+              if (pRPr) {
+                let sz = pRPr.getElementsByTagNameNS(W_NS, 'sz')[0];
+                if (sz && !isS9Chinese) sz.setAttribute('w:val', targetLblSz);
+                let szCs = pRPr.getElementsByTagNameNS(W_NS, 'szCs')[0];
+                if (szCs && !isS9Chinese) szCs.setAttribute('w:val', targetLblSz);
+                let rFonts = pRPr.getElementsByTagNameNS(W_NS, 'rFonts')[0];
+                if (rFonts) {
+                  rFonts.setAttribute('w:ascii', targetLblAscii);
+                  rFonts.setAttribute('w:hAnsi', targetLblAscii);
+                  rFonts.setAttribute('w:eastAsia', targetLblFont);
+                  rFonts.setAttribute('w:cs', targetLblAscii);
+                }
+              }
+
+              // 折行对齐规范 (REQ-05): 标签换行第二行首字必须永远与标签第一行首字对齐
+              const pText = (p.textContent || '').trim();
+              const hasSeq = /^(\d+\.\d+(?:\.\d+)?)\b/.test(pText);
+              let ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
+              if (hasSeq) {
+                if (!ind) {
+                  ind = doc.createElementNS(W_NS, 'w:ind');
+                  pPr.appendChild(ind);
+                }
+                ind.setAttribute('w:left', '420');
+                ind.setAttribute('w:hanging', '420');
+                ind.removeAttribute('w:firstLine');
+                ind.removeAttribute('w:firstLineChars');
+              } else {
+                if (ind) {
+                  const fl = ind.getAttribute('w:firstLine');
+                  if (fl && fl !== '0') {
+                    ind.removeAttribute('w:firstLine');
+                    ind.removeAttribute('w:firstLineChars');
+                  }
+                  if (ind.getAttribute('w:hanging')) {
+                    ind.removeAttribute('w:hanging');
+                    ind.removeAttribute('w:hangingChars');
+                  }
+                }
+              }
+            }
+
+            const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+            for (const run of runs) {
+              const runText = (run.textContent || '').trim();
+              if (!runText && !run.getElementsByTagNameNS(W_NS, 'drawing').length && !run.getElementsByTagNameNS(W_NS, 'br').length && !run.getElementsByTagNameNS(W_NS, 'tab').length) {
+                run.parentNode?.removeChild(run);
+                continue;
+              }
+
+              let rPr = run.getElementsByTagNameNS(W_NS, 'rPr')[0];
+              if (!rPr) {
+                rPr = doc.createElementNS(W_NS, 'w:rPr');
+                run.insertBefore(rPr, run.firstChild);
+              }
+
+              let b = rPr.getElementsByTagNameNS(W_NS, 'b')[0];
+              if (!b) {
+                b = doc.createElementNS(W_NS, 'w:b');
+                rPr.appendChild(b);
+              }
+              let bCs = rPr.getElementsByTagNameNS(W_NS, 'bCs')[0];
+              if (!bCs) {
+                bCs = doc.createElementNS(W_NS, 'w:bCs');
+                rPr.appendChild(bCs);
+              }
+
+              const isSeqRun = isS9Chinese && /^(\d+\.\d+)\s*$/.test(runText);
+              const runSz = isSeqRun ? '21' : targetLblSz;
+              let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0];
+              if (!sz) {
+                sz = doc.createElementNS(W_NS, 'w:sz');
+                rPr.appendChild(sz);
+              }
+              sz.setAttribute('w:val', runSz);
+
+              let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0];
+              if (!szCs) {
+                szCs = doc.createElementNS(W_NS, 'w:szCs');
+                rPr.appendChild(szCs);
+              }
+              szCs.setAttribute('w:val', runSz);
+
+              let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0];
+              if (!rFonts) {
+                rFonts = doc.createElementNS(W_NS, 'w:rFonts');
+                rPr.appendChild(rFonts);
+              }
+              rFonts.setAttribute('w:ascii', targetLblAscii);
+              rFonts.setAttribute('w:hAnsi', targetLblAscii);
+              rFonts.setAttribute('w:eastAsia', targetLblFont);
+              rFonts.setAttribute('w:cs', targetLblAscii);
+            }
+          }
+        }
+      }
+
       // 对所有值单元格（单列描述行或多列中 c >= 1 的列）强制投影标准 Design Tokens
       const startCol = (cells.length === 1) ? 0 : 1;
       for (let cIdx = startCol; cIdx < cells.length; cIdx++) {

@@ -3136,29 +3136,41 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
   if (options.borders !== false) {
     const tcBorders = doc.createElementNS(W_NS, 'w:tcBorders');
     tcPr.appendChild(tcBorders);
-    const topVal = options.topBorder || 'dotted';
-    const bottomVal = options.bottomBorder || 'dotted';
+    let topVal = options.topBorder || (options.isSection2 ? 'none' : 'dotted');
+    let bottomVal = options.bottomBorder || (options.isSection2 ? 'none' : 'dotted');
+    let leftVal = options.leftBorder || 'single';
+    let rightVal = options.rightBorder || 'single';
 
-    const top = doc.createElementNS(W_NS, 'w:top');
-    top.setAttributeNS(W_NS, 'w:val', topVal);
-    top.setAttributeNS(W_NS, 'w:color', 'auto');
-    top.setAttributeNS(W_NS, 'w:sz', '4');
-    top.setAttributeNS(W_NS, 'w:space', '0');
-    tcBorders.appendChild(top);
+    if (options.isSection2) {
+      const isFirstDataRow = (rowIndex === 1);
+      const isLastRow = (rowIndex === (record.rows?.length || 1) - 1);
+      if (isFirstDataRow) {
+        topVal = 'single';
+        bottomVal = isLastRow ? 'single' : 'none';
+      } else if (isLastRow) {
+        topVal = 'none';
+        bottomVal = 'single';
+      } else {
+        topVal = 'none';
+        bottomVal = 'none';
+      }
+    }
 
-    const bottom = doc.createElementNS(W_NS, 'w:bottom');
-    bottom.setAttributeNS(W_NS, 'w:val', bottomVal);
-    bottom.setAttributeNS(W_NS, 'w:color', 'auto');
-    bottom.setAttributeNS(W_NS, 'w:sz', '4');
-    bottom.setAttributeNS(W_NS, 'w:space', '0');
-    tcBorders.appendChild(bottom);
+    const cellBorders = [
+      { name: 'top', val: topVal },
+      { name: 'bottom', val: bottomVal },
+      { name: 'left', val: leftVal },
+      { name: 'right', val: rightVal }
+    ];
 
-    const right = doc.createElementNS(W_NS, 'w:right');
-    right.setAttributeNS(W_NS, 'w:val', bottomVal);
-    right.setAttributeNS(W_NS, 'w:color', 'auto');
-    right.setAttributeNS(W_NS, 'w:sz', '4');
-    right.setAttributeNS(W_NS, 'w:space', '0');
-    tcBorders.appendChild(right);
+    for (const cb of cellBorders) {
+      const el = doc.createElementNS(W_NS, `w:${cb.name}`);
+      el.setAttributeNS(W_NS, 'w:val', cb.val);
+      el.setAttributeNS(W_NS, 'w:color', 'auto');
+      el.setAttributeNS(W_NS, 'w:sz', cb.val === 'none' ? '0' : '4');
+      el.setAttributeNS(W_NS, 'w:space', '0');
+      tcBorders.appendChild(el);
+    }
   }
 
   // 3. 填充段落内容 (严格对齐全局规范与 handcraft-typography 5 级缩进及加粗状态机)
@@ -4521,6 +4533,14 @@ export function enforceTableStandardBorders(record) {
   const doc = tblNode.ownerDocument;
   if (!doc) return;
 
+  const sectionNumber = record.sectionNumber || (() => {
+    const r0Text = (record.rows?.[0]?.cells?.[0]?.text || '').trim();
+    const m = r0Text.match(/^(\d+)\./);
+    return m ? parseInt(m[1], 10) : null;
+  })();
+
+  const isSection2 = (sectionNumber === 2) || /^(?:2\.\s*|危险性概述|Hazards? Identification)/i.test(record.rows?.[0]?.cells?.[0]?.text || '');
+
   // 1. 设置表格级 tblBorders
   let tblPr = firstChild(tblNode, 'tblPr');
   if (!tblPr) {
@@ -4534,7 +4554,15 @@ export function enforceTableStandardBorders(record) {
   } else {
     while (tblBorders.firstChild) tblBorders.removeChild(tblBorders.firstChild);
   }
-  const borderDefs = [
+  // Section 2 大通栏规范：外框实线 single 4，内部横竖完全为 none（零内框线）
+  const borderDefs = isSection2 ? [
+    { name: 'top', val: 'single', sz: '4' },
+    { name: 'left', val: 'single', sz: '4' },
+    { name: 'bottom', val: 'single', sz: '4' },
+    { name: 'right', val: 'single', sz: '4' },
+    { name: 'insideH', val: 'none', sz: '0' },
+    { name: 'insideV', val: 'none', sz: '0' }
+  ] : [
     { name: 'top', val: 'single', sz: '4' },
     { name: 'left', val: 'single', sz: '4' },
     { name: 'bottom', val: 'single', sz: '4' },
@@ -4580,21 +4608,37 @@ export function enforceTableStandardBorders(record) {
 
       let topVal = 'dotted';
       let bottomVal = 'dotted';
-      if (isTitleRow) {
-        topVal = 'single';
-        bottomVal = 'single';
-      } else if (isFirstDataRow) {
-        topVal = 'single';
-        bottomVal = isLastRow ? 'single' : 'dotted';
-      } else if (isLastRow) {
-        topVal = 'dotted';
-        bottomVal = 'single';
+      if (isSection2) {
+        if (isTitleRow) {
+          topVal = 'single';
+          bottomVal = 'single';
+        } else if (isFirstDataRow) {
+          topVal = 'single';
+          bottomVal = isLastRow ? 'single' : 'none';
+        } else if (isLastRow) {
+          topVal = 'none';
+          bottomVal = 'single';
+        } else {
+          topVal = 'none';
+          bottomVal = 'none';
+        }
+      } else {
+        if (isTitleRow) {
+          topVal = 'single';
+          bottomVal = 'single';
+        } else if (isFirstDataRow) {
+          topVal = 'single';
+          bottomVal = isLastRow ? 'single' : 'dotted';
+        } else if (isLastRow) {
+          topVal = 'dotted';
+          bottomVal = 'single';
+        }
       }
 
       const isLeft = (cIdx === 0);
       const isRight = (cIdx === numCells - 1);
-      const leftVal = isLeft ? 'single' : 'dotted';
-      const rightVal = isRight ? 'single' : 'dotted';
+      const leftVal = isLeft ? 'single' : (isSection2 ? 'none' : 'dotted');
+      const rightVal = isRight ? 'single' : (isSection2 ? 'none' : 'dotted');
 
       const cellBorders = [
         { name: 'top', val: topVal },
@@ -4606,7 +4650,7 @@ export function enforceTableStandardBorders(record) {
       for (const cb of cellBorders) {
         const el = doc.createElementNS(W_NS, `w:${cb.name}`);
         el.setAttributeNS(W_NS, 'w:val', cb.val);
-        el.setAttributeNS(W_NS, 'w:sz', '4');
+        el.setAttributeNS(W_NS, 'w:sz', cb.val === 'none' ? '0' : '4');
         el.setAttributeNS(W_NS, 'w:space', '0');
         el.setAttributeNS(W_NS, 'w:color', 'auto');
         tcBorders.appendChild(el);

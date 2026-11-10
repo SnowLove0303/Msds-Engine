@@ -3986,13 +3986,11 @@ export async function executeEightDeliverablesPipeline({
           ind.removeAttribute('w:hangingChars');
         });
       }
-      // 3. Section 8 英文标签题头统一字号规范: 小标签统一为 w:sz="19" (9.5pt 加粗)，父级 Hand protection: 统一为 w:sz="24" (12pt 加粗) (DEF-12 & INV-S8-HAND)
+      // 3. Section 8 英文标签题头统一字号规范: 全量统一为 w:sz="19" (9.5pt 加粗)，彻底废除 24 局部放大 (DEF-12)
       if (isEn) {
         for (let r = 2; r < s8Rec.rows.length; r++) {
           const c0 = s8Rec.rows[r]?.cells?.[0]?.node;
-          const text = (s8Rec.rows[r]?.cells?.[0]?.text || '').trim();
-          const isHandParent = /Hand protection/i.test(text);
-          const targetSz = isHandParent ? '24' : '19';
+          const targetSz = '19';
           if (c0) {
             const szs = Array.from(c0.getElementsByTagNameNS(W_NS, 'sz'));
             szs.forEach(sz => sz.setAttribute('w:val', targetSz));
@@ -4283,6 +4281,55 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
               for (const s of Array.from(szs)) s.setAttribute('w:val', '24');
               const szCss = pRPr.getElementsByTagNameNS(W_NS, 'szCs');
               for (const s of Array.from(szCss)) s.setAttribute('w:val', '24');
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 5. 全局英文标签单元格字号均一性加固 (INV-FONT-UNIFORMITY, DEF-12):
+  // 统一所有章节第 0 列小标签为法定五号 9.5pt (sz="19") Arial 加粗，彻底清除 12pt (sz="24") 异常放大
+  if (isEn) {
+    const allTables = Array.from(doc.getElementsByTagNameNS(W_NS, 'tbl'));
+    for (const tbl of allTables) {
+      const trs = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
+      for (let rIdx = 1; rIdx < trs.length; rIdx++) {
+        const c0 = trs[rIdx].getElementsByTagNameNS(W_NS, 'tc')[0];
+        if (!c0) continue;
+        const c0Text = (c0.textContent || '').trim();
+        // 豁免 Section 8 顶级题头
+        if (/^8\.\s*EXPOSURE|^8\.1\s*Exposure controls/i.test(c0Text)) continue;
+
+        const runs = Array.from(c0.getElementsByTagNameNS(W_NS, 'r'));
+        for (const run of runs) {
+          let rPr = run.getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');
+          if (!run.getElementsByTagNameNS(W_NS, 'rPr')[0]) run.insertBefore(rPr, run.firstChild);
+          let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0] || doc.createElementNS(W_NS, 'w:sz');
+          sz.setAttribute('w:val', '19');
+          if (!rPr.getElementsByTagNameNS(W_NS, 'sz')[0]) rPr.appendChild(sz);
+          let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || doc.createElementNS(W_NS, 'w:szCs');
+          szCs.setAttribute('w:val', '19');
+          if (!rPr.getElementsByTagNameNS(W_NS, 'szCs')[0]) rPr.appendChild(szCs);
+
+          let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || doc.createElementNS(W_NS, 'w:rFonts');
+          rFonts.setAttribute('w:ascii', 'Arial');
+          rFonts.setAttribute('w:hAnsi', 'Arial');
+          rFonts.setAttribute('w:eastAsia', 'Arial');
+          rFonts.setAttribute('w:cs', 'Arial');
+          if (!rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0]) rPr.appendChild(rFonts);
+        }
+        // 同时清理段落级 pPr/rPr 中可能残留的 sz="24"
+        const ps = Array.from(c0.getElementsByTagNameNS(W_NS, 'p'));
+        for (const p of ps) {
+          const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+          if (pPr) {
+            const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
+            if (pRPr) {
+              const szs = pRPr.getElementsByTagNameNS(W_NS, 'sz');
+              for (const s of Array.from(szs)) s.setAttribute('w:val', '19');
+              const szCss = pRPr.getElementsByTagNameNS(W_NS, 'szCs');
+              for (const s of Array.from(szCss)) s.setAttribute('w:val', '19');
             }
           }
         }

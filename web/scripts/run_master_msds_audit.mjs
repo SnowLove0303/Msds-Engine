@@ -308,7 +308,7 @@ export async function runMasterMsdsAudit(options = {}) {
     }
   }
 
-  // 全局表格边框外实内虚规范 (G-04 / G-05)
+  // 全局表格边框外实内虚规范 (G-04 / G-05，Section 2 专属大通栏零内框线规范)
   const cnGzDocx = path.join(targetDir, `${model} msds_CN 冠志.docx`);
   if (fs.existsSync(cnGzDocx)) {
     const domCn = await loadDocXml(cnGzDocx);
@@ -328,12 +328,17 @@ export async function runMasterMsdsAudit(options = {}) {
         const bottom = borders.getElementsByTagName('w:bottom')[0]?.getAttribute('w:val');
         const insideH = borders.getElementsByTagName('w:insideH')[0]?.getAttribute('w:val');
         const insideV = borders.getElementsByTagName('w:insideV')[0]?.getAttribute('w:val');
-        const isBorderCompliant = (!top || top === 'single') && (!bottom || bottom === 'single') && (!insideH || insideH === 'dotted') && (!insideV || insideV === 'dotted');
+        const isSec2 = (i === 1);
+        const isBorderCompliant = isSec2
+          ? (!top || top === 'single') && (!bottom || bottom === 'single') && (!insideH || insideH === 'none') && (!insideV || insideV === 'none')
+          : (!top || top === 'single') && (!bottom || bottom === 'single') && (!insideH || insideH === 'dotted') && (!insideV || insideV === 'dotted');
         assert(
           isBorderCompliant,
           '环1',
           '表格边框外实内虚规范',
-          `表格 ${i+1} 边框线型必须为外框实线 single、内框虚线 dotted`,
+          isSec2
+            ? `表格 ${i+1} (Section 2) 边框线型必须为纯净大通栏，外框实线 single、内框完全无框线 none`
+            : `表格 ${i+1} 边框线型必须为外框实线 single、内框虚线 dotted`,
           `top=${top}, bottom=${bottom}, insideH=${insideH}, insideV=${insideV}`,
           `Table ${i+1}`
         );
@@ -916,20 +921,20 @@ export async function runMasterMsdsAudit(options = {}) {
       );
     }
 
-    // 检查英文版 Hand protection: 字号规范
+    // 检查英文版 Hand protection: 字号规范 (全局五号 9.5pt / sz="19" 均一化)
     const domEn = await loadDocXml(enDocxPath);
     const handRowEn = Array.from(domEn.getElementsByTagName('w:tr')).find(tr => tr.textContent.includes('Hand protection'));
     if (handRowEn) {
       const c0EnNode = handRowEn.getElementsByTagName('w:tc')[0];
       const serializer = new XmlSerializer();
       const c0EnXml = c0EnNode ? serializer.serializeToString(c0EnNode) : '';
-      const isEnSz24 = /<w:sz\s+w:val="24"/.test(c0EnXml);
+      const isEnSz19 = /<w:sz\s+w:val="19"/.test(c0EnXml) && !/<w:sz\s+w:val="24"/.test(c0EnXml);
       assert(
-        isEnSz24,
+        isEnSz19,
         '环3',
-        'Section 8 英文手部防护字号规范',
-        '英文版“Hand protection:”字号必须统一为 w:sz w:val="24" (12pt 加粗)，严禁缩小为 sz=19',
-        isEnSz24 ? '统一 12pt (sz=24)' : '存在缩小字号 (sz=19)',
+        'Section 8 英文手部防护字号均一性规范',
+        '英文版“Hand protection:”字号必须依法全篇统一为标准五号 9.5pt (sz="19" 加粗)，严禁放大为 sz=24 破坏全局拓扑',
+        isEnSz19 ? '统一 9.5pt (sz=19)' : '存在异常放大字号 (sz=24)',
         'handRowEn Col 0'
       );
     }
@@ -1547,7 +1552,6 @@ export async function runMasterMsdsAudit(options = {}) {
   if (s8RecEn && s8RecEn.rows.length >= 3) {
     for (let r = 2; r < s8RecEn.rows.length; r++) {
       const c0Text = (s8RecEn.rows[r]?.cells?.[0]?.text || '').trim();
-      if (/Hand protection/i.test(c0Text)) continue; // Hand protection: 父级分类题头依法统一为 12pt (sz="24")，小标签保持 9.5pt (sz="19")
       const c0 = s8RecEn.rows[r]?.cells?.[0]?.node;
       if (c0) {
         const szs = c0.getElementsByTagName('w:sz');
@@ -1565,7 +1569,7 @@ export async function runMasterMsdsAudit(options = {}) {
     !enS8LabelOverlarge,
     '环1',
     '英文 Section 8 标签五号标准规范 (REQ-02 / DEF-12)',
-    '英文 Section 8 表格小标签必须为标准 9.5pt (sz="19")，严禁失控暴增至 12pt (sz="24") 造成层级倒挂',
+    '英文 Section 8 表格全量标签必须为标准 9.5pt (sz="19")，严禁包含 Hand protection 在内的任何标签失控暴增至 12pt (sz="24")',
     enS8LabelOverlarge ? '存在 sz="24" 异常放大' : '全量符合 9.5pt (sz="19")',
     'Section 8 EN'
   );

@@ -1,5 +1,36 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-10 MSDS Studio 全 16 章节底层通用拓扑与排版规范全局硬约束 (INV-UNIVERSAL-16-SECTIONS-TOPOLOGY-AND-TYPOGRAPHY)] - 根治 Section 2 通栏内框线残留、英文版 Section 8 Hand protection 异常放大 12pt 导致层级倒挂、全 16 章节序号/标签/值底层拓扑统一投影、标签折行第二行首字垂直对齐与主审计 166 项满分核销 (Exit Code 0)
+
+### 一、 变更背景与用户最高指令
+用户对系统提出严肃批评与最高法定重构指令：
+> “2346A 的section2 内虚线，section8的字体大小错误等，说了几次了，特别是EN版，我都说让你从系统底层去统一起来，统一起来，section2 用通栏，不要有内框线！ 系统统一起来！序号/标签/值 全部按规定的去做拓扑结构，禁止任何形式出现字号字体文本格式不统一的问题，另外，换行的第二行首字对齐也必须统一，标签换行第二行首字必须永远与标签第一行首字对齐，以上必须从系统层面，从模板提供的拓扑层面去永久解决！ 也就是我希望从系统拓扑的角度去永久固定msds 产出内容中的 序号、标签、值的统一字体、字号等，CN/EN 版本字体、字号的相关数值在全局规范中有说明；”
+> “执行，请注意，我不想再强调：只要是走系统底层的就是全局约束，要做的是所有16个 section都必须遵守的约束，包括16个section 的序号/标签/值的字体、字号规定等”
+
+### 二、 核心架构根因与系统底层解决办法
+1. **Section 2 纯净大通栏零内框线底层阻断改造 (REQ-02)**：
+   - **根因分析**：`pipeline-engine.js` 在流水分步中调用全局 `enforceTableStandardBorders`，原逻辑对全文档所有表格无差别硬编码覆盖 `insideH="dotted"` 与单元格级横向虚线，导致 Section 2 内部数据行被强加内框线。
+   - **底层解决办法**：在 `docx-engine.js:enforceTableStandardBorders` 中识别 Section 2，强制设置 `insideH="none"`, `insideV="none"`，并遍历所有单元格将内部 `top` 与 `bottom` 边框清除为 `none`，仅保留最外层边框实线；同时在 `renderFullWidthRow` 中为中间行设置 `topVal="none"`, `bottomVal="none"`。
+2. **全 16 章节“序号/标签/值”底层通用投影引擎重构 (REQ-03, REQ-04)**：
+   - **根因分析**：此前排版规范零散分布在特定章节的局部逻辑中，缺乏全 16 章节统领性的底层投影，且 `pipeline-engine.js` 中存在 `const targetSz = isHandParent ? '24' : '19';` 的局部特殊放大代码，导致英文版中仅 `Hand protection` 变成 12pt (`sz="24"`)，全篇字阶不一致。
+   - **底层解决办法**：在 `universal-editor-primitives.js:applyGlobalTypographyProjection` 中建立第 0 列标签通用投影通道，对全 16 章节所有表格第 0 列单元格强制执行规范：中文版统一为 12pt (`sz="24"`) 宋体加粗，英文版统一为 9.5pt (`sz="19"`) Arial 加粗；彻底删除 Section 8 中对 `Hand protection` 放大为 24 的局部代码；在 `pipeline-engine.js` 结尾新增全篇英文标签兜底遍历，确保所有标签 100% 均一化。
+3. **标签折行悬挂缩进与首字垂直锁定机制统一 (REQ-05)**：
+   - **根因分析**：段落中残留历史 `firstLine="482"` 属性导致带序号标签折行时第二行顶格回缩到序号正下方，破坏垂直对齐美感。
+   - **底层解决办法**：在底层 `applyGlobalTypographyProjection` 与 `formatEnglishLabelCell` 中，对所有带序号标签挂载标准悬挂缩进 `<w:ind w:left="420" w:hanging="420"/>`，并彻底剔除纯标签行中导致首行突进次行回缩的 `firstLine` 畸形属性，确保标签折行时第二行首字永远与第一行标签文本首字在 420 dxa 垂直线上完全对齐。
+4. **集中式中央主审计套件冲突修复与 166 项满分通过 (REQ-01, REQ-06)**：
+   - **根因分析**：`run_master_msds_audit.mjs` 中残留历史陈旧断言，硬编码强制 Table 2 边框必须为 `dotted`，且强制 Hand protection 必须为 `sz="24"`，与新的全局通栏及均一排版规范产生逻辑死锁。
+   - **底层解决办法**：修正主审计套件中对 Table 2（Section 2）的大通栏零内框线断言判定（`insideH="none"`, `insideV="none"`），并修正英文版 Hand protection 的均一性断言（必须统一为五号 9.5pt `sz="19"`，严禁 `sz="24"`）。实测运行 **166 项 100% 满分通过，真实退出码为 0**！
+
+### 三、 物理实测与验收核销
+1. **PU-2346A 交付物物理核销**：
+   - 8 份标准交付物已重新编译生成并同步至目标交付目录 `E:\冠志\TDS MSDS (2)\待处理文件\PU-2346A\`；
+   - 8 份交付物时间戳差值 6.0 秒（< 10 秒），完全新鲜同步；
+   - Section 2 XML 边框验证：`insideH="none"`, `insideV="none"`，内部虚线数量为 0；
+   - Section 8 英文标签字号验证：10 个标签全部为 9.5pt (`sz="19"`)，违规 `sz="24"` 为 0；
+   - 悬挂缩进验证：全篇段落命中 `left="420" hanging="420"` 达 66 处。
+
+---
+
 ## [2026-11-09 MSDS-Studio 通用拓扑结构重构与源文件事实绝对驱动 (INV-UNIVERSAL-TOPOLOGY-AND-SOURCE-GROUNDING)] - 根治 Section 2 大通栏误加内框虚线、全局表格跨页自然断行默认放开与大空白彻底消除、Section 3 “3.2 成分”标签法定加粗与组分行常规体底层固化、Section 11 毒理学通用动态拓扑构建器（16项终点全量动态增删保真）、Section 14 彻底清除 ADG 澳洲法规伪通与国际公约保全、主审计升级至 166 项全景物理断言 100% 满分通过 (Exit Code 0)
 
 ### 一、 变更背景与用户最高裁决
