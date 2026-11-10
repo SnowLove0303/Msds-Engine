@@ -25,10 +25,13 @@ import {
   suppressTrailingDocumentParagraph,
   enableCrossPageBreaksForAllSections,
   healAllTableTopologies,
+  enforceTableStandardBorders,
   stampDocumentIdentity,
   updateHeaderFooterData,
   W_NS
 } from './docx-engine.js';
+import { applyGlobalTypographyProjection } from './universal-editor-primitives.js';
+import { enforceStructuralTypographyInvariants } from './pipeline-engine.js';
 
 export const TEMPLATE_LIBRARY = {
   CN_Guanzhi: {
@@ -540,6 +543,15 @@ export async function saveSession(session, outputPath) {
   suppressTrailingDocumentParagraph(session.engine);
   enableCrossPageBreaksForAllSections(session.engine);
   healAllTableTopologies(session.engine.documentXml);
+
+  // 全局 16 章节拓扑与排版硬约束投影 (所有型号产出永久保障)
+  for (const record of session.engine.records || []) {
+    if (record.kind === 'table') {
+      enforceTableStandardBorders(record);
+    }
+  }
+  applyGlobalTypographyProjection(session.engine, session.isEnglish);
+  enforceStructuralTypographyInvariants(session.engine, session.isEnglish);
 
   const arrayBuf = await session.engine.exportArrayBuffer();
   const outBuf = Buffer.from(arrayBuf);

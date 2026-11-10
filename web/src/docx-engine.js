@@ -3136,12 +3136,13 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
   if (options.borders !== false) {
     const tcBorders = doc.createElementNS(W_NS, 'w:tcBorders');
     tcPr.appendChild(tcBorders);
-    let topVal = options.topBorder || (options.isSection2 ? 'none' : 'dotted');
-    let bottomVal = options.bottomBorder || (options.isSection2 ? 'none' : 'dotted');
+    const isSec2 = (options.isSection2 === true) || (record.sectionNumber === 2) || /^(?:2\.\s*|危险性概述|Hazards? Identification)/i.test(record.rows?.[0]?.cells?.[0]?.text || '');
+    let topVal = options.topBorder || (isSec2 ? 'none' : 'dotted');
+    let bottomVal = options.bottomBorder || (isSec2 ? 'none' : 'dotted');
     let leftVal = options.leftBorder || 'single';
     let rightVal = options.rightBorder || 'single';
 
-    if (options.isSection2) {
+    if (isSec2) {
       const isFirstDataRow = (rowIndex === 1);
       const isLastRow = (rowIndex === (record.rows?.length || 1) - 1);
       if (isFirstDataRow) {
@@ -4579,24 +4580,34 @@ export function enforceTableStandardBorders(record) {
     tblBorders.appendChild(el);
   }
 
-  // 2. 逐行逐单元格设置 tcBorders
-  const rows = record.rows || [];
-  const numRows = rows.length;
+  // 2. 逐行逐单元格设置 tcBorders (遍历物理 DOM 节点，彻底杜绝 vMerge 延续单元格逃逸)
+  const trNodes = Array.from(tblNode.getElementsByTagNameNS(W_NS, 'tr'));
+  const numRows = trNodes.length;
   for (let rIdx = 0; rIdx < numRows; rIdx++) {
-    const row = rows[rIdx];
+    const trNode = trNodes[rIdx];
     const isTitleRow = (rIdx === 0);
     const isFirstDataRow = (rIdx === 1);
     const isLastRow = (rIdx === numRows - 1);
-    const numCells = row.cells?.length || 0;
 
+    // Section 2 通栏规范：如果行级存在 tblPrEx 覆盖边框，坚决清除其 tblBorders
+    if (isSection2) {
+      const tblPrEx = firstChild(trNode, 'tblPrEx');
+      if (tblPrEx) {
+        const b = firstChild(tblPrEx, 'tblBorders');
+        if (b) tblPrEx.removeChild(b);
+      }
+    }
+
+    const tcNodes = Array.from(trNode.getElementsByTagNameNS(W_NS, 'tc'));
+    const numCells = tcNodes.length;
     for (let cIdx = 0; cIdx < numCells; cIdx++) {
-      const cell = row.cells[cIdx];
-      if (!cell || !cell.node) continue;
+      const cellNode = tcNodes[cIdx];
+      if (!cellNode) continue;
 
-      let tcPr = firstChild(cell.node, 'tcPr');
+      let tcPr = firstChild(cellNode, 'tcPr');
       if (!tcPr) {
         tcPr = doc.createElementNS(W_NS, 'w:tcPr');
-        cell.node.insertBefore(tcPr, cell.node.firstChild);
+        cellNode.insertBefore(tcPr, cellNode.firstChild);
       }
       let tcBorders = firstChild(tcPr, 'tcBorders');
       if (!tcBorders) {
