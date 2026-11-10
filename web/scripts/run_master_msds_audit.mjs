@@ -1710,18 +1710,18 @@ export async function runMasterMsdsAudit(options = {}) {
     'Section 11 CN/EN'
   );
 
-  // 10. Section 14 零 ADG 外生污染与公约全量保真断言 (REQ-04)
+  // 10. Section 14 零 ADG 外生污染与公约全量保真断言 (REQ-04 / REQ-S14-01/02)
   const cnS14All = s14RecCn ? s14RecCn.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n') : '';
   const enS14All = s14RecEn ? s14RecEn.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n') : '';
   const hasAdgPollution = /ADG\s*regulations|ADG/i.test(cnS14All) || /ADG\s*regulations|ADG/i.test(enS14All);
   const hasMarpolInS14 = (/PU-2346A/i.test(model) || (sourceDocx && /PU-2346A/i.test(sourceDocx)))
-    ? (/MARPOL/i.test(cnS14All) && /MARPOL/i.test(enS14All) && s14RecCn?.rows.length === 8)
+    ? (/MARPOL/i.test(cnS14All) && /MARPOL/i.test(enS14All) && (s14RecCn?.rows.length === 8 || s14RecCn?.rows.length === 9) && /参见6-8节/.test(cnS14All) && /See sections 6-8/i.test(enS14All))
     : true;
   assert(
     !hasAdgPollution && hasMarpolInS14,
     '环3',
     'Section 14 零 ADG 污染与国际公约保全规范 (REQ-04)',
-    'Section 14 严禁出现 ADG 澳洲法规外生硬编码，且危化品源文件载明 7 大 UN GHS 要素时必须 100% 完整保留 8 行标准拓扑 (含表头)',
+    'Section 14 严禁出现 ADG 澳洲法规外生硬编码，且危化品源文件载明 7 大 UN GHS 要素时必须 100% 完整保留 8/9 行标准拓扑 (含表头及附加信息) 与 14.6 参见6-8节事实',
     `ADG污染=${hasAdgPollution}, MARPOL保留=${hasMarpolInS14}, 行数=${s14RecCn?.rows.length}`,
     'Section 14 CN/EN'
   );

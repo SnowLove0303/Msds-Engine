@@ -2688,8 +2688,6 @@ export function formatSection11LabelCell(cell, numberStr, labelText, isEnglish =
  */
 export function formatSection14LabelCell(cell, numberStr, labelText, isEnglish = false) {
   if (!cell?.node) return;
-  // 9.1 外观黄金几何标尺：420 dxa 悬挂缩进 + <w:tab/> 激光垂直对齐 (REQ-GOLDEN-ANCHOR)
-  applyStandardHangingIndent(cell, '420', '420');
   const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
   if (ps.length === 0) return;
   const p = ps[0];
@@ -2700,6 +2698,24 @@ export function formatSection14LabelCell(cell, numberStr, labelText, isEnglish =
   }
   Array.from(p.getElementsByTagNameNS(W_NS, 'r')).forEach(r => p.removeChild(r));
 
+  if (!numberStr) {
+    // 子标签无序号形态 (如 附加信息：)：左缩进 420 dxa 纯净对齐父标签文字起笔线
+    const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+    if (pPr) {
+      let ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
+      if (!ind) {
+        ind = p.ownerDocument.createElementNS(W_NS, 'w:ind');
+        pPr.appendChild(ind);
+      }
+      ind.setAttributeNS(W_NS, 'w:left', '420');
+      ind.removeAttributeNS(W_NS, 'w:hanging');
+      ind.removeAttributeNS(W_NS, 'w:firstLine');
+    }
+  } else {
+    // 9.1 外观黄金几何标尺：420 dxa 悬挂缩进 + <w:tab/> 激光垂直对齐 (REQ-GOLDEN-ANCHOR)
+    applyStandardHangingIndent(cell, '420', '420');
+  }
+
   let cleanLabel = labelText.trim();
   if (isEnglish) {
     cleanLabel = cleanLabel.replace(/：/g, ':');
@@ -2709,32 +2725,34 @@ export function formatSection14LabelCell(cell, numberStr, labelText, isEnglish =
     if (!cleanLabel.endsWith('：')) cleanLabel += '：';
   }
 
-  // Run 1: 序号 Run + <w:tab/>
-  const r1 = p.ownerDocument.createElementNS(W_NS, 'w:r');
-  const rPr1 = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
-  const rFonts1 = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
-  rFonts1.setAttributeNS(W_NS, 'w:ascii', isEnglish ? 'Arial' : 'Times New Roman');
-  rFonts1.setAttributeNS(W_NS, 'w:hAnsi', isEnglish ? 'Arial' : 'Times New Roman');
-  rFonts1.setAttributeNS(W_NS, 'w:eastAsia', isEnglish ? 'Arial' : '宋体');
-  rFonts1.setAttributeNS(W_NS, 'w:cs', isEnglish ? 'Arial' : 'Times New Roman');
-  rPr1.appendChild(rFonts1);
-  const b1 = p.ownerDocument.createElementNS(W_NS, 'w:b');
-  rPr1.appendChild(b1);
-  const seqSz = !isEnglish ? (numberStr.length >= 5 ? '19' : '21') : (numberStr.length >= 5 ? '15' : '18');
-  const sz1 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
-  sz1.setAttributeNS(W_NS, 'w:val', seqSz);
-  rPr1.appendChild(sz1);
-  const szCs1 = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
-  szCs1.setAttributeNS(W_NS, 'w:val', seqSz);
-  rPr1.appendChild(szCs1);
-  r1.appendChild(rPr1);
+  // Run 1: 序号 Run + <w:tab/> (仅当存在序号时添加)
+  if (numberStr) {
+    const r1 = p.ownerDocument.createElementNS(W_NS, 'w:r');
+    const rPr1 = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
+    const rFonts1 = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+    rFonts1.setAttributeNS(W_NS, 'w:ascii', isEnglish ? 'Arial' : 'Times New Roman');
+    rFonts1.setAttributeNS(W_NS, 'w:hAnsi', isEnglish ? 'Arial' : 'Times New Roman');
+    rFonts1.setAttributeNS(W_NS, 'w:eastAsia', isEnglish ? 'Arial' : '宋体');
+    rFonts1.setAttributeNS(W_NS, 'w:cs', isEnglish ? 'Arial' : 'Times New Roman');
+    rPr1.appendChild(rFonts1);
+    const b1 = p.ownerDocument.createElementNS(W_NS, 'w:b');
+    rPr1.appendChild(b1);
+    const seqSz = !isEnglish ? (numberStr.length >= 5 ? '19' : '21') : (numberStr.length >= 5 ? '15' : '18');
+    const sz1 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
+    sz1.setAttributeNS(W_NS, 'w:val', seqSz);
+    rPr1.appendChild(sz1);
+    const szCs1 = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
+    szCs1.setAttributeNS(W_NS, 'w:val', seqSz);
+    rPr1.appendChild(szCs1);
+    r1.appendChild(rPr1);
 
-  const t1 = p.ownerDocument.createElementNS(W_NS, 'w:t');
-  t1.textContent = numberStr;
-  r1.appendChild(t1);
-  const tab = p.ownerDocument.createElementNS(W_NS, 'w:tab');
-  r1.appendChild(tab);
-  p.appendChild(r1);
+    const t1 = p.ownerDocument.createElementNS(W_NS, 'w:t');
+    t1.textContent = numberStr;
+    r1.appendChild(t1);
+    const tab = p.ownerDocument.createElementNS(W_NS, 'w:tab');
+    r1.appendChild(tab);
+    p.appendChild(r1);
+  }
 
   // Run 2: 标签 Run
   const r2 = p.ownerDocument.createElementNS(W_NS, 'w:r');

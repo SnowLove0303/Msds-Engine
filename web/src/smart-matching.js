@@ -1642,6 +1642,197 @@ export function decoupleSection11ToxicologyBlocks(cellText, rowObj = null) {
 }
 
 /**
+ * 判定一段文本是否具备“属性标签 (Label)”语义形态
+ * 覆盖序号开头、冒号结尾、短标签加粗、双语运输/理化专有名词等
+ */
+export function isLabelLike(txt, rawPara = null) {
+  if (!txt) return false;
+  const t = String(txt).trim();
+  if (!t) return false;
+  if (/^\s*(?:\d+(?:\.\d+)+|\d+[、.])/i.test(t)) return true; // e.g. 14.1, 9.1, 1., 2.
+  if (/[：:]\s*$/.test(t)) return true; // 以冒号结尾
+  const cs = safeColonSplit(t);
+  if (cs.hasColon && cs.label.length < 50 && !/[。！？!?;；]/.test(cs.label)) return true;
+  if (rawPara && Array.isArray(rawPara.runs) && rawPara.runs.some(r => r.bold || r.format?.bold) && t.length < 40 && !/[。！？!?]/.test(t)) {
+    return true;
+  }
+  if (/^(?:附加信息|用户特殊防范措施|特殊防范措施|包装组|运输危险级别|环境危害|海洋污染物|急救措施|消防措施|操作处置|储存条件|废弃处置|理化特性|毒理学信息|生态学信息|Additional information|Special precautions|Transport hazard class|Packing group|Environmental hazards|UN number|Proper shipping name)/i.test(t)) return true;
+  return false;
+}
+
+/**
+ * 通用多段落单元格键值对解构原语 (Universal Multi-Paragraph Cell-Pair Label-Value Deconstruction Engine)
+ * 适用于全系统 16 个章节的任意表格行。
+ * 能够优雅处理：
+ * 1. 同单元格内多段落 1:1 对齐（保留空白段落作为上一属性值的换行延续）；
+ * 2. 具有主标签与子标签（如 14.6 特殊防范措施 与 附加信息：）的多行层级解构；
+ * 3. 单单元格多行键值对；
+ * 4. 段落数不完全相等时的语义感知吸附与智能延续。
+ */
+export function decomposeCellPairToFacts(cell0, cell1, row = null, sectionNumber = null) {
+  const pairs = [];
+  if (!cell0 && !cell1) return pairs;
+
+  const getParas = (c) => {
+    if (!c) return [];
+    if (Array.isArray(c.paragraphs) && c.paragraphs.length > 0) {
+      return c.paragraphs.map(p => ({
+        text: sanitizeTypographyAndSymbols(p.text || ''),
+        rawPara: p
+      }));
+    }
+    const lines = sanitizeTypographyAndSymbols(c.text || '').split('\n');
+    return lines.map(l => ({ text: l, rawPara: null }));
+  };
+
+  const ps0 = getParas(cell0);
+  const ps1 = getParas(cell1);
+  const cell0Txt = ps0.map(p => p.text.trim()).filter(Boolean).join('\n');
+
+  // 单单元格处理 (仅 cell0 存在)
+  if (!cell1 || ps1.length === 0) {
+    const isSec11StructuredBlock = sectionNumber === 11 && (/物种|Species/i.test(cell0Txt) || /重复剂量/i.test(cell0Txt));
+    if (isSec11StructuredBlock) {
+      pairs.push({
+        rawLabel: '',
+        rawValue: sanitizeTypographyAndSymbols(cell0Txt),
+        rowObj: row
+      });
+      return pairs;
+    }
+
+    for (const p of ps0) {
+      const txt = p.text.trim();
+      if (!txt) continue;
+      const cs = safeColonSplit(txt);
+      if (cs.hasColon) {
+        pairs.push({
+          rawLabel: sanitizeTypographyAndSymbols(cs.label),
+          rawValue: sanitizeTypographyAndSymbols(cs.value),
+          rowObj: row
+        });
+      } else {
+        pairs.push({
+          rawLabel: '',
+          rawValue: txt,
+          rowObj: row
+        });
+      }
+    }
+    return pairs;
+  }
+
+  // 双单元格处理：
+  // 模式 1：ps0.length === ps1.length 且大于 1
+  if (ps0.length > 1 && ps0.length === ps1.length) {
+    let currentPair = null;
+    for (let k = 0; k < ps0.length; k++) {
+      const t0 = ps0[k].text.trim();
+      const t1 = ps1[k].text.trim();
+
+      if (t0) {
+        const cs0 = safeColonSplit(t0);
+        const label = sanitizeTypographyAndSymbols(cs0.hasColon ? cs0.label : t0);
+        let val = t1;
+        if (cs0.hasColon && cs0.value) {
+          val = `${cs0.value} ${t1}`.trim();
+        }
+        currentPair = {
+          rawLabel: label,
+          rawValue: sanitizeTypographyAndSymbols(val),
+          rowObj: row
+        };
+        pairs.push(currentPair);
+      } else {
+        // ps0[k] 为空白延续段落，说明 ps1[k] 是上一标签值的后续行！
+        if (currentPair && t1) {
+          currentPair.rawValue = currentPair.rawValue ? `${currentPair.rawValue}\n${t1}` : t1;
+        } else if (t1) {
+          currentPair = {
+            rawLabel: '',
+            rawValue: sanitizeTypographyAndSymbols(t1),
+            rowObj: row
+          };
+          pairs.push(currentPair);
+        }
+      }
+    }
+    return pairs;
+  }
+
+  // 模式 2：ps0 包含多个明确标签
+  const labelCountInPs0 = ps0.filter(p => isLabelLike(p.text, p.rawPara)).length;
+  if (labelCountInPs0 > 1) {
+    let currentPair = null;
+    let p1Idx = 0;
+
+    for (let p0Idx = 0; p0Idx < ps0.length; p0Idx++) {
+      const t0 = ps0[p0Idx].text.trim();
+      if (!t0) {
+        if (p1Idx < ps1.length) {
+          const valLine = ps1[p1Idx].text.trim();
+          p1Idx++;
+          if (currentPair && valLine) {
+            currentPair.rawValue = currentPair.rawValue ? `${currentPair.rawValue}\n${valLine}` : valLine;
+          }
+        }
+        continue;
+      }
+
+      const cs0 = safeColonSplit(t0);
+      const label = sanitizeTypographyAndSymbols(cs0.hasColon ? cs0.label : t0);
+      let inlineVal = cs0.hasColon && cs0.value ? cs0.value : '';
+
+      let col1Val = '';
+      if (p1Idx < ps1.length) {
+        col1Val = ps1[p1Idx].text.trim();
+        p1Idx++;
+      }
+
+      const fullVal = inlineVal ? `${inlineVal} ${col1Val}`.trim() : col1Val;
+      currentPair = {
+        rawLabel: label,
+        rawValue: sanitizeTypographyAndSymbols(fullVal),
+        rowObj: row
+      };
+      pairs.push(currentPair);
+    }
+
+    while (p1Idx < ps1.length) {
+      const remainingVal = ps1[p1Idx].text.trim();
+      p1Idx++;
+      if (remainingVal) {
+        if (currentPair) {
+          currentPair.rawValue = currentPair.rawValue ? `${currentPair.rawValue}\n${remainingVal}` : remainingVal;
+        } else {
+          pairs.push({
+            rawLabel: '',
+            rawValue: sanitizeTypographyAndSymbols(remainingVal),
+            rowObj: row
+          });
+        }
+      }
+    }
+    return pairs;
+  }
+
+  // 默认单对模式：ps0 是整体标签/叙述，ps1 是整体值
+  const cs0 = safeColonSplit(cell0Txt);
+  const label = cs0.hasColon ? cs0.label : cell0Txt;
+  const inlineVal = cs0.hasColon && cs0.value ? cs0.value : '';
+  const cell1Txt = ps1.map(p => p.text.trim()).filter(Boolean).join('\n');
+  const finalVal = inlineVal ? `${inlineVal} ${cell1Txt}`.trim() : cell1Txt;
+
+  pairs.push({
+    rawLabel: sanitizeTypographyAndSymbols(label),
+    rawValue: sanitizeTypographyAndSymbols(finalVal),
+    rowObj: row
+  });
+
+  return pairs;
+}
+
+/**
  * 核心匹配引擎：输入识别结果 records，输出标准匹配数据模型
  * 融合 16 章节局部约束插件、限定词前置解耦、非危运输级联、手套聚类与语义散文路由
  */
@@ -1759,42 +1950,17 @@ export function runSmartMatching(inspectorRecords) {
           }
         }
 
-        const multiLines0 = cellText.split('\n').map((l) => l.trim()).filter(Boolean);
-        const cell1Text = sanitizeTypographyAndSymbols(cell1?.text || '');
-        const multiLines1 = cell1Text.split('\n').map((l) => l.trim()).filter(Boolean);
+        const hasMultiParagraphs = (cell0?.paragraphs?.length > 1) || (cell1?.paragraphs?.length > 1) ||
+                                   (cellText.includes('\n')) || (cell1?.text && cell1.text.includes('\n'));
+        if (hasMultiParagraphs && row.cells.length <= 2) {
+          const multiPairs = decomposeCellPairToFacts(cell0, cell1, row, s);
+          if (multiPairs.length > 0) {
+            rawPairs.push(...multiPairs);
+            continue;
+          }
+        }
 
-        if (cell1 && multiLines0.length > 1 && multiLines0.length === multiLines1.length) {
-          // 单元格内换行配对拆解 (如 Section 9 中一个单元格并列两个理化指标)
-          for (let k = 0; k < multiLines0.length; k++) {
-            const l0 = multiLines0[k];
-            const l1 = multiLines1[k];
-            const cs0 = safeColonSplit(l0);
-            rawPairs.push({
-              rawLabel: sanitizeTypographyAndSymbols(cs0.hasColon ? cs0.label : l0),
-              rawValue: sanitizeTypographyAndSymbols(cs0.hasColon && cs0.value ? `${cs0.value} ${l1}`.trim() : l1),
-              rowObj: row,
-            });
-          }
-        } else if (multiLines0.length > 1 && !cell1 && multiLines0.every((l) => safeColonSplit(l).hasColon)) {
-          // Section 11 结构化毒理学研究试验块（物种/分类/结果 或 重复剂量中毒/病理变化）保持聚合整体，严禁行行孤立切散 (OW-161)
-          const isSec11StructuredBlock = s === 11 && (/物种|Species/i.test(cellText) || /重复剂量/i.test(cellText));
-          if (!isSec11StructuredBlock) {
-            for (const line of multiLines0) {
-              const cs = safeColonSplit(line);
-              rawPairs.push({
-                rawLabel: sanitizeTypographyAndSymbols(cs.label),
-                rawValue: sanitizeTypographyAndSymbols(cs.value),
-                rowObj: row,
-              });
-            }
-          } else {
-            rawPairs.push({
-              rawLabel: '',
-              rawValue: sanitizeTypographyAndSymbols(cellText),
-              rowObj: row,
-            });
-          }
-        } else if (pairLabel.trim() || pairValue.trim()) {
+        if (pairLabel.trim() || pairValue.trim()) {
           rawPairs.push({
             rawLabel: sanitizeTypographyAndSymbols(pairLabel.trim()),
             rawValue: sanitizeTypographyAndSymbols(pairValue.trim()),

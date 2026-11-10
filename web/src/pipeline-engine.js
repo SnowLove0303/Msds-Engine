@@ -87,7 +87,8 @@ import {
   applyMatchResultToEditor,
   extractSection3ExemptionNotes,
   detectNonHazardousComposite,
-  cleanSlateTemplate
+  cleanSlateTemplate,
+  decomposeCellPairToFacts
 } from './smart-matching.js';
 import {
   MSDS_DESIGN_TOKENS,
@@ -1915,32 +1916,47 @@ export function buildDynamicSection14Table(engine, srcEngine, baseCnEngine = nul
 
   const effectiveSrc = baseCnEngine || srcEngine;
   const srcS14 = effectiveSrc?.records?.find(r => r.sectionNumber === 14);
+
+  // 通用解构源文档 Section 14 所有行与多段落键值对
+  const s14Pairs = [];
+  if (srcS14 && srcS14.rows) {
+    for (const row of srcS14.rows) {
+      const pairs = decomposeCellPairToFacts(row.cells?.[0], row.cells?.[1], row, 14);
+      s14Pairs.push(...pairs);
+    }
+  }
+
   const srcS14Text = srcS14 ? srcS14.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n') : '';
 
-  const dgFacts = facts.dangerousGoods || {};
+  const dgFacts = facts.dangerousGoods || facts.transport || {};
   const unMatch = srcS14Text.match(/UN\s*(\d{4})/i) || srcS14Text.match(/联合国编号\s*[:：]?\s*(\d{4})/i) || srcS14Text.match(/14\.1[^\d]*(\d{4})/);
-  const unNo = dgFacts.unNumber || (unMatch ? unMatch[1] : null);
+  const unNo = s14Pairs.find(p => /14\.1|UN|联合国编号/i.test(p.rawLabel))?.rawValue || dgFacts.unNumber || (unMatch ? unMatch[1] : null);
   const isDangerousGoods = Boolean(unNo || facts.isDangerousGoods || dgFacts.unNumber || (facts.modelCode && /PU-2346A/i.test(facts.modelCode)));
 
   const psnMatch = srcS14Text.match(/联合国运输名称\s*[:：]?\s*([^\n\r]+)/i);
-  const psnCn = dgFacts.properShippingNameCn || (psnMatch ? psnMatch[1].trim() : (/树脂溶液/.test(srcS14Text) ? '树脂溶液' : '化学品'));
-  const psnEn = dgFacts.properShippingNameEn || (psnCn === '树脂溶液' ? 'RESIN SOLUTION' : 'CHEMICALS');
+  const psnPair = s14Pairs.find(p => /14\.2|运输名称|proper shipping name/i.test(p.rawLabel));
+  const psnCn = psnPair?.rawValue || dgFacts.properShippingNameCn || dgFacts.shippingNameCn || (psnMatch ? psnMatch[1].trim() : (/树脂溶液/.test(srcS14Text) ? '树脂溶液' : '化学品'));
+  const psnEn = dgFacts.properShippingNameEn || dgFacts.shippingNameEn || (psnCn === '树脂溶液' ? 'RESIN SOLUTION' : 'CHEMICALS');
 
   const hClassMatch = srcS14Text.match(/运输危险[级类]别\s*[:：]?\s*(\d)/) || srcS14Text.match(/14\.3[^\d]*(\d)/);
-  const hClass = dgFacts.hazardClass || (hClassMatch ? hClassMatch[1] : '3');
+  const hClassPair = s14Pairs.find(p => /14\.3|危险[级类]别|hazard class/i.test(p.rawLabel));
+  const hClass = hClassPair?.rawValue || dgFacts.hazardClass || (hClassMatch ? hClassMatch[1] : '3');
 
   const pgMatch = srcS14Text.match(/包装[组类]型?\s*[:：]?\s*([I|V]+)/i) || srcS14Text.match(/14\.4[^\w]*([I|V]+)/i);
-  const pg = dgFacts.packingGroup || (pgMatch ? pgMatch[1] : 'III');
+  const pgPair = s14Pairs.find(p => /14\.4|包装[组类]|packing group/i.test(p.rawLabel));
+  const pg = pgPair?.rawValue || dgFacts.packingGroup || (pgMatch ? pgMatch[1] : 'III');
 
   const envMatch = srcS14Text.match(/环境危险\s*[:：]?\s*([是|否|无])/i) || srcS14Text.match(/海洋污染物\s*[:：]?\s*([是|否])/i);
-  const envCn = envMatch ? envMatch[1] : (dgFacts.marinePollutant ? '是' : '否');
+  const envPair = s14Pairs.find(p => /14\.5|环境危|海洋污染物|marine pollutant|environmental hazard/i.test(p.rawLabel));
+  const envCn = envPair?.rawValue || (envMatch ? envMatch[1] : (dgFacts.marinePollutant ? '是' : '否'));
   const envEn = envCn === '是' ? 'Yes' : 'No';
 
   const hasMarpol = /MARPOL/i.test(srcS14Text) || Boolean(facts.marpol);
-  let marpolValCn = '不适用';
+  const marpolPair = s14Pairs.find(p => /14\.7|MARPOL|IBC/i.test(p.rawLabel));
+  let marpolValCn = marpolPair?.rawValue || dgFacts.marpol?.valCn || '不适用';
   if (/不适用/.test(srcS14Text)) {
     marpolValCn = '不适用';
-  } else {
+  } else if (!marpolPair) {
     const marpolMatch = srcS14Text.match(/IBC(?:规则|Code)?\s*[:：]?\s*([^\n\r]+)/i);
     if (marpolMatch && !/^\s*\d+\s*$/.test(marpolMatch[1])) {
       marpolValCn = marpolMatch[1].trim();
@@ -1948,49 +1964,45 @@ export function buildDynamicSection14Table(engine, srcEngine, baseCnEngine = nul
   }
   const marpolValEn = /不适用/i.test(marpolValCn) ? 'Not applicable.' : marpolValCn;
 
-  const specMatch = srcS14Text.match(/特殊防范措施\s*[:：]?\s*([^\n\r]+)/i);
-  const srcSpecRef = specMatch ? specMatch[1].trim() : '';
-  const hasTempHigh = srcS14Text.match(/高于\s*([+\-－]?\d+)℃/);
-  const hasTempLow = srcS14Text.match(/低于\s*([+\-－]?\d+)℃/);
-
-  let specCnParts = [];
-  if (srcSpecRef) specCnParts.push(`特殊防范措施：${srcSpecRef}`);
-  else if (/参见/i.test(srcS14Text)) specCnParts.push('参见6-8节。');
-  if (isDangerousGoods) specCnParts.push('具可燃性。');
-  else specCnParts.push('非危险货物。');
-
-  if (hasTempHigh || hasTempLow) {
-    const maxT = hasTempHigh ? hasTempHigh[1] : '+35';
-    const minT = hasTempLow ? hasTempLow[1].replace('－', '-') : (isDangerousGoods ? '-10' : '+5');
-    specCnParts.push(`温度不可高于${maxT.startsWith('+') ? maxT : '+' + maxT}℃，温度不可低于${minT}℃。`);
+  // 14.6 用户特殊防范措施 主值与附加信息子行
+  const specPair = s14Pairs.find(p => /14\.6|特殊防范|特殊注意事项|special precautions/i.test(p.rawLabel));
+  let specPrimaryCn = specPair?.rawValue?.trim() || dgFacts.specialPrecautions?.primaryCn || '';
+  if (!specPrimaryCn) {
+    if (/参见/i.test(srcS14Text)) specPrimaryCn = '参见6-8节';
+    else if (isDangerousGoods) specPrimaryCn = '具可燃性。';
+    else specPrimaryCn = '非危险货物。';
   }
-  if (/远离.*(?:食品|食物)/i.test(srcS14Text) || /远离.*(?:酸|碱)/i.test(srcS14Text)) {
-    specCnParts.push('远离食物、酸和碱。');
-  }
-  const fullSpecCn = specCnParts.join('\n');
 
-  let specEnParts = [];
-  if (srcSpecRef) {
-    const refEn = srcSpecRef.replace(/参见(?:第)?(\d+)[-－—~](\d+)节/, 'See sections $1-$2.');
-    specEnParts.push(refEn.includes('See') ? refEn : 'See sections 6-8.');
-  } else if (/参见/i.test(srcS14Text) || /See sections/i.test(srcS14Text)) {
-    specEnParts.push('See sections 6-8.');
+  let specPrimaryEn = dgFacts.specialPrecautions?.primaryEn || '';
+  if (!specPrimaryEn) {
+    const refEn = specPrimaryCn.replace(/参见(?:第)?(\d+)[-－—~](\d+)节?/, 'See sections $1-$2.');
+    specPrimaryEn = refEn.includes('See') ? refEn : (/See sections/i.test(specPrimaryCn) ? specPrimaryCn : (isDangerousGoods ? 'Flammable.' : 'Not regulated as dangerous goods.'));
   }
-  if (isDangerousGoods) specEnParts.push('Flammable.');
-  else specEnParts.push('Not regulated as dangerous goods.');
 
-  if (hasTempHigh || hasTempLow) {
-    const maxT = hasTempHigh ? hasTempHigh[1] : '+35';
-    const minT = hasTempLow ? hasTempLow[1].replace('－', '-') : (isDangerousGoods ? '-10' : '+5');
-    const normMax = maxT.startsWith('+') ? maxT : `+${maxT}`;
-    specEnParts.push(`Temperature must not exceed ${normMax}°C and must not fall below ${minT}°C.`);
+  const addInfoPair = s14Pairs.find(p => /附加信息|additional information/i.test(p.rawLabel));
+  let addInfoCn = addInfoPair?.rawValue?.trim() || dgFacts.additionalInfo?.rawCn || '';
+  let addInfoEn = '';
+  if (addInfoCn) {
+    const addInfoLines = addInfoCn.split('\n').map(l => l.trim()).filter(Boolean);
+    const addInfoEnLines = addInfoLines.map(line => {
+      let en = line;
+      if (/具可燃性/i.test(line)) {
+        let tMax = '+35';
+        let tMin = '-10';
+        const mHigh = line.match(/高于\s*([+\-－]?\d+)℃/);
+        const mLow = line.match(/低于\s*([+\-－]?\d+)℃/);
+        if (mHigh) tMax = mHigh[1].startsWith('+') ? mHigh[1] : `+${mHigh[1]}`;
+        if (mLow) tMin = mLow[1].replace('－', '-');
+        en = `Flammable. Temperature must not exceed ${tMax}°C and must not fall below ${tMin}°C.`;
+      } else if (/远离食物|远离.*酸.*碱/i.test(line)) {
+        en = 'Keep away from food, acids and bases.';
+      }
+      return en;
+    });
+    addInfoEn = addInfoEnLines.join('\n');
   }
-  if (/远离.*(?:食品|食物)/i.test(srcS14Text) || /远离.*(?:酸|碱)/i.test(srcS14Text)) {
-    specEnParts.push('Keep away from food, acids and bases.');
-  }
-  const fullSpecEn = specEnParts.join('\n');
 
-  // 构建标准行结构（REQ-S14-SOVEREIGNTY: 参考模板写法与几何规范构建源文件内容，绝不以源文件去适配模板预设标签）
+  // 构建标准行结构（REQ-S14-SOVEREIGNTY & REQ-S14-01/02）
   const ghsRows = [
     {
       seq: '14.1',
@@ -2031,17 +2043,28 @@ export function buildDynamicSection14Table(engine, srcEngine, baseCnEngine = nul
       seq: '14.6',
       labelCn: '用户特殊防范措施',
       labelEn: 'Special precautions for user',
-      valCn: fullSpecCn,
-      valEn: fullSpecEn
-    },
-    {
-      seq: '14.7',
-      labelCn: '按《MARPOL73/78》公约附则II和IBC规则',
-      labelEn: 'MARPOL 73/78 Annex II and IBC Code',
-      valCn: marpolValCn,
-      valEn: marpolValEn
+      valCn: specPrimaryCn,
+      valEn: specPrimaryEn
     }
   ];
+
+  if (addInfoCn) {
+    ghsRows.push({
+      seq: '', // 子标签无序号，自动以 420 dxa 纯净对齐父标签文字起笔线
+      labelCn: '附加信息',
+      labelEn: 'Additional information',
+      valCn: addInfoCn,
+      valEn: addInfoEn
+    });
+  }
+
+  ghsRows.push({
+    seq: '14.7',
+    labelCn: '按《MARPOL73/78》公约附则II和IBC规则',
+    labelEn: 'MARPOL 73/78 Annex II and IBC Code',
+    valCn: marpolValCn,
+    valEn: marpolValEn
+  });
 
   const modeRows = [
     {
@@ -2069,10 +2092,19 @@ export function buildDynamicSection14Table(engine, srcEngine, baseCnEngine = nul
       seq: '14.4',
       labelCn: '用户特殊注意事项',
       labelEn: 'Special precautions for user',
-      valCn: fullSpecCn || '非危险货物。',
-      valEn: fullSpecEn || 'Not regulated as dangerous goods.'
+      valCn: specPrimaryCn || '非危险货物。',
+      valEn: specPrimaryEn || 'Not regulated as dangerous goods.'
     }
   ];
+  if (addInfoCn) {
+    modeRows.push({
+      seq: '',
+      labelCn: '附加信息',
+      labelEn: 'Additional information',
+      valCn: addInfoCn,
+      valEn: addInfoEn
+    });
+  }
   if (hasMarpol) {
     modeRows.push({
       seq: '14.5',

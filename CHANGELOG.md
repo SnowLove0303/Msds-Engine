@@ -1,5 +1,57 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-10 MSDS Studio 底层通用多段落单元格键值对解构原语与 Section 14.6 主值与附加信息独立子行动态装配工程 (INV-UNIVERSAL-MULTI-PARAGRAPH-RECOGNITION)] - 突破全系统底层多段落单元格 .filter(Boolean) 行数比对失效历史瓶颈、建立跨 16 章节通用多段对齐与子标签解构原语 (decomposeCellPairToFacts)、精准识别 Section 14.6 主值“参见6-8节”与“附加信息”温控隔离事实、动态生成双语独立对称 9 行规范结构 (左缩进 420 dxa)、中央主审计 170 项全景全绿满分核销 (Exit Code 0)
+
+### 一、 变更背景与用户最高指令
+用户在审查产出物后下达关于系统通用底层识别能力与 Section 14.6 语义解构的最高指令：
+> “section14 对源文件内容的理解与分类还是不到位，特别是14.6 特殊防范措施及其子标签 附加信息，很明显啊，14.6 特殊防范措施 的值 是 “参见6-8节” ，而其子标签值是：具可燃性。温度不可高于+35℃，温度不可低于-10℃。远离食物、酸和碱。 ，说明 识别程序底层对这类问题的通用型理解能力与处理能力不是很足”  
+> “执行，此项请对识别模块进行通用型优化，请务必遵循Ps-openspec 关于系统底层的改动要求，需要注意的是，我们将整个msds studio 划分为底层（模板与拓扑结构、编辑器、映射、机械审计、识别模块、匹配引擎、MCP调用）和执行层（SKILL、全局规范与局部规范、审计规范），核心区分是 通用型固化层与具体执行层，一般来说只允许改执行层，但有些通用性问题或工作流调用普遍性存在的问题则需要改动通用固化层去解决，请严格遵守Ps-openspec 关于系统底层改动的说明”  
+> “所谓通用通用，指的是让你去以优化 识别模块 的标签与其值的识别逻辑，这个是系统底层的，不局限于section14 ，要的是防止出现类似情况时，能够精准识别和处理”
+
+### 二、 核心架构根因穿透与系统底层解法
+1. **历史病理根因穿透 (The Brittle Line-Count Filter Pathology)**：
+   - **问题根因**：原先系统在 `web/src/smart-matching.js`（原 1762 行）中使用 `multiLines0 = cellText.split('\n').filter(Boolean)` 与 `multiLines1 = cell1Text.split('\n').filter(Boolean)`，并严格要求 `multiLines0.length === multiLines1.length` 才能逐行拆解。
+   - **崩溃现场**：在源文档 Section 14 Row 3 中，Col 0 包含 7 个段落（14.3~14.6、附加信息、空行占位符、14.7），而 Col 1 包含 7 个段落（3、III、否、参见6-8节、具可燃性...、远离食物...、不适用）。由于 Col 0 的空行段落被 `.filter(Boolean)` 过滤，导致 Col 0 长度变为 6，而 Col 1 仍为 7；`6 !== 7` 导致整个多行配对逻辑彻底失效并回退，将 6 个标签与 7 个值混杂粘连成一个巨大的扁平单字符串，造成“参见6-8节”丢失，14.6 与附加信息严重挤压错位。
+2. **底层通用多段落单元格键值对解构原语 (Universal decomposeCellPairToFacts Primitives)**：
+   - 在 `web/src/smart-matching.js` 中研发并导出 `decomposeCellPairToFacts(cell0, cell1, row, sectionNumber)` 与 `isLabelLike(txt, rawPara)`：
+     - **段落节点级保真映射**：直接读取 `cell.paragraphs`，保留空白占位段落作为上一活跃属性值的换行延续（`\n`），彻底杜绝过早过滤；
+     - **智能标签与子标签感知**：通过正则序号（`14.1`, `9.1` 等）、冒号结尾、加粗样式及专有关键词，自适应识别主标签与子标签（如 `附加信息：`）；
+     - **跨章节底层通用性**：不仅彻底治愈 Section 14，更全面接入 `web/src/recognition-engine.js` 的 `parseSection9`、`parseSection10`、`parseSection12`、`parseSection14` 以及 `smart-matching.js` 的全量行匹配链路，任何章节存在多段压缩单元格时均可精准解构。
+3. **Section 14 动态拓扑装配与 14.6 主子标签分离呈现**：
+   - **`pipeline-engine.js:buildDynamicSection14Table` 重构**：
+     - Row 6：精准绑定主标签 `14.6 用户特殊防范措施：`，主值为 `参见6-8节`（英文版：`See sections 6-8.`）；
+     - Row 7：动态展开子行 `附加信息：`（英文版：`Additional information:`），其值承载完整的温控与隔离说明；
+     - Row 3：严格确立运输危险类别为源文件事实 `3`；
+   - **几何对齐与排版标尺 (420 dxa 纯净对齐)**：
+     - 升级 `docx-engine.js:formatSection14LabelCell`：当序号为空时，自动切换为 `w:left="420"` 纯左缩进，使“附加信息：”的首字与上方“用户特殊防范措施：”的首字精准处于同一垂直基准线，视觉层级完美呼应。
+4. **中央主审计套件 Item 151 升级与全量核销**：
+   - 升级 `run_master_msds_audit.mjs` 中的 Item 151 断言，容纳 8/9 行结构，并严格断言 14.6 包含“参见6-8节”/“See sections 6-8.”，实现 100% 机械闭环与防退化保护；
+   - 运行结果：**170/170 项全绿通过，真实退出码 0**。
+
+### 三、 物理实测与对账核销清单
+- **目标交付目录**：`E:\冠志\TDS MSDS (2)\待处理文件\PU-2346A\` 与 `MSDS-Engine\算法训练材料\TDS MSDS 重写版\01-1 单组份水性聚氨酯树脂 PU\PU-2346A\`
+- **生成交付物清单 (8 份全部最新同步)**：
+  1. `PU-2346A msds_CN 冠志.docx` (43,264 bytes)
+  2. `PU-2346A msds_CN 冠志.pdf` (272,979 bytes)
+  3. `PU-2346A msds_CN 国彩.docx` (43,245 bytes)
+  4. `PU-2346A msds_CN 国彩.pdf` (272,788 bytes)
+  5. `PU-2346A msds_EN Guanzhi.docx` (31,529 bytes)
+  6. `PU-2346A msds_EN Guanzhi.pdf` (158,261 bytes)
+  7. `PU-2346A msds_EN Guocai.docx` (31,496 bytes)
+  8. `PU-2346A msds_EN Guocai.pdf` (156,464 bytes)
+- **Section 14 结构 1:1 双语对账实测**：
+  - Row 1: `14.1 联合国编号` / `14.1 UN number` -> `1866`
+  - Row 2: `14.2 联合国运输名称` / `14.2 UN proper shipping name` -> `树脂溶液` / `RESIN SOLUTION`
+  - Row 3: `14.3 运输危险类别` / `14.3 Transport hazard class` -> `3`
+  - Row 4: `14.4 包装组` / `14.4 Packing group` -> `III`
+  - Row 5: `14.5 环境危害` / `14.5 Environmental hazards` -> `否` / `No`
+  - Row 6: `14.6 用户特殊防范措施` / `14.6 Special precautions for user` -> `参见6-8节` / `See sections 6-8.`
+  - Row 7: `附加信息` (缩进 420 dxa) / `Additional information` -> `具可燃性。温度不可高于+35℃，温度不可低于-10℃。\n远离食物、酸和碱。` / `Flammable. Temperature must not exceed +35°C and must not fall below -10°C.\nKeep away from food, acids and bases.`
+  - Row 8: `14.7 按《MARPOL73/78》公约附则II和IBC规则` / `14.7 MARPOL 73/78 Annex II and IBC Code` -> `不适用` / `Not applicable.`
+- **Central Master Audit 套件核销**：**170 / 170 100% 满分通过，退出码 0**。
+
+---
+
 ## [2026-11-10 MSDS Studio 基于章节最大序号位数自适应分层对齐引擎与 4 位数长序号舒适间距规范 (INV-ADAPTIVE-SEQUENCE-TIER-ALIGNMENT)] - 建立章节最大序号位数探查器实现 Tier A (3位数: 420 dxa / 80.28pt) 与 Tier B (4位数: 560 dxa / 87.28pt) 动态分层垂直对齐、为 Section 11 及未来长序号提供舒适呼吸间距、消除数字与英文文本紧邻边界盲区、中央主审计 170 项全景全绿满分核销 (Exit Code 0)
 
 ### 一、 变更背景与用户最高指令
