@@ -1,5 +1,36 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-11 MSDS Studio OS-8970 8 格式受控交付、修复 Section 11 多组分误判与端点动态装配缺陷 (INV-OS8970-PRODUCTION-AND-S11-TOPOLOGY)] - 完成 OS-8970 水性噁唑啉交联剂 8 格式交付物编译生产、彻底消除 Section 11 因 Section 3 组分数误判为通栏复合模式的系统顽疾、移除 !isNonHazComposite 阻断动态端点装配的陈旧条件、157 项中央主审计与双极双层深度审计 100% 满分全绿、全量同步 E 盘 (Exit Code 0)
+
+### 一、 需求背景与任务目标
+承接用户明确指令：“EP-1404 验收了，"F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料\水性噁唑啉交联剂\OS-8970\OS-8970 msds_CN 冠志.docx" 接下来8970”。
+系统严格遵循 **OrbitStack (Ps-openspec)** 轨道工程体系与 **AI-Harness** 工业级规范，经由 Step 0 门禁 1（1:1 需求物理对账矩阵）、Step 2 门禁 2（Ps-openspec 增量规格资产与双清单自证），推进单焦点执行生产。
+
+### 二、 核心问题排查与系统底层根治 (5-Whys & Systemic Fix)
+1. **Section 11 多组分复合范式误判根因 (Section 11 Paradigm Misjudgment)**：
+   - **现象**：在首轮编译 OS-8970 交付物时，`audit_bipolar_bilayer.mjs` 报出 3 项违章：
+     - `Section 11 中文版字体分离断言 (D-05/G-29)` 失败；
+     - `Section 11 英文版字体分离断言 (D-05/G-29)` 失败；
+     - `Section 11 (L-S11): 组分实测毒理试验数据保全` 失败。
+   - **深潜追溯**：
+     - 在 `pipeline-engine.js:2724` 中，判定是否为多组分复合模式的代码为：
+       `const isMultiComponent = Boolean(facts.isMultiComponentComposite || (facts.components && facts.components.length > 1));`
+     - 这一逻辑严重混淆了 **Section 3 的化学组分数量** 与 **Section 11 的毒理学多组分通栏详述**！任何水性乳液/分散体产品在 Section 3 中均天然包含主聚合物与水（组分 >= 2），但这绝不代表 Section 11 也需要走 `PARADIGM_1_FULL_WIDTH_MERGED`（4 行通栏大单元格详述复合模式）；
+     - 源文档 `OS-8970 msds_CN 冠志.docx` 的 Section 11 为标准的 8 行表格（5 个独立端点插槽：急性毒性、主要皮肤刺激性、主要粘膜刺激性、致敏性、致突变性）；
+     - 错误的 `isMultiComponent` 判定强行将 OS-8970 切换为通栏 4 行模式，且由于调用 `buildThreeTierSection11` 时未传递 `srcEngine`，导致 Row 3 的段落内容完全为空（0 个段落），引发字体分离与毒理数据保全三大断言同时熔断。
+   - **系统级根治方案**：
+     - **剥离 Section 3 组分数量对 Section 11 拓扑的错误传导**：将 `isMultiComponent` 严格收敛为显式标志位 `Boolean(facts.isMultiComponentComposite || facts.isMultiComponentS11)`，其余场景全量交由底层 `detectSection11Paradigm` 数据驱动判定；
+     - **清理 !isNonHazComposite 陈旧阻断条件**：在 `pipeline-engine.js:2974` 与 `3741` 中，移除了历史遗留的 `!isNonHazComposite` 阻断判断，确保非危产品的标准端点表格能够正常通过 `buildDynamicSection11Table` 动态装配；
+     - **注入 Section 11 前言声明行源文适配逻辑**：在 `buildDynamicSection11Table` 中，依据源文件 Section 11 Row 2 文本（如“类似产品的风险评估数据：”）自适应生成双语前言声明行（英文：“Risk assessment data of similar products:”），彻底杜绝口水话与失真翻译；
+     - **补全英文专业词汇映射库**：在 `pipeline-engine.js` 中新增 `Oxazoline-modified acrylic polymer`（噁唑啉改性丙烯酸聚合物）与 `Oxazoline-modified polymer aqueous dispersion`（水性噁唑啉聚合物分散体）的标准英译，确保英文交付物零中文字符残留（Gate 4 纯净度 100%）。
+
+### 三、 交付物物理验证与中央主审计全绿 (Master & Bilayer Audits Full Pass)
+1. **源码架构静态检查**：`node web/scripts/lint_code_invariants.mjs` -> **0 违规项，10 大硬门禁 100% 通过 (退出码 0)**；
+2. **双极双层全景机械深度审计**：`node web/scripts/audit_bipolar_bilayer.mjs` -> **0 缺陷，全景满分通过 (退出码 0)**；
+3. **157 项集中式中央主审计套件**：`node web/scripts/run_master_msds_audit.mjs` -> **157/157 项全部通过，0 缺陷 (退出码 0)**；
+4. **全量 8 份标准交付物已同步至用户协同目录**：
+   - 目标路径：`E:\冠志\TDS MSDS (2)\待处理文件\OS-8970\`（4 DOCX + 4 PDF，修改时间戳 14:20:14~14:20:18，时间差仅 4 秒）。
+
 ## [2026-11-11 MSDS Studio EP-1404 8 格式受控交付、解耦 GHS 危害与运输非危险货物判定缺陷 (INV-EP1404-PRODUCTION-AND-S14-DECOUPLING)] - 完成 EP-1404 水性环氧树脂 8 格式交付物编译生产、彻底解耦 GHS 危险品与运输危险品 (TDG) 判定混淆顽疾、实测 Section 5.3 烟尘归属与全篇表格标签/值纯左对齐通过、165/165 双极双层主审计满分全绿、全量同步 E 盘 (Exit Code 0)
 
 ### 一、 需求背景与任务目标
