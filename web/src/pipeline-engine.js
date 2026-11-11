@@ -4295,35 +4295,7 @@ export async function executeEightDeliverablesPipeline({
     enforceStructuralTypographyInvariants(eng, isEn);
     const s8Rec = eng.records.find(r => r.sectionNumber === 8);
     if (s8Rec) {
-      // 1. Table 8 值格字阶与字体全局统一性规范 (INV-FONT-UNIFORMITY):
-      // 中文版：值格统一为小四号 12pt (sz="24") 宋体常规体（严禁加粗）
-      // 英文版：值格统一为五号 9.5pt (sz="19") Arial 常规体
-      const targetSz = isEn ? '19' : '24';
-      const targetFont = isEn ? 'Arial' : '宋体';
-      for (let r = 2; r < s8Rec.rows.length; r++) {
-        const vCell = s8Rec.rows[r]?.cells?.[1];
-        if (vCell?.node) {
-          const rPrs = Array.from(vCell.node.getElementsByTagNameNS(W_NS, 'rPr'));
-          for (const rPr of rPrs) {
-            const bs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'b'));
-            bs.forEach(b => rPr.removeChild(b));
-            const bCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
-            bCss.forEach(b => rPr.removeChild(b));
-            const szs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'sz'));
-            szs.forEach(sz => sz.setAttribute('w:val', targetSz));
-            const szCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'szCs'));
-            szCss.forEach(szCs => szCs.setAttribute('w:val', targetSz));
-            const rFontsList = Array.from(rPr.getElementsByTagNameNS(W_NS, 'rFonts'));
-            for (const rf of rFontsList) {
-              rf.setAttribute('w:ascii', targetFont);
-              rf.setAttribute('w:hAnsi', targetFont);
-              rf.setAttribute('w:eastAsia', targetFont);
-              rf.setAttribute('w:cs', targetFont);
-            }
-          }
-        }
-      }
-      // 2. Section 8 中文手部防护缩进规范: 统一采用 420 dxa 左缩进，与 8.1 暴字与 9.1 外观绝对铅垂对齐 (REQ-SUB-PARENT-ALIGN)
+      // Section 8 中文手部防护缩进规范: 统一采用 420 dxa 左缩进，与 8.1 暴字与 9.1 外观绝对铅垂对齐 (REQ-SUB-PARENT-ALIGN)
       const handRowCn = s8Rec.rows.find(row => /手部防护/i.test(row.cells[0]?.text || ''));
       if (handRowCn && handRowCn.cells[0]?.node) {
         const c0 = handRowCn.cells[0].node;
@@ -4338,19 +4310,6 @@ export async function executeEightDeliverablesPipeline({
           ind.removeAttributeNS(W_NS, 'leftChars');
           ind.setAttributeNS(W_NS, 'w:leftChars', '0');
         });
-      }
-      // 3. Section 8 英文标签题头统一字号规范: 全量统一为 w:sz="19" (9.5pt 加粗)，彻底废除 24 局部放大 (DEF-12)
-      if (isEn) {
-        for (let r = 2; r < s8Rec.rows.length; r++) {
-          const c0 = s8Rec.rows[r]?.cells?.[0]?.node;
-          const targetSz = '19';
-          if (c0) {
-            const szs = Array.from(c0.getElementsByTagNameNS(W_NS, 'sz'));
-            szs.forEach(sz => sz.setAttribute('w:val', targetSz));
-            const szCss = Array.from(c0.getElementsByTagNameNS(W_NS, 'szCs'));
-            szCss.forEach(szCs => szCs.setAttribute('w:val', targetSz));
-          }
-        }
       }
     }
     // 4. Section 13 废弃处置段落对齐规范 (INV-S13-01): 英文版内容严格纯左对齐 (left)，中文版保持两端对齐 (both)
@@ -4563,11 +4522,25 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
   // 2.1 Section 8: 手部防护父级分类题头字号规范 (INV-S8-HAND)
   // 中文版“手部防护：”统一为 12pt (sz="24" 加粗)，英文版“Hand protection:”统一为 9.5pt (sz="19" 加粗)
   if (s8Rec) {
+    const targetHandSz = isEn ? '19' : '24';
     for (const row of s8Rec.rows) {
       const text = (row.cells[0]?.text || '').trim();
       if (/^(?:手部防护|Hand protection)[：:]?/i.test(text)) {
         const c0 = row.cells[0]?.node;
         if (c0) {
+          const p = c0.getElementsByTagNameNS(W_NS, 'p')[0];
+          if (p) {
+            let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+            if (pPr) {
+              const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
+              if (pRPr) {
+                const pSzs = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'sz'));
+                pSzs.forEach(sz => sz.setAttribute('w:val', targetHandSz));
+                const pSzCss = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'szCs'));
+                pSzCss.forEach(szCs => szCs.setAttribute('w:val', targetHandSz));
+              }
+            }
+          }
           const runs = Array.from(c0.getElementsByTagNameNS(W_NS, 'r'));
           for (const run of runs) {
             let rPr = run.getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');
@@ -4577,10 +4550,10 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
             let bCs = rPr.getElementsByTagNameNS(W_NS, 'bCs')[0] || doc.createElementNS(W_NS, 'w:bCs');
             if (!rPr.getElementsByTagNameNS(W_NS, 'bCs')[0]) rPr.appendChild(bCs);
             let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0] || doc.createElementNS(W_NS, 'w:sz');
-            sz.setAttribute('w:val', '24');
+            sz.setAttribute('w:val', targetHandSz);
             if (!rPr.getElementsByTagNameNS(W_NS, 'sz')[0]) rPr.appendChild(sz);
             let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || doc.createElementNS(W_NS, 'w:szCs');
-            szCs.setAttribute('w:val', '24');
+            szCs.setAttribute('w:val', targetHandSz);
             if (!rPr.getElementsByTagNameNS(W_NS, 'szCs')[0]) rPr.appendChild(szCs);
             let rf = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || doc.createElementNS(W_NS, 'w:rFonts');
             rf.setAttribute('w:ascii', isEn ? 'Arial' : 'Times New Roman');
@@ -4679,7 +4652,7 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
           const runText = (run.textContent || '').trim();
           const hasTab = run.getElementsByTagNameNS(W_NS, 'tab').length > 0 || run.getElementsByTagName('tab').length > 0;
           const isSeqRun = hasTab || /^(\d+\.\d+(?:\.\d+)?)\s*$/.test(runText);
-          const targetSz = isSeqRun ? ((runText.length >= 5) ? '15' : '18') : '19';
+          const targetSz = '19';
 
           let rPr = run.getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');
           if (!run.getElementsByTagNameNS(W_NS, 'rPr')[0]) run.insertBefore(rPr, run.firstChild);
@@ -5498,7 +5471,7 @@ export function rebuildUnifiedLabelRun(p, seqStr, labelText, { font, asciiFont, 
     if (font === '宋体') {
       seqSz = (seqStr.length >= 5) ? '20' : '21';
     } else {
-      seqSz = (seqStr.length >= 5) ? '18' : '19';
+      seqSz = '19';
     }
     applyRunProps(rPrSeq, { font: asciiFont || (font === '宋体' ? 'Times New Roman' : 'Arial'), asciiFont: asciiFont || (font === '宋体' ? 'Times New Roman' : 'Arial'), sizeVal: seqSz, bold }, W_NS);
     rSeq.appendChild(rPrSeq);
@@ -5890,11 +5863,11 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
       const cells = Array.from(rows[r].getElementsByTagNameNS(W_NS, 'tc'));
       if (cells.length < 2) continue;
       const rowText = cells.map(c => (c.textContent || '').trim()).join(' ');
-      if (/化学品名称.*CAS编号|物质.*依据.*类型|Components.*Basis.*Type|Substance.*Basis.*Type/i.test(rowText)) continue;
+      if (/化学品名称.*CAS编号|Chemical\s*name.*CAS|Components?.*(?:CAS|Conc)|物质.*依据.*类型|Components.*Basis.*Type|Substance.*Basis.*Type/i.test(rowText)) continue;
       for (let c = 1; c < cells.length; c++) {
         const cell = cells[c];
         const cellText = (cell.textContent || '').trim();
-        if (/^(?:CAS编号|含量%（w\/w）|CAS NO\.|Concentration % \(w\/w\)|依据|类型|数值|Basis|Type|Value)$/i.test(cellText)) continue;
+        if (/^(?:CAS编号|含量%（w\/w）|CAS\s*NO\.?|Concentration\s*%\s*\(w\/w\)\.?|依据|类型|数值|Basis|Type|Value)$/i.test(cellText)) continue;
         const runs = Array.from(cell.getElementsByTagNameNS(W_NS, 'r'));
         for (const run of runs) {
           const runText = (run.textContent || '').trim();

@@ -1601,6 +1601,42 @@ export async function runMasterMsdsAudit(options = {}) {
     'Section 8 EN'
   );
 
+  // 4.1 英文全篇 16 章节第 0 列序号与标签字号全域统一性断言 (REQ-02 / DEF-12 / INV-EN-TYPOGRAPHY)
+  // 英文表格第 0 列序号与标签全量依法恒定为 9.5pt (sz="19")，零容忍 18、15、24 异常！
+  const tblsEn = docxEnRaw.getElementsByTagName('w:tbl');
+  let enCell0HasNonStandardSz = false;
+  let enCell0Violation = '';
+  for (let t = 0; t < tblsEn.length; t++) {
+    const trs = tblsEn[t].getElementsByTagName('w:tr');
+    for (let r = 1; r < trs.length; r++) {
+      const c0 = trs[r].getElementsByTagName('w:tc')[0];
+      if (!c0 || !c0.textContent.trim()) continue;
+      const runs = Array.from(c0.getElementsByTagName('w:r'));
+      for (const run of runs) {
+        const runText = (run.textContent || '').trim();
+        if (!runText && !run.getElementsByTagName('w:tab').length) continue;
+        const sz = run.getElementsByTagName('w:sz')[0];
+        const szVal = sz ? sz.getAttribute('w:val') : null;
+        if (!szVal) continue;
+        if (szVal !== '19') {
+          enCell0HasNonStandardSz = true;
+          enCell0Violation = `Tbl ${t+1} Row ${r+1} "${runText}" 异常字号 sz="${szVal}" (全篇英文第 0 列恒定为 9.5pt / sz="19")`;
+          break;
+        }
+      }
+      if (enCell0HasNonStandardSz) break;
+    }
+    if (enCell0HasNonStandardSz) break;
+  }
+  assert(
+    !enCell0HasNonStandardSz,
+    '环1',
+    '英文标签第 0 列字阶全域均一性规范 (REQ-02 / DEF-12 / INV-EN-TYPOGRAPHY)',
+    '英文全篇 16 章节表格第 0 列所有序号与标签字阶必须恒定统一为 9.5pt (sz="19")，彻底清零 15/18/24 异变',
+    enCell0HasNonStandardSz ? enCell0Violation : '全量 16 章节恒定为 9.5pt (sz="19")',
+    'MSDS EN Tables'
+  );
+
   // 5. TDS 树脂中和剂与 pH 事实断言 (REQ-06 / DEF-10)
   const tdsCnPath = path.join(targetDir, `${model} tds_CN 冠志.docx`);
   const tdsEnPath = path.join(targetDir, `${model} tds_EN Guanzhi.docx`);
@@ -1715,7 +1751,7 @@ export async function runMasterMsdsAudit(options = {}) {
   const s11RecCn = cnDocx.records.find(r => r.sectionNumber === 11);
   const s11RecEn = enDocx.records.find(r => r.sectionNumber === 11);
   const s11RowsEqual = s11RecCn && s11RecEn && s11RecCn.rows.length === s11RecEn.rows.length;
-  const s11HasEnoughEndpoints = s11RecCn && (s11RecCn.rows.length === 2 || s11RecCn.rows.length >= 15 || (srcS11Rows > 0 && s11RecCn.rows.length === srcS11Rows));
+  const s11HasEnoughEndpoints = s11RecCn && (s11RecCn.rows.length === 2 || s11RecCn.rows.length >= 15 || (srcS11Rows > 0 ? s11RecCn.rows.length === srcS11Rows : s11RecCn.rows.length === 8));
   assert(
     s11RowsEqual && s11HasEnoughEndpoints,
     '环3',

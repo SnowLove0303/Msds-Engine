@@ -2687,13 +2687,15 @@ export function formatSection11LabelCell(cell, numberStr, labelText, isEnglish =
   rPr1.appendChild(rFonts1);
   const b1 = p.ownerDocument.createElementNS(W_NS, 'w:b');
   rPr1.appendChild(b1);
-  const seqSz = !isEnglish ? '21' : '18';
+  const seqSz = !isEnglish ? '21' : '19';
   const sz1 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
   sz1.setAttributeNS(W_NS, 'w:val', seqSz);
   rPr1.appendChild(sz1);
   const szCs1 = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
   szCs1.setAttributeNS(W_NS, 'w:val', seqSz);
   rPr1.appendChild(szCs1);
+  const bCs1 = p.ownerDocument.createElementNS(W_NS, 'w:bCs');
+  rPr1.appendChild(bCs1);
   r1.appendChild(rPr1);
 
   const t1 = p.ownerDocument.createElementNS(W_NS, 'w:t');
@@ -2793,13 +2795,15 @@ export function formatSection14LabelCell(cell, numberStr, labelText, isEnglish =
     rPr1.appendChild(rFonts1);
     const b1 = p.ownerDocument.createElementNS(W_NS, 'w:b');
     rPr1.appendChild(b1);
-    const seqSz = !isEnglish ? (numberStr.length >= 5 ? '19' : '21') : (numberStr.length >= 5 ? '15' : '18');
+    const seqSz = !isEnglish ? (numberStr.length >= 5 ? '19' : '21') : '19';
     const sz1 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
     sz1.setAttributeNS(W_NS, 'w:val', seqSz);
     rPr1.appendChild(sz1);
     const szCs1 = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
     szCs1.setAttributeNS(W_NS, 'w:val', seqSz);
     rPr1.appendChild(szCs1);
+    const bCs1 = p.ownerDocument.createElementNS(W_NS, 'w:bCs');
+    rPr1.appendChild(bCs1);
     r1.appendChild(rPr1);
 
     const t1 = p.ownerDocument.createElementNS(W_NS, 'w:t');
@@ -3135,23 +3139,53 @@ export function applySemanticCellFormat(cell, semanticType, content, isEnglish =
   spacing.setAttributeNS(W_NS, 'w:line', '300');
   spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
 
+  const szVal = isEnglish ? '19' : '24';
+  const fontName = isEnglish ? 'Arial' : '宋体';
+  const asciiFont = isEnglish ? 'Arial' : 'Times New Roman';
+
   if (semanticType === 'label') {
-    // 标签：强制加粗，字号 12pt (sz=24)
+    // 标签：强制加粗，字号 12pt (sz=24 for CN) / 9.5pt (sz=19 for EN)
     const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
     for (const r of runs) {
       let rPr = r.getElementsByTagNameNS(W_NS, 'w:rPr')[0] || r.querySelector('rPr');
       if (!rPr) {
         rPr = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
-        r.insertBefore(rPr, r.firstChild);
+        p.insertBefore(rPr, r.firstChild);
       }
       let b = rPr.getElementsByTagNameNS(W_NS, 'w:b')[0] || rPr.querySelector('b');
       if (!b) {
         b = p.ownerDocument.createElementNS(W_NS, 'w:b');
         rPr.appendChild(b);
       }
+      let bCs = rPr.getElementsByTagNameNS(W_NS, 'w:bCs')[0] || rPr.querySelector('bCs');
+      if (!bCs) {
+        bCs = p.ownerDocument.createElementNS(W_NS, 'w:bCs');
+        rPr.appendChild(bCs);
+      }
+      let sz = rPr.getElementsByTagNameNS(W_NS, 'w:sz')[0] || rPr.querySelector('sz');
+      if (!sz) {
+        sz = p.ownerDocument.createElementNS(W_NS, 'w:sz');
+        rPr.appendChild(sz);
+      }
+      sz.setAttributeNS(W_NS, 'w:val', szVal);
+      let szCs = rPr.getElementsByTagNameNS(W_NS, 'w:szCs')[0] || rPr.querySelector('szCs');
+      if (!szCs) {
+        szCs = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
+        rPr.appendChild(szCs);
+      }
+      szCs.setAttributeNS(W_NS, 'w:val', szVal);
+      let rFonts = rPr.getElementsByTagNameNS(W_NS, 'w:rFonts')[0] || rPr.querySelector('rFonts');
+      if (!rFonts) {
+        rFonts = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+        rPr.appendChild(rFonts);
+      }
+      rFonts.setAttributeNS(W_NS, 'w:ascii', asciiFont);
+      rFonts.setAttributeNS(W_NS, 'w:hAnsi', asciiFont);
+      rFonts.setAttributeNS(W_NS, 'w:eastAsia', fontName);
+      rFonts.setAttributeNS(W_NS, 'w:cs', asciiFont);
     }
   } else if (semanticType === 'value') {
-    // 值：强制非加粗，字号 12pt (sz=24)，无悬挂缩进
+    // 值：强制非加粗，字号 12pt (sz=24 for CN) / 9.5pt (sz=19 for EN)，无悬挂缩进
     const existingInds = Array.from(pPr.getElementsByTagNameNS(W_NS, 'ind'));
     existingInds.forEach(node => pPr.removeChild(node));
     const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
@@ -3162,6 +3196,27 @@ export function applySemanticCellFormat(cell, semanticType, content, isEnglish =
         bs.forEach(bNode => rPr.removeChild(bNode));
         const bcss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
         bcss.forEach(bNode => rPr.removeChild(bNode));
+        let sz = rPr.getElementsByTagNameNS(W_NS, 'w:sz')[0] || rPr.querySelector('sz');
+        if (!sz) {
+          sz = p.ownerDocument.createElementNS(W_NS, 'w:sz');
+          rPr.appendChild(sz);
+        }
+        sz.setAttributeNS(W_NS, 'w:val', szVal);
+        let szCs = rPr.getElementsByTagNameNS(W_NS, 'w:szCs')[0] || rPr.querySelector('szCs');
+        if (!szCs) {
+          szCs = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
+          rPr.appendChild(szCs);
+        }
+        szCs.setAttributeNS(W_NS, 'w:val', szVal);
+        let rFonts = rPr.getElementsByTagNameNS(W_NS, 'w:rFonts')[0] || rPr.querySelector('rFonts');
+        if (!rFonts) {
+          rFonts = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+          rPr.appendChild(rFonts);
+        }
+        rFonts.setAttributeNS(W_NS, 'w:ascii', asciiFont);
+        rFonts.setAttributeNS(W_NS, 'w:hAnsi', asciiFont);
+        rFonts.setAttributeNS(W_NS, 'w:eastAsia', fontName);
+        rFonts.setAttributeNS(W_NS, 'w:cs', asciiFont);
       }
     }
   }
@@ -3543,36 +3598,60 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
           }
         }
       } else {
-        // 通用通栏行：按 boldSubheaders 整体判断
-        const isBold = options.isEnglish
-          ? /^(?:GHS hazard classification|Label elements|GHS pictograms|Signal word|Hazard statements|Precautionary statements|Prevention|Response|Storage|Disposal|Physical and chemical hazards|Health hazards|Environmental hazards)[:：]/i.test(trimmed)
-          : /^(?:GHS危险性类别|羟基丙烯酸酯聚合物GHS危险性分类|标签要素|象形图|警告词|危害性说明|防范说明|预防措施|事故响应|安全储存|安全存储|废弃处置|物理化学危险|健康危害|环境危害)[:：]?/i.test(trimmed);
-        runSpecs = [{ text: pText, bold: Boolean(options.boldSubheaders && isBold) }];
+        // 通用通栏行：支持通用键值对冒号解耦 (Label Bold, Value Regular)
+        const genKvMatch = pText.match(/^([^：:\n]+[：:])\s*(.*)$/);
+        if (options.boldSubheaders && genKvMatch) {
+          const sep = options.isEnglish ? ' ' : '';
+          runSpecs = [
+            { text: genKvMatch[1], bold: true }
+          ];
+          if (genKvMatch[2]) {
+            runSpecs.push({ text: sep + genKvMatch[2], bold: false });
+          }
+        } else {
+          const isBold = options.isEnglish
+            ? /^(?:GHS hazard classification|Label elements|GHS pictograms|Signal word|Hazard statements|Precautionary statements|Prevention|Response|Storage|Disposal|Physical and chemical hazards|Health hazards|Environmental hazards)[:：]/i.test(trimmed)
+            : /^(?:GHS危险性类别|羟基丙烯酸酯聚合物GHS危险性分类|标签要素|象形图|警告词|危害性说明|防范说明|预防措施|事故响应|安全储存|安全存储|废弃处置|物理化学危险|健康危害|环境危害)[:：]?/i.test(trimmed);
+          runSpecs = [{ text: pText, bold: Boolean(options.boldSubheaders && isBold) }];
+        }
       }
 
       for (const rSpec of runSpecs) {
         const rNode = doc.createElementNS(W_NS, 'w:r');
         const rPr = doc.createElementNS(W_NS, 'w:rPr');
         const rFonts = doc.createElementNS(W_NS, 'w:rFonts');
+        const fontAscii = options.isEnglish ? 'Arial' : (options.isSection11 ? '宋体' : 'Times New Roman');
+        const fontEastAsia = options.isEnglish ? 'Arial' : '宋体';
         if (options.isEnglish) {
           rFonts.setAttributeNS(W_NS, 'w:ascii', 'Arial');
           rFonts.setAttributeNS(W_NS, 'w:hAnsi', 'Arial');
+          rFonts.setAttributeNS(W_NS, 'w:eastAsia', 'Arial');
+          rFonts.setAttributeNS(W_NS, 'w:cs', 'Arial');
         } else {
           rFonts.setAttributeNS(W_NS, 'w:hint', 'eastAsia');
-          rFonts.setAttributeNS(W_NS, 'w:ascii', options.isSection11 ? '宋体' : 'Times New Roman');
-          rFonts.setAttributeNS(W_NS, 'w:hAnsi', options.isSection11 ? '宋体' : 'Times New Roman');
-          rFonts.setAttributeNS(W_NS, 'w:eastAsia', '宋体');
+          rFonts.setAttributeNS(W_NS, 'w:ascii', fontAscii);
+          rFonts.setAttributeNS(W_NS, 'w:hAnsi', fontAscii);
+          rFonts.setAttributeNS(W_NS, 'w:eastAsia', fontEastAsia);
+          rFonts.setAttributeNS(W_NS, 'w:cs', fontAscii);
         }
         rPr.appendChild(rFonts);
 
-        const sz = doc.createElementNS(W_NS, 'w:sz');
         const defaultTwips = options.isEnglish ? '19' : '24';
-        sz.setAttributeNS(W_NS, 'w:val', options.fontSizeTwips ? String(options.fontSizeTwips) : defaultTwips);
+        const finalTwips = options.fontSizeTwips ? String(options.fontSizeTwips) : defaultTwips;
+
+        const sz = doc.createElementNS(W_NS, 'w:sz');
+        sz.setAttributeNS(W_NS, 'w:val', finalTwips);
         rPr.appendChild(sz);
+
+        const szCs = doc.createElementNS(W_NS, 'w:szCs');
+        szCs.setAttributeNS(W_NS, 'w:val', finalTwips);
+        rPr.appendChild(szCs);
 
         if (rSpec.bold) {
           const b = doc.createElementNS(W_NS, 'w:b');
           rPr.appendChild(b);
+          const bCs = doc.createElementNS(W_NS, 'w:bCs');
+          rPr.appendChild(bCs);
         }
 
         rNode.appendChild(rPr);

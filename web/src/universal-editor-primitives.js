@@ -5,22 +5,34 @@ import { W_NS, DocxEngineError } from './docx-engine.js';
  * MSDS 全文档工业级设计令牌单一真理源 (Single Source of Truth)
  * 彻底隔离内容与排版。上层业务代码只允许写入纯文本事实，严禁在局部私自指定或篡改字阶与字体！
  */
+// @ANTIGRAVITY_INVARIANT_LOCK_START: MSDS_UNIVERSAL_DESIGN_TOKENS_IMMUTABLE
+/**
+ * MSDS 全文档工业级设计令牌单一真理源 (Single Source of Truth)
+ * 彻底隔离内容与排版。上层业务代码只允许写入纯文本事实，严禁在局部私自指定或篡改字阶与字体！
+ * 全篇 16 个章节与页眉页脚，全部受控于本真理源，严格杜绝局部特判与字阶断层。
+ */
 export const MSDS_DESIGN_TOKENS = Object.freeze({
   CN: Object.freeze({
-    SECTION_HEADER: Object.freeze({ font: '宋体', sz: '24', sizePt: 12, bold: true }),
-    LABEL_BOLD: Object.freeze({ font: '宋体', sz: '24', sizePt: 12, bold: true }),
-    LABEL_SEQ: Object.freeze({ font: 'Times New Roman', sz: '24', sizePt: 12, bold: true }),
-    TABLE_VALUE: Object.freeze({ font: '宋体', sz: '24', sizePt: 12, bold: false }), // 全局 16 章节值格恒为小四号 12pt 宋体常规体
-    TABLE_HEADER: Object.freeze({ font: '宋体', sz: '24', sizePt: 12, bold: true }),
-    PREAMBLE: Object.freeze({ font: '宋体', sz: '24', sizePt: 12, bold: false }),
+    SECTION_HEADER: Object.freeze({ font: '宋体', asciiFont: 'Times New Roman', sz: '24', szCs: '24', sizePt: 12, bold: true }),
+    LABEL_BOLD: Object.freeze({ font: '宋体', asciiFont: 'Times New Roman', sz: '24', szCs: '24', sizePt: 12, bold: true }),
+    LABEL_SEQ: Object.freeze({ font: 'Times New Roman', asciiFont: 'Times New Roman', sz: '21', szCs: '21', sizePt: 10.5, bold: true }),
+    LABEL_SEQ_TIER_B: Object.freeze({ font: 'Times New Roman', asciiFont: 'Times New Roman', sz: '19', szCs: '19', sizePt: 9.5, bold: true }),
+    TABLE_VALUE: Object.freeze({ font: '宋体', asciiFont: 'Times New Roman', sz: '24', szCs: '24', sizePt: 12, bold: false }), // 全局 16 章节值格恒为小四号 12pt 宋体常规体
+    TABLE_HEADER: Object.freeze({ font: '宋体', asciiFont: 'Times New Roman', sz: '24', szCs: '24', sizePt: 12, bold: true }),
+    PREAMBLE: Object.freeze({ font: '宋体', asciiFont: 'Times New Roman', sz: '24', szCs: '24', sizePt: 12, bold: false }),
+    HEADER: Object.freeze({ font: '宋体', asciiFont: 'Times New Roman', sz: '18', szCs: '18', sizePt: 9, bold: false }),
+    FOOTER: Object.freeze({ font: '宋体', asciiFont: 'Times New Roman', sz: '18', szCs: '18', sizePt: 9, bold: false }),
   }),
   EN: Object.freeze({
-    SECTION_HEADER: Object.freeze({ font: 'Arial', sz: '22', sizePt: 11, bold: true }),
-    LABEL_BOLD: Object.freeze({ font: 'Arial', sz: '19', sizePt: 9.5, bold: true }),
-    LABEL_SEQ: Object.freeze({ font: 'Arial', sz: '19', sizePt: 9.5, bold: true }),
-    TABLE_VALUE: Object.freeze({ font: 'Arial', sz: '19', sizePt: 9.5, bold: false }), // 全局 16 章节值格恒为五号 9.5pt Arial 常规体
-    TABLE_HEADER: Object.freeze({ font: 'Arial', sz: '19', sizePt: 9.5, bold: true }),
-    PREAMBLE: Object.freeze({ font: 'Arial', sz: '19', sizePt: 9.5, bold: false }),
+    SECTION_HEADER: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '22', szCs: '22', sizePt: 11, bold: true }),
+    LABEL_BOLD: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '19', szCs: '19', sizePt: 9.5, bold: true }),
+    LABEL_SEQ: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '19', szCs: '19', sizePt: 9.5, bold: true }), // 英文全篇 16 章节所有序号恒定为 9.5pt (sz="19")
+    LABEL_SEQ_TIER_B: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '19', szCs: '19', sizePt: 9.5, bold: true }),
+    TABLE_VALUE: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '19', szCs: '19', sizePt: 9.5, bold: false }), // 全局 16 章节值格恒为五号 9.5pt Arial 常规体
+    TABLE_HEADER: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '19', szCs: '19', sizePt: 9.5, bold: true }),
+    PREAMBLE: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '19', szCs: '19', sizePt: 9.5, bold: false }),
+    HEADER: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '18', szCs: '18', sizePt: 9, bold: false }),
+    FOOTER: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '18', szCs: '18', sizePt: 9, bold: false }),
   })
 });
 // @ANTIGRAVITY_INVARIANT_LOCK_END
@@ -296,9 +308,9 @@ export function parseChemicalFormulaRuns(text, baseStyle = {}) {
 /**
  * 编辑器底层法定投影：全文档跨章节终审排版投影引擎 (Global Typography Projection Engine)
  * 物理杜绝跨章节字阶脱节、局部 Agent 私自篡改或审计误导修改。
- * 遍历全文档所有 16 个表格的所有值格，统一单向强制投影为标准 Design Tokens！
- * 包含：清理模板残留幽灵空 Run、标准字阶字体投影、符号规范化 (≥/≤、单位空格、标点纯净)。
- * 注意：必须使用 setAttribute('w:val', ...) 避免 xmldom 属性命名空间分裂导致重复属性。
+ * 遍历全文档所有 16 个表格的所有行、列、单元格、段落与 Run，以及页眉页脚底层 XML，统一单向强制投影为标准 Design Tokens！
+ * 彻底废除任何针对字符长度局部缩小英文序号至 18 或 15 的非标准逻辑！
+ * 包含：页眉页脚 XML 投影、16 章节大标题 Row 0 投影、第 0 列序号/标签投影、填写值顶格左对齐常规体投影、复合通栏行原生解耦。
  */
 export function applyGlobalTypographyProjection(engine, isEnglish = false) {
   if (!engine?.documentXml) return;
@@ -306,21 +318,159 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
   const tokens = isEnglish ? MSDS_DESIGN_TOKENS.EN : MSDS_DESIGN_TOKENS.CN;
   const targetFont = tokens.TABLE_VALUE.font;
   const targetSz = tokens.TABLE_VALUE.sz;
+  const targetAscii = tokens.TABLE_VALUE.asciiFont || targetFont;
 
+  // 1. 全局投影页眉页脚底层 XML (Header & Footer Typography Projection)
+  if (engine?.supportingXml) {
+    const hdrFtrToken = tokens.HEADER;
+    const fontName = hdrFtrToken.font;
+    const asciiFont = hdrFtrToken.asciiFont || fontName;
+    const szVal = hdrFtrToken.sz; // '18' (9pt)
+
+    for (const [partName, xmlText] of Object.entries(engine.supportingXml)) {
+      if (!/^word\/(?:header|footer)\d+\.xml$/.test(partName) || !xmlText) continue;
+      try {
+        const domParser = new (globalThis.DOMParser || DOMParser)();
+        const partDoc = domParser.parseFromString(xmlText, 'application/xml');
+        const isHeader = /header/i.test(partName);
+        let modified = false;
+
+        if (isHeader) {
+          const pars = Array.from(partDoc.getElementsByTagNameNS(W_NS, 'p'));
+          for (let pIdx = 0; pIdx < Math.min(2, pars.length); pIdx++) {
+            const p = pars[pIdx];
+            const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+            for (const r of runs) {
+              let rPr = r.getElementsByTagNameNS(W_NS, 'rPr')[0] || partDoc.createElementNS(W_NS, 'w:rPr');
+              if (!rPr.parentNode) r.insertBefore(rPr, r.firstChild);
+              const bs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'b'));
+              bs.forEach(b => rPr.removeChild(b));
+              const bCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
+              bCss.forEach(b => rPr.removeChild(b));
+              let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0] || partDoc.createElementNS(W_NS, 'w:sz');
+              sz.setAttribute('w:val', szVal);
+              if (!sz.parentNode) rPr.appendChild(sz);
+              let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || partDoc.createElementNS(W_NS, 'w:szCs');
+              szCs.setAttribute('w:val', szVal);
+              if (!szCs.parentNode) rPr.appendChild(szCs);
+              let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || partDoc.createElementNS(W_NS, 'w:rFonts');
+              rFonts.setAttribute('w:ascii', asciiFont);
+              rFonts.setAttribute('w:hAnsi', asciiFont);
+              rFonts.setAttribute('w:eastAsia', fontName);
+              rFonts.setAttribute('w:cs', asciiFont);
+              if (!rFonts.parentNode) rPr.appendChild(rFonts);
+              modified = true;
+            }
+          }
+          const tbl = partDoc.getElementsByTagNameNS(W_NS, 'tbl')[0];
+          if (tbl) {
+            const tc = tbl.getElementsByTagNameNS(W_NS, 'tc')[0];
+            const p = tc?.getElementsByTagNameNS(W_NS, 'p')[0];
+            if (p) {
+              const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+              for (const r of runs) {
+                let rPr = r.getElementsByTagNameNS(W_NS, 'rPr')[0] || partDoc.createElementNS(W_NS, 'w:rPr');
+                if (!rPr.parentNode) r.insertBefore(rPr, r.firstChild);
+                let b = rPr.getElementsByTagNameNS(W_NS, 'w:b')[0] || partDoc.createElementNS(W_NS, 'w:b');
+                if (!b.parentNode) rPr.appendChild(b);
+                let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0] || partDoc.createElementNS(W_NS, 'w:sz');
+                sz.setAttribute('w:val', szVal);
+                if (!sz.parentNode) rPr.appendChild(sz);
+                let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || partDoc.createElementNS(W_NS, 'w:szCs');
+                szCs.setAttribute('w:val', szVal);
+                if (!szCs.parentNode) rPr.appendChild(szCs);
+                let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || partDoc.createElementNS(W_NS, 'w:rFonts');
+                rFonts.setAttribute('w:ascii', asciiFont);
+                rFonts.setAttribute('w:hAnsi', asciiFont);
+                rFonts.setAttribute('w:eastAsia', fontName);
+                rFonts.setAttribute('w:cs', asciiFont);
+                if (!rFonts.parentNode) rPr.appendChild(rFonts);
+                modified = true;
+              }
+            }
+          }
+        } else {
+          // 页脚处理: 全量 9pt 常规体，Cell 0 靠左，清除残留 w:firstLine="8730"
+          const tbl = partDoc.getElementsByTagNameNS(W_NS, 'tbl')[0];
+          if (tbl) {
+            const tr = tbl.getElementsByTagNameNS(W_NS, 'tr')[0];
+            if (tr) {
+              const tcs = Array.from(tr.getElementsByTagNameNS(W_NS, 'tc'));
+              if (tcs[0]) {
+                const p = tcs[0].getElementsByTagNameNS(W_NS, 'p')[0];
+                if (p) {
+                  let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0] || partDoc.createElementNS(W_NS, 'w:pPr');
+                  if (!pPr.parentNode) p.insertBefore(pPr, p.firstChild);
+                  let jc = pPr.getElementsByTagNameNS(W_NS, 'w:jc')[0] || partDoc.createElementNS(W_NS, 'w:jc');
+                  jc.setAttribute('w:val', 'left');
+                  if (!jc.parentNode) pPr.appendChild(jc);
+                  const ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
+                  if (ind) pPr.removeChild(ind);
+                  modified = true;
+                }
+              }
+              if (tcs[1]) {
+                const p = tcs[1].getElementsByTagNameNS(W_NS, 'p')[0];
+                if (p) {
+                  let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0] || partDoc.createElementNS(W_NS, 'w:pPr');
+                  if (!pPr.parentNode) p.insertBefore(pPr, p.firstChild);
+                  let jc = pPr.getElementsByTagNameNS(W_NS, 'w:jc')[0] || partDoc.createElementNS(W_NS, 'w:jc');
+                  jc.setAttribute('w:val', 'right');
+                  if (!jc.parentNode) pPr.appendChild(jc);
+                  const ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
+                  if (ind) pPr.removeChild(ind);
+                  modified = true;
+                }
+              }
+              const runs = Array.from(tbl.getElementsByTagNameNS(W_NS, 'r'));
+              for (const r of runs) {
+                let rPr = r.getElementsByTagNameNS(W_NS, 'rPr')[0] || partDoc.createElementNS(W_NS, 'w:rPr');
+                if (!rPr.parentNode) r.insertBefore(rPr, r.firstChild);
+                const bs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'b'));
+                bs.forEach(b => rPr.removeChild(b));
+                const bCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
+                bCss.forEach(b => rPr.removeChild(b));
+                let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0] || partDoc.createElementNS(W_NS, 'w:sz');
+                sz.setAttribute('w:val', szVal);
+                if (!sz.parentNode) rPr.appendChild(sz);
+                let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || partDoc.createElementNS(W_NS, 'w:szCs');
+                szCs.setAttribute('w:val', szVal);
+                if (!szCs.parentNode) rPr.appendChild(szCs);
+                let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || partDoc.createElementNS(W_NS, 'w:rFonts');
+                rFonts.setAttribute('w:ascii', asciiFont);
+                rFonts.setAttribute('w:hAnsi', asciiFont);
+                rFonts.setAttribute('w:eastAsia', fontName);
+                rFonts.setAttribute('w:cs', asciiFont);
+                if (!rFonts.parentNode) rPr.appendChild(rFonts);
+                modified = true;
+              }
+            }
+          }
+        }
+
+        if (modified) {
+          const xmlSerializer = new (globalThis.XMLSerializer || XMLSerializer)();
+          engine.supportingXml[partName] = xmlSerializer.serializeToString(partDoc);
+        }
+      } catch (err) {
+        console.warn('applyGlobalTypographyProjection: failed updating header/footer', partName, err);
+      }
+    }
+  }
+
+  // 2. 全篇 16 个章节表格底层拓扑投影
   const tables = Array.from(doc.getElementsByTagNameNS(W_NS, 'tbl'));
   for (let tIdx = 0; tIdx < tables.length; tIdx++) {
     const tbl = tables[tIdx];
     const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
     if (rows.length === 0) continue;
 
-    // 探测 Section 编号
     let sectionNumber = tIdx + 1;
     const r0Text = (rows[0]?.textContent || '').trim();
     const secMatch = r0Text.match(/^(\d+)\./);
     if (secMatch) sectionNumber = parseInt(secMatch[1], 10);
 
     // 探测当前章节最大序号位数 (REQ-TIER-DISCOVERY)
-    // 遍历当前表格 Column 0 中的所有序号，统计数字位数
     let maxSeqDigitCount = 0;
     for (const r of rows) {
       const c0 = r.getElementsByTagNameNS(W_NS, 'tc')[0];
@@ -334,8 +484,6 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
         }
       }
     }
-    // 层级判定：若最大序号包含 4 位及以上数字（如 11.10 ~ 11.16 为 4 位），归入 Tier B (4 位数扩展层级: 560 dxa)；
-    // 否则（如 8.1, 9.1..9.24 为 2~3 位数字）归入 Tier A (3 位数标准层级: 420 dxa)
     const isTierB = (maxSeqDigitCount >= 4) || (sectionNumber === 11);
     const targetIndent = isTierB ? '560' : '420';
 
@@ -344,160 +492,206 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
       const cells = Array.from(row.getElementsByTagNameNS(W_NS, 'tc'));
       if (cells.length === 0) continue;
 
-      // 跳过 Row 0 (大标题行)
-      if (rIdx === 0) continue;
+      // 2.1 Row 0 (大标题行): 强制投影 tokens.SECTION_HEADER (CN 12pt 宋体加粗, EN 11pt Arial 加粗)
+      if (rIdx === 0) {
+        const secHeaderToken = tokens.SECTION_HEADER;
+        for (const cell of cells) {
+          const ps = Array.from(cell.getElementsByTagNameNS(W_NS, 'p'));
+          for (const p of ps) {
+            const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+            for (const run of runs) {
+              const runText = (run.textContent || '').trim();
+              if (!runText) {
+                run.parentNode?.removeChild(run);
+                continue;
+              }
+              let rPr = run.getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');
+              if (!rPr.parentNode) run.insertBefore(rPr, run.firstChild);
+              let b = rPr.getElementsByTagNameNS(W_NS, 'b')[0] || doc.createElementNS(W_NS, 'w:b');
+              if (!b.parentNode) rPr.appendChild(b);
+              let bCs = rPr.getElementsByTagNameNS(W_NS, 'bCs')[0] || doc.createElementNS(W_NS, 'w:bCs');
+              if (!bCs.parentNode) rPr.appendChild(bCs);
+              let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0] || doc.createElementNS(W_NS, 'w:sz');
+              sz.setAttribute('w:val', secHeaderToken.sz);
+              if (!sz.parentNode) rPr.appendChild(sz);
+              let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || doc.createElementNS(W_NS, 'w:szCs');
+              szCs.setAttribute('w:val', secHeaderToken.szCs);
+              if (!szCs.parentNode) rPr.appendChild(szCs);
+              let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || doc.createElementNS(W_NS, 'w:rFonts');
+              rFonts.setAttribute('w:ascii', isEnglish ? 'Arial' : 'Times New Roman');
+              rFonts.setAttribute('w:hAnsi', isEnglish ? 'Arial' : 'Times New Roman');
+              rFonts.setAttribute('w:eastAsia', isEnglish ? 'Arial' : '宋体');
+              rFonts.setAttribute('w:cs', isEnglish ? 'Arial' : 'Times New Roman');
+              if (!rFonts.parentNode) rPr.appendChild(rFonts);
+            }
+          }
+        }
+        continue;
+      }
 
-      // 跳过成分表/控制参数表等列标题行
+      // 2.2 列标题行 (如成分表 CAS编号/含量% 或 依据/类型/数值)
       const rowText = cells.map(c => (c.textContent || '').trim()).join(' ');
-      if (/化学品名称.*CAS编号|物质.*依据.*类型|Components.*Basis.*Type|Substance.*Basis.*Type/i.test(rowText)) {
+      if (/化学品名称.*CAS编号|Chemical\s*name.*CAS|物质.*依据.*类型|Components.*Basis.*Type|Substance.*Basis.*Type|Component.*CAS/i.test(rowText)) {
+        const tblHeaderToken = tokens.TABLE_HEADER;
+        for (const cell of cells) {
+          const ps = Array.from(cell.getElementsByTagNameNS(W_NS, 'p'));
+          for (const p of ps) {
+            const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+            for (const run of runs) {
+              const runText = (run.textContent || '').trim();
+              if (!runText) continue;
+              let rPr = run.getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');
+              if (!rPr.parentNode) run.insertBefore(rPr, run.firstChild);
+              let b = rPr.getElementsByTagNameNS(W_NS, 'b')[0] || doc.createElementNS(W_NS, 'w:b');
+              if (!b.parentNode) rPr.appendChild(b);
+              let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0] || doc.createElementNS(W_NS, 'w:sz');
+              sz.setAttribute('w:val', tblHeaderToken.sz);
+              if (!sz.parentNode) rPr.appendChild(sz);
+              let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || doc.createElementNS(W_NS, 'w:szCs');
+              szCs.setAttribute('w:val', tblHeaderToken.szCs);
+              if (!szCs.parentNode) rPr.appendChild(szCs);
+              let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || doc.createElementNS(W_NS, 'w:rFonts');
+              rFonts.setAttribute('w:ascii', isEnglish ? 'Arial' : 'Times New Roman');
+              rFonts.setAttribute('w:hAnsi', isEnglish ? 'Arial' : 'Times New Roman');
+              rFonts.setAttribute('w:eastAsia', isEnglish ? 'Arial' : '宋体');
+              rFonts.setAttribute('w:cs', isEnglish ? 'Arial' : 'Times New Roman');
+              if (!rFonts.parentNode) rPr.appendChild(rFonts);
+            }
+          }
+        }
         continue;
       }
 
-      // 跳过 Section 8 中的结构性题头行 (8.1 暴露控制 / 8.1 控制参数 / 8.1 Exposure controls / 工作场所组分控制参数)
-      if (sectionNumber === 8 && /^(?:8\.1\s*(?:暴露控制|控制参数|Exposure\s*controls?)|工作场所组分控制参数|Control parameters for workplace components)/i.test(rowText)) {
-        continue;
-      }
-
-      // Section 15 结构性子题头识别 (其它的规定 / 符合下列法规要求 / Other provisions / Complies with the following regulations)
-      const isS15Subheader = sectionNumber === 15 && (
-        /^(?:其它的规定|其它规定|其他规定|Other provisions|Other regulations)[：:]?/i.test(rowText) ||
-        /^(?:符合下列法规要求|Complies with the following regulations|Comply with the following)[：:]?/i.test(rowText)
-      );
-
-      // 0. 对第 0 列标签单元格（多列表格中 c === 0）强制投影标准 Label Design Tokens 与折行对齐规范 (REQ-03, REQ-04, REQ-05)
+      // 2.3 多列表格行 (cells.length > 1)
       if (cells.length > 1) {
+        // A. Column 0: 标签单元格
         const labelCell = cells[0];
         const labelText = (labelCell.textContent || '').trim();
-        const isHeader = /^(?:化学品名称|CAS编号|含量%（w\/w）|Chemical\s*name|CAS\s*NO\.|Concentration\s*%\s*\(w\/w\)|物质|依据|类型|数值|Substance|Basis|Type|Value)$/i.test(labelText);
-        if (!isHeader && labelText) {
-          const targetLblSz = isEnglish ? '19' : '24';
+        if (labelText) {
+          const targetLblSz = tokens.LABEL_BOLD.sz; // '19' (EN) / '24' (CN)
           const targetLblFont = isEnglish ? 'Arial' : '宋体';
           const targetLblAscii = isEnglish ? 'Arial' : 'Times New Roman';
-          const isS9Chinese = (!isEnglish && sectionNumber === 9);
+          const targetSeqSz = isEnglish ? tokens.LABEL_SEQ.sz : (isTierB ? tokens.LABEL_SEQ_TIER_B.sz : tokens.LABEL_SEQ.sz); // '19' (EN) / '21'|'19' (CN)
+          const targetSeqFont = isEnglish ? 'Arial' : 'Times New Roman';
 
           const ps = Array.from(labelCell.getElementsByTagNameNS(W_NS, 'p'));
           for (const p of ps) {
-            // 全局物理清除段落级自动编号定义 (REQ-S3-DUP-PURGE)
             const numPrs = Array.from(p.getElementsByTagNameNS(W_NS, 'numPr'));
             numPrs.forEach(n => n.parentNode?.removeChild(n));
-            const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
-            if (pPr) {
-              const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
-              if (pRPr) {
-                let sz = pRPr.getElementsByTagNameNS(W_NS, 'sz')[0];
-                if (sz && !isS9Chinese) sz.setAttribute('w:val', targetLblSz);
-                let szCs = pRPr.getElementsByTagNameNS(W_NS, 'szCs')[0];
-                if (szCs && !isS9Chinese) szCs.setAttribute('w:val', targetLblSz);
-                let rFonts = pRPr.getElementsByTagNameNS(W_NS, 'rFonts')[0];
-                if (rFonts) {
-                  rFonts.setAttribute('w:ascii', targetLblAscii);
-                  rFonts.setAttribute('w:hAnsi', targetLblAscii);
-                  rFonts.setAttribute('w:eastAsia', targetLblFont);
-                  rFonts.setAttribute('w:cs', targetLblAscii);
-                }
-              }
 
-              // 9.1 外观黄金几何标尺与折行对齐规范 (REQ-GOLDEN-ANCHOR, REQ-SUB-PARENT-ALIGN, REQ-WRAP-VERTICAL-ALIGN)
-              const pText = (p.textContent || '').trim();
-              const mSeq = pText.match(/^(\d+\.\d+(?:\.\d+)?)\s*(.*)$/);
-              const hasSeq = Boolean(mSeq);
-              let ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
-              if (hasSeq) {
-                if (!ind) {
-                  ind = doc.createElementNS(W_NS, 'w:ind');
-                  pPr.appendChild(ind);
-                }
-                ind.setAttribute('w:left', targetIndent);
-                ind.setAttribute('w:hanging', targetIndent);
-                ind.removeAttribute('w:firstLine');
-                ind.removeAttribute('w:firstLineChars');
-                ind.removeAttribute('w:hangingChars');
-                ind.removeAttribute('w:leftChars');
-                ind.removeAttributeNS(W_NS, 'leftChars');
-                ind.setAttributeNS(W_NS, 'w:leftChars', '0');
+            const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0] || doc.createElementNS(W_NS, 'w:pPr');
+            if (!pPr.parentNode) p.insertBefore(pPr, p.firstChild);
 
-                // 确保父级带序号标签挂载 <w:tab/> 黄金锚点
-                const existingTabs = p.getElementsByTagNameNS(W_NS, 'tab');
-                if (existingTabs.length === 0 && mSeq) {
-                  const seqStr = mSeq[1];
-                  const labelPart = mSeq[2];
-                  // 清理旧 Runs，重建为 带序号Run+<w:tab/> 与 标签文本Run
-                  const oldRuns = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
-                  oldRuns.forEach(r => p.removeChild(r));
-
-                  // Run 1: 序号
-                  const r1 = doc.createElementNS(W_NS, 'w:r');
-                  const rPr1 = doc.createElementNS(W_NS, 'w:rPr');
-                  const seqSz = isTierB
-                    ? (!isEnglish ? '21' : '18')
-                    : (!isEnglish ? (seqStr.length >= 5 ? '19' : '21') : (seqStr.length >= 5 ? '15' : '18'));
-                  const rf1 = doc.createElementNS(W_NS, 'w:rFonts');
-                  rf1.setAttribute('w:ascii', targetLblAscii);
-                  rf1.setAttribute('w:hAnsi', targetLblAscii);
-                  rf1.setAttribute('w:eastAsia', targetLblFont);
-                  rf1.setAttribute('w:cs', targetLblAscii);
-                  rPr1.appendChild(rf1);
-                  const b1 = doc.createElementNS(W_NS, 'w:b');
-                  rPr1.appendChild(b1);
-                  const sz1 = doc.createElementNS(W_NS, 'w:sz');
-                  sz1.setAttribute('w:val', seqSz);
-                  rPr1.appendChild(sz1);
-                  const szCs1 = doc.createElementNS(W_NS, 'w:szCs');
-                  szCs1.setAttribute('w:val', seqSz);
-                  rPr1.appendChild(szCs1);
-                  r1.appendChild(rPr1);
-
-                  const t1 = doc.createElementNS(W_NS, 'w:t');
-                  t1.textContent = seqStr;
-                  r1.appendChild(t1);
-                  const tab = doc.createElementNS(W_NS, 'w:tab');
-                  r1.appendChild(tab);
-                  p.appendChild(r1);
-
-                  // Run 2: 标签
-                  if (labelPart) {
-                    const r2 = doc.createElementNS(W_NS, 'w:r');
-                    const rPr2 = doc.createElementNS(W_NS, 'w:rPr');
-                    const rf2 = doc.createElementNS(W_NS, 'w:rFonts');
-                    rf2.setAttribute('w:ascii', targetLblAscii);
-                    rf2.setAttribute('w:hAnsi', targetLblAscii);
-                    rf2.setAttribute('w:eastAsia', targetLblFont);
-                    rf2.setAttribute('w:cs', targetLblAscii);
-                    rPr2.appendChild(rf2);
-                    const b2 = doc.createElementNS(W_NS, 'w:b');
-                    rPr2.appendChild(b2);
-                    const sz2 = doc.createElementNS(W_NS, 'w:sz');
-                    sz2.setAttribute('w:val', targetLblSz);
-                    rPr2.appendChild(sz2);
-                    const szCs2 = doc.createElementNS(W_NS, 'w:szCs');
-                    szCs2.setAttribute('w:val', targetLblSz);
-                    rPr2.appendChild(szCs2);
-                    r2.appendChild(rPr2);
-
-                    const t2 = doc.createElementNS(W_NS, 'w:t');
-                    t2.textContent = labelPart;
-                    r2.appendChild(t2);
-                    p.appendChild(r2);
-                  }
-                }
-              } else {
-                // 子级无序号标签：必须显式注入 w:left=targetIndent（清除 hanging 与 firstLine）
-                // 使首字绝对平齐该章节所属层级基准线 (Tier A: 420 dxa / Tier B: 560 dxa) (REQ-SUB-PARENT-ALIGN)
-                if (!ind) {
-                  ind = doc.createElementNS(W_NS, 'w:ind');
-                  pPr.appendChild(ind);
-                }
-                ind.setAttribute('w:left', targetIndent);
-                ind.removeAttribute('w:hanging');
-                ind.removeAttribute('w:hangingChars');
-                ind.removeAttribute('w:firstLine');
-                ind.removeAttribute('w:firstLineChars');
-                ind.removeAttribute('w:leftChars');
-                ind.removeAttributeNS(W_NS, 'leftChars');
-                ind.setAttributeNS(W_NS, 'w:leftChars', '0');
-              }
+            // 彻底消除段落级默认格式污染：若 pPr 中包含残留的 rPr，同步更新其字号
+            const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
+            if (pRPr) {
+              const pSzs = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'sz'));
+              pSzs.forEach(sz => sz.setAttribute('w:val', targetLblSz));
+              const pSzCss = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'szCs'));
+              pSzCss.forEach(szCs => szCs.setAttribute('w:val', targetLblSz));
             }
 
+            const pText = (p.textContent || '').trim();
+            const mSeq = pText.match(/^(\d+\.\d+(?:\.\d+)?)\s*(.*)$/);
+            const hasSeq = Boolean(mSeq);
+
+            if (hasSeq) {
+              let ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0] || doc.createElementNS(W_NS, 'w:ind');
+              ind.setAttribute('w:left', targetIndent);
+              ind.setAttribute('w:hanging', targetIndent);
+              ind.removeAttribute('w:firstLine');
+              ind.removeAttribute('w:firstLineChars');
+              ind.removeAttribute('w:hangingChars');
+              ind.removeAttribute('w:leftChars');
+              ind.removeAttributeNS(W_NS, 'leftChars');
+              ind.setAttributeNS(W_NS, 'w:leftChars', '0');
+              if (!ind.parentNode) pPr.appendChild(ind);
+
+              const existingTabs = p.getElementsByTagNameNS(W_NS, 'tab');
+              if (existingTabs.length === 0 && mSeq) {
+                const seqStr = mSeq[1];
+                let labelPart = mSeq[2];
+                if (isEnglish) {
+                  labelPart = labelPart.replace(/：/g, ':').trim();
+                  if (!labelPart.endsWith(':') && !labelPart.includes('Other information') && !labelPart.includes('Additional')) {
+                    labelPart += ':';
+                  }
+                } else {
+                  if (!/[：:]$/.test(labelPart) && !labelPart.includes('其他信息')) {
+                    labelPart += '：';
+                  }
+                }
+
+                const oldRuns = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+                oldRuns.forEach(r => p.removeChild(r));
+
+                // Run 1: 序号 (加粗 + Tab)
+                const r1 = doc.createElementNS(W_NS, 'w:r');
+                const rPr1 = doc.createElementNS(W_NS, 'w:rPr');
+                const rf1 = doc.createElementNS(W_NS, 'w:rFonts');
+                rf1.setAttribute('w:ascii', targetSeqFont);
+                rf1.setAttribute('w:hAnsi', targetSeqFont);
+                rf1.setAttribute('w:eastAsia', isEnglish ? 'Arial' : '宋体');
+                rf1.setAttribute('w:cs', targetSeqFont);
+                rPr1.appendChild(rf1);
+                rPr1.appendChild(doc.createElementNS(W_NS, 'w:b'));
+                rPr1.appendChild(doc.createElementNS(W_NS, 'w:bCs'));
+                const sz1 = doc.createElementNS(W_NS, 'w:sz');
+                sz1.setAttribute('w:val', targetSeqSz);
+                rPr1.appendChild(sz1);
+                const szCs1 = doc.createElementNS(W_NS, 'w:szCs');
+                szCs1.setAttribute('w:val', targetSeqSz);
+                rPr1.appendChild(szCs1);
+                r1.appendChild(rPr1);
+
+                const t1 = doc.createElementNS(W_NS, 'w:t');
+                t1.textContent = seqStr;
+                r1.appendChild(t1);
+                const tab = doc.createElementNS(W_NS, 'w:tab');
+                r1.appendChild(tab);
+                p.appendChild(r1);
+
+                // Run 2: 标签文本 (加粗)
+                if (labelPart) {
+                  const r2 = doc.createElementNS(W_NS, 'w:r');
+                  const rPr2 = doc.createElementNS(W_NS, 'w:rPr');
+                  const rf2 = doc.createElementNS(W_NS, 'w:rFonts');
+                  rf2.setAttribute('w:ascii', targetLblAscii);
+                  rf2.setAttribute('w:hAnsi', targetLblAscii);
+                  rf2.setAttribute('w:eastAsia', targetLblFont);
+                  rf2.setAttribute('w:cs', targetLblAscii);
+                  rPr2.appendChild(rf2);
+                  rPr2.appendChild(doc.createElementNS(W_NS, 'w:b'));
+                  rPr2.appendChild(doc.createElementNS(W_NS, 'w:bCs'));
+                  const sz2 = doc.createElementNS(W_NS, 'w:sz');
+                  sz2.setAttribute('w:val', targetLblSz);
+                  rPr2.appendChild(sz2);
+                  const szCs2 = doc.createElementNS(W_NS, 'w:szCs');
+                  szCs2.setAttribute('w:val', targetLblSz);
+                  rPr2.appendChild(szCs2);
+                  r2.appendChild(rPr2);
+
+                  const t2 = doc.createElementNS(W_NS, 'w:t');
+                  t2.textContent = labelPart;
+                  r2.appendChild(t2);
+                  p.appendChild(r2);
+                }
+              }
+            } else {
+              // 无序号标签 (如 手部防护：, Hand protection:)
+              let ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0] || doc.createElementNS(W_NS, 'w:ind');
+              ind.setAttribute('w:left', targetIndent);
+              ind.removeAttribute('w:hanging');
+              ind.removeAttribute('w:hangingChars');
+              ind.removeAttribute('w:firstLine');
+              ind.removeAttribute('w:firstLineChars');
+              ind.removeAttribute('w:leftChars');
+              ind.removeAttributeNS(W_NS, 'leftChars');
+              ind.setAttributeNS(W_NS, 'w:leftChars', '0');
+              if (!ind.parentNode) pPr.appendChild(ind);
+            }
+
+            // 遍历所有 Runs，严格强制注入标准字阶与字体 (彻底消灭 18/15 降级)
             const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
             for (const run of runs) {
               const runText = (run.textContent || '').trim();
@@ -505,191 +699,209 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
                 run.parentNode?.removeChild(run);
                 continue;
               }
+              let rPr = run.getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');
+              if (!rPr.parentNode) run.insertBefore(rPr, run.firstChild);
 
-              let rPr = run.getElementsByTagNameNS(W_NS, 'rPr')[0];
-              if (!rPr) {
-                rPr = doc.createElementNS(W_NS, 'w:rPr');
-                run.insertBefore(rPr, run.firstChild);
-              }
+              let b = rPr.getElementsByTagNameNS(W_NS, 'b')[0] || doc.createElementNS(W_NS, 'w:b');
+              if (!b.parentNode) rPr.appendChild(b);
+              let bCs = rPr.getElementsByTagNameNS(W_NS, 'bCs')[0] || doc.createElementNS(W_NS, 'w:bCs');
+              if (!bCs.parentNode) rPr.appendChild(bCs);
 
-              let b = rPr.getElementsByTagNameNS(W_NS, 'b')[0];
-              if (!b) {
-                b = doc.createElementNS(W_NS, 'w:b');
-                rPr.appendChild(b);
-              }
-              let bCs = rPr.getElementsByTagNameNS(W_NS, 'bCs')[0];
-              if (!bCs) {
-                bCs = doc.createElementNS(W_NS, 'w:bCs');
-                rPr.appendChild(bCs);
-              }
+              const isSeqRun = run.getElementsByTagNameNS(W_NS, 'tab').length > 0 || /^(\d+\.\d+(?:\.\d+)?)\s*$/.test(runText);
+              const runSz = isSeqRun ? targetSeqSz : targetLblSz;
+              const runAscii = isSeqRun ? targetSeqFont : targetLblAscii;
 
-              const isSeqRun = /^(\d+\.\d+(?:\.\d+)?)\s*$/.test(runText);
-              let runSz = targetLblSz;
-              if (isSeqRun) {
-                if (!isEnglish) {
-                  runSz = (runText.length >= 5) ? '19' : '21';
-                } else {
-                  runSz = (runText.length >= 5) ? '15' : '18';
+              let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0] || doc.createElementNS(W_NS, 'w:sz');
+              sz.setAttribute('w:val', runSz);
+              if (!sz.parentNode) rPr.appendChild(sz);
+              let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || doc.createElementNS(W_NS, 'w:szCs');
+              szCs.setAttribute('w:val', runSz);
+              if (!szCs.parentNode) rPr.appendChild(szCs);
+
+              let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || doc.createElementNS(W_NS, 'w:rFonts');
+              rFonts.setAttribute('w:ascii', runAscii);
+              rFonts.setAttribute('w:hAnsi', runAscii);
+              rFonts.setAttribute('w:eastAsia', targetLblFont);
+              rFonts.setAttribute('w:cs', runAscii);
+              if (!rFonts.parentNode) rPr.appendChild(rFonts);
+            }
+          }
+        }
+
+        // B. Column 1+: 填写值单元格 (顶格纯净左对齐，常规体，零方差)
+        for (let cIdx = 1; cIdx < cells.length; cIdx++) {
+          const cell = cells[cIdx];
+          const ps = Array.from(cell.getElementsByTagNameNS(W_NS, 'p'));
+          for (const p of ps) {
+            const numPrs = Array.from(p.getElementsByTagNameNS(W_NS, 'numPr'));
+            numPrs.forEach(n => n.parentNode?.removeChild(n));
+
+            const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+            if (pPr) {
+              const ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
+              if (ind) pPr.removeChild(ind);
+              const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
+              if (pRPr) {
+                const pSzs = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'sz'));
+                pSzs.forEach(sz => sz.setAttribute('w:val', targetSz));
+                const pSzCss = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'szCs'));
+                pSzCss.forEach(szCs => szCs.setAttribute('w:val', targetSz));
+              }
+            }
+
+            const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+            for (const run of runs) {
+              const runText = (run.textContent || '').trim();
+              if (!runText && !run.getElementsByTagNameNS(W_NS, 'drawing').length && !run.getElementsByTagNameNS(W_NS, 'br').length) {
+                run.parentNode?.removeChild(run);
+                continue;
+              }
+              let rPr = run.getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');
+              if (!rPr.parentNode) run.insertBefore(rPr, run.firstChild);
+
+              let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0] || doc.createElementNS(W_NS, 'w:sz');
+              sz.setAttribute('w:val', targetSz);
+              if (!sz.parentNode) rPr.appendChild(sz);
+              let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || doc.createElementNS(W_NS, 'w:szCs');
+              szCs.setAttribute('w:val', targetSz);
+              if (!szCs.parentNode) rPr.appendChild(szCs);
+
+              let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || doc.createElementNS(W_NS, 'w:rFonts');
+              rFonts.setAttribute('w:ascii', targetAscii);
+              rFonts.setAttribute('w:hAnsi', targetAscii);
+              rFonts.setAttribute('w:eastAsia', targetFont);
+              rFonts.setAttribute('w:cs', targetAscii);
+              if (!rFonts.parentNode) rPr.appendChild(rFonts);
+
+              const isSubLabel = /^(预防措施|事故响应|安全储存|废弃处置|经口|吸入|经皮|物种|分类|结果|重复剂量中毒|病理变化|致畸形|致畸性|致畸|生育力|Oral|Inhalation|Dermal|Species|Classification|Result|Repeated dose toxicity|Pathological changes|Teratogenicity|Fertility|Prevention|Response|Storage|Disposal)[：:]?$/i.test(runText) || /^[：:]$/.test(runText);
+              if (!isSubLabel) {
+                const bs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'b'));
+                bs.forEach(b => rPr.removeChild(b));
+                const bCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
+                bCss.forEach(b => rPr.removeChild(b));
+              }
+            }
+          }
+        }
+      } else {
+        // 2.4 单列表格行 (cells.length === 1, 如 Section 2, 11, 15 等通栏行)
+        const cell = cells[0];
+        const ps = Array.from(cell.getElementsByTagNameNS(W_NS, 'p'));
+        for (const p of ps) {
+          const numPrs = Array.from(p.getElementsByTagNameNS(W_NS, 'numPr'));
+          numPrs.forEach(n => n.parentNode?.removeChild(n));
+
+          const pText = (p.textContent || '').trim();
+          if (!pText) continue;
+
+          // 匹配复合键值对 (如 "2.1 GHS危险性类别：非危险化学品" 或 "Signal word: None")
+          const kvMatch = pText.match(/^(\s*(?:(?:2\.\d+\s*)?(?:GHS\s*危险性类别|GHS\s*分类|Classification of the substance or mixture|GHS\s*Classification|GHS\s*标签要素|Label elements|GHS\s*Label\s*Elements|危险性说明|危害性说明|Hazard\s*statements?(?:\s*\([a-zA-Z0-9]+\))?|防范说明|Precautionary\s*statements?(?:\s*\([a-zA-Z0-9]+\))?|其他危害|其他危险|Other\s*hazards?)|(?:GHS\s*)?(?:象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components which must be listed on the label)|(?:需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal)))[:：]\s*(.*)$/i);
+          const s15Match = sectionNumber === 15 && pText.match(/^(\s*(?:其它的规定|其它规定|其他规定|Other provisions|Other regulations|符合下列法规要求|Complies with the following regulations))[:：]\s*(.*)$/i);
+
+          if (kvMatch || s15Match) {
+            const match = kvMatch || s15Match;
+            const labelText = match[1] + (isEnglish ? ': ' : '：');
+            const valText = match[2]?.trim() || '';
+
+            const oldRuns = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+            oldRuns.forEach(r => p.removeChild(r));
+
+            // Run 1: 标签 (加粗)
+            const r1 = doc.createElementNS(W_NS, 'w:r');
+            const rPr1 = doc.createElementNS(W_NS, 'w:rPr');
+            rPr1.appendChild(doc.createElementNS(W_NS, 'w:b'));
+            rPr1.appendChild(doc.createElementNS(W_NS, 'w:bCs'));
+            const sz1 = doc.createElementNS(W_NS, 'w:sz');
+            sz1.setAttribute('w:val', targetSz);
+            rPr1.appendChild(sz1);
+            const szCs1 = doc.createElementNS(W_NS, 'w:szCs');
+            szCs1.setAttribute('w:val', targetSz);
+            rPr1.appendChild(szCs1);
+            const rf1 = doc.createElementNS(W_NS, 'w:rFonts');
+            rf1.setAttribute('w:ascii', targetAscii);
+            rf1.setAttribute('w:hAnsi', targetAscii);
+            rf1.setAttribute('w:eastAsia', targetFont);
+            rf1.setAttribute('w:cs', targetAscii);
+            rPr1.appendChild(rf1);
+            r1.appendChild(rPr1);
+            const t1 = doc.createElementNS(W_NS, 'w:t');
+            t1.textContent = labelText;
+            r1.appendChild(t1);
+            p.appendChild(r1);
+
+            // Run 2: 填写值 (常规体)
+            if (valText) {
+              const r2 = doc.createElementNS(W_NS, 'w:r');
+              const rPr2 = doc.createElementNS(W_NS, 'w:rPr');
+              const sz2 = doc.createElementNS(W_NS, 'w:sz');
+              sz2.setAttribute('w:val', targetSz);
+              rPr2.appendChild(sz2);
+              const szCs2 = doc.createElementNS(W_NS, 'w:szCs');
+              szCs2.setAttribute('w:val', targetSz);
+              rPr2.appendChild(szCs2);
+              const rf2 = doc.createElementNS(W_NS, 'w:rFonts');
+              rf2.setAttribute('w:ascii', targetAscii);
+              rf2.setAttribute('w:hAnsi', targetAscii);
+              rf2.setAttribute('w:eastAsia', targetFont);
+              rf2.setAttribute('w:cs', targetAscii);
+              rPr2.appendChild(rf2);
+              r2.appendChild(rPr2);
+              const t2 = doc.createElementNS(W_NS, 'w:t');
+              t2.textContent = valText;
+              r2.appendChild(t2);
+              p.appendChild(r2);
+            }
+          } else {
+            // 纯结构性标签行 (如 "2.2 GHS标签要素：" 或 "防范说明：") 或 纯值行
+            const isPureLabel = (sectionNumber === 2 && /^(?:(?:2\.\d+\s*)?(?:GHS\s*危险性类别|GHS\s*分类|Classification of the substance or mixture|GHS\s*Classification|GHS\s*标签要素|Label elements|GHS\s*Label\s*Elements|危险性说明|危害性说明|Hazard\s*statements?|防范说明|Precautionary\s*statements?|其他危害|其他危险|Other\s*hazards?)|(?:GHS\s*)?(?:象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal))[：:]?$/i.test(pText)) ||
+              (sectionNumber === 15 && /^(?:其它的规定|其它规定|其他规定|Other provisions|符合下列法规要求|Complies with the following regulations)[：:]?$/i.test(pText)) ||
+              (sectionNumber === 11 && /^(?:[^：\n]+[:：]\s*)$/.test(pText) && !/^(?:毒性|刺激性|急性毒性|Toxicity|Irritation|Acute toxicity)[：:]/i.test(pText));
+
+            const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+            for (const run of runs) {
+              const runText = (run.textContent || '').trim();
+              if (!runText && !run.getElementsByTagNameNS(W_NS, 'drawing').length && !run.getElementsByTagNameNS(W_NS, 'br').length) {
+                run.parentNode?.removeChild(run);
+                continue;
+              }
+              let rPr = run.getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');
+              if (!rPr.parentNode) run.insertBefore(rPr, run.firstChild);
+
+              let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0] || doc.createElementNS(W_NS, 'w:sz');
+              sz.setAttribute('w:val', targetSz);
+              if (!sz.parentNode) rPr.appendChild(sz);
+              let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || doc.createElementNS(W_NS, 'w:szCs');
+              szCs.setAttribute('w:val', targetSz);
+              if (!szCs.parentNode) rPr.appendChild(szCs);
+
+              let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || doc.createElementNS(W_NS, 'w:rFonts');
+              rFonts.setAttribute('w:ascii', targetAscii);
+              rFonts.setAttribute('w:hAnsi', targetAscii);
+              rFonts.setAttribute('w:eastAsia', targetFont);
+              rFonts.setAttribute('w:cs', targetAscii);
+              if (!rFonts.parentNode) rPr.appendChild(rFonts);
+
+              if (isPureLabel) {
+                let b = rPr.getElementsByTagNameNS(W_NS, 'w:b')[0] || doc.createElementNS(W_NS, 'w:b');
+                if (!b.parentNode) rPr.appendChild(b);
+                let bCs = rPr.getElementsByTagNameNS(W_NS, 'w:bCs')[0] || doc.createElementNS(W_NS, 'w:bCs');
+                if (!bCs.parentNode) rPr.appendChild(bCs);
+              } else {
+                const isSubLabel = /^(预防措施|事故响应|安全储存|废弃处置|经口|吸入|经皮|物种|分类|结果|重复剂量中毒|病理变化|致畸形|致畸性|致畸|生育力|Oral|Inhalation|Dermal|Species|Classification|Result|Repeated dose toxicity|Pathological changes|Teratogenicity|Fertility|Prevention|Response|Storage|Disposal)[：:]?$/i.test(runText) || /^[：:]$/.test(runText);
+                if (!isSubLabel) {
+                  const bs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'b'));
+                  bs.forEach(b => rPr.removeChild(b));
+                  const bCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
+                  bCss.forEach(b => rPr.removeChild(b));
                 }
               }
-              let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0];
-              if (!sz) {
-                sz = doc.createElementNS(W_NS, 'w:sz');
-                rPr.appendChild(sz);
-              }
-              sz.setAttribute('w:val', runSz);
-
-              let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0];
-              if (!szCs) {
-                szCs = doc.createElementNS(W_NS, 'w:szCs');
-                rPr.appendChild(szCs);
-              }
-              szCs.setAttribute('w:val', runSz);
-
-              let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0];
-              if (!rFonts) {
-                rFonts = doc.createElementNS(W_NS, 'w:rFonts');
-                rPr.appendChild(rFonts);
-              }
-              rFonts.setAttribute('w:ascii', targetLblAscii);
-              rFonts.setAttribute('w:hAnsi', targetLblAscii);
-              rFonts.setAttribute('w:eastAsia', targetLblFont);
-              rFonts.setAttribute('w:cs', targetLblAscii);
             }
           }
         }
       }
 
-      // 对所有值单元格（单列描述行或多列中 c >= 1 的列）强制投影标准 Design Tokens
-      const startCol = (cells.length === 1) ? 0 : 1;
-      for (let cIdx = startCol; cIdx < cells.length; cIdx++) {
-        const cell = cells[cIdx];
-        const cellText = (cell.textContent || '').trim();
-        // 跳过固定表头字样
-        if (/^(?:CAS编号|含量%（w\/w）|CAS NO\.|Concentration % \(w\/w\)|依据|类型|数值|Basis|Type|Value)$/i.test(cellText)) continue;
-
-        // 1. 清理段落级 pPr -> rPr，消除从模板继承的加粗与残留字号污染
-        const ps = Array.from(cell.getElementsByTagNameNS(W_NS, 'p'));
-        for (const p of ps) {
-          // 多列表格值单元格（cells.length > 1 && cIdx >= 1）纯净左对齐 (REQ-TOPOLOGY-B)
-          // 彻底清除人为注入或模板继承的多余段落级左缩进，顶齐单元格内左边距
-          if (cells.length > 1 && cIdx >= 1) {
-            const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
-            if (pPr) {
-              const ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
-              if (ind) {
-                ind.removeAttribute('w:left');
-                ind.removeAttributeNS(W_NS, 'left');
-                ind.removeAttribute('w:leftChars');
-                ind.removeAttributeNS(W_NS, 'leftChars');
-                if (!ind.hasAttribute('w:firstLine') && !ind.hasAttribute('w:hanging')) {
-                  pPr.removeChild(ind);
-                }
-              }
-            }
-          }
-
-          // 全局物理清除段落级自动编号定义 (REQ-S3-DUP-PURGE)
-          const numPrs = Array.from(p.getElementsByTagNameNS(W_NS, 'numPr'));
-          numPrs.forEach(n => n.parentNode?.removeChild(n));
-          const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
-          if (pPr) {
-            const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
-            if (pRPr) {
-              const bs = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'b'));
-              bs.forEach(b => pRPr.removeChild(b));
-              const bCss = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'bCs'));
-              bCss.forEach(b => pRPr.removeChild(b));
-              let sz = pRPr.getElementsByTagNameNS(W_NS, 'sz')[0];
-              if (sz) sz.setAttribute('w:val', targetSz);
-              let szCs = pRPr.getElementsByTagNameNS(W_NS, 'szCs')[0];
-              if (szCs) szCs.setAttribute('w:val', targetSz);
-              let rFonts = pRPr.getElementsByTagNameNS(W_NS, 'rFonts')[0];
-              if (rFonts) {
-                rFonts.setAttribute('w:ascii', targetFont);
-                rFonts.setAttribute('w:hAnsi', targetFont);
-                rFonts.setAttribute('w:eastAsia', targetFont);
-                rFonts.setAttribute('w:cs', targetFont);
-              }
-            }
-          }
-        }
-
-        // 2. 遍历运行区 Runs，强制注入标准字阶、字体与字形并清理幽灵空节点
-        const runs = Array.from(cell.getElementsByTagNameNS(W_NS, 'r'));
-        for (const run of runs) {
-          const runText = (run.textContent || '').trim();
-          // 清理无文本且无图无换行的幽灵空 Run
-          if (!runText && !run.getElementsByTagNameNS(W_NS, 'drawing').length && !run.getElementsByTagNameNS(W_NS, 'br').length) {
-            run.parentNode?.removeChild(run);
-            continue;
-          }
-
-          let rPr = run.getElementsByTagNameNS(W_NS, 'rPr')[0];
-          if (!rPr) {
-            rPr = doc.createElementNS(W_NS, 'w:rPr');
-            run.insertBefore(rPr, run.firstChild);
-          }
-
-          // 2.1 强制统一字阶 (sz 与 szCs)
-          let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0];
-          if (!sz) {
-            sz = doc.createElementNS(W_NS, 'w:sz');
-            rPr.appendChild(sz);
-          }
-          sz.setAttribute('w:val', targetSz);
-
-          let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0];
-          if (!szCs) {
-            szCs = doc.createElementNS(W_NS, 'w:szCs');
-            rPr.appendChild(szCs);
-          }
-          szCs.setAttribute('w:val', targetSz);
-
-          // 2.2 强制统一字体家族 (ascii, hAnsi, eastAsia, cs)
-          let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0];
-          if (!rFonts) {
-            rFonts = doc.createElementNS(W_NS, 'w:rFonts');
-            rPr.appendChild(rFonts);
-          }
-          rFonts.setAttribute('w:ascii', targetFont);
-          rFonts.setAttribute('w:hAnsi', targetFont);
-          rFonts.setAttribute('w:eastAsia', targetFont);
-          rFonts.setAttribute('w:cs', targetFont);
-
-          // 2.3 粗细隔离与法定标签加粗保护 (INV-BOLD-S2-S15):
-          // - Section 15 结构性子题头 (其它的规定、符合下列法规要求) 强制加粗
-          // - Section 2 结构性节标题与子标签 (2.1-2.5 标题、象形图、信号词、防范四大块等) 强制加粗
-          // - 受控合法子标签 (如 "经口："、"预防措施：" 等) 保持加粗
-          // - 普通值格正文严禁加粗
-          const isS2Label = sectionNumber === 2 && (
-            /^(?:(?:2\.\d+\s*)?(?:GHS\s*危险性类别|GHS\s*分类|Classification of the substance or mixture|GHS\s*Classification|GHS\s*标签要素|Label elements|GHS\s*Label\s*Elements|危险性说明|危害性说明|Hazard\s*statements?|防范说明|Precautionary\s*statements?|其他危害|其他危险|Other\s*hazards?)|(?:GHS\s*)?(?:象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components which must be listed on the label)|(?:需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal))[：:]?$/i.test(runText) ||
-            /^[：:]$/.test(runText)
-          );
-
-          if (isS15Subheader || isS2Label) {
-            let b = rPr.getElementsByTagNameNS(W_NS, 'b')[0];
-            if (!b) {
-              b = doc.createElementNS(W_NS, 'w:b');
-              rPr.appendChild(b);
-            }
-            let bCs = rPr.getElementsByTagNameNS(W_NS, 'bCs')[0];
-            if (!bCs) {
-              bCs = doc.createElementNS(W_NS, 'w:bCs');
-              rPr.appendChild(bCs);
-            }
-          } else {
-            const isSubLabel = /^(预防措施|事故响应|安全储存|废弃处置|经口|吸入|经皮|物种|分类|结果|重复剂量中毒|病理变化|致畸形|致畸性|致畸|生育力|Oral|Inhalation|Dermal|Species|Classification|Result|Repeated dose toxicity|Pathological changes|Teratogenicity|Fertility|Prevention|Response|Storage|Disposal)[：:]?$/i.test(runText) || /^[：:]$/.test(runText);
-            if (!isSubLabel) {
-              const bs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'b'));
-              bs.forEach(b => rPr.removeChild(b));
-              const bCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
-              bCss.forEach(b => rPr.removeChild(b));
-            }
-          }
-        }
-
-        // 3. 值格符号排版规范化（≥/≤ 统一、单位空格、标点纯净）
+      // 2.5 符号排版规范化（≥/≤ 统一、单位空格、标点纯净）
+      for (const cell of cells) {
         const tNodes = Array.from(cell.getElementsByTagNameNS(W_NS, 't'));
         for (const t of tNodes) {
           if (t.textContent) {
@@ -700,14 +912,12 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
               .replace(/\b(min|mm)\.\s*$/gi, '$1');
             if (isEnglish) {
               tc = tc.replace(/；/g, '; ');
-              // 消除西文连词粘连 (如 (SCBA)Do -> (SCBA) Do, equipmentEnsure -> equipment. Ensure)
               tc = tc.replace(/([.!?\)])([A-Za-z])/g, '$1 $2');
-              // 仅非缩写且长度大于15个字符的完整英文陈述句，末尾保留或自动补齐句号 (DEF-14)
-              if (tc.length > 15 && !/[.!?:]$/.test(tc) && !/\b(?:min|mm|CAS|EC|No|N\/A|None)\.?$/i.test(tc)) {
+              const isColHeader = (rIdx <= 4) && /^(?:Chemical\s*name|Components?|CAS\s*NO\.?|Concentration\s*%\s*\(w\/w\)|Basis|Type|Value)$/i.test(tc.trim());
+              if (rIdx > 0 && !isColHeader && tc.length > 15 && !/[.!?:]$/.test(tc) && !/\b(?:min|mm|CAS|EC|No|N\/A|None|Concentration|w\/w)\.?$/i.test(tc)) {
                 tc = tc + '.';
               }
             } else {
-              tc = tc.replace(/;\s*|；\s*/g, '；');
               tc = tc.replace(/\.$/, '');
             }
             t.textContent = tc;
