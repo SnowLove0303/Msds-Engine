@@ -55,8 +55,8 @@ async function generateEp1404() {
     'EP-1404 msds_EN Guocai.docx'
   ];
 
-  const cnS2LabelRegex = /^(?:2\.1\s*GHS危险性类别[：:]|2\.2\s*GHS标签要素[：:]|GHS象形图[：:]|信号词[：:]|2\.3\s*危险性说明[：:]|2\.4\s*防范说明[：:]|预防措施[：:]|事故响应[：:]|安全储存[：:]|废弃处置[：:]|2\.5\s*其他危害[：:])$/;
-  const enS2LabelRegex = /^(?:2\.1\s*Classification of the substance or mixture:|2\.2\s*GHS Label Elements:|GHS pictograms:|Signal word:|2\.3\s*Hazard statements:|2\.4\s*Precautionary statements:|Prevention:|Response:|Storage:|Disposal:|2\.5\s*Other hazards:)$/i;
+  const cnS2LabelRegex = /^(?:2\.1\s*GHS危险性类别[：:]|2\.2\s*GHS标签要素[：:]|GHS象形图[：:]|必须列在标签上的有害成[份分][：:]|信号词[：:]|2\.3\s*危险性说明[：:]|2\.4\s*防范说明[：:]|预防措施[：:]|事故响应[：:]|安全储存[：:]|废弃处置[：:]|2\.5\s*其他危害[：:])$/;
+  const enS2LabelRegex = /^(?:2\.1\s*Classification of the substance or mixture:|2\.2\s*GHS Label Elements:|GHS pictograms:|Hazardous components which must be listed on the label:|Signal word:|2\.3\s*Hazard statements:|2\.4\s*Precautionary statements:|Prevention:|Response:|Storage:|Disposal:|2\.5\s*Other hazards:)$/i;
 
   const cnS15LabelRegex = /^(?:其它的规定[：:]|符合下列法规要求[：:])$/;
   const enS15LabelRegex = /^(?:Other provisions:|Complies with the following regulations:)$/i;

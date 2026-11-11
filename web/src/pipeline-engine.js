@@ -4439,12 +4439,49 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
 
         if (isSectionHeader) {
           if (/^(?:2\.\d+\s*)?(?:其他危害|其他危险|Other\s*hazards?)[：:]/i.test(fullText)) {
+            const r0 = runs[0];
+            const t0 = r0?.getElementsByTagNameNS(W_NS, 't')[0];
+            const r0Text = t0?.textContent || '';
+            const m = r0Text.match(/^([^：:]+[：:])\s*(.+)$/);
+            if (m) {
+              const labelText = m[1];
+              const valText = m[2];
+              t0.textContent = labelText;
+              const rNew = r0.cloneNode(true);
+              const tNew = rNew.getElementsByTagNameNS(W_NS, 't')[0];
+              if (tNew) tNew.textContent = (isEn ? ' ' : '') + valText;
+              if (r0.nextSibling) {
+                p.insertBefore(rNew, r0.nextSibling);
+              } else {
+                p.appendChild(rNew);
+              }
+              runs.splice(1, 0, rNew);
+            }
             setRunBold(runs[0], true);
             for (let i = 1; i < runs.length; i++) setRunBold(runs[i], false);
           } else {
             for (const r of runs) setRunBold(r, true);
           }
         } else if (isSubLabelPrefix) {
+          // 关键物理防线：若第一个 run 同时包含了标签与值内容（如 "必须列在标签上的有害成分：丙二醇甲醚"），必须物理拆分为 [标签+冒号] 与 [值] 两个 runs，保证标签加粗、值常规体
+          const r0 = runs[0];
+          const t0 = r0?.getElementsByTagNameNS(W_NS, 't')[0];
+          const r0Text = t0?.textContent || '';
+          const m = r0Text.match(/^([^：:]+[：:])\s*(.+)$/);
+          if (m) {
+            const labelText = m[1];
+            const valText = m[2];
+            t0.textContent = labelText;
+            const rNew = r0.cloneNode(true);
+            const tNew = rNew.getElementsByTagNameNS(W_NS, 't')[0];
+            if (tNew) tNew.textContent = (isEn ? ' ' : '') + valText;
+            if (r0.nextSibling) {
+              p.insertBefore(rNew, r0.nextSibling);
+            } else {
+              p.appendChild(rNew);
+            }
+            runs.splice(1, 0, rNew);
+          }
           setRunBold(runs[0], true);
           for (let i = 1; i < runs.length; i++) setRunBold(runs[i], false);
         } else {

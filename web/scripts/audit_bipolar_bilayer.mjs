@@ -603,6 +603,16 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
       }
       if (model === 'EP-1404' || /丙二醇甲醚/.test(s2Text)) {
         assert(/丙二醇甲醚/.test(s2Text), `Section 2 (L-S2): ${model} 标签有害成分 丙二醇甲醚保全`);
+        const s2Ps = Array.from(s2Trs).flatMap(tr => Array.from(tr.getElementsByTagName('w:p')));
+        const pComp = s2Ps.find(p => /必须列在标签上的有害成[份分]/.test(p.textContent || ''));
+        if (pComp) {
+          const runs = Array.from(pComp.getElementsByTagName('w:r')).filter(r => (r.textContent || '').trim().length > 0);
+          assert(runs.length >= 2, `Section 2 (L-S2): ${model} 标签有害成分行必须物理分离为标签 run 与值 run (实测有效 runs: ${runs.length})`);
+          const labelBold = runs[0].getElementsByTagName('w:b').length > 0;
+          assert(labelBold, `Section 2 (L-S2): ${model} "必须列在标签上的有害成分：" 标签必须加粗 (<w:b/> 存在)`);
+          const valBold = runs[1].getElementsByTagName('w:b').length > 0;
+          assert(!valBold, `Section 2 (L-S2): ${model} "丙二醇甲醚" 值必须为常规体，严禁加粗`);
+        }
       }
       if (model === 'OS-9547 PGDA80') {
         const s2Ps = Array.from(s2Row1.getElementsByTagName('w:p'));
@@ -638,6 +648,18 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
       assert(/Harmful to aquatic life with long lasting effects/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文 H412 语句保全`);
       assert(/P273/i.test(s2EnText) && /Avoid release to the environment/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文 P273 语句保全`);
       assert(/P501/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文 P501 语句保全`);
+      if (model === 'EP-1404' || /Propylene glycol monomethyl ether/i.test(s2EnText)) {
+        const s2EnPs = Array.from(s2TrsEn).flatMap(tr => Array.from(tr.getElementsByTagName('w:p')));
+        const pEnComp = s2EnPs.find(p => /Hazardous components which must be listed on the label/i.test(p.textContent || ''));
+        if (pEnComp) {
+          const runsEn = Array.from(pEnComp.getElementsByTagName('w:r')).filter(r => (r.textContent || '').trim().length > 0);
+          assert(runsEn.length >= 2, `Section 2 (L-S2 EN): ${model} 英文标签有害成分行必须物理分离为标签 run 与值 run (实测有效 runs: ${runsEn.length})`);
+          const labelBold = runsEn[0].getElementsByTagName('w:b').length > 0;
+          assert(labelBold, `Section 2 (L-S2 EN): ${model} 英文有害成分标签必须加粗`);
+          const valBold = runsEn[1].getElementsByTagName('w:b').length > 0;
+          assert(!valBold, `Section 2 (L-S2 EN): ${model} 英文有害成分值必须为常规体，严禁加粗`);
+        }
+      }
       if (model === 'PA-4780' || /2-Butoxyethanol/i.test(s2EnText)) {
         assert(/2-Butoxyethanol/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文有害成份 2-Butoxyethanol 保全`);
       }

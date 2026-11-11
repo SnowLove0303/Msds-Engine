@@ -595,13 +595,28 @@ export async function runMasterMsdsAudit(options = {}) {
       return { passed: missing.length === 0, missing };
     };
 
+    // 标签与值粗细分离进阶门禁：确保有害成分等行若存在，标签加粗、值常规体
+    const checkS2HazardousIngBold = (docxRecord) => {
+      const ps = docxRecord.rows.slice(1).flatMap(r => r.cells[0]?.paragraphs || []);
+      const p = ps.find(pItem => /必须列在标签上的有害成[份分]|Hazardous components which must be listed on the label/i.test(pItem.text || ''));
+      if (!p) return { passed: true };
+      const runs = (p.runs || []).filter(r => (r.text || '').trim().length > 0);
+      if (runs.length < 2) return { passed: false, reason: '未分离标签与值 run' };
+      const labelBold = computeEffectiveBold(runs[0].node, p.node);
+      const valBold = computeEffectiveBold(runs[1].node, p.node);
+      if (!labelBold) return { passed: false, reason: '标签未加粗' };
+      if (valBold) return { passed: false, reason: '值被错误加粗' };
+      return { passed: true };
+    };
+    const s2IngBoldPass = checkS2HazardousIngBold(cnS2).passed && checkS2HazardousIngBold(enS2).passed;
+
     const s2BoldCn = checkS2Bolding(cnS2, s2LabelsToCheckCn, 'CN');
     assert(
       s2BoldCn.passed,
       '环3',
       'Section 2 中文结构性标签加粗规范 (INV-BOLD-S2-S15)',
-      'Section 2 所有结构性节标题（2.1-2.5）与子标签（象形图、防范四大项等）必须加粗',
-      s2BoldCn.passed ? '全量加粗合规' : `缺失加粗: ${s2BoldCn.missing.join(', ')}`,
+      'Section 2 所有结构性节标题（2.1-2.5）与子标签必须加粗，正文值与有害成分值保持常规细体',
+      (s2BoldCn.passed && s2IngBoldPass) ? '全量加粗与细体隔离合规' : `缺失加粗或值加粗泄露: ${s2BoldCn.missing.join(', ')}`,
       'Section 2 CN',
       ['指控 Section 2 标签加粗为多余格式']
     );

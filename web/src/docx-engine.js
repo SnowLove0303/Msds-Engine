@@ -3449,7 +3449,7 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
       let runSpecs = [];
       if (options.isSection2) {
         // 关键防御：优先匹配键值对行与节标题行，确保 2.1 GHS危险性类别、2.2 GHS标签要素、2.3 危险性说明、2.4 防范说明、2.5 其他危害等加粗，值常规体
-        const kvMatch = pText.match(/^(\s*(?:(?:2\.\d+\s*)?(?:GHS危险性类别|GHS hazard classification|物质或混合物的分类|Classification of the substance or mixture)|羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification|(?:2\.\d+\s*)?(?:GHS\s*)?标签要素|Label elements|(?:2\.\d+\s*)?GHS Label Elements|象形图|GHS\s*象形图|GHS pictograms|警告词|信号词|Signal word|(?:必须列在标签上的有害成份|Hazardous components which must be listed on the label)|(?:2\.\d+\s*)?(?:危险性说明|Hazard statements?(?:\s*\([a-zA-Z0-9]+\))?)|(?:2\.\d+\s*)?(?:防范说明|Precautionary statements?(?:\s*\([a-zA-Z0-9]+\))?)|物理化学危险|Physical and chemical hazards|健康危害|Health hazards|环境危害|Environmental hazards|(?:2\.\d+\s*)?(?:其他危害|其他危险)|(?:2\.\d+\s*)?Other\s*Hazards?))([:：]?)\s*(.*)$/i);
+        const kvMatch = pText.match(/^(\s*(?:(?:2\.\d+\s*)?(?:GHS危险性类别|GHS hazard classification|物质或混合物的分类|Classification of the substance or mixture)|羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification|(?:2\.\d+\s*)?(?:GHS\s*)?标签要素|Label elements|(?:2\.\d+\s*)?GHS Label Elements|象形图|GHS\s*象形图|GHS pictograms|警告词|信号词|Signal word|(?:必须列在标签上的有害成[份分]|Hazardous components which must be listed on the label)|(?:2\.\d+\s*)?(?:危险性说明|Hazard statements?(?:\s*\([a-zA-Z0-9]+\))?)|(?:2\.\d+\s*)?(?:防范说明|Precautionary statements?(?:\s*\([a-zA-Z0-9]+\))?)|物理化学危险|Physical and chemical hazards|健康危害|Health hazards|环境危害|Environmental hazards|(?:2\.\d+\s*)?(?:其他危害|其他危险)|(?:2\.\d+\s*)?Other\s*Hazards?))([:：]?)\s*(.*)$/i);
         if (kvMatch) {
           const label = kvMatch[1];
           const colon = kvMatch[2] || '';
