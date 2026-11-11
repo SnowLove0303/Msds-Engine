@@ -36,16 +36,8 @@ async function generateEp1404() {
       appearanceOverride: '微黄透明状液体',
       section9Overrides: {
         '外观': '微黄透明状液体'
-      },
-      section2Override: {
-        categories: ['对水环境有慢性危害, 类别 3 (H412)'],
-        pictogramText: '', // GHS Cat 3 chronic aquatic hazard has no pictogram
-        signalWord: '',    // GHS Cat 3 chronic aquatic hazard has no signal word
-        hazardStatements: ['H412 对水生生物有害并具有长期持续影响。'],
-        prevention: ['P273 禁止排入环境。'],
-        disposal: ['P501 将本品或其容器送至有资质的废物处理厂处置。'],
-        otherHazards: null
       }
+      // section2Override 已彻底移除，由底层 parseSection2FromSource 全量数据驱动动态解析
     }
   });
 
@@ -132,10 +124,10 @@ async function generateEp1404() {
       }
     }
 
-    // 2. Section 3: Row 2 label bold & size, Row 4 >73 ASCII
+    // 2. Section 3: Row 2 label bold & size, Row 4 >73 ASCII (严格匹配表标题避免与 Section 2 标签有害成分碰撞)
     const s3Tbl = tbls.find(tbl => {
-      const text = tbl.textContent;
-      return (text.includes('成分') || text.includes('Composition/Information on Ingredients')) && tbl.getElementsByTagName('w:tr').length >= 3;
+      const firstRowText = tbl.getElementsByTagName('w:tr')[0]?.textContent || '';
+      return (firstRowText.includes('3.') || firstRowText.includes('成分/组成资料') || firstRowText.includes('Composition/Information on Ingredients')) && tbl.getElementsByTagName('w:tr').length >= 3;
     });
     if (s3Tbl) {
       const s3Trs = Array.from(s3Tbl.getElementsByTagName('w:tr'));

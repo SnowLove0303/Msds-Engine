@@ -530,13 +530,13 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   const s2Row1En = s2TrsEn[1];
   const s2TcsEn = s2Row1En ? s2Row1En.getElementsByTagName('w:tc') : [];
 
-  // G-40 核心硬断言：中英文 Section 2 必须为 2 行或 5 行单单元格通栏 (REQ-01 多行豁免跨页防截断)
-  assert(s2Trs.length === 2 || s2Trs.length === 5, `Section 2 中文版 (G-40): 必须严格收敛为 2 行或 5 行极简通栏拓扑 (实测行数: ${s2Trs.length})`);
+  // G-40 核心硬断言：中英文 Section 2 必须为 2 行、5 行或 6 行单单元格通栏 (REQ-01 多行豁免跨页防截断，6行支持完备 2.5 其他危害)
+  assert(s2Trs.length === 2 || s2Trs.length === 5 || s2Trs.length === 6, `Section 2 中文版 (G-40): 必须严格收敛为 2 行、5 行或 6 行极简通栏拓扑 (实测行数: ${s2Trs.length})`);
   assert(Array.from(s2Trs).slice(1).every(r => r.getElementsByTagName('w:tc').length === 1), `Section 2 中文版 (G-40): 必须为单单元格通栏，严禁多列分列`);
-  assert(s2TrsEn.length === 2 || s2TrsEn.length === 5, `Section 2 英文版 (G-40): 必须严格收敛为 2 行或 5 行极简通栏拓扑 (实测行数: ${s2TrsEn.length})`);
+  assert(s2TrsEn.length === 2 || s2TrsEn.length === 5 || s2TrsEn.length === 6, `Section 2 英文版 (G-40): 必须严格收敛为 2 行、5 行或 6 行极简通栏拓扑 (实测行数: ${s2TrsEn.length})`);
   assert(Array.from(s2TrsEn).slice(1).every(r => r.getElementsByTagName('w:tc').length === 1), `Section 2 英文版 (G-40): 必须为单单元格通栏，严禁多列分列`);
 
-  if ((s2Trs.length === 2 || s2Trs.length === 5)) {
+  if ((s2Trs.length === 2 || s2Trs.length === 5 || s2Trs.length === 6)) {
     const s2Text = Array.from(s2Trs).slice(1).map(r => r.textContent).join(' ');
 
     if (model === 'PU-202A' || model === 'PU-202C') {
@@ -600,6 +600,9 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
       assert(/P501/.test(s2Text) && /处置/.test(s2Text), `Section 2 (L-S2): ${model} P501 废弃处置保全`);
       if (model === 'PA-4780' || /2-丁氧基乙醇/.test(s2Text)) {
         assert(/2-丁氧基乙醇/.test(s2Text), `Section 2 (L-S2): ${model} 标签有害成分 2-丁氧基乙醇保全`);
+      }
+      if (model === 'EP-1404' || /丙二醇甲醚/.test(s2Text)) {
+        assert(/丙二醇甲醚/.test(s2Text), `Section 2 (L-S2): ${model} 标签有害成分 丙二醇甲醚保全`);
       }
       if (model === 'OS-9547 PGDA80') {
         const s2Ps = Array.from(s2Row1.getElementsByTagName('w:p'));

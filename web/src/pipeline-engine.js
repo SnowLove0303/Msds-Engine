@@ -1058,6 +1058,8 @@ export function translateGhsPrecautionary(p) {
 /**
  * 从源文档 Section 2 提取真实结构化事实
  */
+const KNOWN_GHS_PICTOGRAM_REGEX = /^(?:火焰|易燃|腐蚀|感叹号|骷髅|健康危害|环境|圆圈[上方]*火焰|氧化|爆炸|气瓶|无|None|Not applicable|GHS0[1-9])$/i;
+
 export function parseSection2FromSource(srcEngine) {
   const srcS2 = srcEngine?.records?.find(r => r.sectionNumber === 2);
   if (!srcS2) return null;
@@ -1089,32 +1091,41 @@ export function parseSection2FromSource(srcEngine) {
 
   for (let i = 0; i < rawParas.length; i++) {
     const p = rawParas[i];
-    if (/2\.1\s*GHS危险性类别/i.test(p) || /^物质或混合物分类/i.test(p)) {
-      mode = 'cat';
+
+    // 1. 信号词优先捕获
+    const sm = p.match(/(?:[信警]号词|警示词|警示语|Signal\s*word)[：:\s]*(危险|警告|Danger|Warning)/i);
+    if (sm) {
+      signalWord = sm[1];
+      const rest = p.replace(/(?:[信警]号词|警示词|警示语|Signal\s*word)[：:\s]*(危险|警告|Danger|Warning)/i, '').trim();
+      if (!rest) continue;
+    }
+
+    // 2. 其它危害 / 其它危险
+    if (/(?:2\.\d+\s*)?(?:其他危[害险]|Other\s*hazards?)/i.test(p)) {
+      otherHazards = p.replace(/^2\.\d+\s*(?:其他危[害险]|Other\s*hazards?)[：:]?\s*/i, '').trim();
+      mode = 'other';
       continue;
     }
-    if (/2\.2\s*GHS标签要素/i.test(p) || /^2\.2\s*标签要素/i.test(p) || /^标签要素/i.test(p) || /GHS[- ]?象形图/i.test(p)) {
-      mode = 'label';
-      const m = p.match(/GHS[- ]?象形图[：:\s]*(.*)/i);
-      if (m && m[1].trim()) {
-        pictogramText = m[1].trim();
-      } else if (i + 1 < rawParas.length && !/^[1-9]\.|^GHS|^[A-Z]\d+|^防范|^危险|^警告|^信号/i.test(rawParas[i + 1])) {
-        if (!/危害性说明|防范说明|其他危险/i.test(rawParas[i + 1])) {
-          pictogramText = rawParas[i + 1].trim();
-        }
-      }
-      continue;
-    }
-    if (/必须列在标签上的有害成[份分]|有害成[份分]/i.test(p)) {
-      let ing = p.replace(/.*(?:必须列在标签上的有害成[份分]|有害成[份分])[：:]?\s*/, '').trim();
-      if (!ing && i + 1 < rawParas.length && !/^[1-9]\.|^GHS|^[A-Z]\d+|^防范|^危险|^警告|^信号/i.test(rawParas[i + 1])) {
+
+    // 3. 有害成分识别 (必须列在标签上的有害成分)
+    if (/(?:必须列在标签上的有害成[份分]|列在标签上的有害成[份分]|有害成[份分])[：:]?\s*(.*)/i.test(p)) {
+      const m = p.match(/(?:必须列在标签上的有害成[份分]|列在标签上的有害成[份分]|有害成[份分])[：:]?\s*(.*)/i);
+      let ing = m[1].trim();
+      if (!ing && i + 1 < rawParas.length && !/^(?:[1-9]\.|GHS|[A-Z]\d+|防范|危险|警告|信号|警示|危害|其他)/i.test(rawParas[i + 1])) {
         ing = rawParas[i + 1].trim();
+        i++;
       }
       hazardousIngredients = ing;
       continue;
     }
-    if (/([信警]号词|警示词)[：:\s]*(危险|警告)/i.test(p)) {
-      signalWord = p.match(/([信警]号词|警示词)[：:\s]*(危险|警告)/i)[2];
+
+    // 4. 节题头切换
+    if (/^(?:2\.1\s*)?(?:物质或混合物的分类|物质或混合物分类|GHS危险性类别|GHS危险性分类)[：:]?$/i.test(p)) {
+      mode = 'cat';
+      continue;
+    }
+    if (/^(?:2\.2\s*)?(?:GHS\s*)?标签要素[：:]?$/i.test(p)) {
+      mode = 'label';
       continue;
     }
     if (/^(?:(?:2\.\d+\s*)?(?:危险性说明|危害性说明|危害说明|危险说明|Hazard statements?))[：:]?$/i.test(p)) {
@@ -1141,16 +1152,46 @@ export function parseSection2FromSource(srcEngine) {
       mode = 'p_disp';
       continue;
     }
-    if (/(?:2\.\d+\s*)?(?:其他危[害险]|Other\s*hazards?)/i.test(p)) {
-      otherHazards = p.replace(/^2\.\d+\s*(?:其他危[害险]|Other\s*hazards?)[：:]?\s*/i, '');
-      mode = 'other';
+
+    // 5. GHS 象形图行精准解耦：区分真实象形图名称与列在标签上的化学品成分 (INV-SEMANTIC-ATTRIBUTION)
+    if (/GHS[- ]?象形图/i.test(p)) {
+      mode = 'label';
+      let val = p.replace(/^.*GHS[- ]?象形图[：:\s]*/i, '').trim();
+      if (!val && i + 1 < rawParas.length) {
+        const nextP = rawParas[i + 1].trim();
+        // 仅当下段为明确象形图关键词时才消费下一段
+        if (KNOWN_GHS_PICTOGRAM_REGEX.test(nextP)) {
+          val = nextP;
+          i++;
+        }
+      }
+      if (val) {
+        if (KNOWN_GHS_PICTOGRAM_REGEX.test(val)) {
+          pictogramText = val;
+        } else if (/(?:必须列在标签上的有害成[份分]|有害成[份分])/i.test(val)) {
+          hazardousIngredients = val.replace(/.*(?:必须列在标签上的有害成[份分]|有害成[份分])[：:]?\s*/i, '').trim();
+          pictogramText = '无';
+        } else if (/(?:[信警]号词|警示词)[：:\s]*(危险|警告)/i.test(val)) {
+          signalWord = val.match(/(?:[信警]号词|警示词)[：:\s]*(危险|警告)/i)[1];
+          pictogramText = '无';
+        } else if (!/分类|说明|防范|其他/i.test(val)) {
+          // 真实化学有害成分 (如 丙二醇甲醚、1-丁氧基-2-丙醇 等)，归属为 hazardousIngredients
+          hazardousIngredients = val;
+          pictogramText = '无';
+        }
+      } else {
+        pictogramText = '无';
+      }
       continue;
     }
 
+    // 6. 各模式内容装载
     if (mode === 'cat') {
       if (!/GHS标签要素|象形图|有害成[份分]|CHS危险性类别|标签要素/i.test(p)) {
         if (!/2\.1\s*物质或混合物的分类|GHS危险性类别[：:]?$/i.test(p)) {
-          categories.push(p);
+          if (!/(?:[信警]号词|警示词|危险性说明|防范说明|其他危险)/i.test(p)) {
+            categories.push(p);
+          }
         }
       }
     } else if (mode === 'h') {
@@ -1428,7 +1469,7 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         row2Paras.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine });
       } else if (parsed.pictogramText && parsed.pictogramText !== '无') {
         row2Paras.push(`GHS象形图：${parsed.pictogramText}`);
-      } else if (parsed.pictogramText === '无') {
+      } else if (parsed.pictogramText === '无' || (!facts.drawingNodes?.length && !parsed.pictogramText)) {
         row2Paras.push('GHS象形图：无');
       }
       if (parsed.hazardousIngredients) {
@@ -1530,11 +1571,15 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         row2Paras.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine, overrideImageBytes: cleanGhsBytes, overrideExt: cleanGhsBytes ? 'png' : null });
       } else if (parsed.pictogramText && parsed.pictogramText !== '无') {
         let enPic = parsed.pictogramText;
-        if (/丙二醇甲醚|1-甲氧基-2-丙醇/i.test(enPic)) {
-          enPic = 'Propylene glycol monomethyl ether';
-        }
+        if (/火焰|Flammable|Flame/i.test(enPic)) enPic = 'Flame';
+        else if (/腐蚀|Corrosion/i.test(enPic)) enPic = 'Corrosion';
+        else if (/感叹号|Exclamation/i.test(enPic)) enPic = 'Exclamation mark';
+        else if (/骷髅|Skull/i.test(enPic)) enPic = 'Skull and crossbones';
+        else if (/健康危害|Health hazard/i.test(enPic)) enPic = 'Health hazard';
+        else if (/环境|Environment/i.test(enPic)) enPic = 'Environment';
+        else if (/无|None|Not applicable/i.test(enPic)) enPic = 'None';
         row2Paras.push(`GHS pictograms: ${enPic}`);
-      } else if (parsed.pictogramText === '无') {
+      } else if (parsed.pictogramText === '无' || (!facts.drawingNodes?.length && !parsed.pictogramText)) {
         row2Paras.push('GHS pictograms: None');
       }
       if (parsed.hazardousIngredients) {
@@ -1543,6 +1588,18 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
           ingEn = 'Hydrophilic aliphatic polyisocyanate based on HDI';
         } else if (ingEn.includes('丁氧基乙醇')) {
           ingEn = '2-Butoxyethanol';
+        } else if (/1-丁氧基-2-丙醇/i.test(ingEn)) {
+          ingEn = '1-Butoxy-2-propanol';
+        } else if (/丙二醇甲醚|1-甲氧基-2-丙醇/i.test(ingEn)) {
+          ingEn = 'Propylene glycol monomethyl ether';
+        } else if (/轻质芳香烃石脑油/i.test(ingEn)) {
+          ingEn = 'Solvent naphtha (petroleum), light arom. (benzene < 0.1%)';
+        } else if (/二丙二醇甲醚/i.test(ingEn)) {
+          ingEn = 'Dipropylene glycol monomethyl ether';
+        } else if (/N[－-]甲基吡咯烷酮/i.test(ingEn)) {
+          ingEn = 'N-Methyl-2-pyrrolidone';
+        } else if (/三乙胺/i.test(ingEn)) {
+          ingEn = 'Triethylamine';
         }
         row2Paras.push(`Hazardous components which must be listed on the label: ${ingEn}`);
       }
