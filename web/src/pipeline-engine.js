@@ -265,6 +265,9 @@ export function translateChemicalCategoryToEnglish(cnCategory, cnName = '') {
   if (/蜡/i.test(combined)) {
     return 'Polyethylene wax emulsion';
   }
+  if (/噁唑啉.*丙烯酸|丙烯酸.*噁唑啉/i.test(combined)) {
+    return 'Oxazoline-modified acrylic polymer';
+  }
   if (/噁唑啉/i.test(combined)) {
     return 'Oxazoline-modified polymer aqueous dispersion';
   }
@@ -281,8 +284,7 @@ export function translateRecommendedUseToEnglish(cnUse) {
   if (!cnUse || typeof cnUse !== 'string') return 'Raw material for industrial coatings';
   const clean = cnUse.trim();
 
-  if (/涂料.*(?:添加剂|助剂)|(?:添加剂|助剂).*涂料|涂料用添加剂/i.test(clean)) return 'Additive for coatings.';
-  if (/添加剂|助剂/i.test(clean)) return 'Additive for industrial use.';
+  const isAdditive = /添加剂|助剂/i.test(clean);
 
   const USE_TERMS_MAP = [
     { regex: /金属涂层|金属漆|金属表面/i, en: 'metal coatings' },
@@ -294,23 +296,41 @@ export function translateRecommendedUseToEnglish(cnUse) {
     { regex: /塑料涂层|塑料表面/i, en: 'plastic coatings' },
     { regex: /汽车内饰|汽车涂料/i, en: 'automotive coatings' },
     { regex: /油墨|印刷油墨/i, en: 'printing inks' },
-    { regex: /粘合剂|胶粘剂|胶水/i, en: 'adhesives' },
+    { regex: /粘合剂|胶粘剂|胶黏剂|胶水/i, en: 'adhesives' },
     { regex: /工业涂料/i, en: 'industrial coatings' },
     { regex: /建筑涂料/i, en: 'architectural coatings' },
     { regex: /涂料/i, en: 'coatings' },
     { regex: /原材料|原料/i, en: 'raw materials' }
   ];
 
-  const matchedEnTerms = [];
+  const matches = [];
   const matchedEnSet = new Set();
+  const matchedEnTerms = [];
 
   for (const item of USE_TERMS_MAP) {
-    if (item.regex.test(clean)) {
-      if (!matchedEnSet.has(item.en)) {
-        matchedEnSet.add(item.en);
-        matchedEnTerms.push(item.en);
-      }
+    const m = clean.match(item.regex);
+    if (m && m.index !== undefined) {
+      matches.push({ en: item.en, index: m.index });
     }
+  }
+  matches.sort((a, b) => a.index - b.index);
+  for (const item of matches) {
+    if (!matchedEnSet.has(item.en)) {
+      matchedEnSet.add(item.en);
+      matchedEnTerms.push(item.en);
+    }
+  }
+
+  if (isAdditive && matchedEnTerms.length > 0) {
+    if (matchedEnTerms.length === 1) {
+      return `Additive for ${matchedEnTerms[0]}.`;
+    }
+    const lastTerm = matchedEnTerms[matchedEnTerms.length - 1];
+    const leadingTerms = matchedEnTerms.slice(0, -1).join(', ');
+    return `Additive for ${leadingTerms} and ${lastTerm}.`;
+  }
+  if (isAdditive) {
+    return 'Additive for industrial use.';
   }
 
   if (matchedEnTerms.length > 0) {
@@ -399,6 +419,8 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
       if (!prodName) {
         if (/封闭(?:型)?(?:聚)?异氰酸酯/i.test(cnName + ' ' + cnCategory)) {
           prodName = `Waterborne blocked isocyanate curing agent ${modelCode}`;
+        } else if (/噁唑啉.*交联剂|交联剂.*噁唑啉|噁唑啉/i.test(cnName + ' ' + cnCategory)) {
+          prodName = `Waterborne oxazoline crosslinker ${modelCode}`;
         } else if (/固化剂/i.test(cnName + ' ' + cnCategory)) {
           if (/环氧/i.test(cnName + ' ' + cnCategory)) {
             prodName = `Waterborne epoxy curing agent ${modelCode}`;
@@ -517,7 +539,8 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
         if (!val) continue;
 
         if (/外观/i.test(lbl)) {
-          if (/黄色.*透明.*半透明|黄.*半透明/i.test(val)) sec9Facts.appearance = 'Yellow transparent to translucent liquid';
+          if (/淡黄.*至.*黄.*透明|淡黄.*黄.*透明/i.test(val)) sec9Facts.appearance = 'Transparent liquid, light yellow to yellow';
+          else if (/黄色.*透明.*半透明|黄.*半透明/i.test(val)) sec9Facts.appearance = 'Yellow transparent to translucent liquid';
           else if (/乳白.*蓝光|蓝光.*乳液/i.test(val)) sec9Facts.appearance = 'Milky white emulsion with bluish tint';
           else if (/半透明.*乳液|乳液.*半透明/i.test(val)) sec9Facts.appearance = 'Translucent emulsion';
           else if (/半透明/i.test(val)) sec9Facts.appearance = 'Translucent liquid';
@@ -611,7 +634,8 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
         else if (/密度/i.test(pattern)) sec9Facts.density = val.replace(/约\s*/g, 'Approx. ');
         else if (/pH|PH/i.test(pattern)) sec9Facts.ph = val;
         else if (/外\s*观/i.test(pattern)) {
-          if (/无色.*微黄|无色.*淡黄/i.test(val)) sec9Facts.appearance = 'Colorless to slightly yellow transparent liquid';
+          if (/淡黄.*至.*黄.*透明|淡黄.*黄.*透明/i.test(val)) sec9Facts.appearance = 'Transparent liquid, light yellow to yellow';
+          else if (/无色.*微黄|无色.*淡黄/i.test(val)) sec9Facts.appearance = 'Colorless to slightly yellow transparent liquid';
           else if (/微黄.*透明|淡黄.*透明|透明.*微黄|透明.*淡黄/i.test(val)) sec9Facts.appearance = 'Light yellow transparent liquid';
           else if (/无色.*淡黄|淡黄.*粘稠/i.test(val)) sec9Facts.appearance = 'Colorless to light yellow transparent viscous liquid';
           else if (/乳白.*蓝光|蓝光.*乳液/i.test(val)) sec9Facts.appearance = 'Milky white emulsion with bluish tint';
@@ -865,7 +889,7 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     'sec15.regulations': 'Relevant safety, health and environmental regulations for the substance or mixture',
 
     // Section 16
-    'sec16.other': 'To the best of our knowledge, the information provided in this Safety Data Sheet is accurate as of the date of publication. The information given is designed only as guidance for safe handling, use, processing, storage, transportation, disposal, and release and is not to be considered a warranty or quality specification. The information relates only to the specific material designated and may not be valid for such material used in combination with any other materials or in any process, unless specified in the text.',
+    'sec16.other': 'To the best of our knowledge, the information provided in this Safety Data Sheet is accurate as of the date of publication. The information given is designed only as guidance for safe handling, use, production, storage, transportation, disposal, and release and is not to be considered a warranty or quality specification. The information relates only to the specific material designated and may not be valid for such material used in combination with any other materials or in any process, unless specified in the text.',
 
     ...(facts.overrides || {})
   };
@@ -1329,7 +1353,8 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
 
   if (/外\s*观/i.test(cnLabel)) {
     enLabel = 'Appearance:';
-    if (/黄色.*透明.*半透明|黄.*半透明/i.test(cnVal)) enVal = 'Yellow transparent to translucent liquid';
+    if (/淡黄.*至.*黄.*透明|淡黄.*黄.*透明/i.test(cnVal)) enVal = 'Transparent liquid, light yellow to yellow';
+    else if (/黄色.*透明.*半透明|黄.*半透明/i.test(cnVal)) enVal = 'Yellow transparent to translucent liquid';
     else if (/黄色至浅褐色透明液体|黄.*浅褐.*透明/i.test(cnVal)) enVal = 'Yellow to light brown transparent liquid';
     else if (/乳白.*蓝光|蓝光.*乳液/i.test(cnVal)) enVal = 'Milky white emulsion with bluish tint';
     else if (/乳白.*乳液/i.test(cnVal)) enVal = 'Milky white emulsion';

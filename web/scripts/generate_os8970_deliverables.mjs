@@ -34,8 +34,8 @@ async function generateOs8970() {
       isDangerousGoods: false,
       signalWord: '',
       components: [
-        { name: 'Oxazoline-modified acrylic polymer', cas: 'Trade secret', conc: '20-30' },
-        { name: 'Water', cas: '7732-18-5', conc: '70-80' }
+        { name: 'Oxazoline-modified acrylic polymer', cas: 'Trade secret', conc: '40±1' },
+        { name: 'Water', cas: '7732-18-5', conc: '60±1' }
       ],
       appearanceOverride: '淡黄色至黄色透明液体',
       section9Overrides: {
@@ -252,11 +252,25 @@ async function generateOs8970() {
             if (p) {
               const tNodes = Array.from(p.getElementsByTagName('w:t'));
               if (tNodes.length > 0) {
-                tNodes[0].textContent = 'Wear safety glasses/face shield.';
+                tNodes[0].textContent = 'Protective goggles are recommended.';
                 for (let i = 1; i < tNodes.length; i++) tNodes[i].textContent = '';
               }
             }
           }
+        }
+      }
+    }
+
+    // 3.5 Section 11: Micro-typography (spacing and trailing period)
+    const s11Tbl = tbls.find(tbl => {
+      const text = tbl.textContent;
+      return (text.includes('毒理学信息') || text.includes('Toxicity information') || text.includes('Toxicological information')) && tbl.getElementsByTagName('w:tr').length >= 3;
+    });
+    if (s11Tbl && isEn) {
+      for (const tNode of Array.from(s11Tbl.getElementsByTagName('w:t'))) {
+        tNode.textContent = tNode.textContent.replace(/(\d+)\s*mg\/kg/gi, '$1 mg/kg');
+        if (/^No irritation$/i.test(tNode.textContent.trim())) {
+          tNode.textContent = 'No irritation.';
         }
       }
     }
@@ -329,6 +343,7 @@ async function generateOs8970() {
     if (isEn) {
       for (let tIdx = 0; tIdx < tbls.length; tIdx++) {
         const tbl = tbls[tIdx];
+        if (tbl === s3Tbl) continue; // Skip Section 3 component table so chemical names don't end with a period
         const trs = Array.from(tbl.getElementsByTagName('w:tr'));
         for (let rIdx = 0; rIdx < trs.length; rIdx++) {
           const tr = trs[rIdx];
