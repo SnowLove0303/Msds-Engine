@@ -729,7 +729,15 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     // Section 5
     'sec5.suitable_extinguishing': 'Carbon dioxide (CO2), foam, extinguishing powder. For large fires, use water spray.',
     'sec5.unsuitable_extinguishing': unsuitableExtinguishing,
-    'sec5.specific_hazards': 'Combustion may release carbon monoxide, carbon dioxide, nitrogen oxides and trace amounts of hydrogen cyanide.',
+    'sec5.specific_hazards': (() => {
+      const cnS5Rec = baseCnEngine?.records?.find(r => r.sectionNumber === 5);
+      const allS5Text = cnS5Rec?.rows?.map(r => (r.cells[0]?.text || '') + ' ' + (r.cells[1]?.text || '')).join('\n') || '';
+      const parts = ['Combustion may release carbon monoxide, carbon dioxide, nitrogen oxides and trace amounts of hydrogen cyanide.'];
+      if (/吸进烟尘|吸入烟气|吸入烟尘|烟雾|smoke|fumes|着火或爆炸/i.test(allS5Text)) {
+        parts.push('In case of fire or explosion, do not breathe fumes/smoke.');
+      }
+      return parts.join('\n');
+    })(),
     'sec5.protective_equipment': (() => {
       const cnS5Rec = baseCnEngine?.records?.find(r => r.sectionNumber === 5);
       const allS5Text = cnS5Rec?.rows?.map(r => (r.cells[0]?.text || '') + ' ' + (r.cells[1]?.text || '')).join('\n') || '';
@@ -739,9 +747,6 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
       }
       if (/禁止污染的灭火用水|污染.*灭火.*用水.*(?:土壤|地下水|地表水)/i.test(allS5Text)) {
         parts.push('Do not allow contaminated firefighting water to enter soil, groundwater or surface water.');
-      }
-      if (/吸进烟尘|吸入烟气|吸入烟尘|烟雾/i.test(allS5Text) || parts.length === 0) {
-        parts.push('In case of fire or explosion, do not breathe fumes/smoke.');
       }
       return parts.join('\n');
     })(),
@@ -2219,6 +2224,85 @@ export function buildDynamicSection14Table(engine, srcEngine, baseCnEngine = nul
   engine.refresh();
 }
 
+/**
+ * 全局统一表格标签与值格纯左对齐与清除首行公文缩进 (REQ-LABEL-ALIGN-02)
+ * 根除底模残留的 jc="both"、jc="distribute"、jc="center" 与 firstLine 缩进
+ * 标签列（Col 0）除节标题外一律严格纯左对齐 (left)
+ * 值格（Col >= 1）除成分表 CAS/浓度居中与中文 Section 13 尾行方法格两端对齐外，一律纯左对齐 (left)
+ */
+export function enforceGlobalLeftAlignmentAndCleanIndent(engine, isEnglish = false) {
+  if (!engine?.documentXml) return;
+  const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const allTbls = Array.from(engine.documentXml.getElementsByTagNameNS(W_NS, 'tbl'));
+  for (let tIdx = 0; tIdx < allTbls.length; tIdx++) {
+    const tbl = allTbls[tIdx];
+    const isSection13Tbl = (tIdx === 12); // 表格序号 12 对应 Section 13
+    const isSection3Tbl = (tIdx === 2);  // 表格序号 2 对应 Section 3 成分表
+    const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
+    for (let rIdx = 0; rIdx < rows.length; rIdx++) {
+      const row = rows[rIdx];
+      const cells = Array.from(row.getElementsByTagNameNS(W_NS, 'tc'));
+      if (cells.length < 2) continue;
+
+      // --- A. 第一列（Col 0）标签单元格纯左对齐规范 ---
+      // 非第一行（rIdx > 0 排除节标题行），且非成分表数据行（cells.length === 2）
+      if (rIdx > 0 && cells.length === 2) {
+        const cell0 = cells[0];
+        const pList0 = Array.from(cell0.getElementsByTagNameNS(W_NS, 'p'));
+        for (const p of pList0) {
+          const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+          if (pPr) {
+            let jcNode = pPr.getElementsByTagNameNS(W_NS, 'jc')[0];
+            if (!jcNode) {
+              jcNode = p.ownerDocument.createElementNS(W_NS, 'w:jc');
+              pPr.appendChild(jcNode);
+            }
+            const jcVal = jcNode.getAttributeNS(W_NS, 'val');
+            // 若为 both、distribute 或 center，一律强制为 left
+            if (jcVal === 'both' || jcVal === 'distribute' || jcVal === 'center') {
+              jcNode.setAttributeNS(W_NS, 'w:val', 'left');
+            }
+          }
+        }
+      }
+
+      // --- B. 第二列及以上（c >= 1）数值单元格左对齐规范 ---
+      // Section 13 尾行方法内容格 (rIdx === rows.length - 1 && c === 1) 仅中文版豁免保持 both
+      if (!isEnglish && isSection13Tbl && rIdx === rows.length - 1) {
+        continue;
+      }
+      for (let c = 1; c < cells.length; c++) {
+        // 成分表（Section 3）数据行与表头允许居中（CAS/浓度）
+        if (isSection3Tbl && cells.length > 2) {
+          continue;
+        }
+        const cell = cells[c];
+        const pList = Array.from(cell.getElementsByTagNameNS(W_NS, 'p'));
+        for (const p of pList) {
+          const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+          if (pPr) {
+            const jcNode = pPr.getElementsByTagNameNS(W_NS, 'jc')[0];
+            const jcVal = jcNode?.getAttributeNS(W_NS, 'val');
+            if (jcVal === 'both' || jcVal === 'distribute' || (isEnglish && isSection13Tbl && jcVal === 'center')) {
+              jcNode.setAttributeNS(W_NS, 'w:val', 'left');
+            }
+            const indNode = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
+            if (indNode) {
+              const fl = indNode.getAttributeNS(W_NS, 'firstLine');
+              if (fl && fl !== '0') {
+                indNode.removeAttributeNS(W_NS, 'firstLine');
+                indNode.removeAttribute('w:firstLine');
+                indNode.removeAttributeNS(W_NS, 'firstLineChars');
+                indNode.removeAttribute('w:firstLineChars');
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 export async function buildBaseChineseEngine({
   modelCode,
   cnGroundTruthBuffer = null,
@@ -2852,49 +2936,12 @@ function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
     }
   }
 
-  // 12. 统一值格左对齐与清除首行公文缩进 (根除底模残留的 jc="both" 与 firstLine="26"，豁免 Section 13 方法内容格两端对齐)
-  const allTbls = Array.from(engine.documentXml.getElementsByTagNameNS(W_NS, 'tbl'));
-  for (let tIdx = 0; tIdx < allTbls.length; tIdx++) {
-    const tbl = allTbls[tIdx];
-    const isSection13Tbl = (tIdx === 12); // 表格序号 12 对应 Section 13
-    const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
-    for (let rIdx = 0; rIdx < rows.length; rIdx++) {
-      const row = rows[rIdx];
-      const cells = Array.from(row.getElementsByTagNameNS(W_NS, 'tc'));
-      if (cells.length < 2) continue;
-      // Section 13 尾行方法内容格 (rIdx === rows.length - 1 && c === 1) 豁免保持 both
-      if (isSection13Tbl && rIdx === rows.length - 1) {
-        continue;
-      }
-      for (let c = 1; c < cells.length; c++) {
-        const cell = cells[c];
-        const pList = Array.from(cell.getElementsByTagNameNS(W_NS, 'p'));
-        for (const p of pList) {
-          const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
-          if (pPr) {
-            const jcNode = pPr.getElementsByTagNameNS(W_NS, 'jc')[0];
-            const jcVal = jcNode?.getAttributeNS(W_NS, 'val');
-            if (jcVal === 'both' || jcVal === 'distribute') {
-              jcNode.setAttributeNS(W_NS, 'w:val', 'left');
-            }
-            const indNode = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
-            if (indNode) {
-              const fl = indNode.getAttributeNS(W_NS, 'firstLine');
-              if (fl && fl !== '0') {
-                indNode.removeAttributeNS(W_NS, 'firstLine');
-                indNode.removeAttribute('w:firstLine');
-                indNode.removeAttributeNS(W_NS, 'firstLineChars');
-                indNode.removeAttribute('w:firstLineChars');
-              }
-            }
-          }
-        }
-      }
-    }
-  }
+  // 12. 统一标签与值格纯左对齐与清除首行公文缩进 (REQ-LABEL-ALIGN-02)
+  enforceGlobalLeftAlignmentAndCleanIndent(engine, false);
 
   // 13. 全量拔除中文母版中残留的非法自定义 <w:tabs> 制表位与值格非法 <w:tab/> (对齐全局规范 G-09，首列标签法定 <w:tab/> 严格保全)
-  for (const tbl of allTbls) {
+  const allTblsForTabs = Array.from(engine.documentXml.getElementsByTagNameNS(W_NS, 'tbl'));
+  for (const tbl of allTblsForTabs) {
     const tabsInTbl = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tabs'));
     tabsInTbl.forEach(t => t.parentNode?.removeChild(t));
     const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
@@ -4220,6 +4267,9 @@ export async function executeEightDeliverablesPipeline({
     if (s9) renumberRecord(s9);
     const s10 = eng.records.find(r => r.sectionNumber === 10);
     if (s10) renumberRecord(s10);
+
+    // 全局统一表格标签与值格纯左对齐硬保底 (REQ-LABEL-ALIGN-02)
+    enforceGlobalLeftAlignmentAndCleanIndent(eng, isEn);
   }
 
   // 3.5 真实性交叉质检门禁（防止再犯：拦截任何模板残留或中英文不一致）
@@ -5637,7 +5687,7 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
     }
   }
 
-  // Gate 6: 全篇值格 100% 纯左对齐与自然词距断言
+  // Gate 6: 表格全景排版纯净度硬门禁 (标签与值统一左对齐与零公文缩进断言)
   const xmlDoc = engine.documentXml;
   const allTbls = Array.from(xmlDoc.getElementsByTagNameNS(W_NS, 'tbl'));
   for (let t = 0; t < allTbls.length; t++) {
@@ -5646,6 +5696,20 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
     for (let r = 0; r < rows.length; r++) {
       const cells = Array.from(rows[r].getElementsByTagNameNS(W_NS, 'tc'));
       if (cells.length < 2) continue;
+
+      // 1. 标签列（Col 0）硬阻断：两列标准行中，标签严禁 both, distribute, center
+      if (r > 0 && cells.length === 2) {
+        const pList0 = Array.from(cells[0].getElementsByTagNameNS(W_NS, 'p'));
+        for (const p of pList0) {
+          const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+          const jc = pPr?.getElementsByTagNameNS(W_NS, 'jc')[0]?.getAttributeNS(W_NS, 'val');
+          if (jc === 'both' || jc === 'distribute' || jc === 'center') {
+            throw new Error(`【质量门禁拦截 (Gate 6)】${docName} 表格 ${t + 1} 行 ${r + 1} 标签格出现非法 "${jc}" 对齐！全篇标签严格统一纯左对齐 (left)，严禁两端/居中拉伸。`);
+          }
+        }
+      }
+
+      // 2. 值格（c >= 1）硬阻断
       for (let c = 1; c < cells.length; c++) {
         const cell = cells[c];
         const cellText = (cell.textContent || '').trim();

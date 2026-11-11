@@ -910,7 +910,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   const s13 = tblsCn[12];
   const s13LastTr = s13.getElementsByTagName('w:tr')[s13.getElementsByTagName('w:tr').length - 1];
   const s13Jc = s13LastTr.getElementsByTagName('w:jc')[0]?.getAttribute('w:val');
-  assert(s13Jc === 'center', `Section 13 (L-S13): 中文版废弃处置方法标签居中对齐 (jc=center) (实测: ${s13Jc})`);
+  assert(s13Jc === 'left', `Section 13 (L-S13): 中文版废弃处置方法标签纯左对齐 (jc=left) (实测: ${s13Jc})`);
   const s13MethodCell = s13LastTr.getElementsByTagName('w:tc')[1];
   const s13MethodJc = s13MethodCell?.getElementsByTagName('w:jc')[0]?.getAttribute('w:val');
   assert(s13MethodJc === 'left' || s13MethodJc === 'both', `Section 13 (L-S13): 中文版废弃处置方法内容规范对齐 (jc=left或both) (实测: ${s13MethodJc})`);
@@ -918,7 +918,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   const s13En = tblsEn[12];
   const s13LastTrEn = s13En.getElementsByTagName('w:tr')[s13En.getElementsByTagName('w:tr').length - 1];
   const s13JcEn = s13LastTrEn.getElementsByTagName('w:jc')[0]?.getAttribute('w:val');
-  assert(s13JcEn === 'center', `Section 13 (L-S13): 英文版废弃处置方法标签居中对齐 (jc=center) (实测: ${s13JcEn})`);
+  assert(s13JcEn === 'left', `Section 13 (L-S13): 英文版废弃处置方法标签纯左对齐 (jc=left) (实测: ${s13JcEn})`);
   const s13MethodCellEn = s13LastTrEn.getElementsByTagName('w:tc')[1];
   const s13MethodJcEn = s13MethodCellEn?.getElementsByTagName('w:jc')[0]?.getAttribute('w:val');
   assert(s13MethodJcEn === 'left', `Section 13 (L-S13): 英文版废弃处置方法内容严格纯左对齐 (jc=left) (实测: ${s13MethodJcEn})`);

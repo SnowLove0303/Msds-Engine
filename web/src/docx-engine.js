@@ -2308,6 +2308,14 @@ export function applyStandardHangingIndent(cell, leftVal = '420', hangingVal = '
   ind.setAttributeNS(W_NS, 'w:hanging', String(hangingVal));
   ind.setAttributeNS(W_NS, 'w:firstLineChars', '0');
   pPr.appendChild(ind);
+
+  // 严格杜绝两端对齐 (both) 或居中对齐 (center) 引发的词间距横向拉伸走样，统一纯左对齐 (left)
+  let jc = pPr.getElementsByTagNameNS(W_NS, 'jc')[0] || pPr.querySelector('jc');
+  if (!jc) {
+    jc = p.ownerDocument.createElementNS(W_NS, 'w:jc');
+    pPr.appendChild(jc);
+  }
+  jc.setAttributeNS(W_NS, 'w:val', 'left');
 }
 
 export function setCellAlignment(cell, align = 'center') {
@@ -2752,6 +2760,16 @@ export function formatSection14LabelCell(cell, numberStr, labelText, isEnglish =
   } else {
     // 9.1 外观黄金几何标尺：420 dxa 悬挂缩进 + <w:tab/> 激光垂直对齐 (REQ-GOLDEN-ANCHOR)
     applyStandardHangingIndent(cell, '420', '420');
+  }
+
+  const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+  if (pPr) {
+    let jc = pPr.getElementsByTagNameNS(W_NS, 'jc')[0];
+    if (!jc) {
+      jc = p.ownerDocument.createElementNS(W_NS, 'w:jc');
+      pPr.appendChild(jc);
+    }
+    jc.setAttributeNS(W_NS, 'w:val', 'left');
   }
 
   let cleanLabel = labelText.trim();
@@ -3613,7 +3631,7 @@ export function enforceSection13DoubleCenter(cellNode) {
       jc = cellNode.ownerDocument.createElementNS(W_NS, 'w:jc');
       pPr.appendChild(jc);
     }
-    jc.setAttributeNS(W_NS, 'w:val', 'center');
+    jc.setAttributeNS(W_NS, 'w:val', 'left');
 
     const tabs = pPr.getElementsByTagNameNS(W_NS, 'tabs')[0];
     if (tabs) pPr.removeChild(tabs);

@@ -1,5 +1,49 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-11 MSDS Studio 系统底层语义槽位归属与全篇表格标签/值纯左对齐立法 (INV-SYSTEMIC-ATTRIBUTION-AND-GLOBAL-LEFT-ALIGNMENT)] - 底层纠偏 Section 5 火灾烟尘吸入危害物理归属 5.3 物质或混合物的特殊危害并废除破坏性清洗逻辑、全局统一全篇表格所有标签（Col 0）与数值（Col >= 1）纯左对齐（w:jc val="left"）、根除模板残留 both/center 引发的长英文标签（11.4 Respiratory or skin sensitization:）词距横向拉伸走样与 Section 13 标签居中、BL-8129A 8 格式 165/165 满分全绿通过与业务目录物理同步 (Exit Code 0)
+
+### 一、 用户明确指令与架构立法背景
+用户在审阅产出物时敏锐指出两项核心系统缺陷并下达顶层立法指令：
+> “还是有问题，比如5.4 中的在着火或爆炸情况下，不要吸进烟尘。 在源文中是归为 5.3 的，你去看下是不是；以及 11.4 的标签 “Respiratory or skin sensitization:”使用了错误的两端对齐，所有标签在保留与序号已有固定间隔和对齐的同时 全局全部标签采用左对齐，禁止采用居中对齐导致标签中的文字间隔过大”
+> “要从系统底层去统一一下全局遇到这种问题的处理：归属问题和标签统一与值统一左对齐问题”
+
+### 二、 核心根因深潜与系统化解法 (5-Whys & Engineering Solution)
+1. **语义槽位物理归属倒置与破坏性正则清洗根因 (Slot Attribution Inversion & Destructive Cleansing)**：
+   - 在既有 `smart-matching.js:907` 中，词法判定将“不要吸进烟尘/避免吸入烟尘”强行归入 `protective_actions`（5.4 消防预防措施和保护设备），并在行 910 显式排斥将其归入 `special_hazards`；
+   - 在行 3620 中，进一步执行破坏性清洗，强行将 `special_hazards` 中载有的烟尘语句正则剔除抹杀；
+   - `pipeline-engine.js:743` 双语流水线装配时，又将该烟尘警示英译拼接入 5.4 保护设备，导致中英文 5.3 严重缺失源文关键事实，5.4 赘余。
+   - **解法**：
+     - `smart-matching.js`: 调整词法规则，将所有火灾爆炸烟尘吸入危害严格收敛至 `special_hazards`（5.3），彻底删除对 5.3 的正则剔除抹杀；
+     - `smart-matching.js`: 确立无标签续行合并原则（Continuation Row Invariant），凡源文表格中无标签的从属说明行，自动合流进入前序槽位事实链；
+     - `pipeline-engine.js`: 双语装配时，将 `In case of fire or explosion, do not breathe fumes/smoke.` 忠实注入 5.3（`sec5.specific_hazards`），5.4 纯净化收敛至 SCBA 与灭火水流向控制。
+
+2. **全篇表格标签与数值对齐混乱及英文两端对齐拉伸根因 (Table Typography & Justify Alignment)**：
+   - 官方母版在历史排版中，部分表格单元格（如 Section 11 中折叠的备用行、Section 13）遗留了 `<w:jc w:val="both"/>` 或 `<w:jc w:val="center"/>`；
+   - 既有排版函数（`applyStandardHangingIndent`、`formatSection11LabelCell`、`formatSection14LabelCell`）仅负责悬挂缩进和间距，未显式覆盖段落级 `w:jc` 对齐；
+   - 这导致长英文标签（如 `11.4 Respiratory or skin sensitization:`）在 Word 渲染时触发两端对齐（`both`），单词被强行横向拉伸导致词距极度失真；同时 `enforceSection13DoubleCenter` 错误注入了水平 `center`；
+   - 既有全局对齐巡检（Step 12）与出厂硬门禁（Gate 6）此前仅扫描了 `c >= 1`（数值格），放任了 `c === 0`（标签格）。
+   - **解法**：
+     - `docx-engine.js`: 在 `applyStandardHangingIndent`、`formatSection11LabelCell`、`formatSection14LabelCell` 中显式注入 `<w:jc w:val="left"/>`，根除 `both` 与 `center`；
+     - `docx-engine.js`: 修正 `enforceSection13DoubleCenter`，仅保留单元格垂直居中（`w:vAlign val="center"`），段落水平对齐统一为纯左对齐（`w:jc val="left"`）；
+     - `pipeline-engine.js`: 抽象全局对齐函数 `enforceGlobalLeftAlignmentAndCleanIndent(engine, isEnglish)`，全量扫描全篇所有表格第一列标签单元格（`c === 0`）与数值单元格（`c >= 1`），统一强制 `w:jc w:val="left"`（除法定豁免的 CAS/浓度居中列及 CN Section 13 尾行方法长文本），并织入所有 4 份中英文文档生成生命周期中；
+     - `pipeline-engine.js`: 升级 Gate 6 质量门禁，全篇所有表格第 1 列标签单元格凡出现非 `left` 对齐直接硬阻断熔断；
+     - `audit_bipolar_bilayer.mjs`: 同步更新 Section 13 审计断言为 `s13Jc === 'left'` 与 `s13JcEn === 'left'`。
+
+### 三、 集中式主审计与双向物理核销 (165/165 Full Pass)
+- **静态 Lint**：`npm run lint`（10 大源码架构门禁 + 反假阳性检测）-> **0 errors, 0 warnings (退出码 0)**；
+- **165 项双极双层全景主审计**：`node web/scripts/run_master_msds_audit.mjs` -> **165/165 项全绿满分通过 (退出码 0)**；
+- **交付物物理核验与同步**：
+  - 中文版 5.3 物质或混合物的特殊危害：`燃烧时释放一氧化碳、二氧化碳、氮氧化物和少量的氰化氢
+在着火或爆炸情况下，不要吸进烟尘。` (100% 吻合)；
+  - 英文版 5.3 Special hazards: `Combustion may release carbon monoxide, carbon dioxide, nitrogen oxides and trace amounts of hydrogen cyanide.
+In case of fire or explosion, do not breathe fumes/smoke.` (100% 吻合)；
+  - 5.4 纯净收敛至 SCBA 与灭火水流向控制，无任何烟尘混杂；
+  - 全篇 4 份 Word 文档所有表格第 1 列标签非左对齐数：**0**；
+  - Section 11.4 `Respiratory or skin sensitization:` 确认为 `jc="left"`，单词间距标准自然；
+  - 全量 8 份标准交付物已物理同步至：
+    - `F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\TDS MSDS 重写版-2 水性封闭型异氰酸酯固化剂 BL\BL-8129A\`
+    - `E:\冠志\TDS MSDS (2)\待处理文件\BL-8129A\`
+
 ## [2026-11-11 MSDS Studio 铲除底层型号硬编码特判、修复 Section 14 非危险品运输拓扑与 SubAgent 8 格式生产 (INV-ANTI-HARDCODING-AND-S14-TOPOLOGY)] - 彻底清除底层 PU-2346A/PA-3223 型号硬编码，修复 /14.1/ 正则误切危化品缺陷，新增 translateTransportValueToEnglish，BL-8129A 8 格式 165/165 满分通过
 
 ### 一、 用户明确指令与架构立法

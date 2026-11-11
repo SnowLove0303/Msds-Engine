@@ -904,11 +904,11 @@ export function routeSemanticProse(pair, sectionNumber) {
       if ((/合适的灭火剂|适用灭火剂|适用灭火介质|二氧化碳.*泡沫/i.test(rawText)) && !/不合适|不适用/i.test(rawText)) {
         return { slotKey: 'extinguishing_media', confidence: 0.95 };
       }
-      if (/自供气式呼吸器|自给式呼吸器|消防人员|灭火用水流入|不要吸进烟尘|不要吸入烟尘|避免吸入烟尘|防范措施|保护设备|firefighters should be equipped|self-contained breathing/i.test(rawText)) {
-        return { slotKey: 'protective_actions', confidence: 0.95 };
-      }
-      if (/燃烧时释放|一氧化碳|二氧化碳|氮氧化物|dense black smoke|thermal decomposition|oxides of nitrogen/i.test(rawText) || (/着火或爆炸/i.test(rawText) && !/不要吸进烟尘|避免吸入/i.test(rawText))) {
+      if (/燃烧时释放|一氧化碳|二氧化碳|氮氧化物|dense black smoke|thermal decomposition|oxides of nitrogen|不要吸进烟尘|不要吸入烟尘|避免吸入烟尘|着火或爆炸|breathe fumes|inhale smoke/i.test(rawText)) {
         return { slotKey: 'special_hazards', confidence: 0.95 };
+      }
+      if (/自供气式呼吸器|自给式呼吸器|消防人员|灭火用水流入|防范措施|保护设备|firefighters should be equipped|self-contained breathing/i.test(rawText)) {
+        return { slotKey: 'protective_actions', confidence: 0.95 };
       }
       break;
     }
@@ -3615,14 +3615,12 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
                 }
                 if (s === 5) {
                   if (matchedItem.key === 'special_hazards' && injectVal) {
-                    const hasProtAction = matchedSec.matchedRows.some(r => r.key === 'protective_actions' && r.value?.trim());
-                    if (hasProtAction) {
-                      injectVal = injectVal.replace(/\s*(?:在着火或爆炸情况下[，,]?\s*不要吸进烟尘[。]?)/g, '').trim();
-                    } else if (!injectVal.includes('\n')) {
+                    if (!injectVal.includes('\n')) {
                       injectVal = injectVal.replace(/(燃烧(?:时)?释放[^\n。]*[。])\s*(在着火|发生火灾|在发生火灾)/, '$1\n$2');
                     }
                   }
                   if (matchedItem.key === 'protective_actions' && injectVal) {
+                    injectVal = injectVal.replace(/\s*(?:在着火或爆炸情况下[，,]?\s*不要吸进烟尘[。]?)/g, '').trim();
                     if (!injectVal.includes('\n')) {
                       injectVal = injectVal.replace(/(消防人员必须佩戴[^\n。]*[。])\s*(禁止污染)/, '$1\n$2');
                     }
