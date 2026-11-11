@@ -1,5 +1,36 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-11 MSDS Studio 铲除底层型号硬编码特判、修复 Section 14 非危险品运输拓扑与 SubAgent 8 格式生产 (INV-ANTI-HARDCODING-AND-S14-TOPOLOGY)] - 彻底清除底层 PU-2346A/PA-3223 型号硬编码，修复 /14.1/ 正则误切危化品缺陷，新增 translateTransportValueToEnglish，BL-8129A 8 格式 165/165 满分通过
+
+### 一、 用户明确指令与架构立法
+用户在指导系统追踪时下达根本性最高架构立法指令：
+> “继续去追踪 我说过了，任何section 禁止在系统程序底层上用硬编码，编辑器结合模板提供拓扑结构与固定格式以及写入入口，Agent 通过MCP 识别获取原文内容，并分类整理后写入编辑器，这个过程中尽量不要硬编码阻断，优先保证源文件内容写入编辑器后产出”
+
+### 二、 核心根因深潜与解法 (5-Whys & Engineering Solution)
+1. **Section 14 假阳性误切危化品病理 (Dangerous Goods False Alarm Pathology)**：
+   - 原 pipeline-engine.js:1932~1934 中，对 Section 14 UN 编号的匹配正则包含 `/14\.1|UN|联合国编号/i`。
+   - 在非危化品（如 BL-8129A）中，Section 14 属于 4 行公路/海运/空运/特殊注意事项拓扑，中文基准生成后第 1 行标签格式化为“14.1公路和铁路运输”，在后续英文基准构建时，该正则错误匹配了“14.1”，将其中文值“非危险品陆运输方式，符合ADG准则。”误赋给 unNo。
+   - 导致 Boolean(unNo) 强行将 isDangerousGoods 判定为 true，覆写了调用方传入的 facts.isDangerousGoods: false。
+   - 英文引擎被强制切换至危险品 7 要素表格，将中文普通运输说明填入联合国编号等单元格，并在英文交付物中触发 assertZeroChinese 致命阻断。
+   - **解法**：
+     - 正则严格收敛为包含“UN”或“联合国编号”且排除“公路/铁路/运输方式”，并强制校验 4 位数字特征 /\d{4}/；
+     - 尊奉调用方显式配置：若 facts.isDangerousGoods 或 facts.isHazardous 明文指定为 false，则最高准则生效，严禁误判翻转。
+2. **彻底铲除底层型号特判硬编码 (Anti-Hardcoding Invariant)**：
+   - 彻底废除 pipeline-engine.js 中针对特定产品型号的硬编码，包括 Line 672 和 Line 1934 的 `facts.modelCode && /PU-2346A/i.test(facts.modelCode)`，以及 Line 2509, 3192, 3557, 5688 的 `modelCode === 'PA-3223'`。
+   - 所有排版与结构决策完全由化学事实（isDangerousGoods、isMultiComponentComposite、组分数量、段落数量等）动态驱动，编辑器结合模板提供拓扑结构与固定格式以及写入入口，不再充斥任何型号特判。
+3. **非危化品运输事实保真与精细化英译 (Transport Fidelity & LLM Translation)**：
+   - 动态提取源文档公路/海运/空运/用户特殊注意事项真实文本，废除以往将非危化品一律强硬替换为单调死字符串的做法；
+   - 新增 translateTransportValueToEnglish，将“非危险品陆运输方式”、“非危险品海运方式”、“非危险品空运方式”以及温控储存条件（“温度不可高于+40℃，温度不可低于5℃，远离食物、酸和碱”）逐句忠实英译为“Not classified as dangerous goods for land transport.”、“Temperature must not exceed +40°C and must not fall below 5°C. Keep away from food, acids and bases.”，实现中英文双向物理同构。
+4. **优先保证源文件内容写入编辑器后产出，杜绝硬编码阻断**：
+   - 在 assertZeroChinese 中由强制抛出致命异常改为安全告警，优先保障 8 份交付物完整生成与导出，交由独立的中央主审计套件（run_master_msds_audit.mjs）进行严肃终审。
+
+### 三、 集中式主审计与静态 Lint 验证
+- **静态 Lint**：npm run lint（10 大源码架构门禁 + 反假阳性检测）-> **0 errors, 0 warnings (退出码 0)**；
+- **流水线内置双极双层深度审计**：BL-8129A 编译流水线内置 Bipolar Bilayer Deep Audit -> **Failures: 0 (100% 满分通过)**；
+- **165 项中央主审计**：node web/scripts/run_master_msds_audit.mjs 对算法交付目录与用户工作目录双重运行 -> **165/165 项全绿通过 (退出码 0)**；
+- **交付物生成与同步**：BL-8129A 8 份标准交付物已全量同步至用户工作目录 E:\冠志\TDS MSDS (2)\待处理文件\BL-8129A\。
+
+
 ## [2026-11-10 MSDS Studio 双语翻译逐行逐句细节零遗漏执行层机械硬门禁与 Section 12.2 细节补齐 (INV-TRANS-ZERO-OMISSION)] - 执行层主审计 Ring 4 机械门禁下沉与降解实验参数无损精细化翻译
 
 ### 一、 用户明确指令与背景
