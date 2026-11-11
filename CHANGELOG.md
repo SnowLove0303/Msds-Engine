@@ -16,6 +16,9 @@
      - 这一判定将 **GHS 化学品危险性 (isHazardous)** 与 **TDG 运输危险货物 (isDangerousGoods)** 严重混为一谈！在化工法规中，水环境慢性危害 3 类 (H412)、皮肤刺激 2 类等 GHS 危险化学品，在运输法规（IMDG/IATA/ADR/ADG）下均属于**非危险货物 (Non-Dangerous Goods)**；
      - 这一逻辑倒置导致系统强行将 EP-1404 判定为危险货物，硬套 7 行 GHS 运输模板（14.1 联合国编号 ~ 14.7 MARPOL），捏造不存在的 `UN 1866`，并将中文源文中的“非危险品运输方式”文本错位填入危险类别和包装组插槽，导致英译失败并残留中文。
    - **系统级根治方案**：
+     - **物理拔除所有化学常数兜底 (Eradicate Chemical Fallbacks)**：全面清除 `pipeline-engine.js` 中所有 `|| '1866'`、`|| '3'`、`|| 'III'`、`|| 'RESIN SOLUTION'` 等假特判硬编码兜底。缺失事实时严格置空，绝对禁止自作主张编造危化品数据；
+     - **严格基于模板拓扑学驱动 (Template Topology-First Binding)**：官方母版与源文件天然均为 5 行非危拓扑（公路/海运/空运/特殊注意事项），直接通过结构编辑器进行 1:1 事实映射绑定，严禁无中生有强行拆改母版为 8 行危化品拓扑；
+     - **新增 Layer 2 静态分析门禁 (LINT-CODE-11)**：在 `lint_code_invariants.mjs` 中固化第 11 项硬阻断规则，扫描并熔断任何针对联合国编号、危险类别等化学常数的硬编码回退，退出码非 0 直接阻断构建；
      - 修改 `pipeline-engine.js`: 引入源文显式非危判定 `hasExplicitNonDangerous = /非危险品|非危险货物|Not classified as dangerous goods|Not regulated as dangerous goods/i.test(srcS14Text)`；
      - 修正 `isDangerousGoods` 逻辑：优先读取显式配置，其次根据源文非危事实判定为 `false`，仅在存在真实有效 4 位 UN 编号时方判定为危险货物，彻底解耦 GHS 与 TDG；
      - 在 `generate_ep1404_deliverables.mjs` 中显式固化 `isDangerousGoods: false`，形成机理与配置双层防线。
