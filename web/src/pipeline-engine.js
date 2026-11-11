@@ -265,6 +265,9 @@ export function translateChemicalCategoryToEnglish(cnCategory, cnName = '') {
   if (/蜡/i.test(combined)) {
     return 'Polyethylene wax emulsion';
   }
+  if (/噁唑啉/i.test(combined)) {
+    return 'Oxazoline-modified polymer aqueous dispersion';
+  }
   if (/丙烯酸/i.test(combined)) {
     return 'Aqueous acrylic dispersion';
   }
@@ -1935,9 +1938,26 @@ export function buildDynamicSection11Table(engine, srcEngine, baseCnEngine = nul
     );
   }
   if (s11.rows[2]) {
+    const srcS11Rec = (srcEngine || baseCnEngine)?.records?.find(r => r.sectionNumber === 11);
+    const srcRow2Text = (srcS11Rec?.rows[2]?.cells[0]?.text || '').trim();
+    let preamble = !isEnglish ? '下面是这些成分的毒理学数据。' : 'The following is toxicological data for these ingredients:';
+    if (srcRow2Text) {
+      if (!isEnglish) {
+        preamble = srcRow2Text.endsWith('：') || srcRow2Text.endsWith(':') ? srcRow2Text : `${srcRow2Text}：`;
+      } else {
+        if (/类似产品/i.test(srcRow2Text)) {
+          preamble = 'Risk assessment data of similar products:';
+        } else if (/以[下为](?:是)?(.*?)毒理学数据/i.test(srcRow2Text)) {
+          const m = srcRow2Text.match(/以[下为](?:是)?(.*?)毒理学数据/i);
+          preamble = `The following is toxicological data for ${m[1].trim()}:`;
+        } else {
+          preamble = 'The following is toxicological data for these ingredients:';
+        }
+      }
+    }
     formatSection11PreambleRow(
       s11.rows[2],
-      isEnglish ? 'The following is toxicological data for these ingredients:' : '下面是这些成分的毒理学数据。',
+      preamble,
       isEnglish,
       34
     );
@@ -2718,12 +2738,12 @@ function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
   }
 
   // 9.5 Section 11 & Section 12 双范式动态分流处理 (Ps-openspec 2.0: 多组分走通栏，单组分如 PU-202A 走原版分列表格)
-  const isMultiComponent = Boolean(facts.isMultiComponentComposite || (facts.components && facts.components.length > 1));
+  const isMultiComponent = Boolean(facts.isMultiComponentComposite || facts.isMultiComponentS11);
   const s11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || srcEngine?.records?.find(r => r.sectionNumber === 11) || null);
   if (s11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
-    buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || '' }, false);
+    buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || '', srcEngine }, false);
     cleanSection12Preambles(engine, false);
-  } else if (isNonHazComposite) {
+  } else {
     cleanSection12Preambles(engine, false);
   }
 
@@ -2968,7 +2988,7 @@ function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
 
   // 11. 规范化 Section 11：动态拓扑构建器 (严格源事实驱动，通用排版，绝无针对型号硬编码假数据)
   let s11 = engine.records.find(r => r.sectionNumber === 11);
-  if (s11 && s11Paradigm !== 'PARADIGM_1_FULL_WIDTH_MERGED' && !isNonHazComposite) {
+  if (s11 && s11Paradigm !== 'PARADIGM_1_FULL_WIDTH_MERGED') {
     buildDynamicSection11Table(engine, srcEngine, null, false, facts);
     s11 = engine.records.find(r => r.sectionNumber === 11);
   }
@@ -3364,12 +3384,12 @@ export async function buildBaseEnglishEngine({
       srcEngine: baseCnEngine || facts.srcEngine,
       section3ExemptionNotes: enValues['sec3.exemption_notes'] || extractSection3ExemptionNotes(baseCnEngine?.records?.find(r => r.sectionNumber === 3))
     }, true);
-    const isMultiComponent = Boolean(facts.isMultiComponentComposite || (facts.components && facts.components.length > 1));
+    const isMultiComponent = Boolean(facts.isMultiComponentComposite || facts.isMultiComponentS11);
     const cnS11ForCheck = baseCnEngine?.records?.find(r => r.sectionNumber === 11);
     const isCnS11FullWidth = cnS11ForCheck && cnS11ForCheck.rows.length === 4 && cnS11ForCheck.rows[3]?.cells?.length === 1;
     const enS11Paradigm = (isMultiComponent || isCnS11FullWidth) ? 'PARADIGM_1_FULL_WIDTH_MERGED' : 'PARADIGM_2_STANDARD_SLOTS';
     if (enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
-      buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || '' }, true);
+      buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || '', srcEngine: baseCnEngine || facts.srcEngine }, true);
     }
     cleanSection12Preambles(engine, true);
   }
@@ -3433,6 +3453,7 @@ export async function buildBaseEnglishEngine({
             else if (/羟基丙烯酸酯.*聚合物|丙烯酸酯.*聚合物/i.test(cnName)) enName = 'Hydroxy acrylic polymer';
             else if (/丙二醇.*丁醚|丙二醇单丁醚/i.test(cnName)) enName = 'Propylene glycol butyl ether';
             else if (/N,N[－\-—\s]*二甲基乙醇胺|二甲基乙醇胺|DMEA/i.test(cnName)) enName = '2-Dimethylaminoethanol';
+            else if (/噁唑啉改性丙烯酸聚合物|噁唑啉.*聚合物|噁唑啉/i.test(cnName)) enName = 'Oxazoline-modified acrylic polymer';
 
             comps.push({
               name: enName,
@@ -3729,7 +3750,7 @@ function translateConditionsToAvoid(cnText = '') {
     }
   }
   let s11 = engine.records.find(r => r.sectionNumber === 11);
-  const isMultiComponent = Boolean(facts.isMultiComponentComposite || (facts.components && facts.components.length > 1));
+  const isMultiComponent = Boolean(facts.isMultiComponentComposite || facts.isMultiComponentS11);
   const cnS11ForCheck = baseCnEngine?.records?.find(r => r.sectionNumber === 11);
   const isCnS11FullWidth = cnS11ForCheck && cnS11ForCheck.rows.length === 4 && cnS11ForCheck.rows[3]?.cells?.length === 1;
   const enS11Paradigm = (isMultiComponent || isCnS11FullWidth) ? 'PARADIGM_1_FULL_WIDTH_MERGED' : 'PARADIGM_2_STANDARD_SLOTS';

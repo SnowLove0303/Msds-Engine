@@ -998,6 +998,12 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   const s15Text = tblsCn[14].textContent;
   assert(/职业病防治法|安全生产法|危险化学品安全管理条例/.test(s15Text), 'Section 15 (L-S15): 中国法规名录列表完备聚合');
 
+  if (model === 'OS-8970') {
+    assert(/噁唑啉改性丙烯酸聚合物/.test(tblsCn[2].textContent) && /水/.test(tblsCn[2].textContent), 'Section 3 (L-S3): OS-8970 噁唑啉改性丙烯酸聚合物与水组分保全');
+    assert(/Oxazoline-modified acrylic polymer/i.test(tblsEn[2].textContent) && /Water/i.test(tblsEn[2].textContent), 'Section 3 (L-S3 EN): OS-8970 英文组分名保全');
+    assert(/＜500\s*mPa[·.]s|<500\s*mPa[·.]s/.test(tblsCn[8].textContent), 'Section 9 (L-S9): OS-8970 粘度实测值 ＜500 mPa·s 保全');
+  }
+
   // L-S16: 其他信息 (免责声明与第 1 节冲突去重)
   const s16Text = tblsCn[15].textContent;
   assert(/指导书/.test(s16Text) && /担保或品质说明书/.test(s16Text) && !/供应商地址/.test(s16Text), 'Section 16 (L-S16): 免责指导声明法定保全且彻底剥离供应商信息冲突');
