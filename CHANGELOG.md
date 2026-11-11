@@ -1,5 +1,37 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-11 MSDS Studio EP-1404 8 格式受控交付、解耦 GHS 危害与运输非危险货物判定缺陷 (INV-EP1404-PRODUCTION-AND-S14-DECOUPLING)] - 完成 EP-1404 水性环氧树脂 8 格式交付物编译生产、彻底解耦 GHS 危险品与运输危险品 (TDG) 判定混淆顽疾、实测 Section 5.3 烟尘归属与全篇表格标签/值纯左对齐通过、165/165 双极双层主审计满分全绿、全量同步 E 盘 (Exit Code 0)
+
+### 一、 需求背景与任务目标
+承接用户明确指令：“验收通过，接下来做1404 ："F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料\4-1 水性环氧树脂 EP\EP-1404\EP-1404 msds_CN 冠志.docx"”。
+系统严格遵循 **OrbitStack (Ps-openspec)** 轨道工程体系与 **AI-Harness** 工业级规范，经由 Step 0 门禁 1、Step 2 门禁 2（双清单自证），推进单焦点执行生产。
+
+### 二、 核心问题排查与系统底层根治 (5-Whys & Systemic Fix)
+1. **GHS 危险性与 TDG 危险货物运输判定严重混淆根因 (GHS Hazard vs TDG Conflation)**：
+   - **现象**：在首轮编译 EP-1404 英文交付物时，Gate 4 拦截报错：英文文档中存在 4 处中文字符段落（`非危险品运输方式, 符合IATA准则。`、`非危险货物。`等）；
+   - **深潜追溯**：
+     - EP-1404 包含 GHS 危险性说明 `H412 对水生生物有害并具有长期持续影响`，故而在流水线中配置了 `isHazardous: true`；
+     - 然而在 `pipeline-engine.js:1997` 的 `buildDynamicSection14Table` 中，系统采用以下判定式：
+       `const isDangerousGoods = (facts.isDangerousGoods !== undefined ? Boolean(facts.isDangerousGoods) : (facts.isHazardous !== undefined ? Boolean(facts.isHazardous) : Boolean(unNo || dgFacts.unNumber)));`
+     - 这一判定将 **GHS 化学品危险性 (isHazardous)** 与 **TDG 运输危险货物 (isDangerousGoods)** 严重混为一谈！在化工法规中，水环境慢性危害 3 类 (H412)、皮肤刺激 2 类等 GHS 危险化学品，在运输法规（IMDG/IATA/ADR/ADG）下均属于**非危险货物 (Non-Dangerous Goods)**；
+     - 这一逻辑倒置导致系统强行将 EP-1404 判定为危险货物，硬套 7 行 GHS 运输模板（14.1 联合国编号 ~ 14.7 MARPOL），捏造不存在的 `UN 1866`，并将中文源文中的“非危险品运输方式”文本错位填入危险类别和包装组插槽，导致英译失败并残留中文。
+   - **系统级根治方案**：
+     - 修改 `pipeline-engine.js`: 引入源文显式非危判定 `hasExplicitNonDangerous = /非危险品|非危险货物|Not classified as dangerous goods|Not regulated as dangerous goods/i.test(srcS14Text)`；
+     - 修正 `isDangerousGoods` 逻辑：优先读取显式配置，其次根据源文非危事实判定为 `false`，仅在存在真实有效 4 位 UN 编号时方判定为危险货物，彻底解耦 GHS 与 TDG；
+     - 在 `generate_ep1404_deliverables.mjs` 中显式固化 `isDangerousGoods: false`，形成机理与配置双层防线。
+
+### 三、 交付物物理验证与 165 项主审计全绿 (165/165 Full Pass)
+1. **静态检查**：`npm run lint` -> **0 errors, 0 warnings (退出码 0)**；
+2. **集中式主审计终审**：`node web/scripts/audit_bipolar_bilayer.mjs` -> **165/165 项质量断言全绿满分通过 (退出码 0)**；
+3. **关键微观证据物理核验 (`verify_ep1404_final.py`)**：
+   - **Section 5.3 特殊危害**：中文版 `燃烧时释放一氧化碳、二氧化碳、氮氧化物和少量的氰化氢 在着火或爆炸情况下，不要吸进烟尘。` / 英文版 `Combustion may release carbon monoxide, carbon dioxide, nitrogen oxides and trace amounts of hydrogen cyanide. In case of fire or explosion, do not breathe fumes/smoke.` (完整保全)；
+   - **Section 5.4 预防措施**：纯净保留 SCBA 自给式呼吸器与灭火水流向控制，烟尘警示完全剥离；
+   - **全篇标签纯左对齐**：全篇 4 份 DOCX 所有表格第 1 列标签非 `left` 对齐数：**0**；
+   - **Section 14 运输信息**：4 份交付物（冠志/国彩 x 中文/英文）拓扑完全一致，英文版零中文字符残留；
+4. **全量 8 份标准交付物已同步至外部协同目录**：
+   - `E:\冠志\TDS MSDS (2)\待处理文件\EP-1404\`（4 DOCX + 4 PDF，时间戳差值 < 3 秒）。
+
+
 ## [2026-11-11 MSDS Studio 系统底层语义槽位归属与全篇表格标签/值纯左对齐立法 (INV-SYSTEMIC-ATTRIBUTION-AND-GLOBAL-LEFT-ALIGNMENT)] - 底层纠偏 Section 5 火灾烟尘吸入危害物理归属 5.3 物质或混合物的特殊危害并废除破坏性清洗逻辑、全局统一全篇表格所有标签（Col 0）与数值（Col >= 1）纯左对齐（w:jc val="left"）、根除模板残留 both/center 引发的长英文标签（11.4 Respiratory or skin sensitization:）词距横向拉伸走样与 Section 13 标签居中、BL-8129A 8 格式 165/165 满分全绿通过与业务目录物理同步 (Exit Code 0)
 
 ### 一、 用户明确指令与架构立法背景

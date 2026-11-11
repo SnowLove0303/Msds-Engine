@@ -1994,7 +1994,10 @@ export function buildDynamicSection14Table(engine, srcEngine, baseCnEngine = nul
   const unMatch = srcS14Text.match(/UN\s*(\d{4})/i) || srcS14Text.match(/联合国编号\s*[:：]?\s*(\d{4})/i);
   const unPair = s14Pairs.find(p => /(?:UN|联合国编号)/i.test(p.rawLabel) && !/公路|铁路|运输方式/i.test(p.rawLabel));
   const unNo = (unPair && /\d{4}/.test(unPair.rawValue)) ? unPair.rawValue : (dgFacts.unNumber || (unMatch ? unMatch[1] : null));
-  const isDangerousGoods = (facts.isDangerousGoods !== undefined ? Boolean(facts.isDangerousGoods) : (facts.isHazardous !== undefined ? Boolean(facts.isHazardous) : Boolean(unNo || dgFacts.unNumber)));
+  const hasExplicitNonDangerous = /非危险品|非危险货物|Not classified as dangerous goods|Not regulated as dangerous goods/i.test(srcS14Text);
+  const isDangerousGoods = (facts.isDangerousGoods !== undefined
+    ? Boolean(facts.isDangerousGoods)
+    : (unNo ? true : (hasExplicitNonDangerous ? false : Boolean(dgFacts.unNumber))));
 
   const psnMatch = srcS14Text.match(/联合国运输名称\s*[:：]?\s*([^\n\r]+)/i);
   const psnPair = s14Pairs.find(p => /14\.2|运输名称|proper shipping name/i.test(p.rawLabel));
