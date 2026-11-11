@@ -92,6 +92,13 @@ checkFile(path.join(SRC_DIR, 'pipeline-engine.js'), [
     pattern: /safeWrite\(s12\.rows\[1\]\.cells\[0\],\s*['"]No ecotoxicological studies are available for this product\\.['"]\)/,
     message: '严禁在 Section 12 中硬编码英文生态前言长句！',
     remediation: '改用 translateSection12PreambleToEnglish 动态翻译源前言。'
+  },
+  {
+    id: 'LINT-CODE-11',
+    severity: 'ERROR',
+    pattern: /\|\|\s*['"](?:1866|UN 1866|RESIN SOLUTION)['"]|unNo\s*\|\|\s*['"]\d+['"]/,
+    message: '严禁在通用流水线中硬编码联合国编号（如 1866）、运输名称兜底！必须严格基于源文件真实事实与模板拓扑。',
+    remediation: '移除硬编码兜底常量，缺失事实时严格置空或保持源模板拓扑，严禁伪造。'
   }
 ]);
 

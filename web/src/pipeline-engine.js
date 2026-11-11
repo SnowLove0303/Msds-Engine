@@ -848,13 +848,13 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
 
     // Section 14 (Dangerous Goods dynamic support REQ-04)
     'sec14.road_rail': isDangerousGoods
-      ? (facts.dangerousGoods?.roadRailEn || 'UN 1866, RESIN SOLUTION, Class 3, PG III.')
+      ? (facts.dangerousGoods?.roadRailEn || (facts.dangerousGoods?.unNumber ? `UN ${facts.dangerousGoods.unNumber}, ${facts.dangerousGoods.properShippingNameEn || 'CHEMICALS'}, Class ${facts.dangerousGoods.hazardClass || ''}, PG ${facts.dangerousGoods.packingGroup || ''}.` : 'Not classified as dangerous goods for land transport.'))
       : 'Not classified as dangerous goods for land transport.',
     'sec14.sea': isDangerousGoods
-      ? (facts.dangerousGoods?.seaEn || 'UN 1866, RESIN SOLUTION, Class 3, PG III, Marine Pollutant: No, in accordance with IMDG regulations.')
+      ? (facts.dangerousGoods?.seaEn || (facts.dangerousGoods?.unNumber ? `UN ${facts.dangerousGoods.unNumber}, ${facts.dangerousGoods.properShippingNameEn || 'CHEMICALS'}, Class ${facts.dangerousGoods.hazardClass || ''}, PG ${facts.dangerousGoods.packingGroup || ''}, in accordance with IMDG regulations.` : 'Not classified as dangerous goods for sea transport, in accordance with IMDG regulations.'))
       : 'Not classified as dangerous goods for sea transport, in accordance with IMDG regulations.',
     'sec14.air': isDangerousGoods
-      ? (facts.dangerousGoods?.airEn || 'UN 1866, RESIN SOLUTION, Class 3, PG III, in accordance with IATA regulations.')
+      ? (facts.dangerousGoods?.airEn || (facts.dangerousGoods?.unNumber ? `UN ${facts.dangerousGoods.unNumber}, ${facts.dangerousGoods.properShippingNameEn || 'CHEMICALS'}, Class ${facts.dangerousGoods.hazardClass || ''}, PG ${facts.dangerousGoods.packingGroup || ''}, in accordance with IATA regulations.` : 'Not classified as dangerous goods for air transport, in accordance with IATA regulations.'))
       : 'Not classified as dangerous goods for air transport, in accordance with IATA regulations.',
     'sec14.special_precautions': specialPrecautionsEn,
 
@@ -2001,16 +2001,16 @@ export function buildDynamicSection14Table(engine, srcEngine, baseCnEngine = nul
 
   const psnMatch = srcS14Text.match(/联合国运输名称\s*[:：]?\s*([^\n\r]+)/i);
   const psnPair = s14Pairs.find(p => /14\.2|运输名称|proper shipping name/i.test(p.rawLabel));
-  const psnCn = psnPair?.rawValue || dgFacts.properShippingNameCn || dgFacts.shippingNameCn || (psnMatch ? psnMatch[1].trim() : (/树脂溶液/.test(srcS14Text) ? '树脂溶液' : '化学品'));
-  const psnEn = dgFacts.properShippingNameEn || dgFacts.shippingNameEn || (psnCn === '树脂溶液' ? 'RESIN SOLUTION' : 'CHEMICALS');
+  const psnCn = psnPair?.rawValue || dgFacts.properShippingNameCn || dgFacts.shippingNameCn || (psnMatch ? psnMatch[1].trim() : '');
+  const psnEn = dgFacts.properShippingNameEn || dgFacts.shippingNameEn || '';
 
   const hClassMatch = srcS14Text.match(/运输危险[级类]别\s*[:：]?\s*(\d)/) || srcS14Text.match(/14\.3[^\d]*(\d)/);
   const hClassPair = s14Pairs.find(p => /14\.3|危险[级类]别|hazard class/i.test(p.rawLabel));
-  const hClass = hClassPair?.rawValue || dgFacts.hazardClass || (hClassMatch ? hClassMatch[1] : '3');
+  const hClass = hClassPair?.rawValue || dgFacts.hazardClass || (hClassMatch ? hClassMatch[1] : '');
 
   const pgMatch = srcS14Text.match(/包装[组类]型?\s*[:：]?\s*([I|V]+)/i) || srcS14Text.match(/14\.4[^\w]*([I|V]+)/i);
   const pgPair = s14Pairs.find(p => /14\.4|包装[组类]|packing group/i.test(p.rawLabel));
-  const pg = pgPair?.rawValue || dgFacts.packingGroup || (pgMatch ? pgMatch[1] : 'III');
+  const pg = pgPair?.rawValue || dgFacts.packingGroup || (pgMatch ? pgMatch[1] : '');
 
   const envMatch = srcS14Text.match(/环境危险\s*[:：]?\s*([是|否|无])/i) || srcS14Text.match(/海洋污染物\s*[:：]?\s*([是|否])/i);
   const envPair = s14Pairs.find(p => /14\.5|环境危|海洋污染物|marine pollutant|environmental hazard/i.test(p.rawLabel));
@@ -2074,8 +2074,8 @@ export function buildDynamicSection14Table(engine, srcEngine, baseCnEngine = nul
       seq: '14.1',
       labelCn: '联合国编号',
       labelEn: 'UN number',
-      valCn: unNo || '1866',
-      valEn: unNo || '1866'
+      valCn: unNo || '',
+      valEn: unNo || ''
     },
     {
       seq: '14.2',
