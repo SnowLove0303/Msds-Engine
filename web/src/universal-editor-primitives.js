@@ -476,7 +476,7 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
       const c0 = r.getElementsByTagNameNS(W_NS, 'tc')[0];
       if (!c0) continue;
       const c0Text = (c0.textContent || '').trim();
-      const mSeq = c0Text.match(/^(\d+\.\d+(?:\.\d+)?)/);
+      const mSeq = c0Text.match(/^(\d+(?:\.\d+)+)/);
       if (mSeq) {
         const digitsOnly = mSeq[1].replace(/\D/g, '');
         if (digitsOnly.length > maxSeqDigitCount) {
@@ -484,7 +484,7 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
         }
       }
     }
-    const isTierB = (maxSeqDigitCount >= 4) || (sectionNumber === 11);
+    const isTierB = (maxSeqDigitCount >= 4);
     const targetIndent = isTierB ? '560' : '420';
 
     for (let rIdx = 0; rIdx < rows.length; rIdx++) {
@@ -592,7 +592,7 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
             }
 
             const pText = (p.textContent || '').trim();
-            const mSeq = pText.match(/^(\d+\.\d+(?:\.\d+)?)\s*(.*)$/);
+            const mSeq = pText.match(/^(\d+(?:\.\d+)+)\s*(.*)$/);
             const hasSeq = Boolean(mSeq);
 
             if (hasSeq) {
@@ -707,7 +707,7 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
               let bCs = rPr.getElementsByTagNameNS(W_NS, 'bCs')[0] || doc.createElementNS(W_NS, 'w:bCs');
               if (!bCs.parentNode) rPr.appendChild(bCs);
 
-              const isSeqRun = run.getElementsByTagNameNS(W_NS, 'tab').length > 0 || /^(\d+\.\d+(?:\.\d+)?)\s*$/.test(runText);
+              const isSeqRun = run.getElementsByTagNameNS(W_NS, 'tab').length > 0 || /^(\d+(?:\.\d+)+)\s*$/.test(runText);
               const runSz = isSeqRun ? targetSeqSz : targetLblSz;
               const runAscii = isSeqRun ? targetSeqFont : targetLblAscii;
 

@@ -2653,10 +2653,13 @@ export function mapToxicologyLabelToEnglish(cnLabel) {
 /**
  * 格式化 Section 11 标签单元格 (统一 9.1 外观黄金基准 420/420、激光垂直对齐、字号、加粗)
  */
-export function formatSection11LabelCell(cell, numberStr, labelText, isEnglish = false) {
+export function formatSection11LabelCell(cell, numberStr, labelText, isEnglish = false, customIndent = null) {
   if (!cell?.node) return;
   // 4 位数扩展层级专属标尺：560 dxa 悬挂缩进 + <w:tab/> 激光垂直对齐与舒适呼吸间距 (REQ-TIER-4DIGIT-SPACING-ALIGN)
-  applyStandardHangingIndent(cell, '560', '560');
+  // 动态自适应标尺：纯数字位数 >= 4 (如 11.10) 为 560 dxa，<= 3 (如 11.1~11.9) 为 420 dxa (REQ-DYNAMIC-ALIGN-01)
+  const digitsOnly = (numberStr || '').replace(/\D/g, '');
+  const indent = customIndent || (digitsOnly.length >= 4 ? '560' : '420');
+  applyStandardHangingIndent(cell, indent, indent);
   const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
   if (ps.length === 0) return;
   const p = ps[0];
@@ -4750,7 +4753,7 @@ export function renderThreeColumnVMergeSubRows(record, mainRowIndex, subRowIndex
 
   // 1. 构建 mainRow (3 列)
   const mCell0 = createCell(3519, 1, 'restart');
-  appendPara(mCell0, config.mainLabel || (isEn ? '11.7  Reproductive toxicity:' : '11.7  生殖毒性：'), true, { left: '560', hanging: '560' });
+  appendPara(mCell0, config.mainLabel || (isEn ? '11.7  Reproductive toxicity:' : '11.7  生殖毒性：'), true, { left: config.indent || '420', hanging: config.indent || '420' });
   mainRow.node.appendChild(mCell0);
 
   const mCell1 = createCell(1311, 1, null);

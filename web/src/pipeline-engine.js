@@ -5115,27 +5115,23 @@ function formatEnglishLabelCell(cell, W_NS, sectionNumber, customIndent) {
   // 9.1 外观黄金几何标尺：Tier A (<=3位数字如 9.1) 为 420 dxa (21pt, 80.28pt)；Tier B (>=4位数字如 Section 11) 为 560 dxa (28pt, 87.28pt) (REQ-TIER-4DIGIT-SPACING-ALIGN)
   let indent = customIndent;
   if (!indent) {
-    if (sectionNumber === 11) {
-      indent = '560';
-    } else {
-      let table = cell;
-      while (table && table.tagName !== 'w:tbl' && table.localName !== 'tbl') {
-        table = table.parentNode;
-      }
-      let isTierB = false;
-      if (table) {
-        const tc0s = Array.from(table.getElementsByTagNameNS(W_NS, 'tc'));
-        for (const tc of tc0s) {
-          const txt = (tc.textContent || '').trim();
-          const m = txt.match(/^(\d+\.\d+)/);
-          if (m && m[1].replace(/\D/g, '').length >= 4) {
-            isTierB = true;
-            break;
-          }
+    let table = cell;
+    while (table && table.tagName !== 'w:tbl' && table.localName !== 'tbl') {
+      table = table.parentNode;
+    }
+    let isTierB = false;
+    if (table) {
+      const tc0s = Array.from(table.getElementsByTagNameNS(W_NS, 'tc'));
+      for (const tc of tc0s) {
+        const txt = (tc.textContent || '').trim();
+        const m = txt.match(/^(\d+(?:\.\d+)+)/);
+        if (m && m[1].replace(/\D/g, '').length >= 4) {
+          isTierB = true;
+          break;
         }
       }
-      indent = isTierB ? '560' : '420';
     }
+    indent = isTierB ? '560' : '420';
   }
 
   const fullText = ps.map(p => p.textContent || '').join(' ').replace(/\s+/g, ' ').trim();
@@ -5642,7 +5638,7 @@ export function normalizeChineseNumberedLabels(engine) {
         if (!cleanLabel.endsWith('：') && !cleanLabel.endsWith(':')) cleanLabel += '：';
         cleanLabel = cleanLabel.replace(/:$/, '：');
 
-        const isTierB = (secNum === 11) || (seqStr.replace(/\D/g, '').length >= 4);
+        const isTierB = (seqStr.replace(/\D/g, '').length >= 4);
         const indent = isTierB ? '560' : '420';
         applyHangingIndentToP(p, indent, indent, W_NS);
         rebuildUnifiedLabelRun(p, seqStr, cleanLabel, {
