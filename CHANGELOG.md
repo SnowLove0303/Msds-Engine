@@ -1,5 +1,39 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-12 MSDS 识别模块高精度增强与用户批注 100% 物理核销 (INV-RECOGNITION-PRECISION-ENHANCEMENT)] - 升级 recognition-engine.js 支持 v1. 历史杂质标题前缀容差匹配与清洗、实现 Section 2 复合单元格多行多层级穿透解构、精准纠正续行长句与引导语免责声明伪标签缺陷、PA-3612 Context 1 4 列纯净排版毫秒级重构生成 (耗时 245ms, 退出码 0)
+
+### 一、 需求背景与任务目标
+承接用户明确指令与手写批注核对要求：对 `F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\output\PA-3612\PA-3612_context1_recognition.md` 中标注的 4 大系统性缺陷进行深度根治：
+1. **批注 1 (Section 1 行 0)**：`v1.物料及供应商标识` 误判为通栏行/数据行问题，要求支持 `v1.` 容差清洗并准确归类为 `章节标题`；
+2. **批注 2 (Section 2 行 1)**：复合单单元格包含多行混合内容（`物质或混合物分类`、`GHS分类：`、`GHS象形图：`）被简单作为整块处理，要求层级穿透解构为说明行、标签与数据值；
+3. **批注 3 (Section 5 行 4)**：`在着火或爆炸情况下，不要吸进烟尘。` 因左单元格为空而被误判为 `标签`，要求准确判定为 `说明行`；
+4. **批注 4 (Section 11 行 2 & Section 15)**：`类似产品的风险评估数据：` 及法规前言引导语因末尾冒号被误判为 `标签`，要求归类为 `说明行`。
+
+### 二、 核心问题根因排查与底层代码级根治 (5-Whys & Systemic Fix)
+1. **章节标题匹配正则僵化根因**：
+   - `detectSectionHeaderInRow` 原正则仅匹配 `^\s*(\d{1,2})[\.、\s]+`，对历史遗留杂质前缀 `v1.`/`V1.` 无法匹配；
+   - **根治**：升级为 `^\s*(?:[vV])?\s*(\d{1,2})[\.、\s]+(.*)$`，提取 `secNum` 与 `titlePart`，统一规范化清洗为标准 `${secNum}.${titlePart}`，准确赋予 `章节标题` 属性。
+2. **Section 2 复合单元格穿透解构算法**：
+   - 原系统直接将 Section 2 的单大单元格作为普通通栏行处理；
+   - **根治**：引入 `decomposeCompositeSection2Row` 多行穿透机制，依据冒号、关键词和加粗特征，将单大单元格原子解构为：
+     - 子题头 `物质或混合物分类` -> `说明行`；
+     - 标签/值键值对 `GHS分类：` + `根据GHS不属于危险物` -> `标签`；
+     - 标签/值键值对 `GHS象形图：` + `根据GHS不属于危险物` -> `标签`。
+3. **续行长句与空白左列误判根因**：
+   - 原 `classifyRowSemanticType` 判断 `c0Text.length <= 15` 时未校验 `c0Text.length > 0`，当 `c0Text === ""` 时误判为标签；
+   - **根治**：显式注入 `!c0Text && c1Text => SEMANTIC_TYPES.EXPLANATION` 判定，将 Section 5 行 4 的长句烟尘警告准确归类为 `说明行`。
+4. **前言引导语冒号伪标签根因**：
+   - 原逻辑仅凭末尾是否包含冒号即判定为标签，未考虑 Section 11/Section 15 的前置段落引导语特征；
+   - **根治**：注入前置引导语关键词识别（`/风险评估|其它规定|法规要求|免责声明/`），且当其右侧列为空时，一律准确归类为 `说明行`。
+
+### 三、 物理验证与 1:1 双向对账清算 (100% Full Pass)
+1. **VS Code 原生两栏 Diff 检阅**：通过 `vscode-review` (`review_diff_in_vscode`) 完整呈报并获得用户确认应用；
+2. **模块语法与依赖完整性**：`node -c` 检查 0 错误 0 警告，真实退出码 0；
+3. **原生 CLI 运行实测**：`node web/scripts/run_source_recognition.mjs --source="..." --output="..."` 耗时仅 **245 ms**，生成纯净 Context 1 Markdown 与结构化原始事实 JSON；
+4. **OpenSpec 规范变更合流与归档**：`npx openspec archive enhance-msds-recognition-precision --yes` 顺利完成归档沉淀。
+
+
+
 ## [2026-11-11 MSDS Studio OS-8970 8 格式受控交付、修复 Section 11 多组分误判与端点动态装配缺陷 (INV-OS8970-PRODUCTION-AND-S11-TOPOLOGY)] - 完成 OS-8970 水性噁唑啉交联剂 8 格式交付物编译生产、彻底消除 Section 11 因 Section 3 组分数误判为通栏复合模式的系统顽疾、移除 !isNonHazComposite 阻断动态端点装配的陈旧条件、157 项中央主审计与双极双层深度审计 100% 满分全绿、全量同步 E 盘 (Exit Code 0)
 
 ### 一、 需求背景与任务目标

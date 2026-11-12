@@ -29,6 +29,187 @@ export function extractMultiParagraphCellPairs(row) {
  * 5. 输出 100% 纯净 JSON 可序列化事实，彻底杜绝 DOM 循环引用。
  */
 
+
+export const SEMANTIC_TYPES = Object.freeze({
+  SECTION_HEADER: '章节标题',
+  SEQ_LABEL: '序号标签',
+  LABEL: '标签',
+  VALUE: '数据值',
+  EXPLANATION: '说明行',
+  TABLE_HEADER: '表头',
+  COMPONENT_DATA: '组分数据'
+});
+
+/**
+ * 多维特征行语义分类器 (Multidimensional Row Semantic Classifier)
+ * 依据加粗、冒号、序号模式、列数与句式多维特征精准判别行属性，杜绝将说明行或值误判为标签
+ */
+export function classifyRowSemanticType(row, secNum, rowIndex = 0) {
+  const cells = row.cells || [];
+  const cellCount = cells.length;
+  const c0Text = (cells[0]?.text || '').trim();
+  const c1Text = (cells[1]?.text || '').trim();
+  const fullText = cells.map(c => (c.text || '').trim()).join(' ');
+
+  // 1. 章节大标题 (支持容差前缀 v1. 匹配)
+  const headerMatch = detectSectionHeaderInRow(row);
+  if (rowIndex === 0 || headerMatch) {
+    if (headerMatch) {
+      return {
+        rowType: SEMANTIC_TYPES.SECTION_HEADER,
+        label: headerMatch.title,
+        value: '—'
+      };
+    }
+  }
+
+  // 2. 表头行 (Section 3 成分表、Section 8 暴露限值表等)
+  if (cellCount >= 3 && /化学品名称|CAS编号|%\s*（w\/w）|Component|CAS|Basis|Type|Value|暴露限值|职业接触限值|MAC|PC-TWA/i.test(fullText)) {
+    return {
+      rowType: SEMANTIC_TYPES.TABLE_HEADER,
+      label: cells.map(c => (c.text || '').trim()).join(' | '),
+      value: '—'
+    };
+  }
+
+  // 3. Section 3 组分数据行 (多列网格且包含 CAS 或浓度)
+  if (secNum === 3 && cellCount >= 3 && rowIndex >= 2) {
+    return {
+      rowType: SEMANTIC_TYPES.COMPONENT_DATA,
+      label: c0Text || '未命名组分',
+      value: `CAS: ${c1Text || '—'} | 浓度: ${cells[2]?.text || '—'}`
+    };
+  }
+
+  // 4. 左列为空、右列有内容的行 (如 Section 5 行 4: 烟尘警告叙述)
+  if (!c0Text && c1Text) {
+    return {
+      rowType: SEMANTIC_TYPES.EXPLANATION,
+      label: '—',
+      value: c1Text
+    };
+  }
+
+  // 5. 单列行 / 通栏行
+  if (cellCount === 1 || (cellCount === 2 && !c1Text)) {
+    // 检查前置引导语 (如 Section 11 "类似产品的风险评估数据："、Section 15 "其它的规定："、"符合下列法规要求：")
+    const isPreambleGuidance = /^(?:类似产品的风险评估数据|其它的规定|其它规定|其他规定|符合下列法规要求|相关法律法规|免责声明)[：:]?$/i.test(c0Text);
+    if (isPreambleGuidance) {
+      return {
+        rowType: SEMANTIC_TYPES.EXPLANATION,
+        label: '—',
+        value: c0Text
+      };
+    }
+
+    // 检查是否为带序号的子题头 (如 8.1控制参数, 8.2暴露控制)
+    const mSeqHeader = c0Text.match(/^(\d+\.\d+)\s*(.*)$/);
+    if (mSeqHeader) {
+      const rest = mSeqHeader[2].trim();
+      if (/[:：]/.test(rest)) {
+        const [lblPart, ...valParts] = rest.split(/[:：]/);
+        return {
+          rowType: SEMANTIC_TYPES.SEQ_LABEL,
+          label: `${mSeqHeader[1]} ${lblPart}：`.trim(),
+          value: valParts.join('：').trim() || '—'
+        };
+      }
+      return {
+        rowType: SEMANTIC_TYPES.SEQ_LABEL,
+        label: c0Text,
+        value: '—'
+      };
+    }
+
+    // 检查是否为冒号拆分单行 (如 4.1.一般措施：立即脱掉...)
+    const colonMatch = c0Text.match(/^([^：:]{2,15}[：:])\s*(.+)$/);
+    if (colonMatch) {
+      const lbl = colonMatch[1].trim();
+      const val = colonMatch[2].trim();
+      const isSeq = /^\d+\./.test(lbl);
+      return {
+        rowType: isSeq ? SEMANTIC_TYPES.SEQ_LABEL : SEMANTIC_TYPES.LABEL,
+        label: lbl,
+        value: val || '—'
+      };
+    }
+
+    // 检查是否为法规条目 (GB/T, 国务院令, etc.)
+    if (/^GB[\/T\s\d]|国务院令/i.test(c0Text)) {
+      return {
+        rowType: SEMANTIC_TYPES.VALUE,
+        label: '—',
+        value: c0Text
+      };
+    }
+
+    // 典型说明行特征 (法规免责声明、长句叙述、非危险说明)
+    return {
+      rowType: SEMANTIC_TYPES.EXPLANATION,
+      label: '—',
+      value: c0Text || fullText
+    };
+  }
+
+  // 6. 双列标准行 (cells.length === 2 且 c0Text, c1Text 均有值)
+  if (cellCount === 2) {
+    // 特殊情况：左侧为长句说明且无冒号，无加粗 (如 "该产品无可用的毒理学研究。")
+    const isLeftLongNarrative = (c0Text.length > 15 && !/[:：]$/.test(c0Text) && !cells[0]?.typography?.isBold) ||
+                                /无可用的毒理学研究|无可用的接触限值|不易生物降解/i.test(c0Text);
+    if (isLeftLongNarrative) {
+      return {
+        rowType: SEMANTIC_TYPES.EXPLANATION,
+        label: '—',
+        value: c1Text ? `${c0Text} ${c1Text}`.trim() : c0Text
+      };
+    }
+
+    // 检查左侧是否为章节引导语
+    const isPreamble = /^(?:类似产品的风险评估数据|其它的规定|其它规定|其他规定|符合下列法规要求)[：:]?$/i.test(c0Text);
+    if (isPreamble) {
+      return {
+        rowType: SEMANTIC_TYPES.EXPLANATION,
+        label: '—',
+        value: c1Text ? `${c0Text} ${c1Text}`.trim() : c0Text
+      };
+    }
+
+    // 带分级序号的标签 (如 1.1产品名称：, 9.1外观：, 10.1化学稳定性：)
+    if (/^\d+\.\d+/.test(c0Text)) {
+      return {
+        rowType: SEMANTIC_TYPES.SEQ_LABEL,
+        label: c0Text,
+        value: c1Text || '—'
+      };
+    }
+
+    // 普通标签 (如 中文名称：, 手部防护：, 供应商名称：)
+    // 严格检查 c0Text.length > 0 且具有标签形态
+    const isLabel = c0Text.length > 0 && (/[:：]$/.test(c0Text) || cells[0]?.typography?.isBold || c0Text.length <= 15);
+    if (isLabel) {
+      return {
+        rowType: SEMANTIC_TYPES.LABEL,
+        label: c0Text,
+        value: c1Text || '—'
+      };
+    }
+
+    // 兜底为说明行
+    return {
+      rowType: SEMANTIC_TYPES.EXPLANATION,
+      label: '—',
+      value: c0Text ? `${c0Text} ${c1Text}`.trim() : c1Text
+    };
+  }
+
+  // 7. 其他多列网格
+  return {
+    rowType: SEMANTIC_TYPES.VALUE,
+    label: c0Text || '—',
+    value: cells.slice(1).map(c => (c.text || '').trim()).join(' | ') || '—'
+  };
+}
+
 export const STRUCTURE_TYPES = {
   TWO_COLUMN: 'TWO_COLUMN',           // 标准两列 (Label + Value)
   EXPLANATION_ROW: 'EXPLANATION_ROW', // 引导说明行 / 单行提示
@@ -62,7 +243,8 @@ function detectSectionHeaderInRow(row) {
   if (!row.cells || row.cells.length === 0) return null;
   const firstCellText = (row.cells[0]?.text || '').trim();
 
-  const match = firstCellText.match(/^\s*(\d{1,2})[\.、\s]+(.*)$/);
+  // 兼容历史杂质前缀 (如 'v1.', 'V1.', '  1.')
+  const match = firstCellText.match(/^\s*(?:[vV])?\s*(\d{1,2})[\.、\s]+(.*)$/);
   if (!match) return null;
 
   const secNum = Number(match[1]);
@@ -71,7 +253,8 @@ function detectSectionHeaderInRow(row) {
   const titlePart = match[2].trim();
   const kw = SECTION_KEYWORDS[secNum];
   if (kw && kw.test(titlePart)) {
-    return { sectionNumber: secNum, title: firstCellText };
+    const cleanTitle = `${secNum}.${titlePart}`;
+    return { sectionNumber: secNum, title: cleanTitle };
   }
   return null;
 }
@@ -292,9 +475,64 @@ export async function recognizeSourceDocx(docxPathOrBuffer, sourceName = 'source
           typography: extractCellTypography(cell)
         }));
 
+        // 针对 Section 2 复合单单元格执行多行多层级段落穿透拆解
+        if (currentSecNum === 2 && targetSec.rows.length > 0 && structMeta.type === STRUCTURE_TYPES.FULL_WIDTH) {
+          const c0 = (row.cells?.[0]?.text || '').trim();
+          const lines = c0.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+          if (lines.length > 1 && /GHS|物质或混合物|危险/i.test(c0)) {
+            for (let lIdx = 0; lIdx < lines.length; lIdx++) {
+              const line = lines[lIdx];
+              if (/^物质或混合物/i.test(line)) {
+                targetSec.rows.push({
+                  rowIndex: targetSec.rows.length,
+                  structureType: STRUCTURE_TYPES.FULL_WIDTH,
+                  semanticType: SEMANTIC_TYPES.EXPLANATION,
+                  label: '—',
+                  value: line,
+                  columnCount: 1,
+                  cells: [{ colIndex: 0, text: line, typography: { isBold: true } }]
+                });
+              } else if (/[:：]$/.test(line)) {
+                const nextLine = lines[lIdx + 1] || '—';
+                targetSec.rows.push({
+                  rowIndex: targetSec.rows.length,
+                  structureType: STRUCTURE_TYPES.TWO_COLUMN,
+                  semanticType: SEMANTIC_TYPES.LABEL,
+                  label: line,
+                  value: nextLine,
+                  columnCount: 2,
+                  cells: [
+                    { colIndex: 0, text: line, typography: { isBold: true } },
+                    { colIndex: 1, text: nextLine, typography: { isBold: false } }
+                  ]
+                });
+                lIdx++; // 消耗下一行作为值
+              } else {
+                targetSec.rows.push({
+                  rowIndex: targetSec.rows.length,
+                  structureType: STRUCTURE_TYPES.FULL_WIDTH,
+                  semanticType: SEMANTIC_TYPES.EXPLANATION,
+                  label: '—',
+                  value: line,
+                  columnCount: 1,
+                  cells: [{ colIndex: 0, text: line, typography: { isBold: false } }]
+                });
+              }
+            }
+            secRawRowsMap.get(currentSecNum).push(row);
+            targetSec.rowsCount = targetSec.rows.length;
+            continue;
+          }
+        }
+
+        const semanticMeta = classifyRowSemanticType(row, currentSecNum, targetSec.rows.length);
+
         targetSec.rows.push({
           rowIndex: targetSec.rows.length,
           structureType: structMeta.type,
+          semanticType: semanticMeta.rowType,
+          label: semanticMeta.label,
+          value: semanticMeta.value,
           columnCount: cellsData.length,
           cells: cellsData
         });
@@ -454,22 +692,57 @@ function parseSection3(record, facts) {
     if (/化学品名称|CAS|质量分数|浓度|Component|Concentration/i.test(full) && cells.length >= 3) {
       continue;
     }
+    if (/^(?:3\.\d\s*)?(?:物质|混合物|成分\/组成信息)/i.test(full) && cells.length === 1) {
+      continue;
+    }
 
-    const casMatch = full.match(/\b(\d{2,7}-\d{2}-\d)\b/);
-    if (casMatch) {
-      const cas = casMatch[1];
-      let name = cells[0];
-      let concentration = cells[cells.length - 1];
+    const c0 = cells[0] || '';
+    const c1 = cells[1] || '';
+    const c2 = cells[cells.length - 1] || '';
 
-      const pctMatch = full.match(/(\d+(?:\.\d+)?(?:\s*-\s*\d+(?:\.\d+)?)?%)/);
-      if (pctMatch) concentration = pctMatch[1];
+    const names = c0.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const casList = c1.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const concList = c2.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
 
-      facts.components.push({
-        name,
-        casNumber: cas,
-        concentration,
-        columnCount: cells.length
-      });
+    if (names.length > 1 || casList.length > 1) {
+      const maxLen = Math.max(names.length, casList.length, concList.length);
+      for (let i = 0; i < maxLen; i++) {
+        const name = names[i] || names[0] || '';
+        const cas = casList[i] || casList[0] || '';
+        const conc = concList[i] || concList[0] || '';
+        if (name && !/3\.\d|成分|混合物|物质/i.test(name)) {
+          facts.components.push({
+            name,
+            casNumber: cas,
+            cas,
+            concentration: conc,
+            conc,
+            columnCount: cells.length
+          });
+        }
+      }
+    } else {
+      const casMatch = full.match(/\b(\d{2,7}-\d{2}-\d)\b/);
+      const isTradeSecret = /商业机密|商业秘密|保密|Trade\s*secret|Confidential/i.test(full);
+      if (casMatch || isTradeSecret || cells.length >= 3) {
+        const cas = casMatch ? casMatch[1] : (isTradeSecret ? '商业机密' : (c1 || '无'));
+        let name = c0;
+        let concentration = c2;
+
+        const pctMatch = full.match(/(\d+(?:\.\d+)?(?:\s*-\s*\d+(?:\.\d+)?)?%)/);
+        if (pctMatch) concentration = pctMatch[1];
+
+        if (name && !/3\.\d|成分|混合物|物质/i.test(name)) {
+          facts.components.push({
+            name,
+            casNumber: cas,
+            cas,
+            concentration,
+            conc: concentration,
+            columnCount: cells.length
+          });
+        }
+      }
     }
   }
 }
@@ -705,4 +978,91 @@ function parseSection15(record, facts) {
 function parseSection16(record, facts) {
   const allText = record.rows?.map(r => r.cells.map(c => c.text).join(' ')).join('\n') || '';
   facts.otherInfo.rawText = allText;
+}
+
+
+/**
+ * 将识别 facts 对象原生序列化为标准 Context 1 Markdown 资产
+ */
+export function serializeFactsToMarkdown(facts) {
+  const model = facts.modelCode || 'MSDS';
+  const srcName = facts.sourceName || '未命名源文件';
+  const prodName = facts.productName || '未知品名';
+  const category = facts.productType || facts.category || facts.productName || '—';
+  const isHaz = facts.ghs?.isHazardous ? '危险化学品' : '非危险化学品 (未分类 / Non-hazardous)';
+
+  let md = '# ' + model + ' Context 1 原始化学事实与结构形态提取资产\n\n';
+  md += '> **生成时间**：' + (facts.recognizedAt || new Date().toISOString()) + '\n';
+  md += '> **输入源文件**：`' + srcName + '`\n';
+  md += '> **提取特征指纹**：型号 `' + model + '` | 品名 `' + prodName + '`\n';
+  md += '> **GHS 危害性判定**：' + isHaz + '\n\n';
+
+  md += '## 一、核心元数据清单 (Metadata)\n\n';
+  md += '| 属性字段 | 提取事实值 | 判定依据 |\n';
+  md += '| :--- | :--- | :--- |\n';
+  md += '| **产品型号 (Model Code)** | `' + model + '` | Section 1 行 1 匹配提取 |\n';
+  md += '| **产品中文品名 (Product Name)** | `' + prodName + '` | Section 1 行 2 匹配提取 |\n';
+  md += '| **化学品分类 (Chemical Category)** | `' + category + '` | Section 1 匹配提取 |\n';
+  md += '| **GHS 危害性分类** | **' + isHaz + '** | Section 2 明示非危险品，无象形图/信号词 |\n';
+  md += '| **CAS 组分数量** | ' + (facts.components?.length || 0) + ' 个组分 | Section 3 表格提取 |\n';
+  md += '| **理化参数项数** | ' + (facts.physicalProperties?.length || 0) + ' 项原始指标 | Section 9 提取 |\n\n';
+
+  md += '## 二、Section 3 组分明细事实表 (Composition Facts)\n\n';
+  if (facts.components?.length > 0) {
+    md += '| 组分名称 | CAS 登记号 | 质量百分比 (wt%) | 结构列数 |\n';
+    md += '| :--- | :--- | :--- | :---: |\n';
+    for (const comp of facts.components) {
+      const cName = comp.name || '—';
+      const cCas = comp.casNumber || comp.cas || '—';
+      const cConc = (comp.concentration || comp.conc || '—') + '%';
+      const cCols = comp.columnCount || 3;
+      md += '| ' + cName + ' | ' + cCas + ' | ' + cConc + ' | ' + cCols + ' |\n';
+    }
+  } else {
+    md += '*（源文档未提供组分明细表格）*\n';
+  }
+  md += '\n';
+
+  md += '## 三、Section 9 理化特性提取清单 (Physical Properties)\n\n';
+  if (facts.physicalProperties?.length > 0) {
+    md += '| 序号 | 属性指标 (Label) | 原始数值 (Value) |\n';
+    md += '| :---: | :--- | :--- |\n';
+    for (let i = 0; i < facts.physicalProperties.length; i++) {
+      const p = facts.physicalProperties[i];
+      const pLbl = p.label || '未命名';
+      const pVal = p.value || '*(空)*';
+      md += '| ' + (i + 1) + ' | ' + pLbl + ' | ' + pVal + ' |\n';
+    }
+  } else {
+    md += '*（源文档未提供理化参数）*\n';
+  }
+  md += '\n';
+
+  md += '## 四、16 章节全量原始网格与段落结构 (16 Sections Raw Grid & Text)\n\n';
+  for (let s = 1; s <= 16; s++) {
+    const sec = facts.sections?.[s];
+    const sTitle = sec?.title || ('Section ' + s);
+    md += '### 第 ' + s + ' 部分：' + sTitle + '\n\n';
+    if (!sec || !sec.rows || sec.rows.length === 0) {
+      md += '*（源文档未提供该章节内容）*\n\n';
+      continue;
+    }
+    const rCount = sec.rowsCount || sec.rows.length;
+    const sSum = sec.structureSummary || {};
+    md += '- **行数统计**: 共 ' + rCount + ' 行\n';
+    md += '- **结构形态**: 2列标准行: ' + (sSum.twoColumnCount || 0) + ' | 通栏行: ' + (sSum.fullWidthCount || 0) + ' | 多列网格: ' + (sSum.multiColumnCount || 0) + ' | 提示说明行: ' + (sSum.explanationRowCount || 0) + '\n\n';
+
+    md += '| 行号 | 属性 | 标签/题头 | 数据值/内容 |\n';
+    md += '| :---: | :---: | :--- | :--- |\n';
+    for (let rIdx = 0; rIdx < sec.rows.length; rIdx++) {
+      const row = sec.rows[rIdx];
+      const semType = row.semanticType || '说明行';
+      const lbl = (row.label || '').replace(/\r?\n/g, '<br>').trim() || '—';
+      const val = (row.value || '').replace(/\r?\n/g, '<br>').trim() || '—';
+      md += '| ' + rIdx + ' | `' + semType + '` | ' + lbl + ' | ' + val + ' |\n';
+    }
+    md += '\n';
+  }
+
+  return md;
 }
