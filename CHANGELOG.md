@@ -1,5 +1,28 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-12 MSDS 表格语义层级定义规范手册入库与父子标签精准解耦 (INV-HIERARCHICAL-LABEL-SEMANTICS-KB)] - 建立 docs/knowledge-base/ 知识库并固化 8 大语义分类与 6 大词法边界公理、升级 recognition-engine.js 彻底解耦通用标签为父级标签与子标签、排除章节大标题中点分小节误判、全景重新审计并同步 PA-3612 Context 1 (耗时 270ms, 退出码 0)
+
+### 一、 需求背景与任务目标
+承接用户明确指令：
+1. **建立 MSDS-Studio 专属项目开发知识库目录**：在项目中开辟独立目录并固化全套实体定义（章节标题、序号标签、父级标签、子标签、数据值、说明行、数据值行等），永久防后续遗忘；
+2. **将通用“标签”细化解耦为“父级标签”与“子标签”**：精准区分统领性分类题头（如 Section 8 的 `手部防护：`、`建议：`）与具体细分属性（如 `手套材料：`、`中文名称：`、`供应商名称：`、`电话：` 等）；
+3. **基于最新定义全景重新审计并同步 PA-3612 Context 1**：同步更新 brain 与 output 产物，出具 1:1 双向核销矩阵。
+
+### 二、 核心变更与系统级根治方案 (5-Whys & Architectural Evolution)
+1. **项目开发知识库资产建立 (`docs/knowledge-base/`)**：
+   - 撰写并固化《MSDS 表格结构与语义层级定义规范手册》（`MSDS_TABLE_SEMANTICS_AND_LABEL_TAXONOMY.md`）；
+   - 详尽收录 8 大分类角色定义、6 大硬阻断词法边界公理（10字阈值、同行父级上下文、INV-PRUNE-01留空免剪枝白名单、引导语冒号解耦、左列空白续行保护、纯标点剥离）及真实工程案例对照表。
+2. **标签层级二分算法与小节序号防误判**：
+   - **`detectSectionHeaderInRow` 严谨化**：显式注入 `^\s*(?:[vV])?\s*\d{1,2}\.\d+` 排除规则，杜绝将 `4.1.一般措施：`、`5.1.合适的灭火剂：`、`8.1控制参数`、`10.1化学稳定性：` 误判为一级 `章节标题`，准确归正为 `序号标签`；
+   - **分类统领题头精准归类为 `父级标签`**：在单列/双列行中注入白名单判定，将 Section 8 `手部防护：` 与 `建议：` 准确赋予 `父级标签`，保护右侧值格纯净空白；
+   - **细分参数字段准确赋予 `子标签`**：将 `中文名称：`、`化学品分类：`、`供应商名称：`、`电话：`、`GHS分类：`、`呼吸系统防护：`、`手套材料：` 等具体叶子项赋予 `子标签`；
+   - **Context 1 纯净升级**：全篇 Context 1 中不再残留含糊不清的通用 `标签`。
+3. **原生 CLI 极速运行与双向产物同步**：
+   - 运行统一 CLI `run_source_recognition.mjs`，全流程耗时 **270 ms**；
+   - 物理同步至 `F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\output\PA-3612\PA-3612_context1_recognition.md` 与 `c:\Users\Administrator\.gemini\antigravity\brain\...\PA-3612_context1_recognition.md`。
+
+
+
 ## [2026-11-12 MSDS 识别模块高精度增强与用户批注 100% 物理核销 (INV-RECOGNITION-PRECISION-ENHANCEMENT)] - 升级 recognition-engine.js 支持 v1. 历史杂质标题前缀容差匹配与清洗、实现 Section 2 复合单元格多行多层级穿透解构、精准纠正续行长句与引导语免责声明伪标签缺陷、PA-3612 Context 1 4 列纯净排版毫秒级重构生成 (耗时 245ms, 退出码 0)
 
 ### 一、 需求背景与任务目标

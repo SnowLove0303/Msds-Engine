@@ -33,7 +33,9 @@ export function extractMultiParagraphCellPairs(row) {
 export const SEMANTIC_TYPES = Object.freeze({
   SECTION_HEADER: '章节标题',
   SEQ_LABEL: '序号标签',
-  LABEL: '标签',
+  PARENT_LABEL: '父级标签',
+  CHILD_LABEL: '子标签',
+  LABEL: '子标签', // 兼容引用
   VALUE: '数据值',
   EXPLANATION: '说明行',
   TABLE_HEADER: '表头',
@@ -121,14 +123,26 @@ export function classifyRowSemanticType(row, secNum, rowIndex = 0) {
       };
     }
 
+    // 检查是否为父级标签 (如 Section 8 "手部防护：", "建议：")
+    const isParentHeader = /^(?:手部防护|分类题头|建议|分类标准|防护指南|通用要求|防护措施|工程控制)[：:]?$/i.test(c0Text) ||
+                           (secNum === 8 && /^手部防护[：:]?$/i.test(c0Text));
+    if (isParentHeader) {
+      return {
+        rowType: SEMANTIC_TYPES.PARENT_LABEL,
+        label: c0Text,
+        value: '—'
+      };
+    }
+
     // 检查是否为冒号拆分单行 (如 4.1.一般措施：立即脱掉...)
-    const colonMatch = c0Text.match(/^([^：:]{2,15}[：:])\s*(.+)$/);
+    const colonMatch = c0Text.match(/^([^：:]{2,15}[：:])\s*(.*)$/);
     if (colonMatch) {
       const lbl = colonMatch[1].trim();
       const val = colonMatch[2].trim();
       const isSeq = /^\d+\./.test(lbl);
+      const isParent = /^(?:手部防护|分类题头|建议|分类标准|防护指南|通用要求)[：:]?$/i.test(lbl);
       return {
-        rowType: isSeq ? SEMANTIC_TYPES.SEQ_LABEL : SEMANTIC_TYPES.LABEL,
+        rowType: isSeq ? SEMANTIC_TYPES.SEQ_LABEL : (isParent ? SEMANTIC_TYPES.PARENT_LABEL : SEMANTIC_TYPES.CHILD_LABEL),
         label: lbl,
         value: val || '—'
       };
@@ -183,12 +197,16 @@ export function classifyRowSemanticType(row, secNum, rowIndex = 0) {
       };
     }
 
-    // 普通标签 (如 中文名称：, 手部防护：, 供应商名称：)
+    // 检查是否为父级分类题头
+    const isParentHeader = /^(?:手部防护|分类题头|建议|分类标准|防护指南|通用要求|防护措施|工程控制)[：:]?$/i.test(c0Text) ||
+                           (secNum === 8 && /手部防护|建议/i.test(c0Text));
+
+    // 普通标签 (如 中文名称：, 供应商名称：, 手套材料：)
     // 严格检查 c0Text.length > 0 且具有标签形态
     const isLabel = c0Text.length > 0 && (/[:：]$/.test(c0Text) || cells[0]?.typography?.isBold || c0Text.length <= 15);
     if (isLabel) {
       return {
-        rowType: SEMANTIC_TYPES.LABEL,
+        rowType: isParentHeader ? SEMANTIC_TYPES.PARENT_LABEL : SEMANTIC_TYPES.CHILD_LABEL,
         label: c0Text,
         value: c1Text || '—'
       };
@@ -242,6 +260,9 @@ const SECTION_KEYWORDS = {
 function detectSectionHeaderInRow(row) {
   if (!row.cells || row.cells.length === 0) return null;
   const firstCellText = (row.cells[0]?.text || '').trim();
+
+  // 若包含点分二级及以上小节序号 (如 4.1, 5.1., 8.2)，绝非一级章节大标题！
+  if (/^\s*(?:[vV])?\s*\d{1,2}\.\d+/i.test(firstCellText)) return null;
 
   // 兼容历史杂质前缀 (如 'v1.', 'V1.', '  1.')
   const match = firstCellText.match(/^\s*(?:[vV])?\s*(\d{1,2})[\.、\s]+(.*)$/);
@@ -497,7 +518,7 @@ export async function recognizeSourceDocx(docxPathOrBuffer, sourceName = 'source
                 targetSec.rows.push({
                   rowIndex: targetSec.rows.length,
                   structureType: STRUCTURE_TYPES.TWO_COLUMN,
-                  semanticType: SEMANTIC_TYPES.LABEL,
+                  semanticType: SEMANTIC_TYPES.CHILD_LABEL,
                   label: line,
                   value: nextLine,
                   columnCount: 2,
