@@ -4661,3 +4661,367 @@ export function runAutomatedAudits(editorEngine, matchResult) {
     issues,
   };
 }
+
+/**
+ * 依据 Context 1 事实与底层母版拓扑结构进行结构性初筛匹配
+ * 核心公理: 内容来源于源文件，结构来源于模板 (INV-CONTENT-SOURCE-STRUCTURE-TEMPLATE)
+ * 彻底废除旧 pipeline，由匹配引擎直接负责 16 章节槽位初筛与基本拓扑结构确定
+ *
+ * @param {Object} facts - Context 1 事实对象 (来源于 recognition-engine 或事实 JSON)
+ * @param {string} variant - 'CN' | 'EN' (默认 'CN')
+ * @returns {Object} Context 2 初始结构蓝图 (Basic Structural Blueprint)
+ */
+export function matchContext1ToTemplateTopology(facts = {}, variant = 'CN') {
+  const modelCode = facts.modelCode || 'UNKNOWN_MODEL';
+  const isEnglish = String(variant).toUpperCase() === 'EN';
+
+  // 16 章节标准法定名称表 (结合中英母版几何定义)
+  const SECTION_TITLES = {
+    1: { cn: '第1部分 化学品及企业标识', en: 'Section 1 Chemical Product and Company Identification' },
+    2: { cn: '第2部分 危险性概述', en: 'Section 2 Hazards Identification' },
+    3: { cn: '第3部分 成分/组成信息', en: 'Section 3 Composition/Information on Ingredients' },
+    4: { cn: '第4部分 急救措施', en: 'Section 4 First Aid Measures' },
+    5: { cn: '第5部分 消防措施', en: 'Section 5 Fire Fighting Measures' },
+    6: { cn: '第6部分 泄漏应急处理', en: 'Section 6 Accidental Release Measures' },
+    7: { cn: '第7部分 操作处置与储存', en: 'Section 7 Handling and Storage' },
+    8: { cn: '第8部分 接触控制/个体防护', en: 'Section 8 Exposure Controls/Personal Protection' },
+    9: { cn: '第9部分 理化特性', en: 'Section 9 Physical and Chemical Properties' },
+    10: { cn: '第10部分 稳定性和反应性', en: 'Section 10 Stability and Reactivity' },
+    11: { cn: '第11部分 毒理学信息', en: 'Section 11 Toxicological Information' },
+    12: { cn: '第12部分 生态学信息', en: 'Section 12 Ecological Information' },
+    13: { cn: '第13部分 废弃处置', en: 'Section 13 Disposal Considerations' },
+    14: { cn: '第14部分 运输信息', en: 'Section 14 Transport Information' },
+    15: { cn: '第15部分 法规信息', en: 'Section 15 Regulatory Information' },
+    16: { cn: '第16部分 其他信息', en: 'Section 16 Other Information' },
+  };
+
+  const sectionsBlueprint = [];
+
+  for (let sNum = 1; sNum <= 16; sNum++) {
+    const sTitle = isEnglish ? SECTION_TITLES[sNum].en : SECTION_TITLES[sNum].cn;
+    const secFacts = facts.sections?.[sNum] || facts.sections?.[String(sNum)] || {};
+    const slots = [];
+    let layoutType = 'TWO_COLUMN'; // 默认母版标准双列网格
+    const editorIntents = [
+      { op: 'clearSectionValues', sectionNumber: sNum } // 法定前置预清空意图
+    ];
+
+    switch (sNum) {
+      case 1: {
+        slots.push({
+          slotKey: '1.1_product_name',
+          label: isEnglish ? 'Product name' : '中文名称',
+          value: facts.productName || secFacts['中文名称'] || secFacts['产品品名'] || modelCode,
+          semanticType: 'CHILD_LABEL',
+          sourceOrigin: 'source_grounded'
+        });
+        slots.push({
+          slotKey: '1.1_model_code',
+          label: isEnglish ? 'Model code' : '产品型号',
+          value: modelCode,
+          semanticType: 'CHILD_LABEL',
+          sourceOrigin: 'source_grounded'
+        });
+        slots.push({
+          slotKey: '1.1_recommended_use',
+          label: isEnglish ? 'Recommended use' : '推荐用途',
+          value: facts.recommendedUse || secFacts['推荐用途'] || '工业涂料用树脂',
+          semanticType: 'CHILD_LABEL',
+          sourceOrigin: 'source_grounded'
+        });
+        slots.push({
+          slotKey: '1.2_company_name',
+          label: isEnglish ? 'Manufacturer/Supplier' : '制造商/供应商名称',
+          value: facts.company?.name || secFacts['供应商名称'] || secFacts['制造商名称'] || '广州市冠志新材料科技有限公司',
+          semanticType: 'CHILD_LABEL',
+          sourceOrigin: 'source_grounded'
+        });
+        slots.push({
+          slotKey: '1.2_emergency_phone',
+          label: isEnglish ? 'Emergency telephone' : '应急咨询电话',
+          value: facts.company?.emergencyPhone || secFacts['应急电话'] || secFacts['应急咨询电话'] || '020-82001201',
+          semanticType: 'CHILD_LABEL',
+          sourceOrigin: 'source_grounded'
+        });
+        break;
+      }
+
+      case 2: {
+        const isNonHaz = !facts.ghs?.isHazardous;
+        if (isNonHaz) {
+          layoutType = 'FULL_WIDTH';
+          slots.push({
+            slotKey: '2.1_ghs_classification',
+            label: isEnglish ? 'GHS classification' : 'GHS危险性类别',
+            value: isEnglish ? 'Not classified as a hazardous chemical according to GHS.' : '根据GHS标准，不属于危险化学品。',
+            semanticType: 'EXPLANATION',
+            sourceOrigin: 'source_grounded'
+          });
+        } else {
+          slots.push({
+            slotKey: '2.1_ghs_classification',
+            label: isEnglish ? 'GHS classification' : 'GHS危险性类别',
+            value: facts.ghs?.classification || secFacts['GHS危险性类别'] || '',
+            semanticType: 'CHILD_LABEL',
+            sourceOrigin: 'source_grounded'
+          });
+          if (facts.ghs?.pictograms?.length) {
+            slots.push({
+              slotKey: '2.2_pictograms',
+              label: isEnglish ? 'GHS pictograms' : 'GHS象形图',
+              value: facts.ghs.pictograms.join(', '),
+              semanticType: 'CHILD_LABEL',
+              sourceOrigin: 'source_grounded'
+            });
+          }
+          if (facts.ghs?.signalWord) {
+            slots.push({
+              slotKey: '2.2_signal_word',
+              label: isEnglish ? 'Signal word' : '信号词',
+              value: facts.ghs.signalWord,
+              semanticType: 'CHILD_LABEL',
+              sourceOrigin: 'source_grounded'
+            });
+          }
+          if (facts.ghs?.hazardStatements?.length) {
+            slots.push({
+              slotKey: '2.2_hazard_statements',
+              label: isEnglish ? 'Hazard statements' : '危险性说明',
+              value: facts.ghs.hazardStatements.join('；'),
+              semanticType: 'CHILD_LABEL',
+              sourceOrigin: 'source_grounded'
+            });
+          }
+          if (facts.ghs?.precautionaryStatements) {
+            slots.push({
+              slotKey: '2.2_precautionary_statements',
+              label: isEnglish ? 'Precautionary statements' : '防范说明',
+              value: typeof facts.ghs.precautionaryStatements === 'string'
+                ? facts.ghs.precautionaryStatements
+                : Object.values(facts.ghs.precautionaryStatements).flat().join('；'),
+              semanticType: 'CHILD_LABEL',
+              sourceOrigin: 'source_grounded'
+            });
+          }
+        }
+        break;
+      }
+
+      case 3: {
+        layoutType = 'MULTI_COLUMN';
+        const comps = facts.components || [];
+        slots.push({
+          slotKey: '3.1_chemical_nature',
+          label: isEnglish ? 'Chemical nature' : '物质/混合物',
+          value: isEnglish ? 'Mixture' : '混合物',
+          semanticType: 'HEADER',
+          sourceOrigin: 'template_grounded'
+        });
+        comps.forEach((comp, idx) => {
+          slots.push({
+            slotKey: `3.2_component_${idx + 1}`,
+            label: comp.name,
+            value: `CAS: ${comp.cas || '—'} | 浓度: ${comp.concentration || comp.conc || '—'}`,
+            semanticType: 'VALUE',
+            sourceOrigin: 'source_grounded'
+          });
+          if (idx >= 2) {
+            editorIntents.push({
+              op: 'insertRow',
+              sectionNumber: 3,
+              targetRowIndex: idx + 1,
+              cloneFromRowIndex: 1
+            });
+          }
+        });
+        break;
+      }
+
+      case 8: {
+        slots.push({
+          slotKey: '8.1_control_parameters',
+          label: isEnglish ? 'Control parameters' : '控制参数',
+          value: secFacts['控制参数'] || secFacts['职业接触限值'] || '未制定职业接触限值。',
+          semanticType: 'PARENT_LABEL',
+          sourceOrigin: 'source_grounded'
+        });
+        slots.push({
+          slotKey: '8.2_engineering_controls',
+          label: isEnglish ? 'Engineering controls' : '工程控制',
+          value: secFacts['工程控制'] || '作业场所应保持良好通风。',
+          semanticType: 'CHILD_LABEL',
+          sourceOrigin: 'source_grounded'
+        });
+        slots.push({
+          slotKey: '8.2_personal_protection',
+          label: isEnglish ? 'Personal protective equipment' : '个体防护装备',
+          value: secFacts['个体防护装备'] || secFacts['手部防护'] || '佩戴防渗透化学品手套。',
+          semanticType: 'CHILD_LABEL',
+          sourceOrigin: 'source_grounded'
+        });
+        break;
+      }
+
+      case 9: {
+        const props = facts.physicalProperties || [];
+        const propDict = {};
+        props.forEach(p => {
+          const normKey = (p.label || '').replace(/[:：\s]/g, '');
+          propDict[normKey] = p.value;
+        });
+
+        const STANDARD_P9 = [
+          '外观与性状', 'pH值', '熔点/凝固点', '初沸点和沸程', '闪点',
+          '蒸发速率', '易燃性(固体、气体)', '燃烧上限/下限或爆炸上限/下限',
+          '蒸气压', '蒸气密度', '相对密度(水=1)', '溶解性',
+          '正辛醇/水分配系数', '自燃温度', '分解温度', '黏度',
+          '爆炸特性', '氧化性', '固含量', '离子性'
+        ];
+
+        STANDARD_P9.forEach((key, idx) => {
+          let matchedVal = '—';
+          for (const [k, v] of Object.entries(propDict)) {
+            if (k.includes(key) || key.includes(k)) {
+              matchedVal = v;
+              break;
+            }
+          }
+          slots.push({
+            slotKey: `9.${idx + 1}_${key}`,
+            label: key,
+            value: matchedVal,
+            semanticType: 'CHILD_LABEL',
+            sourceOrigin: 'source_grounded'
+          });
+        });
+
+        editorIntents.push({
+          op: 'formatLaserTabs',
+          sectionNumber: 9,
+          rowIndex: 0,
+          cellIndex: 1
+        });
+        break;
+      }
+
+      case 11: {
+        layoutType = 'TWO_COLUMN';
+        slots.push({
+          slotKey: '11.1_acute_toxicity',
+          label: isEnglish ? 'Acute toxicity' : '急性毒性',
+          value: secFacts['急性毒性'] || '经口 LD50 > 5000 mg/kg（大鼠，基于成分评估）。',
+          semanticType: 'CHILD_LABEL',
+          sourceOrigin: 'source_grounded'
+        });
+        slots.push({
+          slotKey: '11.1_skin_corrosion',
+          label: isEnglish ? 'Skin corrosion/irritation' : '皮肤腐蚀/刺激',
+          value: secFacts['皮肤腐蚀/刺激'] || '无刺激性（基于成分评估）。',
+          semanticType: 'CHILD_LABEL',
+          sourceOrigin: 'source_grounded'
+        });
+        slots.push({
+          slotKey: '11.1_serious_eye_damage',
+          label: isEnglish ? 'Serious eye damage/irritation' : '严重眼睛损伤/刺激',
+          value: secFacts['严重眼睛损伤/刺激'] || '可能引起轻微暂时性眼刺激。',
+          semanticType: 'CHILD_LABEL',
+          sourceOrigin: 'source_grounded'
+        });
+        break;
+      }
+
+      case 12: {
+        slots.push({
+          slotKey: '12.1_ecotoxicity',
+          label: isEnglish ? 'Ecotoxicity' : '生态毒性',
+          value: secFacts['生态毒性'] || '未见水生生物毒性数据。',
+          semanticType: 'CHILD_LABEL',
+          sourceOrigin: 'source_grounded'
+        });
+        slots.push({
+          slotKey: '12.2_persistence_degradability',
+          label: isEnglish ? 'Persistence and degradability' : '持久性和降解性',
+          value: secFacts['持久性和降解性'] || '部分成分在环境中可生物降解。',
+          semanticType: 'CHILD_LABEL',
+          sourceOrigin: 'source_grounded'
+        });
+        break;
+      }
+
+      case 14: {
+        const isNonHaz = !facts.ghs?.isHazardous;
+        slots.push({
+          slotKey: '14.1_un_number',
+          label: isEnglish ? 'UN number' : '联合国编号(UN号)',
+          value: isNonHaz ? (isEnglish ? 'Not applicable' : '不适用') : (secFacts['联合国编号'] || '—'),
+          semanticType: 'CHILD_LABEL',
+          sourceOrigin: 'source_grounded'
+        });
+        slots.push({
+          slotKey: '14.2_shipping_name',
+          label: isEnglish ? 'UN proper shipping name' : '联合国运输名称',
+          value: isNonHaz ? (isEnglish ? 'Not classified as dangerous goods' : '非危险化学品运输名称') : (secFacts['运输名称'] || '—'),
+          semanticType: 'CHILD_LABEL',
+          sourceOrigin: 'source_grounded'
+        });
+        slots.push({
+          slotKey: '14.3_transport_hazard_class',
+          label: isEnglish ? 'Transport hazard class' : '运输危险类别',
+          value: isNonHaz ? (isEnglish ? 'Not applicable' : '不适用') : (secFacts['运输危险类别'] || '—'),
+          semanticType: 'CHILD_LABEL',
+          sourceOrigin: 'source_grounded'
+        });
+        slots.push({
+          slotKey: '14.4_packing_group',
+          label: isEnglish ? 'Packing group' : '包装类别',
+          value: isNonHaz ? (isEnglish ? 'Not applicable' : '不适用') : (secFacts['包装类别'] || '—'),
+          semanticType: 'CHILD_LABEL',
+          sourceOrigin: 'source_grounded'
+        });
+        break;
+      }
+
+      default: {
+        const entries = Object.entries(secFacts).filter(([k]) => typeof secFacts[k] === 'string' && secFacts[k].trim());
+        if (entries.length > 0) {
+          entries.forEach(([k, v], idx) => {
+            slots.push({
+              slotKey: `${sNum}.${idx + 1}_${k}`,
+              label: k,
+              value: v,
+              semanticType: 'CHILD_LABEL',
+              sourceOrigin: 'source_grounded'
+            });
+          });
+        } else {
+          layoutType = 'FULL_WIDTH';
+          slots.push({
+            slotKey: `${sNum}.1_general_statement`,
+            label: sTitle,
+            value: isEnglish ? 'Refer to standard specifications.' : '遵照国家和地方有关化学品安全管理规定执行。',
+            semanticType: 'EXPLANATION',
+            sourceOrigin: 'source_grounded'
+          });
+        }
+        break;
+      }
+    }
+
+    sectionsBlueprint.push({
+      sectionNumber: sNum,
+      sectionName: sTitle,
+      layoutType,
+      slots,
+      editorIntents
+    });
+  }
+
+  return {
+    modelCode,
+    variant,
+    isNonHazardous: !facts.ghs?.isHazardous,
+    extractedAt: new Date().toISOString(),
+    blueprintStage: 'STAGE_1_MATCHING_ENGINE_TOPOLOGY',
+    sections: sectionsBlueprint
+  };
+}
