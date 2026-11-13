@@ -1078,8 +1078,8 @@ export function serializeFactsToMarkdown(facts) {
     for (let rIdx = 0; rIdx < sec.rows.length; rIdx++) {
       const row = sec.rows[rIdx];
       const semType = row.semanticType || '说明行';
-      const lbl = (row.label || '').replace(/\r?\n/g, '<br>').trim() || '—';
-      const val = (row.value || '').replace(/\r?\n/g, '<br>').trim() || '—';
+      const lbl = (row.label || '').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>').trim() || '—';
+      const val = (row.value || '').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>').trim() || '—';
       md += '| ' + rIdx + ' | `' + semType + '` | ' + lbl + ' | ' + val + ' |\n';
     }
     md += '\n';
