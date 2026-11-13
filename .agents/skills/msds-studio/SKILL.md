@@ -1,11 +1,11 @@
 ---
 name: msds-studio
-description: "MSDS Studio 工业级 MCP 工作流体系与 Agent 生产治理规范 (v6.0-ENTERPRISE)：收敛 10 大标准原子 MCP 工具（识别/穿透提取/比对/母版注册/模式探查/透视/动态审计规划/万能几何手术原语/批量8导出/150项主审计）、标准5阶作业流水线 SOP、万能几何手术配方库（Recipe A~H）、系统核心目录绝对只读约束（web/src/, web/templates/, web/scripts/）、MCP 唯一执行通道（msds_mcp_gateway.mjs）及底座通用缺陷安全停机申报规程。"
+description: "MSDS Studio 工业级受控工作流体系与 Agent 生产治理规范 (v7.0-ENTERPRISE)：收敛 10 大标准原子 MCP 工具、7 阶法定受控生产流水线 SOP（源文件锁定/识别Context1/治理Context2/强制编辑器原语写入/严格中英Word及PDF工序/两阶159项深度审计/用户目录自动镜像交付）、万能几何手术配方库（Recipe A~H）、系统核心目录绝对只读约束（web/src/, web/templates/, web/scripts/）、MCP 唯一执行通道（msds_mcp_gateway.mjs）及统一生产总控（produce_standard_deliverables.mjs）。"
 ---
 
-# MSDS Studio MCP 工作流体系与 Agent 生产治理规范 (v6.0-ENTERPRISE)
+# MSDS Studio 受控工作流体系与 Agent 生产治理规范 (v7.0-ENTERPRISE)
 
-> **版本**：v6.0-ENTERPRISE (最高法定架构收敛版)  
+> **版本**：v7.0-ENTERPRISE (最高法定 7 阶流水线收敛版)  
 > **适用范围**：MSDS-Engine 文档处理工作台、`msds-studio` 技能生态、Antigravity 跨线程协作、MSDS Overwrite Producer 及 Auditor 智能体。  
 > **核心使命**：为智能体赋予精确的感官（识别/下钻/透视/对账）与稳健的手脚（编辑器万能原语：清空值格/单节恢复/企业预设/增删行/删列/横向合并/富文本化学式/激光对齐），遵循“格式服从于原文”公理与“前置值格清零”机制，依托 Agent 大模型语义深度英译，彻底终结历史型号特判与脆弱黑盒过拟合，确立系统目录只读与 MCP 唯一执行通道，打造 100% 工业级通用文档工作台。
 
@@ -192,58 +192,152 @@ node web/scripts/msds_mcp_gateway.mjs --tool=msds_recognize_source --argsFile=ar
 
 ---
 
-## 四、 标准 5 阶作业流水线 SOP (5-Stage Standard Pipeline)
+## 四、 工作流开篇三部曲与标准作业流水线 SOP (Mandatory Pipeline)
 
-任何 Agent 执行生产与覆写任务时，**SHALL** 严格遵循以下 5 阶段 SOP 顺序执行，严禁跨越门禁：
+任何 Agent 执行 MSDS 文档生产与识别任务时，**SHALL** 强制将工作流路线收敛并锁定为以下不可动摇的法定受控作业流水线，严禁任何跳步或私写 ad-hoc 脚本：
 
 ```mermaid
-flowchart LR
-    Stage1["阶段 1: 零损耗源感知<br>(msds_recognize_source)"] --> Stage2["阶段 2: 语义决策与几何预演<br>(分类/外观保真/配方选择)"]
-    Stage2 --> Stage3["阶段 3: 受控几何手术执行<br>(msds_execute_editor_ops)"]
-    Stage3 --> Stage4["阶段 4: 标准 8 格式批处理导出<br>(msds_batch_export_eight)"]
-    Stage4 --> Stage5["阶段 5: 150项主审计核销<br>(msds_audit_deliverables)"]
+flowchart TD
+    subgraph Context1Entry["开篇三部曲 (Context 1 识别提取与独立反向机械审计闭环)"]
+        S1["步骤 1: 接受任务并找到源文件 (Source Discovery)<br>锁定物理 DOCX，排除 TDS，提取型号与冻结指纹"]
+        S2["步骤 2: 通过导入受控识别器识别 (Recognizer Ingestion)<br>(run_source_recognition 抽取 16 章节客观事实，转义管道符，落地 4 列 Markdown)"]
+        S3["步骤 3: 获取 Context 1 并进行独立反向审计 (Context 1 Audit)<br>(audit_context1_mechanical 严格执行 P1~P4 及 M-01~M-08 探针检测)"]
+        GATE1{"审计结果<br>Exit Code == 0?"}
+        
+        S1 --> S2 --> S3 --> GATE1
+    end
+
+    subgraph Context2Flow["Context 2 业务合规治理与受控生产流水线"]
+        S4["阶段 4: 源文件检查与规范化治理形成 Context 2<br>(全局与局部规范/内容100%源自原文/大模型专业逐句双语英译)"]
+        S5["阶段 5: 强制调用编辑器模块受控写入<br>(前置清空 + 万能原语装配 + 格式服从原文 + Design Tokens)"]
+        S6["阶段 6: 严格法定生产工序<br>(先做中文 Word -> 再做英文 Word -> 批量转换 4 份高清 PDF)"]
+        S7["阶段 7: 两阶双轨深度审计<br>(159项机械主审计退出码0 + Agent 16章节逐行对照审验证伪)"]
+        S8["阶段 8: 自动镜像分发至用户目录并交付<br>(自动同步至 E:\\冠志\\...\\待处理文件\\<modelCode>)"]
+        
+        S4 --> S5 --> S6 --> S7 --> S8
+    end
+
+    GATE1 -->|通过 (0 违规 0 警告)| S4
+    GATE1 -->|未通过| HALT["触发安全停机，上报具体违规探针，严禁盲目推进"]
 ```
 
-### 阶段 1：零损耗源感知与母版模式透视
-1. 调用 `msds_recognize_source` 穿透提取输入源文件的 16 大章节事实结构；
-2. 调用 `msds_get_template_schema` 获取目标母版（CN/EN × 冠志/国彩）的表格网格与插槽定义；
-3. 对重点章节（如 Section 2, 8, 9, 11, 12）调用 `msds_peek_cell_or_row` 透视母版默认行数与列宽。
+---
 
-### 阶段 2：语义决策与增减行/删列几何预演
-1. **化学品类定性**：准确区分“无水环氧”、“非水环氧”与“水性乳液”，杜绝品名串流；
-2. **外观事实锁定**：锁定 Section 9.1 原文字实（微黄透明严禁篡改为乳白）；
-3. **结构形态分类判定**：
-   - 若源文件为纯说明/免责声明 $\rightarrow$ 选用【形态 0：纯说明行插槽】；
-   - 若列数=2 且为标准键值对 $\rightarrow$ 选用【形态 A：标准双列】；
-   - 若列数 $\ge 3$ 且包含冗余标签列 $\rightarrow$ 预演【形态 B：Recipe A 删列平摊】；
-   - 若需大段免责通栏 $\rightarrow$ 预演【形态 C：Recipe B 通栏合并】；
-   - 若为 Section 9 理化参数 $\rightarrow$ 预演【形态 D：Recipe F 激光垂线对齐】。
+### 🚀 新 Agent 极速上手指南卡片 (Quick Start Card for Any New Agent)
 
-### 阶段 3：万能手术原语批量执行与双实体预设派生
-1. 组装 `operations` 操作序列：
-   - 步骤 1：对目标章节调用 `clearSectionValues` 彻底清除模板历史脏数据；
-   - 步骤 2：应用母版预设或执行结构手术（`deleteColumn`, `mergeCells`, `insertRow`, `deleteRow`）；
-   - 步骤 3：写入真实数据（`writeCell`, `writeRichText`, `formatLaserTabs`）；
-2. 调用 `msds_execute_editor_ops` 一次性受控执行，生成纯净 DOCX 实体；
-3. 严格遵循双实体隔离公理：冠志主体与国彩主体分别注入各自的企业抬头、地址与应急电话。
+> 💡 **任何全新入驻的 Agent，请在接到 MSDS 处理任务后，直接执行以下三步模板！无需猜测，无需自写脚本！**
 
-### 阶段 4：标准 8 格式原子批处理导出
-1. 调用 `msds_batch_export_eight` 触发批量批处理流水线；
-2. 自动化产出全套 8 份标准交付物：
-   - `[型号] msds_CN 冠志.docx` + `[型号] msds_CN 冠志.pdf`
-   - `[型号] msds_CN 国彩.docx` + `[型号] msds_CN 国彩.pdf`
-   - `[型号] msds_EN Guanzhi.docx` + `[型号] msds_EN Guanzhi.pdf`
-   - `[型号] msds_EN Guocai.docx` + `[型号] msds_EN Guocai.pdf`
+```markdown
+### 🚀 MSDS 处理新 Agent 极速上手指南（三步开篇法）
 
-### 阶段 5：1:1 事实物理对账与集中式主审计
-1. 调用 `msds_audit_deliverables` 执行 150 项全景主审计：
-   - G-01 纯净度（无历史样例残留）；
-   - G-36 物理新鲜度（当前时间戳有效）；
-   - G-37 字体字号层级规范；
-   - G-38 激光垂线对齐公差 $\le 1.2\text{pt}$；
-   - Section 1.1 品名与分类保真硬门禁（退出码 0）；
-   - Section 9.1 外观与源文件 100% 对齐门禁；
-2. 必须以主审计套件**退出码 0** 作为验收通过的唯一充要指标。
+1. 【第一步：找到源文件】
+   定位目标型号的中文 MSDS 源文件（严格排除 TDS）：
+   $sourceFile = "算法训练材料/源文件材料/.../<MODEL>/<MODEL> msds_CN 冠志.docx"
+
+2. 【第二步：导入受控识别器】
+   运行官方受控识别命令（耗时约 300ms）：
+   node web/scripts/run_source_recognition.mjs --source="$sourceFile" --output="<OUTPUT_DIR>" --format=md
+   确认已生成文件：<OUTPUT_DIR>/<MODEL>_context1_recognition.md
+
+3. 【第三步：独立机械反向审计】
+   运行独立司法机械审计器进行一票否决式严查：
+   node web/scripts/audit_context1_mechanical.mjs --target="<OUTPUT_DIR>/<MODEL>_context1_recognition.md" --strict
+   
+   【通关判断】：
+   - 检查控制台：必须显示 "0 violations, 0 warnings" 且进程退出码为 0！
+   - 若通过：恭喜！Context 1 物理事实已成功锁定，向用户呈报并进入 Context 2！
+   - 若失败：立即停机并上报具体的报错探针编号，严禁擅自修改审计脚本！
+```
+
+---
+
+### 【开篇三部曲核心规约】Context 1 职责与审计边界公理
+1. **Context 1 的审计核心**：确保源文件和识别结果准确与分类准确（标签/值/说明行的归类判断准确性，物理网格忠实映射）。
+2. **Context 1 绝对零修改公理**：在此阶段**绝对严禁**进行任何中英翻译、词汇替换、语序调整、数据推测补全或预设注水。
+3. **内容治理收敛至 Context 2**：真正要对源文件内容进行的标准化治理、高保真专业双语翻译、理化指标格式清洗、GHS 象形图对齐及企业底模几何适配，**统一且必须在 Context 2 及后续阶段完成**。
+
+---
+
+### 步骤 1：接受任务并找到源文件 (Source Discovery & Verification)
+1. 定位输入的源 DOCX 文件绝对路径，校验文件物理存在且字节数 $> 0$；
+2. 提取或确认产品目标型号（`modelCode`，如 `HPU-7651`），冻结输入事实指纹；
+3. **排他过滤铁律**：严格纳选 `*msds_CN*.docx`，坚决过滤排除包含 `tds`、`TDS`、`技术说明书` 的文件。
+
+### 步骤 2：通过导入受控识别器识别 (Recognizer Ingestion & Extraction)
+1. 统一调用官方受控执行通路：
+   ```bash
+   node web/scripts/run_source_recognition.mjs --source="<SOURCE_DOCX>" --output="<OUTPUT_DIR>" --format=md
+   ```
+2. 零损耗提取源文档 16 章节原始化学事实、GHS 危害分类、CAS 组分明细、理化指标与毒理学数据；
+3. 单元格内容若含管道符 `|`，底层引擎自动转义为 `\|`，杜绝破坏 Markdown 表格列数；
+4. 生成客观未经修饰的原始数据资产 `Context 1`（标准 4 列 Markdown，包含序号、标签、事实值、语义类型），严禁夹带任何底模预设。
+
+### 步骤 3：获取 Context 1 并进行独立反向审计 (Context 1 Acquisition & Audit)
+1. 严禁识别脚本内部自测自通，强制调用独立的外部反向反欺诈机械审计器：
+   ```bash
+   node web/scripts/audit_context1_mechanical.mjs --target="<OUTPUT_DIR>/<MODEL>_context1_recognition.md" --strict
+   ```
+2. 严格核验 M-01~M-08 格式规范及 P1~P4 探针（P1 伪标签猎杀、P2 伪说明行猎杀、P3 伪参数值猎杀、P4 物理网格真实性）；
+3. **一票否决通关门禁**：真实进程退出码必须为 `0`，且 `CRITICAL: 0`，`WARNING: 0`；通过后方可推进至 Context 2。
+
+### 阶段 4：源文件检查与规范化治理形成 Context 2 (Content Governance)
+1. 依据系统最高全局规范、16 章节局部规范与主审计契约，对 `Context1` 执行深度清洗与结构化治理；
+2. **事实保真与防外生虚增契约**：源文件载明为非危险化学品或未提及象形图/信号词时，严格标注 `isHazardous = false`，**绝对严禁**生成“象形图：无”或“信号词：无”虚增项；
+3. **标点与度数符号纠偏**：度数符号统一标准化为西文 `°C`（如 `100 °C`），去除粘连标点与行末悬挂冒号；
+4. **大模型地道双语英译**：对组分名、外观、气味及毒理测试终点执行专业语义深度英译，严格遵照 OECD/GHS 国际化学品标准；
+5. **内容必须来源于源文件**：除专业英文翻译外，所有数据与标签 100% 来源于源文件事实，形成唯一法定交付数据源 `Context2`。
+
+### 阶段 4：强制调用编辑器模块受控写入 (Universal Editor Primitives Execution)
+1. **必须调用编辑器模块**：编辑器（`universal-editor-primitives.js`、`template-editor.js`、`docx-engine.js`）已内置标准化输出能力（固定 Design Tokens、自适应对齐标尺、表格边框、剪枝能力）；
+2. **前置清空机制**：写入前必须清空底模历史残留示范数据（如示范 CAS、浓度），使值格处于纯净空白插槽状态；
+3. **格式服从原文公理**：不能死板硬套模板结构，而是通过调用编辑器的万能原语能力（增行、删行、删列、通栏合并、写入富文本、更新页眉页脚）动态重构表格网格，使“格式服从于原文”；
+4. **排版拓扑自动投影**：写入完毕自动投影标准字阶（中文小四12pt/五号10.5pt，英文五号9.5pt/小四11pt）与自适应 420/560 dxa 悬挂缩进标尺。
+
+### 阶段 5：严格法定生产工序 (Strict Order of Production)
+1. **严格线性编排**，绝对严禁工序颠倒：
+   - **工序 1**：先做中文 Word（冠志版 `CN 冠志.docx` + 国彩版 `CN 国彩.docx`）；
+   - **工序 2**：再做英文 Word（Guanzhi版 `EN Guanzhi.docx` + Guocai版 `EN Guocai.docx`）；
+   - **工序 3**：最后由原生 Word/WPS 引擎批量导出对应的 4 份高清 PDF；
+2. 全流程受控运行，总耗时稳定控制在 60 秒以内（基准实测 $\sim 45$ 秒）。
+
+### 阶段 6：两阶双轨全景深度审计 (Two-Step Deep Audit)
+1. **第一阶：机械确定性主审计（机器准入门禁）**：
+   - 运行 159 项集中式主审计（`run_master_msds_audit.mjs`），覆盖 G-01~G-40 物理宏观不变量、PDF 渲染实测（80.28pt 垂线）、16 章节局部专属契约及 Oracle 白名单；
+   - 运行双极双层法医级深度审计（`audit_bipolar_bilayer.mjs`）；
+   - **充要门禁**：必须以真实进程**退出码 0**（Failures: 0）作为通行的不可动摇凭证；
+2. **第二阶：Agent 智能体语义规范审计（语义契约证伪）**：
+   - Agent 必须亲自介入 16 章节，逐章逐行逐句对照源文件与产出物的数值、测试条件与中英文翻译保真度；
+   - 检查 OECD 导则号保全度、非危品防虚增及企业主体信息隔离。
+
+### 阶段 7：自动镜像分发至用户目录并正式交付 (Delivery & Synchronization)
+1. 审计全绿通过后，系统自动将全量 8 份标准交付物同步至用户工作目录：
+   - 目标路径：`E:\\冠志\\TDS MSDS (2)\\待处理文件\\<modelCode>\\`
+2. 校验目标目录下 8 份文件物理存在、时间戳为当前批次且字节数合规；
+3. 出具标准 1:1 双向物理核销交付报告与 Git 存证。
+
+---
+
+### 统一受控生产入口 (Unified Production Entrypoints)
+
+全系统提供以下两种标准调用方式，生产 Agent 必须二选一调用，**严禁私写脚本**：
+
+#### 方式 A：标准命令行一键生产 (CLI Entrypoint)
+```powershell
+# 一键触发 7 阶流水线原子执行：源文件 -> 8格式产出 -> 159项审计 -> 用户目录同步
+node web/scripts/produce_standard_deliverables.mjs \
+  --model=OS-8970 \
+  --sourceDocx="算法训练材料/源文件材料/水性噁唑啉交联剂/OS-8970/OS-8970 msds_CN 冠志.docx"
+```
+
+#### 方式 B：官方 MCP 工具网关调用 (MCP Gateway Entrypoint)
+```powershell
+# 构造参数文件 args.json
+# {
+#   "modelCode": "OS-8970",
+#   "sourceFilePath": "算法训练材料/源文件材料/水性噁唑啉交联剂/OS-8970/OS-8970 msds_CN 冠志.docx"
+# }
+node web/scripts/msds_mcp_gateway.mjs --tool=msds_batch_export_eight --argsFile=args.json
+```
 
 ---
 

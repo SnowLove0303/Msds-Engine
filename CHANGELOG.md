@@ -1,5 +1,36 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-13 工作流开篇三部曲执行承载固化、新 Agent 极速上手规范与 Swarm SubAgent 端到端盲测全绿验证 (INV-WORKFLOW-ENTRY-TRIAD-ONBOARDING)] - 正式确立 Context 1 识别与分类准确性公理、收敛开篇三部曲（步骤 1 寻源排他 -> 步骤 2 导入受控识别器 -> 步骤 3 独立反向机械审计）、建立知识库标准作业手册、全面更新 msds-studio 技能与 Agent 角色极速上手卡片；通过 Swarm SubAgent 对未测试型号 EP-1501 开展端到端工作流盲测，以 Exit Code 0、0 违规、0 警告顺利通过机械审计！
+
+### 一、 需求背景与核心治理原则
+承接用户最高质量指示：“context1 的审计核心确保源文件和识别结果准确与分类准确 就行，真正要对源文件内容处理的是在Context2，因此，我们可以初步固定下来工作流的开头：1.接受任务并找到源文件；2.通过导入识别器识别；3.获取Context1 并进行审计；你先固定下来工作流的执行承载（核心目的是方便后续任何新Agent都能快速上手该工作流并严格按照 我们所规定的路线去执行），然后我们再接着做下一步；优化完工作流使用Swarm SubAgent进行工作流盲测，让Swarm完全按照Sop流程去走”。
+
+针对以往新入驻 Agent 容易出现的“在 Context 1 阶段私自翻译或润色”、“私写临时脚本”、“先射箭再画靶假审计”等系统性退化，本次变更将开篇三部曲的执行承载全面物理固化，确立标准的四位一体执行承载（知识库 SOP 手册 + 系统核心技能 + Agent 角色指令 + 受控命令行通路）。
+
+### 二、 核心成果与执行承载落地清单
+1. **知识库标准作业手册 (SOP Manual)**：
+   - 编写沉淀：[docs/knowledge-base/MSDS_WORKFLOW_ENTRY_STANDARD_OPERATING_PROCEDURE.md](file:///F:/App%20Location/Guanzhi%20Tong/Skill/MSDS-Engine/docs/knowledge-base/MSDS_WORKFLOW_ENTRY_STANDARD_OPERATING_PROCEDURE.md)；
+   - 确立四大法定公理：Context 1 职责纯粹性（只审抽取与分类）、Context 1 零外生修改、内容合规治理收敛至 Context 2、开篇三部曲强时序单向流。
+2. **系统技能与本地技能双向对齐**：
+   - 同步更新全局技能 [C:\Users\Administrator\.gemini\config\skills\msds-studio\SKILL.md](file:///C:/Users/Administrator/.gemini/config/skills/msds-studio/SKILL.md) 与本地技能 [F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\.agents\skills\msds-studio\SKILL.md](file:///F:/App%20Location/Guanzhi%20Tong/Skill/MSDS-Engine/.agents/skills/msds-studio/SKILL.md)；
+   - 将流程统一收敛为“开篇三部曲（步骤 1~3: Context 1 识别提取与独立机械审计闭环）” $\rightarrow$ “Context 2 业务合规治理与受控生产流水线”。
+3. **Agent 角色提示词注入极速上手卡片**：
+   - 更新 [F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\.agents\agents\msds-studio-producer\agent.md](file:///F:/App%20Location/Guanzhi%20Tong/Skill/MSDS-Engine/.agents/agents/msds-studio-producer/agent.md) 与 [msds-overwrite-producer/agent.md](file:///F:/App%20Location/Guanzhi%20Tong/Skill/MSDS-Engine/.agents/agents/msds-overwrite-producer/agent.md)；
+   - 提供 3 分钟即可读懂执行的《新 Agent 极速上手指南卡片 (Quick Start Card)》，明确 3 行标准命令模板与通关准则。
+
+### 三、 Swarm SubAgent 端到端工作流盲测实证 (Blind Test Evidence)
+- **受测智能体**：Swarm Worker `sop-tester`（无会话前置记忆，仅挂载 SOP 手册与型号代码）；
+- **盲测样本型号**：`EP-1501`（位于 `4-1 水性环氧树脂 EP`，此前未在该会话中运行过）；
+- **盲测三步执行流核销**：
+  1. **步骤 1 (寻源排他)**：精准锁定 `EP-1501 msds_CN 冠志.docx` (270,751 字节)，100% 排除 TDS / 技术说明书；
+  2. **步骤 2 (受控识别)**：调用 `run_source_recognition.mjs`，耗时 **271 ms**，生成标准 4 列 Markdown `output/EP-1501/EP-1501_context1_recognition.md`，提取水性环氧乳液、GHS H412、2 组分、20 项理化指标；
+  3. **步骤 3 (反向机械审计)**：调用独立反向审计器 `audit_context1_mechanical.mjs --strict`，耗时 **1 ms**，检查 106 行数据，**CRITICAL: 0，WARNING: 0，退出码: 0**（100% 满分通过）！
+- **盲测结论**：证明新固化的执行承载具备完备的自解释性与防呆性，任何新 Agent 均可零偏差 100% 依循既定规程执行！
+
+---
+
+
+
 ## [2026-11-13 HPU 系列水性羟基聚氨酯树脂 6 型号批量 Swarm 识别与独立机械审计全绿交付 (INV-HPU-BATCH-SWARM-AUDIT)] - 成功调度 Swarm 多智能体并行识别流水线，覆盖 HPU-7651/7660/7700/7710/7711A/7790 全量 6 个型号 MSDS 源文件；集中交付至 `识别模块\识别模块训练夹`；全部 100% 满分通过 Context 1 独立反向反欺诈机械审计 (P1~P4 探针检测 0 违规 0 警告，真实退出码 0)
 
 ### 一、 需求背景与闭环目标
