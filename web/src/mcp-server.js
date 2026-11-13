@@ -10,7 +10,7 @@ const originalConsoleError = console.error;
 console.log = (...args) => process.stderr.write(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ') + '\n');
 console.error = (...args) => process.stderr.write(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ') + '\n');
 
-import { recognizeSourceDocx } from './recognition-engine.js';
+import { recognizeSourceDocx, serializeFactsToMarkdown } from './recognition-engine.js';
 import {
   createWorkSession,
   saveSession,
@@ -234,13 +234,13 @@ const TOOLS = [
   },
   {
     name: 'msds_batch_export_eight',
-    description: '通过 MSDS-Engine 批量受控流水线，驱动生成中英双语（CN/EN）与双主体（冠志/国彩）全量标准 8 格式正式交付物（4 DOCX + 4 高清 PDF）。',
+    description: '通过 MSDS-Engine 7 阶标准受控生产流水线，驱动生成中英双语（CN/EN）与双主体（冠志/国彩）全量标准 8 格式正式交付物（4 DOCX + 4 高清 PDF），并执行两阶深度审计与用户目录自动同步。',
     inputSchema: {
       type: 'object',
       properties: {
         modelCode: {
           type: 'string',
-          description: '产品型号编码 (如 PU-218A)'
+          description: '产品型号编码 (如 OS-8970, PU-218A)'
         },
         sourceFilePath: {
           type: 'string',
@@ -248,15 +248,31 @@ const TOOLS = [
         },
         targetDir: {
           type: 'string',
-          description: '正式交付物输出专有目录绝对路径'
+          description: '正式交付物输出专有目录绝对路径 (可选)'
+        },
+        userSyncDir: {
+          type: 'string',
+          description: '用户工作目录镜像同步路径 (可选)'
+        },
+        skipAudit: {
+          type: 'boolean',
+          description: '是否跳过两阶全景深度审计 (默认 false)'
+        },
+        skipUserSync: {
+          type: 'boolean',
+          description: '是否跳过用户工作目录同步 (默认 false)'
+        },
+        facts: {
+          type: 'object',
+          description: '附加治理事实或覆盖项 (可选)'
         }
       },
-      required: ['modelCode', 'sourceFilePath', 'targetDir']
+      required: ['modelCode', 'sourceFilePath']
     }
   },
   {
     name: 'msds_audit_deliverables',
-    description: '对指定目录内的交付物执行双极双层全景机械深度终审（覆盖纯净度 G-01、物理新鲜度 G-36、字号 G-37、激光对齐 G-38、OPC 完备性 G-39 及 16 章节局部规范）。',
+    description: '对指定目录内的交付物执行 159 项集中式主审计与双极双层全景法医级深度终审（覆盖纯净度 G-01、物理新鲜度 G-36、字号 G-37、激光对齐 G-38、OPC 完备性 G-39 及 16 章节局部规范）。',
     inputSchema: {
       type: 'object',
       properties: {
@@ -267,6 +283,10 @@ const TOOLS = [
         modelCode: {
           type: 'string',
           description: '产品型号编码'
+        },
+        sourceFilePath: {
+          type: 'string',
+          description: '原始输入源文件路径 (用于 1:1 对账)'
         }
       },
       required: ['targetDir', 'modelCode']
@@ -279,7 +299,11 @@ async function handleToolCall(name, args) {
     const filePath = args.sourceFilePath;
     if (!fs.existsSync(filePath)) throw new Error(`Source file not found: ${filePath}`);
     const buf = fs.readFileSync(filePath);
-    return await recognizeSourceDocx(buf, path.basename(filePath));
+    const facts = await recognizeSourceDocx(buf, path.basename(filePath));
+    return {
+      ...facts,
+      context1Markdown: serializeFactsToMarkdown(facts)
+    };
   }
 
   if (name === 'msds_extract_section_facts') {
@@ -529,21 +553,33 @@ async function handleToolCall(name, args) {
   }
 
   if (name === 'msds_batch_export_eight') {
-    const { runPipelineEight, executeEightDeliverablesPipeline } = await import('./pipeline-engine.js');
-    const runner = runPipelineEight || executeEightDeliverablesPipeline;
-    const result = await runner({
+    const { produceStandardDeliverables } = await import('./production-orchestrator.js');
+    const result = await produceStandardDeliverables({
       modelCode: args.modelCode,
-      cnGroundTruthPath: args.sourceFilePath || args.sourcePath,
-      sourcePath: args.sourceFilePath || args.sourcePath,
-      targetDir: args.targetDir
+      sourceFilePath: args.sourceFilePath || args.sourcePath || args.cnGroundTruthPath,
+      targetDir: args.targetDir,
+      userSyncDir: args.userSyncDir,
+      facts: args.facts || {},
+      skipAudit: Boolean(args.skipAudit),
+      skipUserSync: Boolean(args.skipUserSync)
     });
     return result;
   }
 
   if (name === 'msds_audit_deliverables') {
-    const contract = planAuditTargets(args.modelCode, {});
-    const auditRes = verifyAuditContract(args.targetDir, contract);
-    return auditRes;
+    const { runMasterMsdsAudit } = await import('../scripts/run_master_msds_audit.mjs');
+    const { runBipolarBilayerAudit } = await import('../scripts/audit_bipolar_bilayer.mjs');
+    const masterRes = await runMasterMsdsAudit({
+      model: args.modelCode,
+      targetDir: args.targetDir,
+      sourceDocx: args.sourceFilePath || args.sourcePath
+    });
+    const bilayerRes = await runBipolarBilayerAudit(args.targetDir, args.modelCode);
+    return {
+      success: masterRes.success && bilayerRes.success,
+      masterAudit: masterRes,
+      bilayerAudit: bilayerRes
+    };
   }
 
   throw new Error(`Tool not found: ${name}`);

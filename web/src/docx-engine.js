@@ -1593,7 +1593,7 @@ export function writeStructuredToxicologyCellValue(cell, value, options = {}) {
   const isEnglish = Boolean(options.isEnglish || /^[A-Za-z0-9\s:;,./()%-]+$/.test(String(value || '').slice(0, 30)));
   let text = String(value || '').trim();
   if (!text) {
-    replaceCellValueContent(cell, '');
+    replaceCellValueContent(cell, '', null, true);
     return;
   }
 
@@ -1819,9 +1819,9 @@ export function setCellPreambleTypography(cell, isEnglish = false) {
   }
 }
 
-function replaceCellValueContent(cell, value, roleStyle) {
+function replaceCellValueContent(cell, value, roleStyle, skipSection11 = false) {
   const valStr = String(value || "");
-  if (cell?.record?.sectionNumber === 11) {
+  if (cell?.record?.sectionNumber === 11 && !skipSection11) {
     writeStructuredToxicologyCellValue(cell, valStr);
     return;
   }
@@ -4531,9 +4531,16 @@ export function clearCellValue(cell, valueStyle = null) {
 export function clearSectionValues(record, valueStyle = null) {
   if (!record || !Array.isArray(record.rows)) return 0;
   let clearedCount = 0;
-  for (const row of record.rows) {
-    for (const cell of row.cells) {
+  for (let rIdx = 0; rIdx < record.rows.length; rIdx++) {
+    const row = record.rows[rIdx];
+    for (let cIdx = 0; cIdx < row.cells.length; cIdx++) {
+      const cell = row.cells[cIdx];
       if (cell.editable) {
+        writeCellValue(cell, '', valueStyle);
+        clearedCount++;
+      } else if (rIdx >= 1 && cIdx >= 1 && cell.kind !== 'label-only' && !cell.sequence) {
+        cell.editable = true;
+        cell.protectedReason = null;
         writeCellValue(cell, '', valueStyle);
         clearedCount++;
       }

@@ -24,7 +24,7 @@
   - [x] 3.6 运行 `audit_context1_mechanical.mjs` 审计 HPU-7790 成果并断言 Exit Code 0
   - *验证命令*: `node web/scripts/audit_context1_mechanical.mjs --target="F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\识别模块\识别模块训练夹\*.md"` (所有文件 0 violations, 0 warnings, Exit Code 0)
 
-- [-] 4. 1:1 双向物理核销与总结归档 (REQ-HPU-01 ~ REQ-HPU-04)
-  - [ ] 4.1 汇总 6 大型号的物理事实行数、耗时、表格数与审计结果
-  - [ ] 4.2 运行 `openspec validate --all --strict` 确保规范契约合流
+- [x] 4. 1:1 双向物理核销与总结归档 (REQ-HPU-01 ~ REQ-HPU-04)
+  - [x] 4.1 汇总 6 大型号的物理事实行数、耗时、表格数与审计结果
+  - [x] 4.2 运行 `openspec validate --all --strict` 确保规范契约合流
   - [ ] 4.3 呈报终审交付报告并等待人工验收

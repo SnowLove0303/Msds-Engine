@@ -1,3 +1,4 @@
+import { translateChemicalTerm } from './context-governor.js';
 import fsSync from 'node:fs';
 
 /**
@@ -3424,67 +3425,41 @@ export async function buildBaseEnglishEngine({
   if (s3) {
     if (s3.rows[1]?.cells[1]) safeWrite(s3.rows[1].cells[1], enValues['sec3.product_type'] || 'Mixture');
     
-    // 优先从 baseCnEngine 真实提取组分列表
-    let comps = facts.components;
-    if (!comps && baseCnEngine) {
-      const cnS3 = baseCnEngine.records.find(r => r.sectionNumber === 3);
-      if (cnS3 && cnS3.rows.length >= 5) {
-        comps = [];
-        for (let i = 4; i < cnS3.rows.length; i++) {
-          const r = cnS3.rows[i];
-          const rawC0 = (r.cells[0]?.text || '').trim();
-          const rawC1 = (r.cells[1]?.text || '').trim();
-          const rawC2 = (r.cells[2]?.text || '').trim();
+    // 优先从 facts.enComponents 或 facts.componentsEn 获取英文组分
+    let comps = facts.enComponents || facts.componentsEn;
+    if (!comps) {
+      if (facts.components && Array.isArray(facts.components)) {
+        comps = facts.components.map(c => ({
+          name: translateChemicalTerm(c.name || ''),
+          cas: /商业机密|商业秘密/i.test(c.cas || '') ? 'Trade secret' : (c.cas || ''),
+          conc: c.conc || ''
+        }));
+      } else if (baseCnEngine) {
+        const cnS3 = baseCnEngine.records.find(r => r.sectionNumber === 3);
+        if (cnS3 && cnS3.rows.length >= 5) {
+          comps = [];
+          for (let i = 4; i < cnS3.rows.length; i++) {
+            const r = cnS3.rows[i];
+            const rawC0 = (r.cells[0]?.text || '').trim();
+            const rawC1 = (r.cells[1]?.text || '').trim();
+            const rawC2 = (r.cells[2]?.text || '').trim();
 
-          const subNames = rawC0.includes('\n') ? rawC0.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : [rawC0];
-          const subCas = rawC1.includes('\n') ? rawC1.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : [rawC1];
-          const subConc = rawC2.includes('\n') ? rawC2.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : [rawC2];
+            const subNames = rawC0.includes('\n') ? rawC0.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : [rawC0];
+            const subCas = rawC1.includes('\n') ? rawC1.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : [rawC1];
+            const subConc = rawC2.includes('\n') ? rawC2.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : [rawC2];
 
-          for (let k = 0; k < subNames.length; k++) {
-            const cnName = subNames[k];
-            let cas = subCas[k] || subCas[0] || '';
-            const conc = subConc[k] || subConc[0] || '';
-            let enName = cnName;
-            if (/胺和环氧树脂的加合物|环氧.*胺.*加合物/i.test(cnName)) enName = 'Amine and epoxy resin adduct';
-            else if (/改性环氧聚合物|环氧聚合物/i.test(cnName)) enName = 'Modified epoxy polymer';
-            else if (/封闭型脂肪族聚异氰酸酯/i.test(cnName)) enName = 'Blocked aliphatic polyisocyanate';
-            else if (/二丙二醇二甲醚/i.test(cnName)) enName = 'Dipropylene glycol dimethyl ether';
-            else if (/六甲撑二异氰酸酯基均聚物|六亚甲基二异氰酸酯.*均聚物|HDI.*均聚物|HDI.*低聚物/i.test(cnName)) {
-              if (/亲水/i.test(cnName)) enName = 'Hydrophilically modified hexamethylene diisocyanate homopolymer';
-              else enName = 'Hexamethylene diisocyanate homopolymer';
+            for (let k = 0; k < subNames.length; k++) {
+              const cnName = subNames[k];
+              let cas = subCas[k] || subCas[0] || '';
+              const conc = subConc[k] || subConc[0] || '';
+              let enName = translateChemicalTerm(cnName);
+
+              comps.push({
+                name: enName,
+                cas: /商业机密|商业秘密/i.test(cas) ? 'Trade secret' : cas,
+                conc: conc
+              });
             }
-            else if (/亲水改性.*异氰酸酯/i.test(cnName)) enName = 'Hydrophilically modified polyisocyanate';
-            else if (/六甲撑二异氰酸酯|六亚甲基二异氰酸酯|HDI/i.test(cnName)) enName = 'Hexamethylene diisocyanate';
-            else if (/丙二醇二乙酸酯|PGDA/i.test(cnName)) enName = 'Propylene glycol diacetate';
-            else if (/丙二醇甲醚醋酸酯|PMA/i.test(cnName)) enName = 'Propylene glycol monomethyl ether acetate (PMA)';
-            else if (/丙二醇甲醚|1-甲氧基-2-丙醇/i.test(cnName)) enName = '1-Methoxy-2-propanol';
-            else if (/乙醇/i.test(cnName)) enName = 'Ethanol';
-            else if (/丙酮/i.test(cnName)) enName = 'Acetone';
-            else if (/乙酸/i.test(cnName)) enName = 'Acetic acid';
-            else if (/聚乙烯蜡/i.test(cnName)) enName = 'Polyethylene wax';
-            else if (/蜡/i.test(cnName)) enName = 'Wax';
-            else if (/二甲基乙酰胺|DMAC/i.test(cnName)) enName = 'N,N-Dimethylacetamide (DMAC)';
-            else if (/甲基吡咯烷酮|NMP/i.test(cnName)) enName = 'N-Methyl-2-pyrrolidone (NMP)';
-            else if (/乙基吡咯烷酮|NEP/i.test(cnName)) enName = '1-Ethylpyrrolidin-2-one (NEP)';
-            else if (/去离子水/i.test(cnName)) enName = 'Deionized water';
-            else if (/聚氨酯.*分散体|水性聚氨酯/i.test(cnName)) enName = 'Polyurethane dispersion';
-            else if (/聚氨酯.*聚合物/i.test(cnName)) enName = 'Polyurethane polymer';
-            else if (/聚氨酯/i.test(cnName)) enName = 'Polyurethane';
-            else if (/氢氧化钠/i.test(cnName)) enName = 'Sodium hydroxide';
-            else if (/三乙胺/i.test(cnName)) enName = 'Triethylamine';
-            else if (/水$/i.test(cnName)) enName = 'Water';
-            else if (/环氧改性丙烯酸聚合物|环氧.*丙烯酸/i.test(cnName)) enName = 'Epoxy modified acrylic polymer';
-            else if (/丁氧基乙醇|乙二醇丁醚/i.test(cnName)) enName = '2-Butoxyethanol';
-            else if (/羟基丙烯酸酯.*聚合物|丙烯酸酯.*聚合物/i.test(cnName)) enName = 'Hydroxy acrylic polymer';
-            else if (/丙二醇.*丁醚|丙二醇单丁醚/i.test(cnName)) enName = 'Propylene glycol butyl ether';
-            else if (/N,N[－\-—\s]*二甲基乙醇胺|二甲基乙醇胺|DMEA/i.test(cnName)) enName = '2-Dimethylaminoethanol';
-            else if (/噁唑啉改性丙烯酸聚合物|噁唑啉.*聚合物|噁唑啉/i.test(cnName)) enName = 'Oxazoline-modified acrylic polymer';
-
-            comps.push({
-              name: enName,
-              cas: /商业机密|商业秘密/i.test(cas) ? 'Trade secret' : cas,
-              conc: conc
-            });
           }
         }
       }

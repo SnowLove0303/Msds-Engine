@@ -472,6 +472,7 @@ export function writeFullWidthSection(session, { sectionNumber, content, options
 
 /**
  * 注入 Section 9 激光垂线制表符 (G-38 Laser Alignment)
+ * 严格按照实际行索引顺序生成单调递增编号 (9.1, 9.2 ... 9.23)，杜绝底模跳号与回填断裂
  */
 export function formatSection9LaserTabs(session) {
   const record = (session.engine.records || []).find(r => r.sectionNumber === 9);
@@ -482,12 +483,9 @@ export function formatSection9LaserTabs(session) {
     const cell = row.cells?.[0];
     if (cell) {
       const txt = (cell.text || '').trim();
-      const numMatch = txt.match(/^(?:9\.)?(\d+)/);
-      if (numMatch) {
-        const numStr = `9.${numMatch[1]}`;
-        const labelText = txt.replace(/^(?:9\.)?\d+[\s\t:：]*/, '').replace(/[:：]$/, '');
-        formatSection9LabelCell(cell, numStr, labelText, session.isEnglish);
-      }
+      const numStr = `9.${i}`;
+      const labelText = txt.replace(/^(?:9\.)?\d+[\s\t:：]*/, '').replace(/[:：]$/, '');
+      formatSection9LabelCell(cell, numStr, labelText, session.isEnglish);
     }
   }
 
@@ -511,18 +509,34 @@ export function deleteRowFromSession(session, { sectionNumber, rowIndex }) {
  * 企业预设注入 (Apply Company Preset)
  */
 export function applyCompanyPreset(session, presetKey) {
-  const preset = COMPANY_PRESETS[presetKey];
+  let preset = COMPANY_PRESETS[presetKey];
+  if (!preset) {
+    if (typeof presetKey === 'object' && presetKey !== null) {
+      preset = presetKey;
+    } else if (typeof presetKey === 'string') {
+      const isEn = session.templateKey?.includes('EN') || session.templateKey?.includes('en');
+      const langSuffix = isEn ? '_en' : '_zh';
+      const cleanKey = presetKey.toLowerCase();
+      if (cleanKey.includes('guanzhi')) {
+        preset = COMPANY_PRESETS[`Guanzhi${langSuffix}`];
+      } else if (cleanKey.includes('guocai')) {
+        preset = COMPANY_PRESETS[`Guocai${langSuffix}`];
+      }
+    }
+  }
   if (!preset) return { success: false, reason: `Unknown preset: ${presetKey}` };
 
   const s1 = (session.engine.records || []).find(r => r.sectionNumber === 1);
   if (s1) {
     for (const row of s1.rows || []) {
       const lbl = (row.cells[0]?.text || '').trim();
-      if (/供应商名称|Company name|Manufacturer/i.test(lbl)) {
+      if (/供应商名称|Company\s*name|Manufacturer|Name\s*of\s*supplier/i.test(lbl)) {
         writeCellValue(row.cells[1], preset.name);
       } else if (/供应商地址|Address/i.test(lbl)) {
         writeCellValue(row.cells[1], preset.address);
-      } else if (/电话|Telephone|Phone/i.test(lbl)) {
+      } else if (/应急电话|Emergency\s*telephone|Emergency\s*phone/i.test(lbl)) {
+        writeCellValue(row.cells[1], preset.emergencyPhone || preset.tel);
+      } else if (/电话|Telephone|Phone|\bTel\b/i.test(lbl)) {
         writeCellValue(row.cells[1], preset.tel);
       } else if (/传真|Fax/i.test(lbl)) {
         writeCellValue(row.cells[1], preset.fax);
@@ -552,6 +566,19 @@ export async function saveSession(session, outputPath) {
   }
   applyGlobalTypographyProjection(session.engine, session.isEnglish);
   enforceStructuralTypographyInvariants(session.engine, session.isEnglish);
+
+  // 英文交付物全篇西文标点纯度治理 (西文半角冒号与度数符号 °C)
+  if (session.isEnglish && session.engine.documentXml) {
+    const textNodes = Array.from(session.engine.documentXml.getElementsByTagNameNS(W_NS, 't'));
+    for (const tNode of textNodes) {
+      if (tNode.textContent && tNode.textContent.includes('：')) {
+        tNode.textContent = tNode.textContent.replace(/：/g, ':');
+      }
+      if (tNode.textContent && tNode.textContent.includes('℃')) {
+        tNode.textContent = tNode.textContent.replace(/℃/g, '°C');
+      }
+    }
+  }
 
   const arrayBuf = await session.engine.exportArrayBuffer();
   const outBuf = Buffer.from(arrayBuf);
