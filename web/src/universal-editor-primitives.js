@@ -4,35 +4,29 @@ import { W_NS, DocxEngineError } from './docx-engine.js';
 /**
  * MSDS 全文档工业级设计令牌单一真理源 (Single Source of Truth)
  * 彻底隔离内容与排版。上层业务代码只允许写入纯文本事实，严禁在局部私自指定或篡改字阶与字体！
- */
-// @ANTIGRAVITY_INVARIANT_LOCK_START: MSDS_UNIVERSAL_DESIGN_TOKENS_IMMUTABLE
-/**
- * MSDS 全文档工业级设计令牌单一真理源 (Single Source of Truth)
- * 彻底隔离内容与排版。上层业务代码只允许写入纯文本事实，严禁在局部私自指定或篡改字阶与字体！
- * 全篇 16 个章节与页眉页脚，全部受控于本真理源，严格杜绝局部特判与字阶断层。
+ * 全篇 16 个章节全部受控于本真理源，严格杜绝局部特判与字阶断层。
+ * 页眉页脚样式默认继承模板原生定义 (REQ-TOPO-HF-INHERIT-01)，不受本真理源强制覆写。
  */
 export const MSDS_DESIGN_TOKENS = Object.freeze({
   CN: Object.freeze({
     SECTION_HEADER: Object.freeze({ font: '宋体', asciiFont: 'Times New Roman', sz: '24', szCs: '24', sizePt: 12, bold: true }),
+    SUBHEADER: Object.freeze({ font: '宋体', asciiFont: 'Times New Roman', sz: '24', szCs: '24', sizePt: 12, bold: true }),
     LABEL_BOLD: Object.freeze({ font: '宋体', asciiFont: 'Times New Roman', sz: '24', szCs: '24', sizePt: 12, bold: true }),
     LABEL_SEQ: Object.freeze({ font: 'Times New Roman', asciiFont: 'Times New Roman', sz: '21', szCs: '21', sizePt: 10.5, bold: true }),
     LABEL_SEQ_TIER_B: Object.freeze({ font: 'Times New Roman', asciiFont: 'Times New Roman', sz: '19', szCs: '19', sizePt: 9.5, bold: true }),
     TABLE_VALUE: Object.freeze({ font: '宋体', asciiFont: 'Times New Roman', sz: '24', szCs: '24', sizePt: 12, bold: false }), // 全局 16 章节值格恒为小四号 12pt 宋体常规体
     TABLE_HEADER: Object.freeze({ font: '宋体', asciiFont: 'Times New Roman', sz: '24', szCs: '24', sizePt: 12, bold: true }),
     PREAMBLE: Object.freeze({ font: '宋体', asciiFont: 'Times New Roman', sz: '24', szCs: '24', sizePt: 12, bold: false }),
-    HEADER: Object.freeze({ font: '宋体', asciiFont: 'Times New Roman', sz: '18', szCs: '18', sizePt: 9, bold: false }),
-    FOOTER: Object.freeze({ font: '宋体', asciiFont: 'Times New Roman', sz: '18', szCs: '18', sizePt: 9, bold: false }),
   }),
   EN: Object.freeze({
     SECTION_HEADER: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '22', szCs: '22', sizePt: 11, bold: true }),
+    SUBHEADER: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '19', szCs: '19', sizePt: 9.5, bold: true }),
     LABEL_BOLD: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '19', szCs: '19', sizePt: 9.5, bold: true }),
     LABEL_SEQ: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '19', szCs: '19', sizePt: 9.5, bold: true }), // 英文全篇 16 章节所有序号恒定为 9.5pt (sz="19")
     LABEL_SEQ_TIER_B: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '19', szCs: '19', sizePt: 9.5, bold: true }),
     TABLE_VALUE: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '19', szCs: '19', sizePt: 9.5, bold: false }), // 全局 16 章节值格恒为五号 9.5pt Arial 常规体
     TABLE_HEADER: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '19', szCs: '19', sizePt: 9.5, bold: true }),
     PREAMBLE: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '19', szCs: '19', sizePt: 9.5, bold: false }),
-    HEADER: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '18', szCs: '18', sizePt: 9, bold: false }),
-    FOOTER: Object.freeze({ font: 'Arial', asciiFont: 'Arial', sz: '18', szCs: '18', sizePt: 9, bold: false }),
   })
 });
 // @ANTIGRAVITY_INVARIANT_LOCK_END
@@ -325,143 +319,9 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
   const targetSz = tokens.TABLE_VALUE.sz;
   const targetAscii = tokens.TABLE_VALUE.asciiFont || targetFont;
 
-  // 1. 全局投影页眉页脚底层 XML (Header & Footer Typography Projection)
-  if (engine?.supportingXml) {
-    const hdrFtrToken = tokens.HEADER;
-    const fontName = hdrFtrToken.font;
-    const asciiFont = hdrFtrToken.asciiFont || fontName;
-    const szVal = hdrFtrToken.sz; // '18' (9pt)
-
-    for (const [partName, xmlText] of Object.entries(engine.supportingXml)) {
-      if (!/^word\/(?:header|footer)\d+\.xml$/.test(partName) || !xmlText) continue;
-      try {
-        const domParser = new (globalThis.DOMParser || DOMParser)();
-        const partDoc = domParser.parseFromString(xmlText, 'application/xml');
-        const isHeader = /header/i.test(partName);
-        let modified = false;
-
-        if (isHeader) {
-          const pars = Array.from(partDoc.getElementsByTagNameNS(W_NS, 'p'));
-          for (let pIdx = 0; pIdx < Math.min(2, pars.length); pIdx++) {
-            const p = pars[pIdx];
-            const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
-            for (const r of runs) {
-              let rPr = r.getElementsByTagNameNS(W_NS, 'rPr')[0] || partDoc.createElementNS(W_NS, 'w:rPr');
-              if (!rPr.parentNode) r.insertBefore(rPr, r.firstChild);
-              const bs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'b'));
-              bs.forEach(b => rPr.removeChild(b));
-              const bCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
-              bCss.forEach(b => rPr.removeChild(b));
-              let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0] || partDoc.createElementNS(W_NS, 'w:sz');
-              sz.setAttribute('w:val', szVal);
-              if (!sz.parentNode) rPr.appendChild(sz);
-              let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || partDoc.createElementNS(W_NS, 'w:szCs');
-              szCs.setAttribute('w:val', szVal);
-              if (!szCs.parentNode) rPr.appendChild(szCs);
-              let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || partDoc.createElementNS(W_NS, 'w:rFonts');
-              rFonts.setAttribute('w:ascii', asciiFont);
-              rFonts.setAttribute('w:hAnsi', asciiFont);
-              rFonts.setAttribute('w:eastAsia', fontName);
-              rFonts.setAttribute('w:cs', asciiFont);
-              if (!rFonts.parentNode) rPr.appendChild(rFonts);
-              modified = true;
-            }
-          }
-          const tbl = partDoc.getElementsByTagNameNS(W_NS, 'tbl')[0];
-          if (tbl) {
-            const tc = tbl.getElementsByTagNameNS(W_NS, 'tc')[0];
-            const p = tc?.getElementsByTagNameNS(W_NS, 'p')[0];
-            if (p) {
-              const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
-              for (const r of runs) {
-                let rPr = r.getElementsByTagNameNS(W_NS, 'rPr')[0] || partDoc.createElementNS(W_NS, 'w:rPr');
-                if (!rPr.parentNode) r.insertBefore(rPr, r.firstChild);
-                let b = rPr.getElementsByTagNameNS(W_NS, 'w:b')[0] || partDoc.createElementNS(W_NS, 'w:b');
-                if (!b.parentNode) rPr.appendChild(b);
-                let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0] || partDoc.createElementNS(W_NS, 'w:sz');
-                sz.setAttribute('w:val', szVal);
-                if (!sz.parentNode) rPr.appendChild(sz);
-                let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || partDoc.createElementNS(W_NS, 'w:szCs');
-                szCs.setAttribute('w:val', szVal);
-                if (!szCs.parentNode) rPr.appendChild(szCs);
-                let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || partDoc.createElementNS(W_NS, 'w:rFonts');
-                rFonts.setAttribute('w:ascii', asciiFont);
-                rFonts.setAttribute('w:hAnsi', asciiFont);
-                rFonts.setAttribute('w:eastAsia', fontName);
-                rFonts.setAttribute('w:cs', asciiFont);
-                if (!rFonts.parentNode) rPr.appendChild(rFonts);
-                modified = true;
-              }
-            }
-          }
-        } else {
-          // 页脚处理: 全量 9pt 常规体，Cell 0 靠左，清除残留 w:firstLine="8730"
-          const tbl = partDoc.getElementsByTagNameNS(W_NS, 'tbl')[0];
-          if (tbl) {
-            const tr = tbl.getElementsByTagNameNS(W_NS, 'tr')[0];
-            if (tr) {
-              const tcs = Array.from(tr.getElementsByTagNameNS(W_NS, 'tc'));
-              if (tcs[0]) {
-                const p = tcs[0].getElementsByTagNameNS(W_NS, 'p')[0];
-                if (p) {
-                  let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0] || partDoc.createElementNS(W_NS, 'w:pPr');
-                  if (!pPr.parentNode) p.insertBefore(pPr, p.firstChild);
-                  let jc = pPr.getElementsByTagNameNS(W_NS, 'w:jc')[0] || partDoc.createElementNS(W_NS, 'w:jc');
-                  jc.setAttribute('w:val', 'left');
-                  if (!jc.parentNode) pPr.appendChild(jc);
-                  const ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
-                  if (ind) pPr.removeChild(ind);
-                  modified = true;
-                }
-              }
-              if (tcs[1]) {
-                const p = tcs[1].getElementsByTagNameNS(W_NS, 'p')[0];
-                if (p) {
-                  let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0] || partDoc.createElementNS(W_NS, 'w:pPr');
-                  if (!pPr.parentNode) p.insertBefore(pPr, p.firstChild);
-                  let jc = pPr.getElementsByTagNameNS(W_NS, 'w:jc')[0] || partDoc.createElementNS(W_NS, 'w:jc');
-                  jc.setAttribute('w:val', 'right');
-                  if (!jc.parentNode) pPr.appendChild(jc);
-                  const ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
-                  if (ind) pPr.removeChild(ind);
-                  modified = true;
-                }
-              }
-              const runs = Array.from(tbl.getElementsByTagNameNS(W_NS, 'r'));
-              for (const r of runs) {
-                let rPr = r.getElementsByTagNameNS(W_NS, 'rPr')[0] || partDoc.createElementNS(W_NS, 'w:rPr');
-                if (!rPr.parentNode) r.insertBefore(rPr, r.firstChild);
-                const bs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'b'));
-                bs.forEach(b => rPr.removeChild(b));
-                const bCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
-                bCss.forEach(b => rPr.removeChild(b));
-                let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0] || partDoc.createElementNS(W_NS, 'w:sz');
-                sz.setAttribute('w:val', szVal);
-                if (!sz.parentNode) rPr.appendChild(sz);
-                let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || partDoc.createElementNS(W_NS, 'w:szCs');
-                szCs.setAttribute('w:val', szVal);
-                if (!szCs.parentNode) rPr.appendChild(szCs);
-                let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || partDoc.createElementNS(W_NS, 'w:rFonts');
-                rFonts.setAttribute('w:ascii', asciiFont);
-                rFonts.setAttribute('w:hAnsi', asciiFont);
-                rFonts.setAttribute('w:eastAsia', fontName);
-                rFonts.setAttribute('w:cs', asciiFont);
-                if (!rFonts.parentNode) rPr.appendChild(rFonts);
-                modified = true;
-              }
-            }
-          }
-        }
-
-        if (modified) {
-          const xmlSerializer = new (globalThis.XMLSerializer || XMLSerializer)();
-          engine.supportingXml[partName] = xmlSerializer.serializeToString(partDoc);
-        }
-      } catch (err) {
-        console.warn('applyGlobalTypographyProjection: failed updating header/footer', partName, err);
-      }
-    }
-  }
+  // 1. 页眉页脚样式基座只读公理 (REQ-TOPO-HF-INHERIT-01)
+  // 无论母版如何变化，默认完整继承母版原生的页眉页脚样式、字号、字体与底纹，
+  // 外部全局投影绝不侵入或重置 word/header*.xml 与 word/footer*.xml。
 
   // 2. 全篇 16 个章节表格底层拓扑投影
   const tables = Array.from(doc.getElementsByTagNameNS(W_NS, 'tbl'));

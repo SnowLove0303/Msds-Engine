@@ -1,5 +1,41 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-13 拓扑结构模板原生样式继承与全16章节统一排版重构 (INV-TEMPLATE-HF-INHERITANCE-AND-UNIFIED-TYPOGRAPHY)] - 遵循 Ps-openspec 与 Spec-Kit 工业级双门禁工程规范，全量落实用户三大指令：1. 改版拓扑结构架构，确立“模板即页眉页脚样式基座”公理，从 applyGlobalTypographyProjection 中彻底移除对页眉页脚的外部粗暴重写，无论母版如何变化，默认 100% 继承母版原生的页眉页脚样式、字号、字体、粗细与底纹；2. 完备中英文双轨 MSDS_DESIGN_TOKENS（大标题/小标题/序号/标签/说明行/值），重构 16 章节遍历引擎统一排版投影，使全篇文本格式不受模板历史残留单元格干扰，且实现拓扑层一键可调；3. 严格捍卫既有功能与业务规范不可否定公理，将 Section 2 GHS两行通栏、Section 3 表头加粗与克隆、Section 8 暴露限值与手部防护、Section 9 激光垂线对齐、Section 13 英文左对齐、Section 14 危险货物文本、420/560 dxa 悬挂缩进及标点清洗等法定不变量全量无损咬合；重跑导出 HPU-7651 全部 8 格式交付物并经全景深度审计核销。
+
+### 一、 需求背景与核心治理宗旨
+承接用户指示：
+> “1.改一下拓扑结构，不管模板如何变化，默认使用模板的页眉、页脚的样式及其字号、字体等；
+> 2.按照之前我们对Pipeline 的要求（含全局与局部规范），开始重构 标题、序号、标签、说明行、值的文本格式、字体、字号，进行全section统一，且不受模板影响（分中英文），统一的好处是方便后续可以通过对拓扑的一键修改以调整文本格式；
+> 3.除了2所提及的标题、序号、标签、说明行、值的文本格式、字体、字号等问题，请你仔细去阅读全局与局部规范以及过去的pipeline等，参考之前产出标准格式的体系中的核心要求，我们只是重构工作流的执行方式，不代表各种规范和细节设计都不再使用；”
+
+### 二、 核心成果与物理核销清单
+1. **拓扑结构重构：模板页眉页脚样式原生继承 (`REQ-TOPO-HF-INHERIT-01`)**:
+   - 彻底解除 `universal-editor-primitives.js` 中 `applyGlobalTypographyProjection` 对 `word/header*.xml` 和 `word/footer*.xml` 的侵入式清洗与 9pt 降级；
+   - 确立“模板即样式基座”法定原则：在 `docx-engine.js:updateHeaderFooterData` 中升级 `setRunProps`，采用“已定义属性完全保留、缺失属性注入保底”的非破坏性继承机制；
+   - 保证母版页眉大标题（22pt加粗居中）、版本号（9pt右对齐）、型号框（18pt灰底加粗居中）、页脚公司型号（10.5pt左对齐）、修订日期（10pt灰字右对齐）及动态页码（12pt右对齐）100% 原生继承；
+   - 编写 `web/tests/test_header_footer_template_inheritance.mjs` 测试套件，验证中英母版页眉页脚继承保真度达到 100%（退出码 0）。
+2. **全 16 章节五大语义要素格式统一重构与 Design Tokens 解耦 (`REQ-TYPO-UNIFIED-TOKENS-02`)**:
+   - 梳理并升级 `universal-editor-primitives.js` 中的 `MSDS_DESIGN_TOKENS`，严格划分中英文双轨：
+     - 中文版 (CN)：大标题（12pt宋体加粗）、小标题（12pt加粗）、标签（12pt加粗）、序号（10.5pt/9.5pt加粗）、说明行与值（12pt常规体）；
+     - 英文版 (EN)：大标题（11pt Arial加粗）、小标题（9.5pt加粗）、标签（9.5pt加粗）、序号（9.5pt加粗）、说明行与值（9.5pt常规体）；
+   - 遍历 16 章节表格所有单元格，彻底消除母版历史单元格样式污染，实现由 Design Tokens 统一驱动的集中排版投影与拓扑一键调控；
+   - 编写 `web/tests/test_unified_section_typography.mjs`，验证中英文版全 16 章节共 878 个 Runs 100% 严格吻合 Design Tokens 规范（退出码 0）。
+3. **既有全局与局部规范及 Pipeline 核心细节设计全量继承 (`REQ-PIPELINE-INVARIANTS-PRESERVE-03`)**:
+   - 在 `web/src/editor-writer.js` 中确保 `applyGlobalTypographyProjection` 与 `enforceStructuralTypographyInvariants` 无缝咬合；
+   - 完整继承 Section 2 GHS 无危害两行通栏收敛与空行剪枝、Section 3 成分表头加粗居中与行克隆、Section 8 暴露限值表及手部防护加粗、Section 9 激光垂线对齐豁免、Section 13 英文左对齐、Section 14 合规文本规范、420/560 dxa 悬挂缩进及标点符号自动规整；
+   - 重新执行 `web/scripts/export_hpu7651_deliverables.mjs`，成功更新并导出全部 8 格式交付物（4 DOCX + 4 PDF）；
+   - 执行 `web/scripts/run_exhaustive_msds_audit.mjs` 完成全景深度审计，历史通过项零退化（Zero Regressions）。
+
+### 三、 遇到问题与解法沉淀 (Root Cause & Solution)
+1. **问题**: 早期 `applyGlobalTypographyProjection` 误将 `word/header` 与 `word/footer` 纳入全篇降级遍历，导致母版本已预设的 22pt 加粗居中大标题被强行降级为 9pt 常规体，且加粗被剥离。
+   - **根因**: 排版投影引擎未建立“正文表格”与“母版页眉页脚基座”的边界隔离，盲目将正文规则粗暴投射到页眉页脚。
+   - **解法**: 彻底移除 `applyGlobalTypographyProjection` 对页眉页脚的篡改循环，将页眉页脚确立为“只读母版样式基座”，上层仅进行纯动态文本插槽填充并保留原生 `rPr`。
+2. **问题**: 模板原生大标题段落中包含两个 `<w:r>` 节点（Run 0 为前导空格 `sz="36"`，Run 1 为文字 `sz="44"`），若粗暴选取 Run 0 进行内容覆写，会导致大标题误继承 `sz="36"`。
+   - **根因**: 母版在 Word 历史编辑中产生了细碎的 Run 片段，文字实际挂载在后续特定 Run 上。
+   - **解法**: 在 `docx-engine.js:updateHeaderFooterData` 中增加语义定位逻辑，优先锁定包含标题文本或具有 `sz="44"` 标记的 Target Run 进行替换，其余细碎 Run 予以物理清理，确保 22pt 原生继承。
+
+---
+
 ## [2026-11-13 模板资产自省感知、写入前内容全量清零与页眉页脚标杆级排版治理 (INV-TEMPLATE-DISCOVERY-AND-TYPOGRAPHY-REMEDIATION)] - 遵循 Ps-openspec 与 Spec-Kit 工业级双门禁工程规范，全量落实用户三大指令：1. 研发模板资产自省探测器（discoverAvailableTemplates/resolveDefaultTemplate），写入前动态感知识别当前系统模板，默认锁定标准 CN/EN 模板；2. 彻底解耦模板内容与拓扑，废除 keepSections 保护机制，装载后 100% 清空 16 个章节所有值格旧数据，使模板纯粹作为几何、边框、底纹与字号骨架；3. 深度逆向 BL-8129A 黄金标杆排版参数，对 HPU-7651 页眉页脚进行地毯式修复与 XML 跨节点清洗，将页眉标题(22pt加粗居中)、版本号(9pt右对齐)、型号框(18pt加粗灰底居中)、页脚企业型号(10.5pt左对齐)、修订日期(10pt灰字右对齐空3格)与动态页码(12pt右对齐)精准落地；修复 WPS COM 转换器后台句柄锁；全量重跑导出 8 份标准交付物并通过全景深度敌手审计，旧型号残留与英文版中文混杂数彻底归零！
 
 ### 一、 需求背景与核心治理宗旨

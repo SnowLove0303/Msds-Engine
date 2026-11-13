@@ -1014,47 +1014,47 @@ export function updateHeaderFooterData(engine, patch = {}) {
       rPr = doc.createElementNS(W_NS, 'w:rPr');
       rNode.insertBefore(rPr, rNode.firstChild);
     }
+    // 默认继承母版原生运行属性 (REQ-TOPO-HF-INHERIT-01)：
+    // 若母版节点已定义对应属性，则 100% 保留母版原生字号、粗细、字体与颜色；若母版未定义，才注入默认保底值。
     if (fontSize !== null) {
       let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0];
       if (!sz) {
         sz = doc.createElementNS(W_NS, 'w:sz');
+        sz.setAttributeNS(W_NS, 'w:val', String(fontSize));
         rPr.appendChild(sz);
       }
-      sz.setAttributeNS(W_NS, 'w:val', String(fontSize));
       let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0];
       if (!szCs) {
         szCs = doc.createElementNS(W_NS, 'w:szCs');
+        szCs.setAttributeNS(W_NS, 'w:val', String(fontSize));
         rPr.appendChild(szCs);
       }
-      szCs.setAttributeNS(W_NS, 'w:val', String(fontSize));
     }
     if (bold !== null) {
       const existingB = rPr.getElementsByTagNameNS(W_NS, 'b')[0];
-      if (bold && !existingB) {
+      if (!existingB && bold) {
         const bNode = doc.createElementNS(W_NS, 'w:b');
         rPr.appendChild(bNode);
-      } else if (!bold && existingB) {
-        rPr.removeChild(existingB);
       }
     }
     if (color !== null) {
       let colorNode = rPr.getElementsByTagNameNS(W_NS, 'color')[0];
       if (!colorNode) {
         colorNode = doc.createElementNS(W_NS, 'w:color');
+        colorNode.setAttributeNS(W_NS, 'w:val', color);
         rPr.appendChild(colorNode);
       }
-      colorNode.setAttributeNS(W_NS, 'w:val', color);
     }
     if (fontFamily) {
       let fontNode = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0];
       if (!fontNode) {
         fontNode = doc.createElementNS(W_NS, 'w:rFonts');
+        fontNode.setAttributeNS(W_NS, 'w:ascii', fontFamily);
+        fontNode.setAttributeNS(W_NS, 'w:eastAsia', fontFamily);
+        fontNode.setAttributeNS(W_NS, 'w:hAnsi', fontFamily);
+        fontNode.setAttributeNS(W_NS, 'w:cs', fontFamily);
         rPr.appendChild(fontNode);
       }
-      fontNode.setAttributeNS(W_NS, 'w:ascii', fontFamily);
-      fontNode.setAttributeNS(W_NS, 'w:eastAsia', fontFamily);
-      fontNode.setAttributeNS(W_NS, 'w:hAnsi', fontFamily);
-      fontNode.setAttributeNS(W_NS, 'w:cs', fontFamily);
     }
   }
 
@@ -1097,14 +1097,24 @@ export function updateHeaderFooterData(engine, patch = {}) {
 
           const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
           if (runs.length > 0) {
-            let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
+            const targetRun = runs.find(r => /物料安全数据表|MATERIAL\s*SAFETY/i.test(r.textContent || '')) ||
+                              runs.find(r => {
+                                const sz = r.getElementsByTagNameNS(W_NS, 'sz')[0];
+                                const v = sz?.getAttribute('w:val') || sz?.getAttributeNS(W_NS, 'val');
+                                return v === '44';
+                              }) ||
+                              runs[runs.length - 1];
+
+            let t = targetRun.getElementsByTagNameNS(W_NS, 't')[0];
             if (!t) {
               t = doc.createElementNS(W_NS, 'w:t');
-              runs[0].appendChild(t);
+              targetRun.appendChild(t);
             }
             t.textContent = effectiveTitle.startsWith(' ') ? effectiveTitle : `  ${effectiveTitle}`;
-            setRunProps(doc, runs[0], { fontSize: 44, bold: true, fontFamily: isEnDoc ? 'Arial' : '楷体_GB2312' });
-            for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
+            setRunProps(doc, targetRun, { fontSize: 44, bold: true, fontFamily: isEnDoc ? 'Arial' : '楷体_GB2312' });
+            for (const r of runs) {
+              if (r !== targetRun) p.removeChild(r);
+            }
             modified = true;
           }
         }
