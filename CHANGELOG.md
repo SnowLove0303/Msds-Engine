@@ -1,5 +1,47 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-13 Context 2 匹配引擎融合、Agent 全局与局部规范二次认知打磨及独立准确性审查器全绿交付 (INV-CONTEXT2-MATCHING-AND-SPEC-REFINEMENT)] - 彻底废除旧 pipeline/pipeline-engine.js 职能并全面融入匹配引擎；确立“内容来源于源文件，结构来源于模板”全局拓扑映射公理；建立 Agent 二次打磨规范链（G-01 非危品防虚增、G-02 无水隔离、G-03 西文化度数、16 章节局部排版意图与万能编辑器原语组装）；研发部署 `produce_context2.mjs` 与独立准确性审查器 `audit_context2_accuracy.mjs`；基准型号 HPU-7651 (非危品) 与 EP-1501 (危险品) 实测双双 100% 满分通过审查 (Exit Code 0，0 Critical，0 Warning)！
+
+### 一、 需求背景与架构质变 (Axiomatic Shift)
+承接用户最高战略指示：
+> “接下来准备做Context 2 的产出流程，首先，识别到源文件内容后，按照旧有的流程，是使用pipeline 对 源文件内容进行处理，但是我们要调整一下，改成使用匹配引擎+全局与局部规范进行处理，以后不再有pipeline，pineline的职能彻底融入匹配引擎，并由Agent使用全局与局部规范来进行二次处理，即将识别结果扔进匹配引擎，让匹配引擎依据源文件内容结合底层模板拓扑学结构进行结构性匹配（核心仍需遵照 内容来源于源文件，结构来源于模板的全局要求）；匹配引擎的重点在于映射于多元化处理，通过匹配引擎+Agent二次处理，实际上生成的Context 2 将用于 编辑器的写入，编辑器写入内容是否准确，很大程度上决定于Context2 的准确性，其次是编辑器操作的准确性；因此，匹配引擎需要能先确定基本结构，再由Agent按照全局与局部规范进行二次打磨；”
+
+针对以往脆弱的多级 pipeline 架构，确立以下质变：
+1. **废除 Pipeline 独立概念**：不再存在 `pipeline` 独立孤岛，其槽位匹配与结构映射职能彻底沉淀为匹配引擎底层能力；
+2. **两阶漏斗处理模型 (Two-Stage Funnel Paradigm)**：
+   - **第一阶 (匹配引擎拓扑初筛)**：Context 1 事实 $\rightarrow$ `smart-matching.js:matchContext1ToTemplateTopology`，纯机械确定性提取 16 章节槽位初筛蓝图；
+   - **第二阶 (Agent 规范二次认知打磨)**：结构蓝图 $\rightarrow$ `context-governor.js:refineContext2WithSpecifications`，严格遵循全局不变量与局部规范，组装专业双语并直接绑定万能编辑器原语（`universal-editor-primitives.js`）；
+3. **独立准确性司法法官**：构建 `audit_context2_accuracy.mjs`，执行机械级（结构完整性、非危防虚增、西文度数、槽位溯源）与原语级（操作合法性、参数齐备性）双轨严密审查。
+
+### 二、 核心成果与交付物清单
+1. **匹配引擎拓扑映射升级**：
+   - 文件：[web/src/smart-matching.js](file:///F:/App%20Location/Guanzhi%20Tong/Skill/MSDS-Engine/web/src/smart-matching.js)；
+   - 核心导出函数：`matchContext1ToTemplateTopology(facts, variant)`；
+   - 特性：遵循“内容来源于源文件，结构来源于模板”，针对 16 章节分别匹配通栏布局（Full-Width）、双列网格（Two-Column）与多列成分网格（Component-Table），明确槽位事实来源溯源（`source_grounded` / `template_grounded`）。
+2. **Agent 规范治理器与认知打磨链**：
+   - 文件：[web/src/context-governor.js](file:///F:/App%20Location/Guanzhi%20Tong/Skill/MSDS-Engine/web/src/context-governor.js)；
+   - 核心导出函数：`refineContext2WithSpecifications(blueprint, options)`；
+   - 规则落实：
+     - **G-01 非危品防虚增**：非危品强行置空象形图，信号词锁定“无/None”，危险说明与防范说明锁定标准免责声明；
+     - **G-02 无水隔离**：非水性树脂产品品名绝对禁止出现“水性”前缀；
+     - **G-03 度数符号西文化**：全面规范替换 `℃` 为 `°C`；
+     - **16 章节局部排版与编辑器原语组装**：预置 `clearSectionValues`、`updateSlot`、`fillTableGrid`、`formatLaserTabs` 等原子写操作，为编辑器提供零歧义写入指令。
+3. **受控生产流水线脚本**：
+   - 文件：[web/scripts/produce_context2.mjs](file:///F:/App%20Location/Guanzhi%20Tong/Skill/MSDS-Engine/web/scripts/produce_context2.mjs)；
+   - 提供 CLI 通路，支持 `--source=<docx>` 或 `--facts=<json>`，极速（~280ms）产出 CN 与 EN 双轨 Context 2 JSON 与 Markdown 报告。
+4. **Context 2 独立准确性审查器**：
+   - 文件：[web/scripts/audit_context2_accuracy.mjs](file:///F:/App%20Location/Guanzhi%20Tong/Skill/MSDS-Engine/web/scripts/audit_context2_accuracy.mjs)；
+   - 校验探针：C2-M01（16 章节完整性）、C2-M02（非危品象形图零容忍）、C2-M03（度数西文化）、C2-M04（事实溯源闭环）、C2-P01~P04（编辑器原语与参数校验）；
+   - 实行真实进程退出码 0 与零告警一票否决制。
+
+### 三、 实测实证与准确性审查数据矩阵
+| 受测型号 | 危险性类别 | 生产耗时 | 第一阶初筛 (匹配引擎) | 第二阶打磨 (Agent 规范) | 编辑器原语数 | 准确性审查结论 | 退出码 | 交付物理路径 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **HPU-7651** | 非危险品 (GHS 未分类) | 287 ms | 16 章节覆盖 (0ms) | G-01/02/03 全命中 (1ms) | 18 项原语 | **CRITICAL: 0, WARNING: 0 (100% 满分通过)** | 0 | `output/HPU-7651/HPU-7651_context2_CN.md` / `output/HPU-7651/HPU-7651_context2_CN.json` |
+| **EP-1501** | 危险品 (GHS H412) | 295 ms | 16 章节覆盖 (0ms) | 保留 H412 危险声明 (1ms) | 18 项原语 | **CRITICAL: 0, WARNING: 0 (100% 满分通过)** | 0 | `output/EP-1501/EP-1501_context2_CN.md` / `output/EP-1501/EP-1501_context2_CN.json` |
+
+---
+
 ## [2026-11-13 工作流开篇三部曲执行承载固化、新 Agent 极速上手规范与 Swarm SubAgent 端到端盲测全绿验证 (INV-WORKFLOW-ENTRY-TRIAD-ONBOARDING)] - 正式确立 Context 1 识别与分类准确性公理、收敛开篇三部曲（步骤 1 寻源排他 -> 步骤 2 导入受控识别器 -> 步骤 3 独立反向机械审计）、建立知识库标准作业手册、全面更新 msds-studio 技能与 Agent 角色极速上手卡片；通过 Swarm SubAgent 对未测试型号 EP-1501 开展端到端工作流盲测，以 Exit Code 0、0 违规、0 警告顺利通过机械审计！
 
 ### 一、 需求背景与核心治理原则
