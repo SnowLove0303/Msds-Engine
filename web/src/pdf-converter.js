@@ -479,7 +479,7 @@ try {
     foreach ($f in $files) {
         $pdfPath = [System.IO.Path]::ChangeExtension($f.FullName, ".pdf")
         $doc = $app.Documents.Open($f.FullName, $false, $true)
-        $doc.ExportAsFixedFormat($pdfPath, 17)
+        $doc.ExportAsFixedFormat($pdfPath, 17, $false)
         $doc.Close($false)
     }
 } finally {

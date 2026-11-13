@@ -168,9 +168,25 @@ async function main() {
     const res = convertedPdfs[i];
     const item = pdfItems[i];
     if (res && res.pdfBuffer && item) {
-      fs.writeFileSync(item.outputPath, res.pdfBuffer);
-      pdfDeliverables.push(item.outputPath);
-      console.log(`  ✓ 已生成 PDF [${i + 1}/4]: ${path.basename(item.outputPath)} (${res.pdfBuffer.length} bytes)`);
+      let written = false;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          fs.writeFileSync(item.outputPath, res.pdfBuffer);
+          written = true;
+          break;
+        } catch (writeErr) {
+          if (writeErr.code === 'EBUSY' && attempt < 3) {
+            console.warn(`  ⚠️ 写入受阻 (EBUSY)，第 ${attempt} 次重试中...`);
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000);
+          } else {
+            throw writeErr;
+          }
+        }
+      }
+      if (written) {
+        pdfDeliverables.push(item.outputPath);
+        console.log(`  ✓ 已生成 PDF [${i + 1}/4]: ${path.basename(item.outputPath)} (${res.pdfBuffer.length} bytes)`);
+      }
     } else {
       console.error(`  ❌ PDF 转换失败: ${item.sourcePath}`);
     }

@@ -1,6 +1,42 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
-## [2026-11-13 全景多维深度审计探针出具详细 MD 报告与通用模板拓扑识别层动态解耦落地 (INV-COMPREHENSIVE-AUDIT-AND-DYNAMIC-TOPOLOGY)] - 研发部署全要素深度审计探针 `run_exhaustive_msds_audit.mjs`，穿透 DOCX 内部 XML DOM，对页眉页脚及 16 章节文字内容、网格几何、字阶、悬挂缩进、激光制表位、历史剪枝与英文中文残留开展全景审计，生成详细审计报告 `docs/audit/HPU-7651_MSDS_全维度全景深度审计报告.md`；研发通用母版拓扑识别层 `template-topology-recognizer.js`，彻底解耦硬编码母版绑定，动态解析任意 DOCX 母版网格与语义角色；升级匹配引擎新增 `matchContext1ToDynamicTemplateTopology` 接口，通过单元测试验证中英母版切换时拓扑自适应随动 100% 满分通过！
+## [2026-11-13 模板资产自省感知、写入前内容全量清零与页眉页脚标杆级排版治理 (INV-TEMPLATE-DISCOVERY-AND-TYPOGRAPHY-REMEDIATION)] - 遵循 Ps-openspec 与 Spec-Kit 工业级双门禁工程规范，全量落实用户三大指令：1. 研发模板资产自省探测器（discoverAvailableTemplates/resolveDefaultTemplate），写入前动态感知识别当前系统模板，默认锁定标准 CN/EN 模板；2. 彻底解耦模板内容与拓扑，废除 keepSections 保护机制，装载后 100% 清空 16 个章节所有值格旧数据，使模板纯粹作为几何、边框、底纹与字号骨架；3. 深度逆向 BL-8129A 黄金标杆排版参数，对 HPU-7651 页眉页脚进行地毯式修复与 XML 跨节点清洗，将页眉标题(22pt加粗居中)、版本号(9pt右对齐)、型号框(18pt加粗灰底居中)、页脚企业型号(10.5pt左对齐)、修订日期(10pt灰字右对齐空3格)与动态页码(12pt右对齐)精准落地；修复 WPS COM 转换器后台句柄锁；全量重跑导出 8 份标准交付物并通过全景深度敌手审计，旧型号残留与英文版中文混杂数彻底归零！
+
+### 一、 需求背景与核心治理宗旨
+承接用户最高质量指示：
+> “第一，首先，匹配结果写入编辑器前，需要先检测当前系统所拥有的模板，默认使用CN/EN版模板；2.写入前编辑器中的模板内容必须清空，我希望，模板只提供拓扑、表格样式、字号等需要全局统一的属性，请注意，模板只提供拓扑，使用编辑器及其对应的模板只是用模板的格式，不使用内容，举个例子：模板中存在三列结构，但源文件内容并不一定需要三列，所以使用前，清除模板的所有结构，只保留操作工具，便于灵活处理源文件中出现的各种情况；3.开始排前面HPU-7651 产出物的页眉页脚，在使用模板的情况下，在编辑器中写入页眉页脚内容，那对应的就是要写入模板中的页眉页脚，禁止出现格式、文本大小等问题，你先对照模板排除问题，我会告诉你要怎么改；4. 还有页眉页脚字号大小的问题，请你参考我们在改进MSDS-Studio前，使用pipeline产出的产出，那个就很标准：BL-8129A...”
+
+### 二、 核心成果与物理核销清单
+1. **模板自省探测与默认模板绑定 (`REQ-TPL-DISCOVERY-01`)**:
+   - 在 `web/src/editor-writer.js` 中新增 `discoverAvailableTemplates` 与 `resolveDefaultTemplate`；
+   - 动态识别 `web/public/templates/` 目录中全部标准及自定义模板；
+   - 中文默认绑定 `正式模板_MSDS_CN_冠志(1).docx`，英文默认绑定 `正式模板_MSDS_EN_冠志(1).docx`；
+   - 验证脚本 `web/tests/test_template_discovery.mjs` 测试通过（退出码 0）。
+2. **模板内容全量清零与纯拓扑解耦 (`REQ-TPL-CONTENT-WIPE-02`)**:
+   - 升级 `editor-writer.js`，彻底移除 `keepSections: [4, 5, 6, 7, 8, 10, 11, 12, 15, 16]` 限制；
+   - 写入前将模板 16 个章节所有值单元格 100% 清空，同时完整保留网格列宽、单元格边框线条、底纹颜色与字体属性，确保单元格维持 `editable = true`；
+   - 验证脚本 `web/tests/test_template_wiping.mjs` 验证中英双语模板共 257 个可编辑值格内容清空率达到 100%（退出码 0）。
+3. **页眉页脚参数契约修复与 XML 跨节点清洗 (`REQ-HEADER-FOOTER-FIX-03`)**:
+   - 修复 `editor-writer.js` 与 `template-editor.js` 中的参数名错位（将 `productName` 修正为 `model`，将 `companyName` 修正为 `company`，显式传递双语标识）；
+   - 优化 `docx-engine.js:updateHeaderFooterData`，对 Office 跨 `<w:r>` 节点切分的 `P EA - 4139` 进行全 XML DOM 节点与序列化后处理级清洗，彻底根除旧型号残留；
+   - 英文版页脚企业主体强制映射为 100% 纯英文主体（`Guangzhou Guanzhi New Material Technology Co., Ltd.` / `Yingde Guocai New Material Co., Ltd.`），根除中英文混杂；
+   - 严格保护原生 Word 动态页码域代码（`<w:instrText> PAGE </w:instrText>` / `NUMPAGES`）。
+4. **页眉页脚排版 1:1 对标 BL-8129A 黄金标杆 (`REQ-HEADER-FOOTER-TYPOGRAPHY-04`)**:
+   - **页眉大标题**: 22 pt (`sz="44"`) 加粗 居中 (`物料安全数据表` / `MATERIAL SAFETY DATA SHEET`)；
+   - **页眉版本号**: 9 pt (`sz="18"`) 常规 右对齐 (中文版 `Version：V1.0` 全角冒号，英文版 `Version: V1.0` 半角冒号)；
+   - **页眉型号框**: 18 pt (`sz="36"`) 加粗 居中 灰底单格表格 (`#D9D9D9`)；
+   - **页脚企业与型号**: 10.5 pt (`sz="21"`) 常规 左对齐；
+   - **页脚修订日期**: 10 pt (`sz="20"`) 常规 灰字 `#7F7F7F` 右对齐（末尾保留 3 个空格）；
+   - **页脚动态页码**: 12 pt (`sz="24"`) 原生动态域代码 右对齐；
+   - 验证脚本 `web/tests/test_header_footer_fix.mjs` 针对 4 类变体验证 100% 通过（退出码 0）。
+5. **八格式最新成果与全维度审计核销 (`Task 5`)**:
+   - 重新执行 `web/scripts/export_hpu7651_deliverables.mjs`，成功产出 4 份标准 DOCX 与 4 份原生高清 PDF；
+   - 修复 `pdf-converter.js` 中 `ExportAsFixedFormat` 缺少 `$false` 参数导致 WPS 自动弹出后台查看器锁死句柄的缺陷；
+   - 运行全要素敌手审计脚本 `web/scripts/run_exhaustive_msds_audit.mjs`，重新生成 `docs/audit/HPU-7651_MSDS_全维度全景深度审计报告.md`；
+   - 经实体检验：`PEA-4139` 残留数为 **0**；英文页脚中文残留数为 **0**；字阶阶梯与 `BL-8129A` 达成 **100% 物理级重合**。
+
+---
+
 
 ### 一、 需求背景与战略解耦
 承接用户最高质量指示：

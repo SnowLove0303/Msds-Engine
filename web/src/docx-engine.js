@@ -996,15 +996,66 @@ export function updateHeaderFooterData(engine, patch = {}) {
   const targetVersion = String(next.version || '').trim();
   const targetTitle = String(next.title || '').trim();
 
-  // 格式化修订日期：去除残留 P 前缀与异形空格，确保 EN 下 Revision Date 严格首字母大写
+  const isGlobalEn = /^en$/i.test(next.language || '') || /^en$/i.test(engine?.headerFooterData?.language || '') || /_EN_|EN\b/i.test(engine?.filename || '');
   const cleanDateStr = targetDate.replace(/^[P\s]+/, '').trim();
   let formattedDate = cleanDateStr;
-  if (next.language === 'EN') {
+  if (isGlobalEn) {
     const pureDate = cleanDateStr.replace(/^(?:revision\s*date|修订日期|日期)[：:\s]*/i, '').trim();
     formattedDate = `Revision Date: ${pureDate}`;
   } else {
     const pureDate = cleanDateStr.replace(/^(?:修订日期|revision\s*date|日期)[：:\s]*/i, '').trim();
     formattedDate = `修订日期：${pureDate}`;
+  }
+
+  function setRunProps(doc, rNode, { fontSize = null, bold = null, color = null, fontFamily = null }) {
+    if (!rNode) return;
+    let rPr = rNode.getElementsByTagNameNS(W_NS, 'rPr')[0];
+    if (!rPr) {
+      rPr = doc.createElementNS(W_NS, 'w:rPr');
+      rNode.insertBefore(rPr, rNode.firstChild);
+    }
+    if (fontSize !== null) {
+      let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0];
+      if (!sz) {
+        sz = doc.createElementNS(W_NS, 'w:sz');
+        rPr.appendChild(sz);
+      }
+      sz.setAttributeNS(W_NS, 'w:val', String(fontSize));
+      let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0];
+      if (!szCs) {
+        szCs = doc.createElementNS(W_NS, 'w:szCs');
+        rPr.appendChild(szCs);
+      }
+      szCs.setAttributeNS(W_NS, 'w:val', String(fontSize));
+    }
+    if (bold !== null) {
+      const existingB = rPr.getElementsByTagNameNS(W_NS, 'b')[0];
+      if (bold && !existingB) {
+        const bNode = doc.createElementNS(W_NS, 'w:b');
+        rPr.appendChild(bNode);
+      } else if (!bold && existingB) {
+        rPr.removeChild(existingB);
+      }
+    }
+    if (color !== null) {
+      let colorNode = rPr.getElementsByTagNameNS(W_NS, 'color')[0];
+      if (!colorNode) {
+        colorNode = doc.createElementNS(W_NS, 'w:color');
+        rPr.appendChild(colorNode);
+      }
+      colorNode.setAttributeNS(W_NS, 'w:val', color);
+    }
+    if (fontFamily) {
+      let fontNode = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0];
+      if (!fontNode) {
+        fontNode = doc.createElementNS(W_NS, 'w:rFonts');
+        rPr.appendChild(fontNode);
+      }
+      fontNode.setAttributeNS(W_NS, 'w:ascii', fontFamily);
+      fontNode.setAttributeNS(W_NS, 'w:eastAsia', fontFamily);
+      fontNode.setAttributeNS(W_NS, 'w:hAnsi', fontFamily);
+      fontNode.setAttributeNS(W_NS, 'w:cs', fontFamily);
+    }
   }
 
   for (const [partName, xmlText] of Object.entries(engine.supportingXml || {})) {
@@ -1013,11 +1064,37 @@ export function updateHeaderFooterData(engine, patch = {}) {
       const doc = parseXml(xmlText, partName);
       let modified = false;
 
+      const isEnDoc = /^en$/i.test(next.language || '') || /^en$/i.test(engine?.headerFooterData?.language || '') || /EN|English/i.test(partName) || /_EN_|EN\b/i.test(engine?.filename || '');
+
+      // 格式化修订日期：去除残留 P 前缀与异形空格，确保 EN 下 Revision Date 严格首字母大写
+      const cleanDateStr = targetDate.replace(/^[P\s]+/, '').trim();
+      let formattedDate = cleanDateStr;
+      if (isEnDoc) {
+        const pureDate = cleanDateStr.replace(/^(?:revision\s*date|修订日期|日期)[：:\s]*/i, '').trim();
+        formattedDate = `Revision Date: ${pureDate}`;
+      } else {
+        const pureDate = cleanDateStr.replace(/^(?:修订日期|revision\s*date|日期)[：:\s]*/i, '').trim();
+        formattedDate = `修订日期：${pureDate}`;
+      }
+
       if (/header/i.test(partName)) {
         const pars = Array.from(doc.getElementsByTagNameNS(W_NS, 'p'));
-        // 1. Header 标题
-        if (targetTitle && pars[0]) {
+        // 1. Header 标题 (对标 BL-8129A: 22pt bold 居中)
+        const effectiveTitle = targetTitle || (isEnDoc ? 'MATERIAL SAFETY DATA SHEET' : '物料安全数据表');
+        if (pars[0]) {
           const p = pars[0];
+          let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+          if (!pPr) {
+            pPr = doc.createElementNS(W_NS, 'w:pPr');
+            p.insertBefore(pPr, p.firstChild);
+          }
+          let jc = pPr.getElementsByTagNameNS(W_NS, 'w:jc')[0];
+          if (!jc) {
+            jc = doc.createElementNS(W_NS, 'w:jc');
+            pPr.appendChild(jc);
+          }
+          jc.setAttributeNS(W_NS, 'w:val', 'center');
+
           const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
           if (runs.length > 0) {
             let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
@@ -1025,15 +1102,29 @@ export function updateHeaderFooterData(engine, patch = {}) {
               t = doc.createElementNS(W_NS, 'w:t');
               runs[0].appendChild(t);
             }
-            t.textContent = targetTitle.startsWith(' ') ? targetTitle : `  ${targetTitle}`;
+            t.textContent = effectiveTitle.startsWith(' ') ? effectiveTitle : `  ${effectiveTitle}`;
+            setRunProps(doc, runs[0], { fontSize: 44, bold: true, fontFamily: isEnDoc ? 'Arial' : '楷体_GB2312' });
             for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
             modified = true;
           }
         }
 
-        // 2. Header 版本号
-        if (targetVersion && pars[1]) {
+        // 2. Header 版本号 (对标 BL-8129A: 9pt 常规 右对齐)
+        const effectiveVersion = targetVersion || 'V1.0';
+        if (pars[1]) {
           const p = pars[1];
+          let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+          if (!pPr) {
+            pPr = doc.createElementNS(W_NS, 'w:pPr');
+            p.insertBefore(pPr, p.firstChild);
+          }
+          let jc = pPr.getElementsByTagNameNS(W_NS, 'w:jc')[0];
+          if (!jc) {
+            jc = doc.createElementNS(W_NS, 'w:jc');
+            pPr.appendChild(jc);
+          }
+          jc.setAttributeNS(W_NS, 'w:val', 'right');
+
           const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
           if (runs.length > 0) {
             let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
@@ -1041,21 +1132,33 @@ export function updateHeaderFooterData(engine, patch = {}) {
               t = doc.createElementNS(W_NS, 'w:t');
               runs[0].appendChild(t);
             }
-            const cleanV = targetVersion.replace(/^Version[：:\s]*/i, '');
-            const isEnDoc = /^en$/i.test(next.language || '') || /^en$/i.test(engine?.headerFooterData?.language || '') || /EN|English/i.test(partName) || /_EN_|EN\b/i.test(engine?.filename || '');
+            const cleanV = effectiveVersion.replace(/^Version[：:\s]*/i, '');
             t.textContent = isEnDoc ? `Version: ${cleanV}` : `Version：${cleanV}`;
+            setRunProps(doc, runs[0], { fontSize: 18, bold: false, fontFamily: isEnDoc ? 'Arial' : '楷体_GB2312' });
             for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
             modified = true;
           }
         }
 
-        // 3. Header 表格型号
+        // 3. Header 表格型号 (对标 BL-8129A: 18pt bold 居中 灰底单格表格)
         if (targetModel) {
           const tbl = doc.getElementsByTagNameNS(W_NS, 'tbl')[0];
           if (tbl) {
             const tc = tbl.getElementsByTagNameNS(W_NS, 'tc')[0];
             const p = tc?.getElementsByTagNameNS(W_NS, 'p')[0];
             if (p) {
+              let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+              if (!pPr) {
+                pPr = doc.createElementNS(W_NS, 'w:pPr');
+                p.insertBefore(pPr, p.firstChild);
+              }
+              let jc = pPr.getElementsByTagNameNS(W_NS, 'w:jc')[0];
+              if (!jc) {
+                jc = doc.createElementNS(W_NS, 'w:jc');
+                pPr.appendChild(jc);
+              }
+              jc.setAttributeNS(W_NS, 'w:val', 'center');
+
               const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
               if (runs.length > 0) {
                 let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
@@ -1064,6 +1167,7 @@ export function updateHeaderFooterData(engine, patch = {}) {
                   runs[0].appendChild(t);
                 }
                 t.textContent = targetModel;
+                setRunProps(doc, runs[0], { fontSize: 36, bold: true, fontFamily: isEnDoc ? 'Arial' : '楷体_GB2312' });
                 for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
                 modified = true;
               }
@@ -1076,7 +1180,7 @@ export function updateHeaderFooterData(engine, patch = {}) {
           const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
           if (rows[0]) {
             const cells = Array.from(rows[0].getElementsByTagNameNS(W_NS, 'tc'));
-            // 1. Footer Row 0 Cell 0: 公司 + 型号-MSDS (强制左对齐 w:jc left)
+            // 1. Footer Row 0 Cell 0: 公司 + 型号-MSDS (对标 BL-8129A: 10.5pt 左对齐)
             if (cells[0] && (targetCompany || targetModel)) {
               const p = cells[0].getElementsByTagNameNS(W_NS, 'p')[0];
               if (p) {
@@ -1092,6 +1196,16 @@ export function updateHeaderFooterData(engine, patch = {}) {
                 }
                 jc.setAttributeNS(W_NS, 'w:val', 'left');
 
+                let comp = targetCompany || current.company || (isEnDoc ? 'Guangzhou Guanzhi New Material Technology Co., Ltd.' : '广州冠志新材料科技有限公司');
+                if (isEnDoc) {
+                  if (/国彩|Guocai/i.test(comp)) {
+                    comp = 'Yingde Guocai New Material Co., Ltd.';
+                  } else {
+                    comp = 'Guangzhou Guanzhi New Material Technology Co., Ltd.';
+                  }
+                }
+                const mod = targetModel || current.model || '';
+
                 const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
                 if (runs.length > 0) {
                   let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
@@ -1099,16 +1213,15 @@ export function updateHeaderFooterData(engine, patch = {}) {
                     t = doc.createElementNS(W_NS, 'w:t');
                     runs[0].appendChild(t);
                   }
-                  const comp = targetCompany || current.company || '广州冠志新材料科技有限公司';
-                  const mod = targetModel || current.model || '';
                   t.textContent = mod ? `${comp} ${mod}-MSDS` : comp;
+                  setRunProps(doc, runs[0], { fontSize: 21, bold: false, fontFamily: isEnDoc ? 'Arial' : '宋体' });
                   for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
                   modified = true;
                 }
               }
             }
 
-            // 2. Footer Row 0 Cell 1: 修订日期 (强制右对齐 w:jc right)
+            // 2. Footer Row 0 Cell 1: 修订日期 (对标 BL-8129A: 10pt 灰字 右对齐 空3格)
             if (cells[1] && formattedDate) {
               const p = cells[1].getElementsByTagNameNS(W_NS, 'p')[0];
               if (p) {
@@ -1117,7 +1230,6 @@ export function updateHeaderFooterData(engine, patch = {}) {
                   pPr = doc.createElementNS(W_NS, 'w:pPr');
                   p.insertBefore(pPr, p.firstChild);
                 }
-                // 必须彻底清除任何残留的 w:ind（如 w:firstLine="8730"），避免无头 PDF 引擎右边界截断首字符！
                 const oldInd = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
                 if (oldInd) {
                   pPr.removeChild(oldInd);
@@ -1139,9 +1251,25 @@ export function updateHeaderFooterData(engine, patch = {}) {
                     runs[0].appendChild(t);
                   }
                   t.textContent = `${formattedDate}   `;
+                  setRunProps(doc, runs[0], { fontSize: 20, bold: false, color: '7F7F7F', fontFamily: isEnDoc ? 'Arial' : '楷体_GB2312' });
                   for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
                   modified = true;
                 }
+              }
+            }
+          }
+
+          // 3. Footer Row 1 Cell 1: 动态页码 (对标 BL-8129A: 12pt 右对齐)
+          if (rows[1]) {
+            const pageCells = Array.from(rows[1].getElementsByTagNameNS(W_NS, 'tc'));
+            if (pageCells[1]) {
+              const p = pageCells[1].getElementsByTagNameNS(W_NS, 'p')[0];
+              if (p) {
+                const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+                for (const r of runs) {
+                  setRunProps(doc, r, { fontSize: 24, bold: false });
+                }
+                modified = true;
               }
             }
           }
@@ -1149,7 +1277,12 @@ export function updateHeaderFooterData(engine, patch = {}) {
       }
 
       if (modified) {
-        engine.supportingXml[partName] = serializer().serializeToString(doc);
+        let serialized = serializer().serializeToString(doc);
+        if (targetModel) {
+          serialized = serialized.replace(/P\s*EA\s*-\s*4139/g, targetModel)
+                                 .replace(/PEA\s*-\s*4139/g, targetModel);
+        }
+        engine.supportingXml[partName] = serialized;
       }
     } catch (e) {
       console.warn('Failed to update header/footer part', partName, e);
@@ -3289,7 +3422,9 @@ export function deleteRow(engine, record, rowIndex) {
   if (record.rows.length <= 2) throw new DocxEngineError('至少保留一行数据，禁止删除唯一行', 'PROTECTED_ROW');
   const row = record.rows[rowIndex];
   if (!row) throw new DocxEngineError('未找到要删除的行', 'ROW_NOT_FOUND');
-  row.node.parentNode.removeChild(row.node);
+  if (row.node && row.node.parentNode) {
+    row.node.parentNode.removeChild(row.node);
+  }
   engine.refresh();
   let updated = engine.records.find((item) => item.id === record.id);
   if (updated) {

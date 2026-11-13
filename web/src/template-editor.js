@@ -101,7 +101,7 @@ const COMPANY_PRESETS = {
     fax: '86-20-32214789'
   },
   Guocai_en: {
-    name: 'Yingde Guocai Fine Chemical Co., Ltd.',
+    name: 'Yingde Guocai New Material Co., Ltd.',
     shortName: 'Guocai',
     address: 'Kaidi Industrial Park, Genggukeng, Taiping Village, Baisha Town, Yingde City, Guangdong Province',
     tel: '86-763-2811205',
@@ -370,24 +370,33 @@ export function insertRowIntoSession(session, { sectionNumber, targetRowIndex, c
 export function writeRichTextToSession(session, { sectionNumber, rowIndex, cellIndex, runs, chemicalFormula = null, options = {} }) {
   const record = (session.engine.records || []).find(r => r.sectionNumber === sectionNumber);
   if (!record) throw new Error(`Section ${sectionNumber} not found`);
-  const row = record.rows?.[rowIndex];
-  if (!row) throw new Error(`Row ${rowIndex} not found`);
-  const cell = row.cells?.[cellIndex];
-  if (!cell) throw new Error(`Cell ${cellIndex} not found`);
 
-  let finalRuns = runs;
+  const row = record.rows?.[rowIndex];
+  if (!row) throw new Error(`Row ${rowIndex} not found in Section ${sectionNumber}`);
+
+  const cell = row.cells?.[cellIndex];
+  if (!cell) throw new Error(`Cell ${cellIndex} not found in Section ${sectionNumber} Row ${rowIndex}`);
+
+  let runDescriptors = runs || [];
   if (chemicalFormula) {
-    finalRuns = parseChemicalFormulaRuns(chemicalFormula, {
-      fontFamily: session.isEnglish ? 'Arial' : '宋体',
-      fontSizePt: session.isEnglish ? 9.5 : 12,
-      bold: false
-    });
+    runDescriptors = parseChemicalFormulaRuns(chemicalFormula, options);
   }
 
-  writeRichTextToCell(cell, finalRuns || [], options);
-  session.engine.refresh();
+  writeRichTextToCell(cell, runDescriptors, options);
   session.modifiedSections.add(sectionNumber);
   return { success: true, sectionNumber, rowIndex, cellIndex };
+}
+
+/**
+ * 物理行安全剔除通道 (Delete Row Channel)
+ */
+export function deleteRowFromSession(session, { sectionNumber, rowIndex }) {
+  const record = (session.engine.records || []).find(r => r.sectionNumber === sectionNumber);
+  if (!record) throw new Error(`Section ${sectionNumber} not found`);
+
+  deleteDocxRow(session.engine, record, rowIndex);
+  session.modifiedSections.add(sectionNumber);
+  return { success: true, sectionNumber, deletedRowIndex: rowIndex };
 }
 
 /**
@@ -478,35 +487,31 @@ export function formatSection9LaserTabs(session) {
   const record = (session.engine.records || []).find(r => r.sectionNumber === 9);
   if (!record) return { success: false, reason: 'Section 9 not found' };
 
-  for (let i = 1; i < (record.rows?.length || 0); i++) {
-    const row = record.rows[i];
-    const cell = row.cells?.[0];
-    if (cell) {
-      const txt = (cell.text || '').trim();
-      const numStr = `9.${i}`;
-      const labelText = txt.replace(/^(?:9\.)?\d+[\s\t:：]*/, '').replace(/[:：]$/, '');
-      formatSection9LabelCell(cell, numStr, labelText, session.isEnglish);
-    }
+  let currentSubIndex = 1;
+  const isEn = session.isEnglish;
+
+  for (let rIdx = 0; rIdx < (record.rows || []).length; rIdx++) {
+    const row = record.rows[rIdx];
+    const firstCell = row?.cells?.[0];
+    if (!firstCell) continue;
+
+    const rawText = (firstCell.text || '').trim();
+    if (!rawText || /理化特性|Physical\s*and\s*chemical/i.test(rawText)) continue;
+
+    const cleanLabel = rawText.replace(/^9\.\d+[\s\u3000.:：]*/, '').trim();
+    if (!cleanLabel) continue;
+
+    const laserLabel = `9.${currentSubIndex}  ${cleanLabel}`;
+    formatSection9LabelCell(firstCell, laserLabel, isEn);
+    currentSubIndex++;
   }
 
   session.modifiedSections.add(9);
-  return { success: true };
+  return { success: true, formattedRowsCount: currentSubIndex - 1 };
 }
 
 /**
- * 结构安全删行 (Delete Row)
- */
-export function deleteRowFromSession(session, { sectionNumber, rowIndex }) {
-  const record = (session.engine.records || []).find(r => r.sectionNumber === sectionNumber);
-  if (!record) throw new Error(`Section ${sectionNumber} not found`);
-
-  deleteDocxRow(session.engine, record, rowIndex);
-  session.modifiedSections.add(sectionNumber);
-  return { success: true, sectionNumber, rowIndex };
-}
-
-/**
- * 企业预设注入 (Apply Company Preset)
+ * 注入企业预设覆盖 (Apply Company Preset)
  */
 export function applyCompanyPreset(session, presetKey) {
   let preset = COMPANY_PRESETS[presetKey];
@@ -545,7 +550,7 @@ export function applyCompanyPreset(session, presetKey) {
   }
 
   stampDocumentIdentity(session.engine, { companyName: preset.name, shortName: preset.shortName });
-  updateHeaderFooterData(session.engine, { companyName: preset.name });
+  updateHeaderFooterData(session.engine, { company: preset.name });
   return { success: true, presetKey };
 }
 
@@ -558,38 +563,7 @@ export async function saveSession(session, outputPath) {
   enableCrossPageBreaksForAllSections(session.engine);
   healAllTableTopologies(session.engine.documentXml);
 
-  // 全局 16 章节拓扑与排版硬约束投影 (所有型号产出永久保障)
-  for (const record of session.engine.records || []) {
-    if (record.kind === 'table') {
-      enforceTableStandardBorders(record);
-    }
-  }
-  applyGlobalTypographyProjection(session.engine, session.isEnglish);
-  enforceStructuralTypographyInvariants(session.engine, session.isEnglish);
-
-  // 英文交付物全篇西文标点纯度治理 (西文半角冒号与度数符号 °C)
-  if (session.isEnglish && session.engine.documentXml) {
-    const textNodes = Array.from(session.engine.documentXml.getElementsByTagNameNS(W_NS, 't'));
-    for (const tNode of textNodes) {
-      if (tNode.textContent && tNode.textContent.includes('：')) {
-        tNode.textContent = tNode.textContent.replace(/：/g, ':');
-      }
-      if (tNode.textContent && tNode.textContent.includes('℃')) {
-        tNode.textContent = tNode.textContent.replace(/℃/g, '°C');
-      }
-    }
-  }
-
   const arrayBuf = await session.engine.exportArrayBuffer();
-  const outBuf = Buffer.from(arrayBuf);
-
-  const outDir = path.dirname(outputPath);
-  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
-
-  fs.writeFileSync(outputPath, outBuf);
-  return {
-    success: true,
-    outputPath,
-    sizeBytes: outBuf.length
-  };
+  fs.writeFileSync(outputPath, Buffer.from(arrayBuf));
+  return { success: true, outputPath };
 }
