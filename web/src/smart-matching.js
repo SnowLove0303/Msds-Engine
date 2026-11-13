@@ -5025,3 +5025,145 @@ export function matchContext1ToTemplateTopology(facts = {}, variant = 'CN') {
     sections: sectionsBlueprint
   };
 }
+
+/**
+ * 依据识别层产出的动态模板拓扑蓝图 (Template Topology Blueprint) 映射 Context 1 事实
+ * 核心公理与使命 (REQ-TOPO-03):
+ * 1. 彻底与固定母版解耦: 结构由 templateTopology 决定，内容由 facts 决定；
+ * 2. 动态拓扑随动: 模板增减行列、改变列宽或调整布局时，输出拓扑自动依循新母版；
+ * 3. 语义槽位动态咬合: 基于 slotKey 与 label 双重智能寻源，产出结构化 Context 2 蓝图。
+ *
+ * @param {Object} facts - Context 1 事实对象
+ * @param {Object} templateTopology - template-topology-recognizer 产出的动态拓扑蓝图
+ * @param {string} variant - 'CN' | 'EN' (默认 'CN')
+ * @returns {Object} 动态同构的 Context 2 结构蓝图
+ */
+export function matchContext1ToDynamicTemplateTopology(facts = {}, templateTopology = {}, variant = 'CN') {
+  const modelCode = facts.modelCode || 'UNKNOWN_MODEL';
+  const isEnglish = String(variant).toUpperCase() === 'EN';
+  const tplSections = templateTopology.sections || [];
+
+  const dynamicSections = [];
+
+  for (const tplSec of tplSections) {
+    const sNum = tplSec.sectionNumber;
+    const secFacts = facts.sections?.[sNum] || facts.sections?.[String(sNum)] || {};
+    const dynamicSlots = [];
+    const editorIntents = [
+      { op: 'clearSectionValues', sectionNumber: sNum }
+    ];
+
+    // 遍历模板识别出的每一个插槽
+    for (const slot of (tplSec.slots || [])) {
+      let resolvedValue = slot.templateText || '';
+      let sourceOrigin = 'template_grounded';
+
+      if (slot.isEditable || slot.role === 'VALUE' || slot.role === 'EXPLANATION') {
+        // 根据 slotKey 动态注入事实
+        switch (slot.slotKey) {
+          case 'product_name':
+          case 'product_chinese_name':
+            resolvedValue = isEnglish
+              ? (facts.productNameEn || facts.productName || modelCode)
+              : (facts.productName || modelCode);
+            sourceOrigin = 'source_grounded';
+            break;
+
+          case 'model_code':
+            resolvedValue = modelCode;
+            sourceOrigin = 'source_grounded';
+            break;
+
+          case 'recommended_use':
+            resolvedValue = facts.recommendedUse || (isEnglish ? 'Industrial coating resin' : '工业涂料用树脂');
+            sourceOrigin = 'source_grounded';
+            break;
+
+          case 'company_name':
+            resolvedValue = facts.company?.name || (isEnglish ? 'Guangzhou Guanzhi New Material Technology Co., Ltd.' : '广州市冠志新材料科技有限公司');
+            sourceOrigin = 'source_grounded';
+            break;
+
+          case 'emergency_phone':
+            resolvedValue = facts.company?.emergencyPhone || '020-82001201';
+            sourceOrigin = 'source_grounded';
+            break;
+
+          case 'chemical_nature':
+            resolvedValue = isEnglish ? 'Mixture' : '混合物';
+            sourceOrigin = 'template_grounded';
+            break;
+
+          case 'un_number':
+            resolvedValue = facts.transport?.unNumber || (isEnglish ? 'Not applicable' : '不适用');
+            sourceOrigin = 'source_grounded';
+            break;
+
+          case 'shipping_name':
+            resolvedValue = facts.transport?.shippingName || (isEnglish ? 'Not classified as dangerous goods' : '非危险化学品运输名称');
+            sourceOrigin = 'source_grounded';
+            break;
+
+          case 'transport_hazard_class':
+            resolvedValue = facts.transport?.hazardClass || (isEnglish ? 'Not applicable' : '不适用');
+            sourceOrigin = 'source_grounded';
+            break;
+
+          case 'packing_group':
+            resolvedValue = facts.transport?.packingGroup || (isEnglish ? 'Not applicable' : '不适用');
+            sourceOrigin = 'source_grounded';
+            break;
+
+          default:
+            // 尝试按 label 从 secFacts 或理化特性中匹配
+            if (sNum === 9 && Array.isArray(facts.physicalProperties)) {
+              const matchedProp = facts.physicalProperties.find(p => (p.label && slot.templateText && p.label.includes(slot.templateText)) || (slot.templateText && p.label && slot.templateText.includes(p.label)));
+              if (matchedProp) {
+                resolvedValue = matchedProp.value;
+                sourceOrigin = 'source_grounded';
+              }
+            } else if (secFacts[slot.templateText]) {
+              resolvedValue = secFacts[slot.templateText];
+              sourceOrigin = 'source_grounded';
+            }
+            break;
+        }
+      }
+
+      dynamicSlots.push({
+        slotKey: slot.slotKey,
+        rowIndex: slot.rowIndex,
+        cellIndex: slot.cellIndex,
+        gridSpan: slot.gridSpan,
+        widthTwips: slot.widthTwips,
+        label: slot.templateText,
+        value: resolvedValue,
+        semanticType: slot.role,
+        sourceOrigin
+      });
+    }
+
+    dynamicSections.push({
+      sectionNumber: sNum,
+      sectionTitle: tplSec.sectionTitle,
+      tableIndex: tplSec.tableIndex,
+      layoutType: tplSec.layoutType,
+      rowsCount: tplSec.rowsCount,
+      columnWidths: tplSec.columnWidths,
+      borders: tplSec.borders,
+      slots: dynamicSlots,
+      editorIntents
+    });
+  }
+
+  return {
+    modelCode,
+    templateKey: templateTopology.templateKey || 'DYNAMIC_TEMPLATE',
+    variant,
+    isNonHazardous: !facts.ghs?.isHazardous,
+    isTopologyDynamic: true,
+    extractedAt: new Date().toISOString(),
+    blueprintStage: 'STAGE_1_DYNAMIC_TEMPLATE_TOPOLOGY',
+    sections: dynamicSections
+  };
+}
