@@ -1,5 +1,33 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-13 HPU 系列水性羟基聚氨酯树脂 6 型号批量 Swarm 识别与独立机械审计全绿交付 (INV-HPU-BATCH-SWARM-AUDIT)] - 成功调度 Swarm 多智能体并行识别流水线，覆盖 HPU-7651/7660/7700/7710/7711A/7790 全量 6 个型号 MSDS 源文件；集中交付至 `识别模块\识别模块训练夹`；全部 100% 满分通过 Context 1 独立反向反欺诈机械审计 (P1~P4 探针检测 0 违规 0 警告，真实退出码 0)
+
+### 一、 需求背景与闭环目标
+依据用户指令，对 `F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料\1-2 水性羟基聚氨酯树脂 HPU` 目录下的所有型号 MSDS 源文件启动 Swarm 多智能体并发检测抽取流水线。抽取成果统一采用标准 Markdown 格式交付至 `F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\识别模块\识别模块训练夹`，并严格接入刚刚研发部署的独立反向机械审计器进行一票否决式阻断审计，杜绝“先射箭再画靶”与虚假伪通。
+
+### 二、 核心架构与 Swarm 并发调度设计
+1. **多智能体并发调度拓扑**：
+   - 调度器构建三层拓扑：Coordinator（主协调与物理过滤）+ 并发 Worker 流（Worker 1/2/3 物理隔离并发处理）+ 独立司法法官（audit_context1_mechanical.mjs）；
+   - 排他性过滤：自动锁定 6 个型号的 `*msds_CN 冠志.docx`，严禁纳选技术说明书 `*tds_CN 冠志.doc`；
+   - 官方受控执行通路：各 Worker 统一定向调用 `web/scripts/run_source_recognition.mjs --source="..." --output="..." --format=md`，单次抽取极速完成（~310ms）。
+2. **司法与执行物理隔离审计**：
+   - 每个型号提取生成的 Markdown 成果，均由独立机械审计器 `audit_context1_mechanical.mjs` 执行 P1（伪标签）、P2（伪说明行）、P3（伪数据值）、P4（物理网格真实性）探针全覆盖审查；
+   - 严格遵循真实进程退出码 0 与 0 违规、0 警告准入红线。
+
+### 三、 6 大型号实测交付与审计核销矩阵
+| 型号代码 | 源文件名称 | 提取耗时 | 识别行数 | 提取特征 (品名 / GHS / 组分 / 理化) | 机械审计结果 | 退出码 | 交付物理路径 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **HPU-7651** | `HPU-7651 msds_CN 冠志.docx` | 309 ms | 104 行 | 羟基聚氨酯分散体 / 未分类 / 3组分 / 20项 | 0 CRITICAL, 0 WARNING | **0** | `识别模块/识别模块训练夹/HPU-7651_context1_recognition.md` |
+| **HPU-7660** | `HPU-7660 msds_CN 冠志.docx` | 306 ms | 104 行 | 羟基聚氨酯分散体 / 未分类 / 3组分 / 20项 | 0 CRITICAL, 0 WARNING | **0** | `识别模块/识别模块训练夹/HPU-7660_context1_recognition.md` |
+| **HPU-7700** | `HPU-7700 msds_CN 冠志.docx` | 312 ms | 104 行 | 羟基聚氨酯分散体 / 未分类 / 3组分 / 20项 | 0 CRITICAL, 0 WARNING | **0** | `识别模块/识别模块训练夹/HPU-7700_context1_recognition.md` |
+| **HPU-7710** | `HPU-7710 msds_CN 冠志.docx` | 310 ms | 104 行 | 羟基聚氨酯分散体 / 未分类 / 3组分 / 20项 | 0 CRITICAL, 0 WARNING | **0** | `识别模块/识别模块训练夹/HPU-7710_context1_recognition.md` |
+| **HPU-7711A** | `HPU-7711A msds_CN 冠志.docx` | 332 ms | 104 行 | 羟基聚氨酯分散体 / 未分类 / 3组分 / 20项 | 0 CRITICAL, 0 WARNING | **0** | `识别模块/识别模块训练夹/HPU-7711A_context1_recognition.md` |
+| **HPU-7790** | `HPU-7790 msds_CN 冠志.docx` | 312 ms | 104 行 | 多元醇分散体 / 未分类 / 2组分 / 20项 | 0 CRITICAL, 0 WARNING | **0** | `识别模块/识别模块训练夹/HPU-7790_context1_recognition.md` |
+
+---
+
+
+
 ## [2026-11-13 Context 1 独立反向证伪机械审计与双盲碰撞辅助认知审计双轨闭环 (INV-CONTEXT1-DUAL-TRACK-AUDIT)] - 根治“先射箭再画靶”同源同构假审计顽疾、研发并部署 audit_context1_mechanical.mjs (P1~P4反向猎杀探针) 与 audit_context1_cognitive.mjs (属性遮蔽双盲碰撞比对器)、捕获并根治 Section 3 管道符破损 4 列表格缺陷、PA-3612 全景质检 100% 满分通过 (耗时 1ms, 退出码 0)
 
 ### 一、 需求背景与核心质检目标
