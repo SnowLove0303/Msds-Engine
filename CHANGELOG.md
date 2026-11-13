@@ -1,5 +1,41 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-13 Context 2 直接对接编辑器写入并成功导出八格式至 HPU-7651 目标文件夹及现场排版问题全景穿透存证 (INV-CONTEXT2-EDITOR-WRITE-AND-EXPORT)] - 直接对照并复用现有编辑器写入功能（writeDeliverableViaEditor），将 HPU-7651 Context 2 数据完整注入母版会话；成功生成 4 份标准 DOCX 并由本地 PDF 引擎批量转换为 4 份原生高清 PDF；八格式全量交付物无损落盘至 `算法训练材料\TDS MSDS 重写版\01-2 水性羟基聚氨酯树脂 HPU\HPU-7651\`；通过自主研发的审查探针，深度排查并无损留存当前编辑器写入与导出中暴露的 4 大核心格式缺陷（Section 3 新增行可编辑性、英文文档 96 处中文残留、Section 8 & 14 局部空值、Section 15&16 法规模板历史硬编码残留），为下一步针对性优化奠定坚实事实基础！
+
+### 一、 需求背景与核心宗旨
+承接用户指示：
+> “将Context2 写入编辑器并导出，直接对照着去使用编辑器的功能写入并导出就行，我先看下存在的问题再决定下一步；产出八格式到F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\TDS MSDS 重写版\01-2 水性羟基聚氨酯树脂 HPU 中对应的型号文件夹”
+
+本轮执行完全聚焦于“不提前主观重构、直接使用现有编辑器功能原汁原味写入并导出”，以真实验收产物为基准，深入暴露底层编辑器在对接 Context 2 时存在的格式缺陷、排版错位与翻译漏洞，形成清晰的问题排查清单供决策。
+
+### 二、 核心成果与八格式交付矩阵
+- **交付目标目录**：`F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\TDS MSDS 重写版\01-2 水性羟基聚氨酯树脂 HPU\HPU-7651\`
+- **交付文件清单** (共 8 份，全部存在且字节数 > 0)：
+  1. `HPU-7651 msds_CN 冠志.docx` (33,216 bytes)
+  2. `HPU-7651 msds_CN 国彩.docx` (33,210 bytes)
+  3. `HPU-7651 msds_EN Guanzhi.docx` (33,115 bytes)
+  4. `HPU-7651 msds_EN Guocai.docx` (33,044 bytes)
+  5. `HPU-7651 msds_CN 冠志.pdf` (204,339 bytes)
+  6. `HPU-7651 msds_CN 国彩.pdf` (204,585 bytes)
+  7. `HPU-7651 msds_EN Guanzhi.pdf` (179,021 bytes)
+  8. `HPU-7651 msds_EN Guocai.pdf` (177,640 bytes)
+
+### 三、 现场问题与格式排查清单 (Forensic Audit Findings)
+通过对生成的 DOCX 与 PDF 执行 XML DOM 深度审查，发现以下 4 项核心缺陷：
+1. **Section 3 新增行克隆单元格可编辑性缺陷 (已当场阻断修复)**：`universal-editor-primitives.js:cloneAndInsertRow` 清空段落后未保留空白运行区，导致 DOM 刷新时将中间列误判为非编辑区抛出 `LOCKED_FIELD`；已通过补齐 `<w:r><w:t> </w:t></w:r>` 闭环修复。
+2. **英文文档中存在 96 处中文字符残留 (核心问题)**：
+   - Section 1 中文品名“羟基聚氨酯分散体”未按英文映射替换为纯英文；
+   - Section 3 成分 3 “N,N-二甲基乙醇胺”未翻译为“N,N-dimethylethanolamine”；
+   - Section 9 理化特性中“透明至半透明液体”、“初沸点以下无闪点”、“可混溶”等未完成专业英译；
+   - Section 11/12 毒理生态中包含大段中文（如“半数致死剂量”、“大鼠”、“兔”），甚至出现模板历史残留“二乙二醇单丁醚”字样；
+   - Section 15/16 包含国内法规中文与免责声明中文。
+3. **Section 8 & Section 14 局部值格留空**：
+   - Section 14 海运 “14.2海上运输：” 右侧值为空；
+   - Section 8 手部防护右侧值为空。
+4. **Section 15&16 底模历史残留未彻底抹除**：保留章节未接入 Context 2 动态覆写逻辑，导致示范模板中的死数据直接流向交付物。
+
+---
+
 ## [2026-11-13 Context 2 匹配引擎融合、Agent 全局与局部规范二次认知打磨及独立准确性审查器全绿交付 (INV-CONTEXT2-MATCHING-AND-SPEC-REFINEMENT)] - 彻底废除旧 pipeline/pipeline-engine.js 职能并全面融入匹配引擎；确立“内容来源于源文件，结构来源于模板”全局拓扑映射公理；建立 Agent 二次打磨规范链（G-01 非危品防虚增、G-02 无水隔离、G-03 西文化度数、16 章节局部排版意图与万能编辑器原语组装）；研发部署 `produce_context2.mjs` 与独立准确性审查器 `audit_context2_accuracy.mjs`；基准型号 HPU-7651 (非危品) 与 EP-1501 (危险品) 实测双双 100% 满分通过审查 (Exit Code 0，0 Critical，0 Warning)！
 
 ### 一、 需求背景与架构质变 (Axiomatic Shift)
