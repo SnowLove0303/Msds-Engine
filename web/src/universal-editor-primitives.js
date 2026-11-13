@@ -340,12 +340,15 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
     for (const r of rows) {
       const c0 = r.getElementsByTagNameNS(W_NS, 'tc')[0];
       if (!c0) continue;
-      const c0Text = (c0.textContent || '').trim();
-      const mSeq = c0Text.match(/^(\d+(?:\.\d+)+)/);
-      if (mSeq) {
-        const digitsOnly = mSeq[1].replace(/\D/g, '');
-        if (digitsOnly.length > maxSeqDigitCount) {
-          maxSeqDigitCount = digitsOnly.length;
+      const ps = Array.from(c0.getElementsByTagNameNS(W_NS, 'p'));
+      for (const p of ps) {
+        const pText = (p.textContent || '').trim();
+        const mSeq = pText.match(/^(\d+(?:\.\d+)+)/);
+        if (mSeq) {
+          const digitsOnly = mSeq[1].replace(/\D/g, '');
+          if (digitsOnly.length > maxSeqDigitCount) {
+            maxSeqDigitCount = digitsOnly.length;
+          }
         }
       }
     }
@@ -427,7 +430,69 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
         continue;
       }
 
-      // 2.3 多列表格行 (cells.length > 1)
+      // 2.3 多列数据网格行 (cells.length >= 3，如 Section 3 成分表、Section 8 容许浓度表)
+      const c0Text = (cells[0]?.textContent || '').trim();
+      const c0HasSeq = /^(\d+(?:\.\d+)+)/.test(c0Text);
+      if (cells.length >= 3 && !c0HasSeq) {
+        for (const cell of cells) {
+          const ps = Array.from(cell.getElementsByTagNameNS(W_NS, 'p'));
+          for (const p of ps) {
+            const numPrs = Array.from(p.getElementsByTagNameNS(W_NS, 'numPr'));
+            numPrs.forEach(n => n.parentNode?.removeChild(n));
+
+            const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0] || doc.createElementNS(W_NS, 'w:pPr');
+            if (!pPr.parentNode) p.insertBefore(pPr, p.firstChild);
+
+            const ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
+            if (ind) pPr.removeChild(ind);
+            const pPrNumPrs = Array.from(pPr.getElementsByTagNameNS(W_NS, 'numPr'));
+            pPrNumPrs.forEach(n => pPr.removeChild(n));
+            const tabsInPPr = Array.from(pPr.getElementsByTagNameNS(W_NS, 'tabs'));
+            tabsInPPr.forEach(n => pPr.removeChild(n));
+
+            const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
+            if (pRPr) {
+              const pSzs = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'sz'));
+              pSzs.forEach(sz => sz.setAttribute('w:val', targetSz));
+              const pSzCss = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'szCs'));
+              pSzCss.forEach(szCs => szCs.setAttribute('w:val', targetSz));
+            }
+
+            const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+            for (const run of runs) {
+              const runText = (run.textContent || '').trim();
+              if (!runText && !run.getElementsByTagNameNS(W_NS, 'drawing').length && !run.getElementsByTagNameNS(W_NS, 'br').length) {
+                run.parentNode?.removeChild(run);
+                continue;
+              }
+              let rPr = run.getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');
+              if (!rPr.parentNode) run.insertBefore(rPr, run.firstChild);
+
+              let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')[0] || doc.createElementNS(W_NS, 'w:sz');
+              sz.setAttribute('w:val', targetSz);
+              if (!sz.parentNode) rPr.appendChild(sz);
+              let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')[0] || doc.createElementNS(W_NS, 'w:szCs');
+              szCs.setAttribute('w:val', targetSz);
+              if (!szCs.parentNode) rPr.appendChild(szCs);
+
+              let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0] || doc.createElementNS(W_NS, 'w:rFonts');
+              rFonts.setAttribute('w:ascii', targetAscii);
+              rFonts.setAttribute('w:hAnsi', targetAscii);
+              rFonts.setAttribute('w:eastAsia', targetFont);
+              rFonts.setAttribute('w:cs', targetAscii);
+              if (!rFonts.parentNode) rPr.appendChild(rFonts);
+
+              const bs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'b'));
+              bs.forEach(b => rPr.removeChild(b));
+              const bCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
+              bCss.forEach(b => rPr.removeChild(b));
+            }
+          }
+        }
+        continue;
+      }
+
+      // 2.4 多列表格行 (cells.length > 1)
       if (cells.length > 1) {
         // A. Column 0: 标签单元格
         const labelCell = cells[0];
@@ -446,6 +511,9 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
 
             const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0] || doc.createElementNS(W_NS, 'w:pPr');
             if (!pPr.parentNode) p.insertBefore(pPr, p.firstChild);
+
+            const pPrNumPrs = Array.from(pPr.getElementsByTagNameNS(W_NS, 'numPr'));
+            pPrNumPrs.forEach(n => pPr.removeChild(n));
 
             // 彻底消除段落级默认格式污染：若 pPr 中包含残留的 rPr，同步更新其字号
             const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
@@ -468,14 +536,25 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
               ind.removeAttribute('w:firstLineChars');
               ind.removeAttribute('w:hangingChars');
               ind.removeAttribute('w:leftChars');
+              ind.removeAttributeNS(W_NS, 'firstLine');
+              ind.removeAttributeNS(W_NS, 'firstLineChars');
+              ind.removeAttributeNS(W_NS, 'hangingChars');
               ind.removeAttributeNS(W_NS, 'leftChars');
               ind.setAttributeNS(W_NS, 'w:leftChars', '0');
               if (!ind.parentNode) pPr.appendChild(ind);
 
-              const existingTabs = p.getElementsByTagNameNS(W_NS, 'tab');
-              if (existingTabs.length === 0 && mSeq) {
+              const existingTabsInPPr = Array.from(pPr.getElementsByTagNameNS(W_NS, 'tabs'));
+              existingTabsInPPr.forEach(n => pPr.removeChild(n));
+              const tabsNode = doc.createElementNS(W_NS, 'w:tabs');
+              const tabDef = doc.createElementNS(W_NS, 'w:tab');
+              tabDef.setAttributeNS(W_NS, 'w:val', 'left');
+              tabDef.setAttributeNS(W_NS, 'w:pos', targetIndent);
+              tabsNode.appendChild(tabDef);
+              pPr.appendChild(tabsNode);
+
+              if (mSeq) {
                 const seqStr = mSeq[1];
-                let labelPart = mSeq[2];
+                let labelPart = (mSeq[2] || '').replace(/^[\s\t]+/, '').trim();
                 if (isEnglish) {
                   labelPart = labelPart.replace(/：/g, ':').trim();
                   if (!labelPart.endsWith(':') && !labelPart.includes('Other information') && !labelPart.includes('Additional')) {
@@ -490,7 +569,7 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
                 const oldRuns = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
                 oldRuns.forEach(r => p.removeChild(r));
 
-                // Run 1: 序号 (加粗 + Tab)
+                // Run 1: 序号 (加粗 + 单个 Tab，序号后绝无多余空格)
                 const r1 = doc.createElementNS(W_NS, 'w:r');
                 const rPr1 = doc.createElementNS(W_NS, 'w:rPr');
                 const rf1 = doc.createElementNS(W_NS, 'w:rFonts');
@@ -551,9 +630,16 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
               ind.removeAttribute('w:firstLine');
               ind.removeAttribute('w:firstLineChars');
               ind.removeAttribute('w:leftChars');
+              ind.removeAttributeNS(W_NS, 'hanging');
+              ind.removeAttributeNS(W_NS, 'hangingChars');
+              ind.removeAttributeNS(W_NS, 'firstLine');
+              ind.removeAttributeNS(W_NS, 'firstLineChars');
               ind.removeAttributeNS(W_NS, 'leftChars');
               ind.setAttributeNS(W_NS, 'w:leftChars', '0');
               if (!ind.parentNode) pPr.appendChild(ind);
+
+              const existingTabsInPPr = Array.from(pPr.getElementsByTagNameNS(W_NS, 'tabs'));
+              existingTabsInPPr.forEach(n => pPr.removeChild(n));
             }
 
             // 遍历所有 Runs，严格强制注入标准字阶与字体 (彻底消灭 18/15 降级)
@@ -601,17 +687,29 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
             const numPrs = Array.from(p.getElementsByTagNameNS(W_NS, 'numPr'));
             numPrs.forEach(n => n.parentNode?.removeChild(n));
 
-            const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
-            if (pPr) {
-              const ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
-              if (ind) pPr.removeChild(ind);
-              const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
-              if (pRPr) {
-                const pSzs = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'sz'));
-                pSzs.forEach(sz => sz.setAttribute('w:val', targetSz));
-                const pSzCss = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'szCs'));
-                pSzCss.forEach(szCs => szCs.setAttribute('w:val', targetSz));
-              }
+            const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0] || doc.createElementNS(W_NS, 'w:pPr');
+            if (!pPr.parentNode) p.insertBefore(pPr, p.firstChild);
+
+            const ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
+            if (ind) pPr.removeChild(ind);
+            const pPrNumPrs = Array.from(pPr.getElementsByTagNameNS(W_NS, 'numPr'));
+            pPrNumPrs.forEach(n => pPr.removeChild(n));
+            const tabsInPPr = Array.from(pPr.getElementsByTagNameNS(W_NS, 'tabs'));
+            tabsInPPr.forEach(n => pPr.removeChild(n));
+
+            let jc = pPr.getElementsByTagNameNS(W_NS, 'jc')[0];
+            if (!jc) {
+              jc = doc.createElementNS(W_NS, 'w:jc');
+              pPr.appendChild(jc);
+            }
+            jc.setAttribute('w:val', 'left');
+
+            const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
+            if (pRPr) {
+              const pSzs = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'sz'));
+              pSzs.forEach(sz => sz.setAttribute('w:val', targetSz));
+              const pSzCss = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'szCs'));
+              pSzCss.forEach(szCs => szCs.setAttribute('w:val', targetSz));
             }
 
             const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));

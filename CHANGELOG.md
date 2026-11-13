@@ -1,5 +1,44 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-13 编辑器底层排版几何固化与多列顶格/通栏层级缩进全量闭环 (INV-EDITOR-SUBSTRATE-TYPOGRAPHY-LOCKING)] - 遵循 Ps-openspec 与 Spec-Kit 工业级双门禁工程规范，全量落实用户核心指令：从编辑器底层原语与拓扑结构层面彻底固化排版几何，彻底杜绝打补丁；1. 固化序号与标签间隔机制（单个 <w:tab/> 节点装配，消除多余空格，自适应章节最大序号位数实现 Tier A 420 dxa / Tier B 560 dxa 标尺自动升级）；2. 固化标签对齐与多行折行机制（悬挂缩进锁死，折行第二行首字在 420/560 dxa 垂线绝对垂直对齐；未编号标签注入相同基线 w:left="420"，首字完全齐平，消除锯齿；物理级彻底剔除 w:firstLine、leftChars 及 w:numPr 污染）；3. 固化多列顶格/通栏层级缩进二分机制（多列表格 cells.length > 1 填写值单元格强制顶格左对齐，清空段落 w:ind；通栏单列表格保留树状层级缩进，子项措施 P 代码向右缩进 s2SubValueIndent）；编写专用测试套件 test_editor_indent_and_alignment_invariants.mjs，母版与实产 HPU-7651 交付物 100% 通过；完成 OpenSpec 规范合流与归档。
+
+### 一、 需求背景与核心治理宗旨
+承接用户指示：
+> “记录上述讨论，对编辑器及其拓扑结构进行开发，针对‘序号与标签间隔’、‘标签对齐与多行折行’、‘值的缩进与多列/通栏对齐’等问题进行固定，不是打补丁，是从编辑器底层固定，保证以后产出的都是标准的排版格式”
+
+### 二、 核心成果与物理核销清单
+1. **排版公理与几何标尺系统规范沉淀 (`REQ-SPECS-RECORD-01`)**:
+   - 将“序号与标签间隔”、“标签对齐与多行折行”、“值的缩进与多列/通栏对齐”讨论结论沉淀进 `openspec/specs/editor-typography/spec.md`；
+   - 确立“多列表格值顶格左对齐”与“通栏单列树状层级缩进”两大不可动摇的排版公理，成为系统单一真理源。
+2. **编辑器底层序号与标签间隔机制固化 (`REQ-SEQ-LABEL-SPACING-02`)**:
+   - 在 `web/src/universal-editor-primitives.js` 的 `applyGlobalTypographyProjection` 中，解除 `existingTabs.length === 0` 条件跳步限制，强制重构 Run 1（`[seqStr]` + 单个 `<w:tab/>`，无多余空格）与 Run 2（`[labelPart]`）；
+   - 在段落属性 `w:pPr` 中显式清除旧制表符并注入 `<w:tabs><w:tab w:val="left" w:pos="${targetIndent}"/></w:tabs>`；
+   - 固化全章节自适应标尺探测：动态扫描章节最大序号位数（$D_{max}$），$D_{max} \le 3$ 自动采用 Tier A（420 dxa），$D_{max} \ge 4$（如 Section 11 的 `11.1.1`）自动升级为 Tier B（560 dxa），彻底消灭硬编码特判。
+3. **编辑器底层标签对齐与多行折行机制固化 (`REQ-LABEL-CONTINUATION-ALIGN-03`)**:
+   - 固化段落悬挂缩进 `<w:ind w:left="${targetIndent}" w:hanging="${targetIndent}" w:leftChars="0"/>`，确保多行折行时第二行首字在 420 dxa（或 560 dxa）垂线绝对垂直对齐（物理实测偏差 $\le 1\text{px}$），绝不回缩至序号正下方；
+   - 针对未编号标签（如“手部防护：”、“眼睛防护：”），段落属性注入 `w:left="${targetIndent}"`（无 hanging），使未编号标签首字起始线与带编号标签在制表符后的首字在同一垂线上对齐，彻底消除锯齿；
+   - 物理级彻底清除 `w:firstLine`、`w:firstLineChars`、`w:hangingChars`、`leftChars` 及 `w:numPr` 污染原语。
+4. **编辑器底层多列顶格/通栏层级缩进二分机制固化 (`REQ-VALUE-INDENT-ALIGN-04`)**:
+   - 明确架构分层：
+     - 多列表格行（`cells.length > 1`）：第 1 列及后续值单元格内所有段落强制移除 `w:ind`，注入 `jc="left"`，紧贴单元格左内边距（108 dxa）顶格左对齐，杜绝二次漂移；
+     - 多列数据网格（`cells.length >= 3` 且无序号）：所有单元格应用 `tokens.TABLE_VALUE` 常规体，清除悬挂缩进；
+     - 单列通栏表格行（`cells.length === 1`，如 Section 2）：分类标签保留基础顶格对齐，防范说明与措施（P代码）保留向右层级缩进（`s2SubValueIndent`），形成清晰大纲树状层次；
+   - 重新执行 `web/scripts/export_hpu7651_deliverables.mjs` 重新生成 HPU-7651 交付物（4 DOCX + 4 PDF），并经 `run_exhaustive_msds_audit.mjs` 全景深度审计（退出码 0）。
+5. **双轨双阶自动化验证测试套件 (`web/tests/test_editor_indent_and_alignment_invariants.mjs`)**:
+   - `--suite=spacing`：验证 4 份文档（中英官方母版 + 实产 HPU-7651 中英交付物）共 288 个带序号段落 100% 具备单一 `<w:tab/>` 节点与自适应标尺（退出码 0）；
+   - `--suite=label-alignment`：验证 4 份文档共 387 个标签段落（含 99 个未编号标签）100% 具备悬挂/左缩进垂线对齐与 0 污染（退出码 0）；
+   - `--suite=value-alignment`：验证 4 份文档共 372 个多列值段落 100% 顶格左对齐（退出码 0）。
+
+### 三、 遇到问题与解法沉淀 (Root Cause & Solution)
+1. **问题**: 早期测试在检测段落中的 `<w:tab/>` 时报 `found 2`。
+   - **根因**: OpenXML 中段落制表符定义 `<w:pPr><w:tabs><w:tab w:val="left" w:pos="420"/></w:tabs></w:pPr>` 与文本运行中的制表字符 `<w:r><w:tab/></w:r>` 使用了相同的标签名 `tab` 与命名空间 `W_NS`。使用 `p.getElementsByTagNameNS(W_NS, 'tab')` 时同时匹配了定义节点与字符节点。
+   - **解法**: 严格将文本字符制表符限定在 `Array.from(p.getElementsByTagNameNS(W_NS, 'r')).flatMap(r => Array.from(r.getElementsByTagNameNS(W_NS, 'tab')))` 范围内核验，确保定义与字符物理隔离。
+2. **问题**: Section 3 成分表与 Section 8 容许浓度表的数据行在遍历时误被当作普通 2 列标签行处理，导致数据行的首列单元格（如成分名称“聚氨酯聚合物”）被误注入 420 dxa 悬挂缩进。
+   - **根因**: 编辑器此前通过 `cells.length > 1` 笼统判定多列表格，未区分“2 列标签-值对结构”与“3 列以上数据网格结构（Data Grid）”。
+   - **解法**: 在 `universal-editor-primitives.js` 中新增多列数据网格（`cells.length >= 3 && !c0HasSeq`）专门分支，统一将数据网格所有单元格按 `TABLE_VALUE` 常规体处理并清除 `w:ind`，从而实现了 2 列标签-值对与 3+ 列数据网格的完美解耦。
+
+---
+
 ## [2026-11-13 拓扑结构模板原生样式继承与全16章节统一排版重构 (INV-TEMPLATE-HF-INHERITANCE-AND-UNIFIED-TYPOGRAPHY)] - 遵循 Ps-openspec 与 Spec-Kit 工业级双门禁工程规范，全量落实用户三大指令：1. 改版拓扑结构架构，确立“模板即页眉页脚样式基座”公理，从 applyGlobalTypographyProjection 中彻底移除对页眉页脚的外部粗暴重写，无论母版如何变化，默认 100% 继承母版原生的页眉页脚样式、字号、字体、粗细与底纹；2. 完备中英文双轨 MSDS_DESIGN_TOKENS（大标题/小标题/序号/标签/说明行/值），重构 16 章节遍历引擎统一排版投影，使全篇文本格式不受模板历史残留单元格干扰，且实现拓扑层一键可调；3. 严格捍卫既有功能与业务规范不可否定公理，将 Section 2 GHS两行通栏、Section 3 表头加粗与克隆、Section 8 暴露限值与手部防护、Section 9 激光垂线对齐、Section 13 英文左对齐、Section 14 危险货物文本、420/560 dxa 悬挂缩进及标点清洗等法定不变量全量无损咬合；重跑导出 HPU-7651 全部 8 格式交付物并经全景深度审计核销。
 
 ### 一、 需求背景与核心治理宗旨
