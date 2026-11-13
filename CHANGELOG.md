@@ -1,5 +1,38 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-13 全景多维深度审计探针出具详细 MD 报告与通用模板拓扑识别层动态解耦落地 (INV-COMPREHENSIVE-AUDIT-AND-DYNAMIC-TOPOLOGY)] - 研发部署全要素深度审计探针 `run_exhaustive_msds_audit.mjs`，穿透 DOCX 内部 XML DOM，对页眉页脚及 16 章节文字内容、网格几何、字阶、悬挂缩进、激光制表位、历史剪枝与英文中文残留开展全景审计，生成详细审计报告 `docs/audit/HPU-7651_MSDS_全维度全景深度审计报告.md`；研发通用母版拓扑识别层 `template-topology-recognizer.js`，彻底解耦硬编码母版绑定，动态解析任意 DOCX 母版网格与语义角色；升级匹配引擎新增 `matchContext1ToDynamicTemplateTopology` 接口，通过单元测试验证中英母版切换时拓扑自适应随动 100% 满分通过！
+
+### 一、 需求背景与战略解耦
+承接用户最高质量指示：
+> “1.先进行全面审计，从页眉页脚，到16个section，包括内容、表格格式、文本格式、字号、文本位置等，以及之前要求的缩进、对齐、剪枝等等（不止这些），进行全方位审计，然后写一份详细的md报告给我，16个section+页眉页脚或多或少存在些问题；2.当前的拓扑结构有点与模板绑死了，我希望先将拓扑层与模板分开来，做一个识别层，识别模板的结构并将其作为当前覆写产出的拓扑层使用，当模板更换时，拓扑结构随之改变；”
+
+本次变更确立双轨闭环：
+1. **全要素全景多维深度审计**：不仅审计 16 章节，还将页眉、页脚、字阶（19/21/24 sz）、微观对齐、缩进（420/560 dxa）、剪枝情况彻底透视留痕，形成结构化报告；
+2. **架构彻底解耦**：彻底推翻“代码中写死母版几何”的旧模式，建立独立的**母版拓扑识别层 (Template Recognition Layer)**，将任意 DOCX 母版作为拓扑资产动态读取，实现“母版更换，拓扑随动”。
+
+### 二、 核心成果与交付物清单
+1. **全要素多维深度审计探针与全景报告**：
+   - 执行脚本：[web/scripts/run_exhaustive_msds_audit.mjs](file:///F:/App%20Location/Guanzhi%20Tong/Skill/MSDS-Engine/web/scripts/run_exhaustive_msds_audit.mjs)
+   - 深度审计报告：[docs/audit/HPU-7651_MSDS_全维度全景深度审计报告.md](file:///F:/App%20Location/Guanzhi%20Tong/Skill/MSDS-Engine/docs/audit/HPU-7651_MSDS_全维度全景深度审计报告.md)
+   - 核心审计结论：
+     - **页眉/页脚**：检出页眉与页脚中残留底模示范型号 `PEA-4139` 与旧日期 `2023/09/27`，英文页脚混入中文公司名称；
+     - **16 章节空值**：中文版检出 10 处空值格（如海运 14.2、手部防护 8.2 等）；
+     - **英文中文残留**：英文版检出 36 处中文残留（包含品名、成分名、理化特性描述与法规条文）；
+     - **底模清空豁免死数据**：第 15、16 章节因清空豁免策略，导致官方底模示范数据完整流出。
+2. **通用模板拓扑识别层 (Template Recognition Layer)**：
+   - 核心模块：[web/src/template-topology-recognizer.js](file:///F:/App%20Location/Guanzhi%20Tong/Skill/MSDS-Engine/web/src/template-topology-recognizer.js)
+   - 导出函数：`recognizeTemplateTopology(templateSource, options)`
+   - 动态能力：输入任意 DOCX 母版，自动提取 16 章节表格索引、行列分布、初始列宽、边框配置、单元格语义角色（`SECTION_HEADER`, `CHILD_LABEL`, `PARENT_LABEL`, `VALUE`, `TABLE_HEADER`, `EXPLANATION`）与动态插槽清单。
+3. **匹配引擎自适应动态拓扑咬合**：
+   - 核心模块：[web/src/smart-matching.js](file:///F:/App%20Location/Guanzhi%20Tong/Skill/MSDS-Engine/web/src/smart-matching.js)
+   - 导出函数：`matchContext1ToDynamicTemplateTopology(facts, templateTopology, variant)`
+   - 业务事实与母版空间拓扑通过动态插槽咬合，彻底废除死写特定母版的代码分支。
+4. **自适应拓扑切换单元测试**：
+   - 测试脚本：[web/tests/test_dynamic_template_topology.mjs](file:///F:/App%20Location/Guanzhi%20Tong/Skill/MSDS-Engine/web/tests/test_dynamic_template_topology.mjs)
+   - 验证结论：测试中英母版解析、事实动态咬合与母版热切换随动，4 大断言全绿通过（退出码 0）。
+
+---
+
 ## [2026-11-13 Context 2 直接对接编辑器写入并成功导出八格式至 HPU-7651 目标文件夹及现场排版问题全景穿透存证 (INV-CONTEXT2-EDITOR-WRITE-AND-EXPORT)] - 直接对照并复用现有编辑器写入功能（writeDeliverableViaEditor），将 HPU-7651 Context 2 数据完整注入母版会话；成功生成 4 份标准 DOCX 并由本地 PDF 引擎批量转换为 4 份原生高清 PDF；八格式全量交付物无损落盘至 `算法训练材料\TDS MSDS 重写版\01-2 水性羟基聚氨酯树脂 HPU\HPU-7651\`；通过自主研发的审查探针，深度排查并无损留存当前编辑器写入与导出中暴露的 4 大核心格式缺陷（Section 3 新增行可编辑性、英文文档 96 处中文残留、Section 8 & 14 局部空值、Section 15&16 法规模板历史硬编码残留），为下一步针对性优化奠定坚实事实基础！
 
 ### 一、 需求背景与核心宗旨
