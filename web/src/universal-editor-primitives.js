@@ -194,6 +194,11 @@ export function cloneAndInsertRow(engine, record, targetRowIndex, cloneFromRowIn
     const paras = Array.from(tc.getElementsByTagNameNS(W_NS, 'p'));
     paras.forEach(p => tc.removeChild(p));
     const emptyP = tblNode.ownerDocument.createElementNS(W_NS, 'w:p');
+    const r = tblNode.ownerDocument.createElementNS(W_NS, 'w:r');
+    const t = tblNode.ownerDocument.createElementNS(W_NS, 'w:t');
+    t.textContent = ' ';
+    r.appendChild(t);
+    emptyP.appendChild(r);
     tc.appendChild(emptyP);
   }
 
