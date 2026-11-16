@@ -1472,6 +1472,9 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
   } else if (/固体含量|固含/i.test(cnLabel)) {
     enLabel = 'Solid content:';
     enVal = cnVal.replace(/约\s*/g, 'Approx. ');
+  } else if (/羟基含量|羟基值|羟基/i.test(cnLabel)) {
+    enLabel = /羟基值/i.test(cnLabel) ? 'Hydroxyl value:' : 'Hydroxyl content:';
+    enVal = cnVal;
   } else if (/成膜温度|MFFT/i.test(cnLabel)) {
     enLabel = 'Minimum film-forming temperature (MFFT):';
     enVal = cnVal.includes('°C') || cnVal.includes('℃') ? cnVal.replace(/约\s*/g, 'Approx. ').replace(/℃/g, ' °C') : `${cnVal} °C`;

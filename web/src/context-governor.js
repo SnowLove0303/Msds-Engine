@@ -27,6 +27,8 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '聚氨酯': 'Polyurethane',
   '羟基丙烯酸酯聚合物': 'Hydroxy acrylic polymer',
   '丙烯酸酯聚合物': 'Acrylic polymer',
+  '丙烯酸聚合物': 'Acrylic polymer',
+  '水性丙烯酸聚合物': 'Waterborne acrylic polymer',
   '丙烯酸树脂': 'Acrylic resin',
   '水性丙烯酸树脂': 'Waterborne acrylic resin',
   '丙烯酸乳液': 'Acrylic emulsion',
@@ -36,6 +38,10 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '水性丙烯酸共聚物': 'Waterborne acrylic copolymer',
   '丙烯酸共聚物乳液': 'Acrylic copolymer emulsion',
   '丙烯酸共聚物': 'Acrylic copolymer',
+  '羟基丙烯酸': 'Hydroxy acrylic polymer',
+  '羟基丙烯酸树脂': 'Hydroxy acrylic resin',
+  '水性羟基丙烯酸乳液': 'Waterborne hydroxy acrylic emulsion',
+  '水性羟基丙烯酸树脂': 'Waterborne hydroxy acrylic resin',
   '封闭型脂肪族聚异氰酸酯': 'Blocked aliphatic polyisocyanate',
   '亲水改性异氰酸酯': 'Hydrophilically modified polyisocyanate',
   '六甲撑二异氰酸酯基均聚物': 'Hexamethylene diisocyanate homopolymer',
@@ -113,7 +119,7 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '未测定': 'Not determined',
   '无意义': 'Not applicable',
   '无': 'None'
-});
+})
 
 // 运输标准术语英译
 export const TRANSPORT_TRANSLATION_MAP = Object.freeze({
@@ -126,67 +132,71 @@ export const TRANSPORT_TRANSLATION_MAP = Object.freeze({
   '非危险品海运方式。': 'Not classified as dangerous goods for sea transport (IMDG).',
   '非危险货物。': 'Not classified as dangerous goods.',
   '非危险品。': 'Not classified as dangerous goods.'
-});
+})
 
 /**
  * 翻译化学名称或短语至标准西文
  */
 export function translateChemicalTerm(term) {
-  if (!term || typeof term !== 'string') return '';
-  const trimmed = term.trim();
+  if (!term || typeof term !== 'string') return ''
+  const trimmed = term.trim()
   if (CHEMICAL_TRANSLATION_DICT[trimmed]) {
-    return CHEMICAL_TRANSLATION_DICT[trimmed];
+    return CHEMICAL_TRANSLATION_DICT[trimmed]
   }
   if (TRANSPORT_TRANSLATION_MAP[trimmed]) {
-    return TRANSPORT_TRANSLATION_MAP[trimmed];
+    return TRANSPORT_TRANSLATION_MAP[trimmed]
   }
 
   // 模式模糊匹配
-  if (/透明.*半透明/i.test(trimmed)) return 'Transparent to translucent liquid';
-  if (/初沸点以下无闪点/i.test(trimmed)) return 'No flash point below initial boiling point';
-  if (/可混溶/i.test(trimmed)) return 'Miscible';
+  if (/透明.*半透明/i.test(trimmed)) return 'Transparent to translucent liquid'
+  if (/初沸点以下无闪点/i.test(trimmed)) return 'No flash point below initial boiling point'
+  if (/可混溶/i.test(trimmed)) return 'Miscible'
   if (/(?:按\s*)?(\d+:\d+)(?:.*比例)?.*稀释/i.test(trimmed)) {
-    const mRatio = trimmed.match(/(\d+:\d+)/);
-    const numMatch = trimmed.match(/[\d.-]+/);
-    const numRange = numMatch ? numMatch[0] : '7-9';
-    const ratio = mRatio ? mRatio[1] : '1:10';
-    return `${numRange} (diluted with water at a ratio of ${ratio}).`;
+    const mRatio = trimmed.match(/(\d+:\d+)/)
+    const numMatch = trimmed.match(/[\d.-]+/)
+    const numRange = numMatch ? numMatch[0] : '7-9'
+    const ratio = mRatio ? mRatio[1] : '1:10'
+    return `${numRange} (diluted with water at a ratio of ${ratio}).`
   }
   if (/1%水溶液|1%.*溶液/i.test(trimmed)) {
-    const numMatch = trimmed.match(/[\d.-]+/);
-    const numRange = numMatch ? numMatch[0] : '7-9';
-    return `${numRange} (1% aqueous solution).`;
+    const numMatch = trimmed.match(/[\d.-]+/)
+    const numRange = numMatch ? numMatch[0] : '7-9'
+    return `${numRange} (1% aqueous solution).`
   }
-  if (/上述数据非产品指标/i.test(trimmed)) return 'The above data are not product specifications. For specifications, please refer to the technical data sheet.';
-  if (/羟基聚氨酯/i.test(trimmed)) return 'Hydroxy polyurethane dispersion';
-  if (/微黄.*半透明/i.test(trimmed)) return 'Light yellow, semi-transparent liquid';
-  if (/微黄.*透明/i.test(trimmed)) return 'Light yellow transparent liquid';
-  if (/丙烯酸.*共聚物/i.test(trimmed)) return 'Waterborne acrylic copolymer emulsion';
-  if (/噁唑啉.*丙烯酸/i.test(trimmed)) return 'Oxazoline-modified acrylic polymer';
-  if (/水性.*噁唑啉/i.test(trimmed)) return 'Oxazoline-modified polymer aqueous dispersion';
-  if (/环氧.*丙烯酸/i.test(trimmed)) return 'Epoxy modified acrylic polymer';
-  if (/丙烯酸树脂/i.test(trimmed)) return 'Acrylic resin';
-  if (/丙烯酸乳液/i.test(trimmed)) return 'Acrylic emulsion';
-  if (/二甲基乙酰胺/i.test(trimmed)) return 'N,N-Dimethylacetamide (DMAC)';
-  if (/甲基吡咯烷酮/i.test(trimmed)) return 'N-Methyl-2-pyrrolidone (NMP)';
-  if (/乙基吡咯烷酮/i.test(trimmed)) return '1-Ethylpyrrolidin-2-one (NEP)';
-  if (/水$/i.test(trimmed)) return 'Water';
-  if (/去离子水/i.test(trimmed)) return 'Deionized water';
-  if (/商业机密|商业秘密/i.test(trimmed)) return 'Trade secret';
-  if (/完全混溶/i.test(trimmed)) return 'Completely miscible';
-  if (/非危险品.*ADG/i.test(trimmed)) return 'Not classified as dangerous goods for land transport.';
-  if (/非危险品.*IATA/i.test(trimmed)) return 'Not classified as dangerous goods for air transport (IATA).';
-  if (/非危险品.*IMDG/i.test(trimmed)) return 'Not classified as dangerous goods for sea transport (IMDG).';
-  if (/非危险(品|货物)/i.test(trimmed)) return 'Not classified as dangerous goods.';
+  if (/上述数据非产品指标/i.test(trimmed)) return 'The above data are not product specifications. For specifications, please refer to the technical data sheet.'
+  if (/羟基聚氨酯/i.test(trimmed)) return 'Hydroxy polyurethane dispersion'
+  if (/微黄.*半透明/i.test(trimmed)) return 'Light yellow, semi-transparent liquid'
+  if (/微黄.*透明/i.test(trimmed)) return 'Light yellow transparent liquid'
+  if (/水性.*羟基.*丙烯酸/i.test(trimmed)) return 'Waterborne hydroxy acrylic emulsion'
+  if (/羟基.*丙烯酸/i.test(trimmed)) return 'Hydroxy acrylic polymer'
+  if (/水性.*丙烯酸.*聚合物/i.test(trimmed)) return 'Waterborne acrylic polymer'
+  if (/丙烯酸.*聚合物/i.test(trimmed)) return 'Acrylic polymer'
+  if (/丙烯酸.*共聚物/i.test(trimmed)) return 'Waterborne acrylic copolymer emulsion'
+  if (/噁唑啉.*丙烯酸/i.test(trimmed)) return 'Oxazoline-modified acrylic polymer'
+  if (/水性.*噁唑啉/i.test(trimmed)) return 'Oxazoline-modified polymer aqueous dispersion'
+  if (/环氧.*丙烯酸/i.test(trimmed)) return 'Epoxy modified acrylic polymer'
+  if (/丙烯酸树脂/i.test(trimmed)) return 'Acrylic resin'
+  if (/丙烯酸乳液/i.test(trimmed)) return 'Acrylic emulsion'
+  if (/二甲基乙酰胺/i.test(trimmed)) return 'N,N-Dimethylacetamide (DMAC)'
+  if (/甲基吡咯烷酮/i.test(trimmed)) return 'N-Methyl-2-pyrrolidone (NMP)'
+  if (/乙基吡咯烷酮/i.test(trimmed)) return '1-Ethylpyrrolidin-2-one (NEP)'
+  if (/水$/i.test(trimmed)) return 'Water'
+  if (/去离子水/i.test(trimmed)) return 'Deionized water'
+  if (/商业机密|商业秘密/i.test(trimmed)) return 'Trade secret'
+  if (/完全混溶/i.test(trimmed)) return 'Completely miscible'
+  if (/非危险品.*ADG/i.test(trimmed)) return 'Not classified as dangerous goods for land transport.'
+  if (/非危险品.*IATA/i.test(trimmed)) return 'Not classified as dangerous goods for air transport (IATA).'
+  if (/非危险品.*IMDG/i.test(trimmed)) return 'Not classified as dangerous goods for sea transport (IMDG).'
+  if (/非危险(品|货物)/i.test(trimmed)) return 'Not classified as dangerous goods.'
 
-  return trimmed;
+  return trimmed
 }
 
 /**
  * 规范化摄氏度符号与标点
  */
 export function sanitizeDegreeAndPunctuation(text) {
-  if (!text || typeof text !== 'string') return text;
+  if (!text || typeof text !== 'string') return text
   return text
     // 治理缺失度数符号的 100 C / 100C 为 100 °C
     .replace(/(\d+)\s*C\b/g, '$1 °C')
@@ -196,7 +206,7 @@ export function sanitizeDegreeAndPunctuation(text) {
     .replace(/:\s*$/, '')
     // 治理多余连续空格
     .replace(/[ \t]{2,}/g, ' ')
-    .trim();
+    .trim()
 }
 
 /**
@@ -208,19 +218,19 @@ export function sanitizeDegreeAndPunctuation(text) {
  */
 export function governContext(context1, overrides = {}) {
   if (!context1 || typeof context1 !== 'object') {
-    throw new Error('[GOVERNOR FATAL] 输入的 Context1 为空或非法！');
+    throw new Error('[GOVERNOR FATAL] 输入的 Context1 为空或非法！')
   }
 
   // 1. 深度克隆原始事实，保障不可变性
-  const raw = JSON.parse(JSON.stringify(context1));
-  const modelCode = (overrides.modelCode || raw.modelCode || 'UNKNOWN').toUpperCase();
+  const raw = JSON.parse(JSON.stringify(context1))
+  const modelCode = (overrides.modelCode || raw.modelCode || 'UNKNOWN').toUpperCase()
 
   // 2. GHS 非危品判定与防外生虚增契约 (INV-ZERO-EXOGENOUS)
-  const sec2Raw = raw.sections?.['2'] || raw.sections?.[2] || '';
-  const sec2Text = typeof sec2Raw === 'string' ? sec2Raw : JSON.stringify(sec2Raw);
+  const sec2Raw = raw.sections?.['2'] || raw.sections?.[2] || ''
+  const sec2Text = typeof sec2Raw === 'string' ? sec2Raw : JSON.stringify(sec2Raw)
   const isNonHazardous = !raw.ghs?.isHazardous ||
     /不属于危险品|非危险品|不属于危害|未分类为危险|Not classified as hazardous/i.test(sec2Text) ||
-    Boolean(raw.isNonHazardousComposite);
+    Boolean(raw.isNonHazardousComposite)
 
   // 3. 构建中文分支 (context2.cn)
   const cn = {
@@ -282,30 +292,30 @@ export function governContext(context1, overrides = {}) {
       generalStatement: '非危险货物。'
     },
     sections: raw.sections || {}
-  };
+  }
 
   // 4. 构建英文分支 (context2.en) - 高保真地道专业英译
   const enComponents = cn.components.map(comp => {
-    let enName = translateChemicalTerm(comp.name);
-    let enCas = comp.cas;
+    let enName = translateChemicalTerm(comp.name)
+    let enCas = comp.cas
     if (/商业机密|商业秘密|保密/i.test(comp.cas)) {
-      enCas = 'Trade secret';
+      enCas = 'Trade secret'
     }
     return {
       name: enName,
       cas: enCas,
       conc: comp.conc
-    };
-  });
+    }
+  })
 
   const enPhysicalProperties = cn.physicalProperties.map(prop => {
     return {
       label: prop.label,
       value: translateChemicalTerm(prop.value)
-    };
-  });
+    }
+  })
 
-  const enProductName = raw.productNameEn || (raw.productName ? translateChemicalTerm(raw.productName) : null) || modelCode;
+  const enProductName = raw.productNameEn || (raw.productName ? translateChemicalTerm(raw.productName) : null) || modelCode
 
   const en = {
     modelCode,
@@ -351,14 +361,14 @@ export function governContext(context1, overrides = {}) {
       generalStatement: 'Not classified as dangerous goods.'
     },
     sections: raw.sections || {}
-  };
+  }
 
   // 5. 应用外层显式覆盖项
   if (overrides.cn && typeof overrides.cn === 'object') {
-    Object.assign(cn, overrides.cn);
+    Object.assign(cn, overrides.cn)
   }
   if (overrides.en && typeof overrides.en === 'object') {
-    Object.assign(en, overrides.en);
+    Object.assign(en, overrides.en)
   }
 
   return {
@@ -369,7 +379,7 @@ export function governContext(context1, overrides = {}) {
     en,
     componentsEn: enComponents,
     physicalPropertiesEn: enPhysicalProperties
-  };
+  }
 }
 
 /**
@@ -387,46 +397,46 @@ export function governContext(context1, overrides = {}) {
  */
 export function refineContext2WithSpecifications(blueprint, options = {}) {
   if (!blueprint || !blueprint.sections) {
-    throw new Error('【规范打磨拦截】传入的匹配引擎蓝图无效，缺少 sections 拓扑结构！');
+    throw new Error('【规范打磨拦截】传入的匹配引擎蓝图无效，缺少 sections 拓扑结构！')
   }
 
-  const modelCode = blueprint.modelCode || 'UNKNOWN_MODEL';
-  const variant = blueprint.variant || 'CN';
-  const isEnglish = String(variant).toUpperCase() === 'EN';
-  const isNonHazardous = Boolean(blueprint.isNonHazardous);
+  const modelCode = blueprint.modelCode || 'UNKNOWN_MODEL'
+  const variant = blueprint.variant || 'CN'
+  const isEnglish = String(variant).toUpperCase() === 'EN'
+  const isNonHazardous = Boolean(blueprint.isNonHazardous)
 
-  const refinedSections = [];
-  const allEditorOps = [];
+  const refinedSections = []
+  const allEditorOps = []
 
   for (const sec of blueprint.sections) {
-    const sNum = sec.sectionNumber;
-    const refinedSlots = [];
-    const secOps = [];
+    const sNum = sec.sectionNumber
+    const refinedSlots = []
+    const secOps = []
 
     // 法定第一步: 每个章节必须先清空值格 (INV-PRE-CLEAR)
     secOps.push({
       op: 'clearSectionValues',
       sectionNumber: sNum
-    });
+    })
 
     for (const slot of sec.slots) {
-      let label = (slot.label || '').trim();
-      let val = (slot.value || '').trim();
+      let label = (slot.label || '').trim()
+      let val = (slot.value || '').trim()
 
       // 全局治理 1: 度数符号西文化与标点纠偏
-      val = sanitizeDegreeAndPunctuation(val);
+      val = sanitizeDegreeAndPunctuation(val)
 
       // 全局治理 2: 无水产品防串流 (INV-PRODUCER-ISOLATION)
       if (isEnglish && /无水|非水|无溶剂/.test(modelCode) && /epoxy/i.test(val)) {
         val = val.replace(/waterborne\s*epoxy/i, 'Anhydrous epoxy')
-                 .replace(/epoxy\s*dispersion/i, 'Anhydrous epoxy resin');
+                 .replace(/epoxy\s*dispersion/i, 'Anhydrous epoxy resin')
       }
 
       // 全局治理 3: 英文分支标签与数值专业翻译
       if (isEnglish) {
-        label = translateChemicalTerm(label);
+        label = translateChemicalTerm(label)
         if (slot.semanticType === 'CHILD_LABEL' || slot.semanticType === 'VALUE') {
-          val = translateChemicalTerm(val);
+          val = translateChemicalTerm(val)
         }
       }
 
@@ -434,7 +444,7 @@ export function refineContext2WithSpecifications(blueprint, options = {}) {
       if (isNonHazardous && sNum === 2) {
         if (/象形图|pictogram|信号词|signal\s*word/i.test(label) || /象形图|信号词/i.test(slot.slotKey)) {
           // 彻底跳过象形图与信号词虚增项
-          continue;
+          continue
         }
       }
 
@@ -442,7 +452,7 @@ export function refineContext2WithSpecifications(blueprint, options = {}) {
         ...slot,
         label,
         value: val
-      });
+      })
     }
 
     // 局部规范装配: 针对特定章节生成万能编辑器原语意图
@@ -450,17 +460,17 @@ export function refineContext2WithSpecifications(blueprint, options = {}) {
       // 组分行克隆与写入原语
       refinedSlots.forEach((slot, idx) => {
         if (slot.slotKey.startsWith('3.2_component_')) {
-          const compIdx = parseInt(slot.slotKey.split('_').pop(), 10) - 1;
+          const compIdx = parseInt(slot.slotKey.split('_').pop(), 10) - 1
           if (compIdx >= 2) {
             secOps.push({
               op: 'insertRow',
               sectionNumber: 3,
               targetRowIndex: compIdx + 1,
               cloneFromRowIndex: 1
-            });
+            })
           }
         }
-      });
+      })
     } else if (sNum === 9) {
       // Section 9 冒号垂直对齐原语
       secOps.push({
@@ -468,36 +478,36 @@ export function refineContext2WithSpecifications(blueprint, options = {}) {
         sectionNumber: 9,
         rowIndex: 0,
         cellIndex: 1
-      });
+      })
     }
 
     refinedSections.push({
       ...sec,
       slots: refinedSlots,
       editorIntents: secOps
-    });
+    })
 
-    allEditorOps.push(...secOps);
+    allEditorOps.push(...secOps)
   }
 
   // 构造标准 Context 2 Markdown 事实表现层
-  let mdOutput = `# Context 2 数据资产与编辑器写入意图清单: ${modelCode} (${variant})\n\n`;
-  mdOutput += `> **生成机制**: 匹配引擎拓扑映射 + Agent 全局/局部规范二次打磨 (Ps-openspec)\n`;
-  mdOutput += `> **产品型号**: ${modelCode} | **语言版本**: ${variant} | **GHS属性**: ${isNonHazardous ? '非危险化学品 (未分类)' : '危险化学品'}\n`;
-  mdOutput += `> **生成时间**: ${new Date().toISOString()}\n\n`;
-  mdOutput += `---\n\n`;
+  let mdOutput = `# Context 2 数据资产与编辑器写入意图清单: ${modelCode} (${variant})\n\n`
+  mdOutput += `> **生成机制**: 匹配引擎拓扑映射 + Agent 全局/局部规范二次打磨 (Ps-openspec)\n`
+  mdOutput += `> **产品型号**: ${modelCode} | **语言版本**: ${variant} | **GHS属性**: ${isNonHazardous ? '非危险化学品 (未分类)' : '危险化学品'}\n`
+  mdOutput += `> **生成时间**: ${new Date().toISOString()}\n\n`
+  mdOutput += `---\n\n`
 
   refinedSections.forEach(sec => {
-    mdOutput += `### ${sec.sectionName} (排版网格: ${sec.layoutType})\n\n`;
-    mdOutput += `| 槽位编号 (SlotKey) | 字段标签 (Label) | 事实数值 (Value) | 语义角色 | 事实溯源 |\n`;
-    mdOutput += `| :--- | :--- | :--- | :--- | :--- |\n`;
+    mdOutput += `### ${sec.sectionName} (排版网格: ${sec.layoutType})\n\n`
+    mdOutput += `| 槽位编号 (SlotKey) | 字段标签 (Label) | 事实数值 (Value) | 语义角色 | 事实溯源 |\n`
+    mdOutput += `| :--- | :--- | :--- | :--- | :--- |\n`
     sec.slots.forEach(slot => {
-      const safeVal = String(slot.value || '').replace(/\|/g, '\\|');
-      const safeLabel = String(slot.label || '').replace(/\|/g, '\\|');
-      mdOutput += `| \`${slot.slotKey}\` | ${safeLabel} | ${safeVal} | \`${slot.semanticType}\` | \`${slot.sourceOrigin}\` |\n`;
-    });
-    mdOutput += `\n`;
-  });
+      const safeVal = String(slot.value || '').replace(/\|/g, '\\|')
+      const safeLabel = String(slot.label || '').replace(/\|/g, '\\|')
+      mdOutput += `| \`${slot.slotKey}\` | ${safeLabel} | ${safeVal} | \`${slot.semanticType}\` | \`${slot.sourceOrigin}\` |\n`
+    })
+    mdOutput += `\n`
+  })
 
   return {
     modelCode,
@@ -508,5 +518,5 @@ export function refineContext2WithSpecifications(blueprint, options = {}) {
     sections: refinedSections,
     editorOps: allEditorOps,
     markdown: mdOutput
-  };
+  }
 }

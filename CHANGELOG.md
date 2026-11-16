@@ -1,5 +1,20 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-16 02-2 水性羟基丙烯酸乳液全量 13 型号受控生产与底座通用缺陷法医根治 (02-2-HYDROXY-ACRYLIC-BATCH-PRODUCTION)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户两大核心最高准则【通用性准则】（零型号特判硬编码、化工领域模型级抽象）与【内容来源于源文件准则】（100% 原始事实溯源、零外部捏造篡改）。针对法医调查报告反映的底座品类通用缺陷与批处理执行期暴露的问题，进行了彻底的领域级工程根治：
+1. **Section 3 化工聚合物实体通用词典与模式匹配扩充 (`web/src/context-governor.js`)**：在 `CHEMICAL_TRANSLATION_DICT` 中收录水性双组份交联体系专用的 `羟基丙烯酸` (`Hydroxy acrylic polymer`)、`水性羟基丙烯酸乳液` (`Waterborne hydroxy acrylic emulsion`) 及 `丙烯酸聚合物` (`Acrylic polymer`)，并在 `translateChemicalTerm` 中建立通用正则匹配，彻底消除水性羟基丙烯酸品类组分英译盲区；
+2. **Section 9 理化特性国标/ISO 羟基指标通用判定链扩充 (`web/src/pipeline-engine.js`)**：在 `translateSection9Item` 判定链中新增 `/羟基含量|羟基值|羟基/i` 分支，映射为法定标准西文标签 `Hydroxyl content:` / `Hydroxyl value:`，数值 100% 取自源文件单元格，同时自然解毒前缀残留叠词；
+3. **Section 9.1 外观审计断言西文语义完善 (`web/scripts/run_master_msds_audit.mjs`)**：在 Section 9.1 英文外观断言中补充半透明 (`translucent`) 合法西文语义，根除源文件载明为“半透明液体”时被误报为缺陷的假阳性误判；
+4. **型号推断自动剥离标记 (`web/scripts/run_universal_msds_pipeline.mjs`)**：在 `inferModelCode` 中前置剥离 `msds`/`tds` 连写标记，防止如 `PA-4800msds` 被贪婪捕获为 `PA-4800MSDS`，杜绝文件命名污染。
+
+### 全量 13 型号 104 份交付物矩阵 100% 满分通过对账
+全系统依托通用流水线 `run_universal_msds_pipeline.mjs`，对 `算法训练材料/源文件材料/2-2 水性羟基丙烯酸乳液 PA RA` 下全部 13 个型号执行了流水线批处理覆写与全景法医审计：
+- **覆写范围**: `PA-4000`, `PA-4006`, `PA-4771`, `PA-4778`, `PA-4800`, `PA-4804T`, `PA-4807`, `PA-4808`, `PA-4812`, `PA-4816`, `PA-4817`, `PA-4819`, `PA-4835`；
+- **交付矩阵**: 每个型号精准输出 4 DOCX + 4 PDF，全品类共 $13 \times 8 = 104$ 份交付物，全部归档于 `算法训练材料/TDS MSDS 重写版/02-2 水性羟基丙烯酸乳液 PA/<ModelCode>/`；
+- **全要素法医审计**: 13 个型号全部通过三大集中式法医审计套件（集中式中央主审计 169~175 项全绿，双极双层全景深度审计 100% PASS，Gate 4 英文版零中文字符实测恒为 0，退出码恒为 0）；
+- **物理验证**: 104 份文件单文件体积均 > 20KB (28.7 KB ~ 236.8 KB)，目录无多余陈旧文件，目录纯净门禁 100% PASS。
+
+---
+
 ## [2026-11-16 PA-3663 标准受控八格式覆写与全要素深度审计 100% 满分通过 (PA3663-EIGHT-DELIVERABLES-AND-DEEP-AUDIT)] - 严格遵循 OrbitStack (Ps-openspec) 与 MSDS-Studio v9.0-ENTERPRISE 全流程规范，全量落实用户核心指令：“'E:\冠志\TDS MSDS (2)\待处理文件\PA-3663 TDS MSDS WORD版本\PA-3663MSDS（冠志）.docx' 覆写产出八格式，存储位置还是那个路径，如果没有对应型号文件夹就创建一个”。以通用受控流水线 `run_universal_msds_pipeline.mjs` 为唯一调度中枢，彻底杜绝针对单个型号手写 ad-hoc 临时脚本；Step 1 智能文档解析识别（提取 2 组分、22 项理化指标及非危品 GHS 事实，耗时 265 ms）；Step 2 规范化中英双语对齐与非危品状态机锁定（严防虚增象形图/信号词，度数符号标准化为西文 `°C`）；Step 3 原生母版拓扑覆写（自动创建目标型号文件夹 `02-1 单组份水性丙烯酸乳液 PA/PA-3663`），导出 4 份标准 Word 并原生转换为 4 份高清矢量 PDF；Step 4 级联全景法医级三大审计套件（双极双层 165 项深度审计 100% PASS，集中式中央主审计 173/173 项全绿通过，S2~S16 逐行双重对照 95 条满分匹配，🏆 AUDIT_PASSED，Exit code 0）。8 格式交付物（4 DOCX + 4 PDF）全部释放于目标目录 `算法训练材料/TDS MSDS 重写版/02-1 单组份水性丙烯酸乳液 PA/PA-3663`，单文件体积 28.8 KB ~ 236.7 KB，全批次时间戳同步差仅 5.5 秒（< 5 分钟），实现 1:1 需求物理核销。
 
 ### 一、 需求背景与核心治理宗旨

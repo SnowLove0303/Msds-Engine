@@ -1242,10 +1242,10 @@ export async function runMasterMsdsAudit(options = {}) {
         'Section 9.1 EN'
       );
       assert(
-        /light yellow|transparent|yellowish/i.test(enS9Row0),
+        /light yellow|transparent|translucent|yellowish/i.test(enS9Row0),
         '环3',
         'Section 9.1 英文外观准确性',
-        '源文档载明为微黄/透明时，英文交付物必须准确反映 Light yellow / transparent',
+        '源文档载明为微黄/透明/半透明时，英文交付物必须准确反映 Light yellow / transparent / translucent',
         enS9Row0,
         'Section 9.1 EN'
       );
