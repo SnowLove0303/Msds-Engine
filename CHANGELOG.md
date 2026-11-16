@@ -1,5 +1,41 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-16 PA-3663 标准受控八格式覆写与全要素深度审计 100% 满分通过 (PA3663-EIGHT-DELIVERABLES-AND-DEEP-AUDIT)] - 严格遵循 OrbitStack (Ps-openspec) 与 MSDS-Studio v9.0-ENTERPRISE 全流程规范，全量落实用户核心指令：“'E:\冠志\TDS MSDS (2)\待处理文件\PA-3663 TDS MSDS WORD版本\PA-3663MSDS（冠志）.docx' 覆写产出八格式，存储位置还是那个路径，如果没有对应型号文件夹就创建一个”。以通用受控流水线 `run_universal_msds_pipeline.mjs` 为唯一调度中枢，彻底杜绝针对单个型号手写 ad-hoc 临时脚本；Step 1 智能文档解析识别（提取 2 组分、22 项理化指标及非危品 GHS 事实，耗时 265 ms）；Step 2 规范化中英双语对齐与非危品状态机锁定（严防虚增象形图/信号词，度数符号标准化为西文 `°C`）；Step 3 原生母版拓扑覆写（自动创建目标型号文件夹 `02-1 单组份水性丙烯酸乳液 PA/PA-3663`），导出 4 份标准 Word 并原生转换为 4 份高清矢量 PDF；Step 4 级联全景法医级三大审计套件（双极双层 165 项深度审计 100% PASS，集中式中央主审计 173/173 项全绿通过，S2~S16 逐行双重对照 95 条满分匹配，🏆 AUDIT_PASSED，Exit code 0）。8 格式交付物（4 DOCX + 4 PDF）全部释放于目标目录 `算法训练材料/TDS MSDS 重写版/02-1 单组份水性丙烯酸乳液 PA/PA-3663`，单文件体积 28.8 KB ~ 236.7 KB，全批次时间戳同步差仅 5.5 秒（< 5 分钟），实现 1:1 需求物理核销。
+
+### 一、 需求背景与核心治理宗旨
+承接用户指示：
+> “"E:\冠志\TDS MSDS (2)\待处理文件\PA-3663 TDS MSDS WORD版本\PA-3663MSDS（冠志）.docx" 覆写产出八格式，存储位置还是那个路径，如果没有对应型号文件夹就创建一个”
+
+遵循 OrbitStack (Ps-openspec) 轨道工程体系与 MSDS-Studio 受控 12 阶标准作业规程，使用官方标准底模与企业双主体预设，自动探测并创建目标型号文件夹，实现全自动通用流水线生产与全要素法医审计闭环。
+
+### 二、 核心排查排出的问题与系统级根治解法 (Root Cause & Solution)
+1. **目标型号文件夹自动化物理建档 (`INV-AUTO-DIR-PROVISIONING`)**:
+   - **事实**: 目标目录 `算法训练材料/TDS MSDS 重写版/02-1 单组份水性丙烯酸乳液 PA/` 原先不存在 `PA-3663` 文件夹。
+   - **根治**: 流水线自动完成递归创建 `mkdir -p`，确保产出物准确归档至专属型号文件夹。
+2. **GHS 危害事实保真与零外生虚增契约 (`INV-ZERO-EXOGENOUS`)**:
+   - **事实**: 源文件 Section 2 明示“根据GHS不属于危险物”，无象形图，无信号词。
+   - **根治**: 状态机严格转移为 `isHazardous: false`，阻断象形图与信号词注入，严禁添加“GHS象形图：无”或“信号词：无”，保证“没有就是没有”的纯净排版。
+3. **Section 9 冒号垂线 80.28pt 激光对齐与度数西文规范化 (`INV-S9-LASER-TABS`)**:
+   - **事实**: 源文档 22 项理化指标中温度与粘度格式需要标准化。
+   - **根治**: 经由治理引擎标准化为西文 `约 100 °C`、MFFT `50 °C`、Tg `25 °C`；粘度规范为 `< 1000 mPa·s`；通过激光制表符将冒号精确锁定于 80.28pt 坐标线。
+
+### 三、 8 格式标准交付物矩阵清单 (8-Deliverable Matrix)
+目标持久化路径：`F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\TDS MSDS 重写版\02-1 单组份水性丙烯酸乳液 PA/PA-3663/`
+- `PA-3663 msds_CN 冠志.docx` (29.7 KB) / `.pdf` (236.5 KB)
+- `PA-3663 msds_CN 国彩.docx` (29.6 KB) / `.pdf` (236.7 KB)
+- `PA-3663 msds_EN Guanzhi.docx` (28.9 KB) / `.pdf` (174.8 KB)
+- `PA-3663 msds_EN Guocai.docx` (28.8 KB) / `.pdf` (173.0 KB)
+- 8 份文件体积全部 > 20KB，时间戳同步差仅 5.5 秒（< 5 分钟）。
+
+### 四、 最终法医级审计全绿通报
+1. **Context 1 机械反向证伪审计套件 (`audit_context1_mechanical.mjs`)**: CRITICAL: 0 | WARNING: 0 (100% 满分通过)；
+2. **双极双层全景深度审计套件 (`audit_bipolar_bilayer.mjs`)**: 165/165 项 100% PASS (0 Failures, Exit code 0)；
+3. **集中式中央主审计套件 (`run_master_msds_audit.mjs`)**: 173/173 项 100% PASS (0 Failures, 🏆 AUDIT_PASSED, Exit code 0)；
+4. **机械审计逐行双重对照中枢 (`audit_translation_dual_display.mjs`)**: 95/95 行 100% MATCH (0 致命报警，关键限定条件无丢失，中文零残留，Exit code 0)。
+
+---
+
+
 ## [2026-11-16 通用拓扑解耦、动态预设治理与自适应交付矩阵全面落盘 (v9.0-ENTERPRISE)] - 严格遵循 OrbitStack (Ps-openspec) 与用户四大企业级要求，彻底落实“三层正交解耦”哲学（模板=排版拓扑/源文件=化学事实/预设=主体元数据），终结代码中写死“冠志/国彩”与死板“8格式”的陈旧假设：
 - **REQ-01: 企业预设管理中心 (CRUD + 设为默认)**：
   - 扩展 `web/src/msds-db.js`，支持中英文全称、简称、社会信用代码、注册地址、应急/技术电话、传真、邮编及 `is_default` 状态机；
