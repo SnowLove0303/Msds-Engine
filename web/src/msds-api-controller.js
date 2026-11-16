@@ -20,6 +20,8 @@ import {
   serializeMatchResult,
   listPresets,
   getPresetById,
+  getDefaultPreset,
+  setDefaultPreset,
   savePreset,
   deletePreset,
 } from './msds-db.js';
@@ -598,6 +600,31 @@ export async function handleApiRequest(req, res) {
       return true;
     }
 
+    // 0.5.1b GET /api/msds/presets/default - 获取当前默认企业预设
+    if (pathname === '/api/msds/presets/default' && req.method === 'GET') {
+      const lang = searchParams.get('language') || searchParams.get('lang') || 'CN';
+      const def = getDefaultPreset(lang);
+      if (!def) {
+        sendJson(res, 404, { success: false, error: { message: `未找到语言为 ${lang} 的默认预设` } });
+        return true;
+      }
+      sendJson(res, 200, { success: true, data: def });
+      return true;
+    }
+
+    // 0.5.1c POST /api/msds/presets/:id/default - 将指定预设设为默认
+    const presetDefaultMatch = pathname.match(/^\/api\/msds\/presets\/([^\/]+)\/(?:set-)?default$/);
+    if (presetDefaultMatch && req.method === 'POST') {
+      const presetId = decodeURIComponent(presetDefaultMatch[1]);
+      try {
+        const updated = setDefaultPreset(presetId);
+        sendJson(res, 200, { success: true, data: updated, message: `预设【${updated.name}】已成功设为系统默认` });
+      } catch (err) {
+        sendJson(res, 400, { success: false, error: { message: err.message } });
+      }
+      return true;
+    }
+
     // 0.5.2 GET /api/msds/presets/:id - 获取指定预设详情
     const presetDetailMatch = pathname.match(/^\/api\/msds\/presets\/([^\/]+)$/);
     if (presetDetailMatch && req.method === 'GET') {
@@ -693,6 +720,101 @@ export async function handleApiRequest(req, res) {
         presetName: presetObj.name,
         appliedFieldsCount: appliedCount,
         message: `预设【${presetObj.name}】已成功覆盖应用`,
+      });
+      return true;
+    }
+
+    // ==========================================
+    // 0.5.7 模板中心与 16 章节拓扑自省 API (Templates & Topology Discovery)
+    // ==========================================
+
+    // GET /api/msds/templates - 获取全量模板列表及基础元数据
+    if (pathname === '/api/msds/templates' && req.method === 'GET') {
+      const tpls = [
+        { key: 'CN_Guanzhi', name: '正式模板_MSDS_CN_通用', language: 'zh', path: path.join(TEMPLATES_DIR, '正式模板_MSDS_CN_冠志(1).docx'), isDefault: true },
+        { key: 'EN_Guanzhi', name: '正式模板_MSDS_EN_通用', language: 'en', path: path.join(TEMPLATES_DIR, '正式模板_MSDS_EN_冠志(1).docx'), isDefault: true }
+      ];
+      const customDir = path.join(TEMPLATES_DIR, 'custom');
+      if (fsSync.existsSync(customDir)) {
+        const files = fsSync.readdirSync(customDir).filter((f) => f.endsWith('.docx'));
+        for (const f of files) {
+          tpls.push({
+            key: `custom_${f}`,
+            name: f,
+            language: /en|english/i.test(f) ? 'en' : 'zh',
+            path: path.join(customDir, f),
+            isCustom: true
+          });
+        }
+      }
+      sendJson(res, 200, { success: true, total: tpls.length, data: tpls });
+      return true;
+    }
+
+    // POST /api/msds/templates/inspect - 16 章节网格拓扑自省
+    if (pathname === '/api/msds/templates/inspect' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      let docxBuf = null;
+      let tplKey = body.templateKey || 'CUSTOM_TEMPLATE';
+
+      if (body.contentBase64) {
+        docxBuf = Buffer.from(body.contentBase64, 'base64');
+      } else if (body.templatePath) {
+        if (!fsSync.existsSync(body.templatePath)) {
+          sendJson(res, 404, { success: false, error: { message: `模板文件不存在: ${body.templatePath}` } });
+          return true;
+        }
+        docxBuf = fsSync.readFileSync(body.templatePath);
+        tplKey = path.basename(body.templatePath, '.docx');
+      } else if (body.templateKey) {
+        const isEn = body.templateKey.toLowerCase().includes('en');
+        const tplPath = isEn
+          ? path.join(TEMPLATES_DIR, '正式模板_MSDS_EN_冠志(1).docx')
+          : path.join(TEMPLATES_DIR, '正式模板_MSDS_CN_冠志(1).docx');
+        docxBuf = fsSync.readFileSync(tplPath);
+        tplKey = body.templateKey;
+      } else {
+        sendJson(res, 400, { success: false, error: { message: '请提供 contentBase64, templatePath 或 templateKey' } });
+        return true;
+      }
+
+      const { recognizeTemplateTopology } = await import('./template-topology-recognizer.js');
+      const topology = await recognizeTemplateTopology(docxBuf, { templateKey: tplKey });
+
+      sendJson(res, 200, {
+        success: true,
+        templateKey: tplKey,
+        sectionsCount: topology.sectionsCount,
+        topology
+      });
+      return true;
+    }
+
+    // POST /api/msds/templates/upload - 上传并注册新自定义模板
+    if (pathname === '/api/msds/templates/upload' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      if (!body.contentBase64 || !body.fileName) {
+        sendJson(res, 400, { success: false, error: { message: '请提供 contentBase64 与 fileName' } });
+        return true;
+      }
+      const docxBuf = Buffer.from(body.contentBase64, 'base64');
+      const customDir = path.join(TEMPLATES_DIR, 'custom');
+      if (!fsSync.existsSync(customDir)) fsSync.mkdirSync(customDir, { recursive: true });
+
+      const cleanFileName = body.fileName.replace(/[\\/:*?"<>|]/g, '_');
+      const targetPath = path.join(customDir, cleanFileName);
+      fsSync.writeFileSync(targetPath, docxBuf);
+
+      const { recognizeTemplateTopology } = await import('./template-topology-recognizer.js');
+      const topology = await recognizeTemplateTopology(docxBuf, { templateKey: cleanFileName });
+
+      sendJson(res, 200, {
+        success: true,
+        fileName: cleanFileName,
+        savedPath: targetPath,
+        sectionsCount: topology.sectionsCount,
+        topology,
+        message: '新模板上传并拓扑解析成功'
       });
       return true;
     }

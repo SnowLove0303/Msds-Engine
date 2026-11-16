@@ -86,7 +86,18 @@ function initTables(db) {
     // column already exists
   }
   try {
+    db.exec("ALTER TABLE presets ADD COLUMN entity_json TEXT DEFAULT '{}';");
+  } catch {
+    // column already exists
+  }
+  try {
+    db.exec("ALTER TABLE presets ADD COLUMN is_default INTEGER DEFAULT 0;");
+  } catch {
+    // column already exists
+  }
+  try {
     db.exec("CREATE INDEX IF NOT EXISTS idx_presets_baseline_id ON presets(baseline_id);");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_presets_is_default ON presets(is_default);");
     db.exec("UPDATE presets SET baseline_id = 'baseline_en_guanzhi' WHERE id IN ('preset_guocai_en', 'preset_guanzhi_en') OR language = 'EN';");
   } catch {
     // ignore
@@ -425,41 +436,203 @@ export function getRepoStats() {
 // 预设库持久化管理 (Presets Database Management)
 // ============================================================
 
+export const BUILTIN_COMPANY_PRESETS = [
+  {
+    id: 'preset_guanzhi_cn',
+    name: '广州冠志（中文官方标准）',
+    baselineId: 'baseline_cn_guanzhi',
+    entity: '冠志',
+    language: 'CN',
+    targetTemplate: 'CN 冠志',
+    isBuiltin: true,
+    isDefault: true,
+    enabledForExport: true,
+    entityData: {
+      name_zh: '广州冠志新材料科技有限公司',
+      name_en: 'Guangzhou Guanzhi New Material Technology Co., Ltd.',
+      shortName_zh: '冠志',
+      shortName_en: 'Guanzhi',
+      creditCode: '91440101MA59XXXXXX',
+      address_zh: '广州市萝岗区科学城掬泉路3号广州国际企业孵化器A区1106室',
+      address_en: 'Room 1106, Area A, Guangzhou International Enterprise Incubator, No. 3 Juquan Road, Science City, Luogang District, Guangzhou',
+      tel: '86-20-82567990',
+      fax: '86-20-32214789',
+      emergencyTel_zh: '86-20-82567990 (24小时应急咨询)',
+      emergencyTel_en: '86-20-82567990 (24h Emergency Contact)'
+    },
+    headerFooterOverrides: {
+      company: '广州冠志新材料科技有限公司',
+      title: '化学品安全技术说明书',
+      version: 'V1.0',
+      customFileNamePattern: '{model} msds_CN 冠志.docx',
+    },
+    fieldOverrides: {
+      supplier_name: '广州冠志新材料科技有限公司',
+      supplier_address: '广州市萝岗区科学城掬泉路3号广州国际企业孵化器A区1106室',
+      emergency_phone: '86-20-82567990',
+      phone: '86-20-82567990',
+      fax: '86-20-32214789'
+    }
+  },
+  {
+    id: 'preset_guanzhi_en',
+    name: '广州冠志（英文官方标准）',
+    baselineId: 'baseline_en_guanzhi',
+    entity: 'Guanzhi',
+    language: 'EN',
+    targetTemplate: 'EN Guanzhi',
+    isBuiltin: true,
+    isDefault: true,
+    enabledForExport: true,
+    entityData: {
+      name_zh: '广州冠志新材料科技有限公司',
+      name_en: 'Guangzhou Guanzhi New Material Technology Co., Ltd.',
+      shortName_zh: '冠志',
+      shortName_en: 'Guanzhi',
+      address_zh: '广州市萝岗区科学城掬泉路3号广州国际企业孵化器A区1106室',
+      address_en: 'Room 1106, Area A, Guangzhou International Enterprise Incubator, No. 3 Juquan Road, Science City, Luogang District, Guangzhou',
+      tel: '86-20-82567990',
+      fax: '86-20-32214789',
+      emergencyTel_zh: '86-20-82567990',
+      emergencyTel_en: '86-20-82567990'
+    },
+    headerFooterOverrides: {
+      company: 'Guangzhou Guanzhi New Material Technology Co., Ltd.',
+      title: 'SAFETY DATA SHEET',
+      version: 'V1.0',
+      customFileNamePattern: '{model} msds_EN Guanzhi.docx',
+    },
+    fieldOverrides: {
+      supplier_name: 'Guangzhou Guanzhi New Material Technology Co., Ltd.',
+      supplier_address: 'Room 1106, Area A, Guangzhou International Enterprise Incubator, No. 3 Juquan Road, Science City, Luogang District, Guangzhou',
+      emergency_phone: '86-20-82567990',
+      phone: '86-20-82567990',
+      fax: '86-20-32214789'
+    }
+  },
+  {
+    id: 'preset_guocai_cn',
+    name: '英德国彩（中文官方标准）',
+    baselineId: 'baseline_cn_guanzhi',
+    entity: '国彩',
+    language: 'CN',
+    targetTemplate: 'CN 国彩',
+    isBuiltin: true,
+    isDefault: false,
+    enabledForExport: true,
+    entityData: {
+      name_zh: '英德市国彩精细化工有限公司',
+      name_en: 'Yingde Guocai New Material Co., Ltd.',
+      shortName_zh: '国彩',
+      shortName_en: 'Guocai',
+      address_zh: '广东省英德市白沙镇太平村更古坑凯迪工业园区',
+      address_en: 'Kaidi Industrial Park, Genggukeng, Taiping Village, Baisha Town, Yingde City, Guangdong Province',
+      tel: '86-763-2811205',
+      fax: '86-763-2811024',
+      emergencyTel_zh: '86-763-2811205',
+      emergencyTel_en: '86-763-2811205'
+    },
+    headerFooterOverrides: {
+      company: '英德市国彩新材料有限公司',
+      title: '物料安全数据表',
+      version: 'V1.0',
+      customFileNamePattern: '{model} msds_CN 国彩.docx',
+    },
+    fieldOverrides: {
+      supplier_name: '英德市国彩精细化工有限公司',
+      supplier_address: '广东省英德市白沙镇太平村更古坑凯迪工业园区',
+      emergency_phone: '86-763-2811205',
+      phone: '86-763-2811205',
+      fax: '86-763-2811024',
+      postal_code: '513038',
+    }
+  },
+  {
+    id: 'preset_guocai_en',
+    name: '英德国彩（英文官方标准）',
+    baselineId: 'baseline_en_guanzhi',
+    entity: 'Guocai',
+    language: 'EN',
+    targetTemplate: 'EN Guocai',
+    isBuiltin: true,
+    isDefault: false,
+    enabledForExport: true,
+    entityData: {
+      name_zh: '英德市国彩精细化工有限公司',
+      name_en: 'Yingde Guocai New Material Co., Ltd.',
+      shortName_zh: '国彩',
+      shortName_en: 'Guocai',
+      address_zh: '广东省英德市白沙镇太平村更古坑凯迪工业园区',
+      address_en: 'Kaidi Industrial Park, Genggukeng, Taiping Village, Baisha Town, Yingde City, Guangdong Province',
+      tel: '86-763-2811205',
+      fax: '86-763-2811024',
+      emergencyTel_zh: '86-763-2811205',
+      emergencyTel_en: '86-763-2811205'
+    },
+    headerFooterOverrides: {
+      company: 'Yingde Guocai New Material Co., Ltd.',
+      title: 'SAFETY DATA SHEET',
+      version: 'V1.0',
+      customFileNamePattern: '{model} msds_EN Guocai.docx',
+    },
+    fieldOverrides: {
+      supplier_name: 'Yingde Guocai New Material Co., Ltd.',
+      supplier_address: 'Kaidi Industrial Park, Genggukeng, Taiping Village, Baisha Town, Yingde City, Guangdong Province',
+      emergency_phone: '86-763-2811205',
+      phone: '86-763-2811205',
+      fax: '86-763-2811024',
+      postal_code: '513038',
+    }
+  }
+];
+
 export function seedDefaultPresets(db = getDb()) {
   try {
-    const countStmt = db.prepare('SELECT COUNT(*) AS count FROM presets');
-    const count = countStmt.get()?.count || 0;
-    if (count === 0) {
-      const insertStmt = db.prepare(`
-        INSERT INTO presets (
-          id, name, baseline_id, entity, language, target_template,
-          is_builtin, enabled_for_export,
-          header_footer_json, field_overrides_json, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-      const now = Date.now();
-      for (const p of SYSTEM_DEFAULT_PRESETS) {
-        insertStmt.run(
-          p.id,
-          p.name,
-          p.baselineId || (p.language === 'EN' ? 'baseline_en_guanzhi' : 'baseline_cn_guanzhi'),
-          p.entity || '国彩',
-          p.language || 'CN',
-          p.targetTemplate || 'CN 国彩',
-          p.isBuiltin ? 1 : 0,
-          p.enabledForExport ? 1 : 0,
-          JSON.stringify(p.headerFooterOverrides || {}),
-          JSON.stringify(p.fieldOverrides || {}),
-          now
-        );
-      }
+    const insertStmt = db.prepare(`
+      INSERT INTO presets (
+        id, name, baseline_id, entity, language, target_template,
+        is_builtin, is_default, enabled_for_export,
+        entity_json, header_footer_json, field_overrides_json, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        entity_json = excluded.entity_json,
+        is_builtin = excluded.is_builtin,
+        is_default = CASE WHEN presets.is_default = 1 THEN 1 ELSE excluded.is_default END
+    `);
+    const now = Date.now();
+    for (const p of BUILTIN_COMPANY_PRESETS) {
+      insertStmt.run(
+        p.id,
+        p.name,
+        p.baselineId || (p.language === 'EN' ? 'baseline_en_guanzhi' : 'baseline_cn_guanzhi'),
+        p.entity || '冠志',
+        p.language || 'CN',
+        p.targetTemplate || `${p.language} ${p.entity}`,
+        p.isBuiltin ? 1 : 0,
+        p.isDefault ? 1 : 0,
+        p.enabledForExport ? 1 : 0,
+        JSON.stringify(p.entityData || {}),
+        JSON.stringify(p.headerFooterOverrides || {}),
+        JSON.stringify(p.fieldOverrides || {}),
+        now
+      );
+    }
+    // 确保 CN 与 EN 各自至少有一个默认预设
+    const cnDefault = db.prepare("SELECT id FROM presets WHERE language = 'CN' AND is_default = 1").get();
+    if (!cnDefault) {
+      db.prepare("UPDATE presets SET is_default = 1 WHERE id = 'preset_guanzhi_cn'").run();
+    }
+    const enDefault = db.prepare("SELECT id FROM presets WHERE language = 'EN' AND is_default = 1").get();
+    if (!enDefault) {
+      db.prepare("UPDATE presets SET is_default = 1 WHERE id = 'preset_guanzhi_en'").run();
     }
   } catch (e) {
     console.warn('seedDefaultPresets error:', e);
   }
 }
 
-export function listPresets({ baselineId, entity, language, enabledOnly } = {}) {
+export function listPresets({ baselineId, entity, language, enabledOnly, isDefault } = {}) {
   const db = getDb();
   let sql = 'SELECT * FROM presets WHERE 1=1';
   const params = [];
@@ -480,7 +653,11 @@ export function listPresets({ baselineId, entity, language, enabledOnly } = {}) 
   if (enabledOnly) {
     sql += ' AND enabled_for_export = 1';
   }
-  sql += ' ORDER BY is_builtin DESC, updated_at DESC';
+  if (isDefault != null) {
+    sql += ' AND is_default = ?';
+    params.push(isDefault ? 1 : 0);
+  }
+  sql += ' ORDER BY is_default DESC, is_builtin DESC, updated_at DESC';
 
   const stmt = db.prepare(sql);
   const rows = stmt.all(...params);
@@ -493,7 +670,9 @@ export function listPresets({ baselineId, entity, language, enabledOnly } = {}) 
     language: r.language,
     targetTemplate: r.target_template,
     isBuiltin: Boolean(r.is_builtin),
+    isDefault: Boolean(r.is_default),
     enabledForExport: Boolean(r.enabled_for_export),
+    entityData: JSON.parse(r.entity_json || '{}'),
     headerFooterOverrides: JSON.parse(r.header_footer_json || '{}'),
     fieldOverrides: JSON.parse(r.field_overrides_json || '{}'),
     updatedAt: r.updated_at,
@@ -514,11 +693,37 @@ export function getPresetById(id) {
     language: r.language,
     targetTemplate: r.target_template,
     isBuiltin: Boolean(r.is_builtin),
+    isDefault: Boolean(r.is_default),
     enabledForExport: Boolean(r.enabled_for_export),
+    entityData: JSON.parse(r.entity_json || '{}'),
     headerFooterOverrides: JSON.parse(r.header_footer_json || '{}'),
     fieldOverrides: JSON.parse(r.field_overrides_json || '{}'),
     updatedAt: r.updated_at,
   };
+}
+
+export function getDefaultPreset(language = 'CN') {
+  const db = getDb();
+  const lang = (language || 'CN').toUpperCase();
+  const stmt = db.prepare('SELECT * FROM presets WHERE is_default = 1 AND language = ?');
+  let row = stmt.get(lang);
+  if (!row) {
+    row = db.prepare('SELECT * FROM presets WHERE language = ? ORDER BY is_builtin DESC, updated_at DESC LIMIT 1').get(lang);
+  }
+  return row ? getPresetById(row.id) : null;
+}
+
+export function setDefaultPreset(id) {
+  const db = getDb();
+  const target = getPresetById(id);
+  if (!target) {
+    throw new Error(`未找到 ID 为 ${id} 的预设`);
+  }
+  // 取消同语言其他预设的默认标记
+  db.prepare('UPDATE presets SET is_default = 0 WHERE language = ?').run(target.language);
+  // 设当前预设为默认
+  db.prepare('UPDATE presets SET is_default = 1 WHERE id = ?').run(id);
+  return getPresetById(id);
 }
 
 export function savePreset(data) {
@@ -527,33 +732,44 @@ export function savePreset(data) {
   const id = data.id || `preset_custom_${now}`;
   const name = data.name || '新建自定义预设';
   const baselineId = data.baselineId || (data.language === 'EN' || data.targetTemplate?.includes('EN') ? 'baseline_en_guanzhi' : 'baseline_cn_guanzhi');
-  const entity = data.entity || '国彩';
+  const entity = typeof data.entity === 'string' ? data.entity : (data.entityData?.shortName_zh || '自定义');
   const language = (data.language || 'CN').toUpperCase();
   const targetTemplate = data.targetTemplate || `${language} ${entity}`;
   const isBuiltin = data.isBuiltin ? 1 : 0;
+  const isDefault = data.isDefault ? 1 : 0;
   const enabledForExport = data.enabledForExport !== false ? 1 : 0;
+  
+  const entityData = data.entityData || (typeof data.entity === 'object' ? data.entity : {});
+  const entityJson = JSON.stringify(entityData);
   const hfJson = JSON.stringify(data.headerFooterOverrides || {});
   const fieldsJson = JSON.stringify(data.fieldOverrides || {});
+
+  if (isDefault) {
+    // 若设为默认，先清空同语言已有默认
+    db.prepare('UPDATE presets SET is_default = 0 WHERE language = ?').run(language);
+  }
 
   const stmt = db.prepare(`
     INSERT INTO presets (
       id, name, baseline_id, entity, language, target_template,
-      is_builtin, enabled_for_export,
-      header_footer_json, field_overrides_json, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      is_builtin, is_default, enabled_for_export,
+      entity_json, header_footer_json, field_overrides_json, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
       baseline_id = excluded.baseline_id,
       entity = excluded.entity,
       language = excluded.language,
       target_template = excluded.target_template,
+      is_default = excluded.is_default,
       enabled_for_export = excluded.enabled_for_export,
+      entity_json = excluded.entity_json,
       header_footer_json = excluded.header_footer_json,
       field_overrides_json = excluded.field_overrides_json,
       updated_at = excluded.updated_at
   `);
 
-  stmt.run(id, name, baselineId, entity, language, targetTemplate, isBuiltin, enabledForExport, hfJson, fieldsJson, now);
+  stmt.run(id, name, baselineId, entity, language, targetTemplate, isBuiltin, isDefault, enabledForExport, entityJson, hfJson, fieldsJson, now);
   return getPresetById(id);
 }
 

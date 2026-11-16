@@ -1,5 +1,26 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-16 通用拓扑解耦、动态预设治理与自适应交付矩阵全面落盘 (v9.0-ENTERPRISE)] - 严格遵循 OrbitStack (Ps-openspec) 与用户四大企业级要求，彻底落实“三层正交解耦”哲学（模板=排版拓扑/源文件=化学事实/预设=主体元数据），终结代码中写死“冠志/国彩”与死板“8格式”的陈旧假设：
+- **REQ-01: 企业预设管理中心 (CRUD + 设为默认)**：
+  - 扩展 `web/src/msds-db.js`，支持中英文全称、简称、社会信用代码、注册地址、应急/技术电话、传真、邮编及 `is_default` 状态机；
+  - `web/src/main.js` 新增预设可视化编辑表单，支持直接在 Web UI 上新增、编辑、删除预设与一键设为系统默认；
+  - 后端打通 `POST /api/msds/presets/:id/default`、`GET /api/msds/presets/default` 等 REST API 路由。
+- **REQ-02: 模板手动更换与 16 章节拓扑自省可视化**：
+  - `web/src/main.js` 新增“模板拓扑自省”弹窗与上传通道，打通 `POST /api/msds/templates/inspect`；
+  - 实时透视模板 16 章节大纲树、表格数、行数、列宽标尺及关键字段插槽完备性，自动校验 16 章节合法性。
+- **REQ-03: Agent 动态感知与 Gate 1 交互意图对齐**：
+  - 升级 `C:\Users\Administrator\.gemini\config\skills\msds-studio\SKILL.md` 至 v9.0-ENTERPRISE；
+  - Phase 0 动态探测当前模板库与企业预设清单；Gate 1 必须向用户呈现模板与预设选择选项、推荐默认并由用户确认交付范围，彻底废止主观硬编码假设。
+- **REQ-04: 自适应多格式交付矩阵 ($N_{\text{presets}} \times N_{\text{languages}} \times N_{\text{formats}}$)**：
+  - `web/src/pipeline-engine.js` 新增 `executeAdaptiveDeliverablesPipeline`，按需产出任意笛卡尔积组合（支持单主体英文 Word 1 份、单主体双语双格式 4 份、双主体双语双格式 8 份或多主体扩展）；
+  - `web/scripts/audit_bipolar_bilayer.mjs` 升级支持 `expectedDeliverables` 动态矩阵审计；
+  - Web UI 导出中心支持格式 (Word/PDF)、语言 (中/英) 与企业预设自适应多选，实时渲染动态清单预览。
+- **核心遇到问题与解法沉淀**：
+  1. *PU-202A 毒理学第 11 节源文件混杂英文标签与中文值*：源文件写有 `Species: 兔子`、`半数致死浓度.../Rat 雌性:`、`＜`，导致原正则跳过。解法：在 `pipeline-engine.js` 中扩充双语标签匹配与标点容差，达成英文交付物 0 中文残留；
+  2. *Section 2 审计脚本旧逻辑漏检多行拓扑*：PU-202A 为 6 行结构（Row 4 为防范说明、Row 5 为其他危险）。解法：升级为全表格扫描 `tblsCn[1]` 并兼容 840/960 动态标尺；
+  3. *Section 3 组分表英文翻译漏网*：因全角破折号与 `(DMAC)` 别名未入词典。解法：在 `context-governor.js` 中扩充别名映射与模糊匹配。
+- **实测验证凭据**：`run_full_regression.mjs` 全流程 5 大核心模块 100% 通过（ExitCode 0），OpenSpec `universal-topology-and-dynamic-presets` 严格校验通过。
+
 ## [2026-11-16 PU-6013Bio 标准受控八格式覆写与全要素深度审计 100% 满分通过 (PU6013BIO-EIGHT-DELIVERABLES-AND-DEEP-AUDIT)] - 严格遵循 OrbitStack (Ps-openspec) 与 MSDS-Studio v9.0-ENTERPRISE 全流程规范，全量落实用户核心指令：“'F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料\1-1 单组份水性聚氨酯树脂 PU\PU-6013Bio\PU-6013Bio msds_CN 冠志.docx' 先执行这个的覆写产出”。以通用受控流水线 `run_universal_msds_pipeline.mjs` 为唯一调度中枢，彻底杜绝针对单个型号手写 ad-hoc 临时脚本；Step 1 智能文档解析识别（提取 2 组分、20 项理化指标及非危品 GHS 事实）；Step 2 规范化中英双语对齐与非危品状态机锁定（严防虚增象形图/信号词，度数符号标准化为西文 `°C`）；Step 3 原生母版拓扑覆写，导出 4 份标准 Word 并原生转换为 4 份高清矢量 PDF；Step 4 级联全景法医级三大审计套件（排版几何不变量测试 100% PASS，双极双层 165 项深度审计 100% PASS，集中式中央主审计 166/166 项全绿通过，S2~S16 逐行双重对照 104 条满分匹配，🏆 AUDIT_PASSED，Exit code 0）。8 格式交付物（4 DOCX + 4 PDF）全部释放于目标目录 `算法训练材料/TDS MSDS 重写版/01-1 单组份水性聚氨酯树脂 PU/PU-6013Bio`，单文件体积 30.1 KB ~ 250.5 KB，全批次时间戳同步差仅 6.0 秒（< 5 分钟），实现 1:1 需求物理核销。
 
 ### 一、 需求背景与核心治理宗旨

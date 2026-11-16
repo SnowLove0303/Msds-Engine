@@ -30,7 +30,8 @@ import {
   updateHeaderFooterData,
   W_NS
 } from './docx-engine.js';
-import { applyGlobalTypographyProjection } from './universal-editor-primitives.js';
+import { applyGlobalTypographyProjection, bindEntityPresetToDocument } from './universal-editor-primitives.js';
+import { getPresetById, listPresets } from './msds-db.js';
 import { enforceStructuralTypographyInvariants } from './pipeline-engine.js';
 
 export const TEMPLATE_LIBRARY = {
@@ -233,7 +234,15 @@ export async function inspectTemplateSchema(templateKey = 'CN_Guanzhi') {
 /**
  * 创建独立工作会话 (Create Isolated Work Session)
  */
-export async function createWorkSession(templateKey = 'CN_Guanzhi', workingDir = null) {
+export async function createWorkSession(templateKeyOrOptions = 'CN_Guanzhi', workingDir = null) {
+  let templateKey = templateKeyOrOptions;
+  let modelCode = null;
+  if (typeof templateKeyOrOptions === 'object' && templateKeyOrOptions !== null) {
+    templateKey = templateKeyOrOptions.templateKey || 'CN_Guanzhi';
+    workingDir = templateKeyOrOptions.workingDir || workingDir;
+    modelCode = templateKeyOrOptions.modelCode || null;
+  }
+
   let tplInfo;
   if (typeof templateKey === 'string' && fs.existsSync(templateKey)) {
     const isEn = /_EN|English/i.test(templateKey);
@@ -270,6 +279,7 @@ export async function createWorkSession(templateKey = 'CN_Guanzhi', workingDir =
     workingPath: workingFile,
     workingDir: dir,
     engine,
+    modelCode,
     modifiedSections: new Set(),
     checkpoints: new Map()
   };
@@ -538,44 +548,41 @@ export function formatSection9LaserTabs(session) {
  * 注入企业预设覆盖 (Apply Company Preset)
  */
 export function applyCompanyPreset(session, presetKey) {
-  let preset = COMPANY_PRESETS[presetKey];
-  if (!preset) {
-    if (typeof presetKey === 'object' && presetKey !== null) {
-      preset = presetKey;
-    } else if (typeof presetKey === 'string') {
-      const isEn = session.templateKey?.includes('EN') || session.templateKey?.includes('en');
+  let preset = null;
+  if (typeof presetKey === 'object' && presetKey !== null) {
+    preset = presetKey;
+  } else if (typeof presetKey === 'string') {
+    // 优先从 SQLite 预设库中根据 id 检索
+    preset = getPresetById(presetKey);
+    if (!preset) {
+      const allPresets = listPresets();
+      preset = allPresets.find(p => p.id === presetKey || p.name === presetKey || p.entity === presetKey);
+    }
+    if (!preset) {
+      const isEn = session.templateKey?.includes('EN') || session.templateKey?.includes('en') || session.isEnglish;
       const langSuffix = isEn ? '_en' : '_zh';
       const cleanKey = presetKey.toLowerCase();
       if (cleanKey.includes('guanzhi')) {
         preset = COMPANY_PRESETS[`Guanzhi${langSuffix}`];
       } else if (cleanKey.includes('guocai')) {
         preset = COMPANY_PRESETS[`Guocai${langSuffix}`];
+      } else if (COMPANY_PRESETS[presetKey]) {
+        preset = COMPANY_PRESETS[presetKey];
       }
     }
   }
+
   if (!preset) return { success: false, reason: `Unknown preset: ${presetKey}` };
 
-  const s1 = (session.engine.records || []).find(r => r.sectionNumber === 1);
-  if (s1) {
-    for (const row of s1.rows || []) {
-      const lbl = (row.cells[0]?.text || '').trim();
-      if (/供应商名称|Company\s*name|Manufacturer|Name\s*of\s*supplier/i.test(lbl)) {
-        writeCellValue(row.cells[1], preset.name);
-      } else if (/供应商地址|Address/i.test(lbl)) {
-        writeCellValue(row.cells[1], preset.address);
-      } else if (/应急电话|Emergency\s*telephone|Emergency\s*phone/i.test(lbl)) {
-        writeCellValue(row.cells[1], preset.emergencyPhone || preset.tel);
-      } else if (/电话|Telephone|Phone|\bTel\b/i.test(lbl)) {
-        writeCellValue(row.cells[1], preset.tel);
-      } else if (/传真|Fax/i.test(lbl)) {
-        writeCellValue(row.cells[1], preset.fax);
-      }
-    }
-  }
+  const isEn = session.isEnglish || session.templateKey?.includes('EN') || session.templateKey?.includes('en');
+  const result = bindEntityPresetToDocument(session.engine, preset, {
+    isEnglish: isEn,
+    modelCode: session.modelCode
+  });
 
-  stampDocumentIdentity(session.engine, { companyName: preset.name, shortName: preset.shortName });
-  updateHeaderFooterData(session.engine, { company: preset.name });
-  return { success: true, presetKey };
+  stampDocumentIdentity(session.engine, { companyName: result.companyName, shortName: result.shortName });
+  session.modifiedSections.add(1);
+  return { success: true, presetKey, companyName: result.companyName, shortName: result.shortName };
 }
 
 /**

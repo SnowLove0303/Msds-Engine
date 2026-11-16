@@ -58,6 +58,14 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '丙酮': 'Acetone',
   '乙酸': 'Acetic acid',
   '二甲基乙酰胺': 'N,N-Dimethylacetamide (DMAC)',
+  'N,N-二甲基乙酰胺': 'N,N-Dimethylacetamide (DMAC)',
+  'N,N－二甲基乙酰胺': 'N,N-Dimethylacetamide (DMAC)',
+  'N,N-二甲基乙酰胺(DMAC)': 'N,N-Dimethylacetamide (DMAC)',
+  'N,N－二甲基乙酰胺(DMAC)': 'N,N-Dimethylacetamide (DMAC)',
+  'N-甲基吡咯烷酮': 'N-Methyl-2-pyrrolidone (NMP)',
+  'N－甲基吡咯烷酮': 'N-Methyl-2-pyrrolidone (NMP)',
+  'N-甲基吡咯烷酮(NMP)': 'N-Methyl-2-pyrrolidone (NMP)',
+  'N－甲基吡咯烷酮(NMP)': 'N-Methyl-2-pyrrolidone (NMP)',
   '甲基吡咯烷酮': 'N-Methyl-2-pyrrolidone (NMP)',
   '乙基吡咯烷酮': '1-Ethylpyrrolidin-2-one (NEP)',
   '三乙胺': 'Triethylamine',
@@ -159,6 +167,9 @@ export function translateChemicalTerm(term) {
   if (/环氧.*丙烯酸/i.test(trimmed)) return 'Epoxy modified acrylic polymer';
   if (/丙烯酸树脂/i.test(trimmed)) return 'Acrylic resin';
   if (/丙烯酸乳液/i.test(trimmed)) return 'Acrylic emulsion';
+  if (/二甲基乙酰胺/i.test(trimmed)) return 'N,N-Dimethylacetamide (DMAC)';
+  if (/甲基吡咯烷酮/i.test(trimmed)) return 'N-Methyl-2-pyrrolidone (NMP)';
+  if (/乙基吡咯烷酮/i.test(trimmed)) return '1-Ethylpyrrolidin-2-one (NEP)';
   if (/水$/i.test(trimmed)) return 'Water';
   if (/去离子水/i.test(trimmed)) return 'Deionized water';
   if (/商业机密|商业秘密/i.test(trimmed)) return 'Trade secret';

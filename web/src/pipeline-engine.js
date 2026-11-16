@@ -93,8 +93,10 @@ import {
 } from './smart-matching.js';
 import {
   MSDS_DESIGN_TOKENS,
-  applyGlobalTypographyProjection
+  applyGlobalTypographyProjection,
+  bindEntityPresetToDocument
 } from './universal-editor-primitives.js';
+import { getPresetById, listPresets, getDefaultPreset } from './msds-db.js';
 import { convertBatchDocxToPdf } from './pdf-converter.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -2000,7 +2002,10 @@ export function buildDynamicSection11Table(engine, srcEngine, baseCnEngine = nul
           preamble = 'Risk assessment data of similar products:';
         } else if (/以[下为](?:是)?(.*?)毒理学数据/i.test(srcRow2Text)) {
           const m = srcRow2Text.match(/以[下为](?:是)?(.*?)毒理学数据/i);
-          preamble = `The following is toxicological data for ${m[1].trim()}:`;
+          let targetChem = m[1].trim();
+          targetChem = translateChemicalTerm(targetChem) || targetChem;
+          targetChem = targetChem.replace(/N,N[－-]二甲基乙酰胺(?:\s*[（(]DMAC[）)])?/gi, 'N,N-Dimethylacetamide (DMAC)');
+          preamble = `The following is toxicological data for ${targetChem}:`;
         } else {
           preamble = 'The following is toxicological data for these ingredients:';
         }
@@ -3206,57 +3211,61 @@ function translateToxicologyValueToEnglish(cnText, endpoint = '') {
   t = t.replace(/皮肤接触不致敏/g, 'Not sensitizing by skin contact.');
   t = t.replace(/不致敏/g, 'Non-sensitizing.');
   t = t.replace(/皮肤接触可能致敏/g, 'May cause sensitization by skin contact.');
-  t = t.replace(/半数致死浓度\s*[（(]\s*LC50\s*[）)]\s*[/／]\s*1\s*h\s*[/／]\s*大鼠(?:\s*雌性)?\s*[:：]\s*/gi, 'LC50 / Inhalation / 1h / Rat: ');
-  t = t.replace(/半数致死浓度\s*[（(]\s*LC50\s*[）)]\s*[/／]\s*4\s*h\s*[/／]\s*大鼠(?:\s*雌性)?\s*[:：]\s*/gi, 'LC50 / Inhalation / 4h / Rat: ');
+  t = t.replace(/半数致死浓度\s*[（(]\s*LC50\s*[）)]\s*[/／]\s*1\s*h\s*[/／]\s*(?:大鼠|Rat)(?:\s*雌性)?\s*[:：]\s*/gi, 'LC50 / Inhalation / 1h / Rat (female): ');
+  t = t.replace(/半数致死浓度\s*[（(]\s*LC50\s*[）)]\s*[/／]\s*4\s*h\s*[/／]\s*(?:大鼠|Rat)(?:\s*雌性)?\s*[:：]\s*/gi, 'LC50 / Inhalation / 4h / Rat (female): ');
   t = t.replace(/\s*[（(]\s*蒸气\s*[）)]/g, ' (vapour)');
   t = t.replace(/\s*[（(]\s*气溶胶\s*[）)]/g, ' (aerosol)');
-  t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*[/／]\s*豚鼠\s*[:：]\s*/g, 'LD50 / Dermal / Guinea pig: ');
-  t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*[/／]\s*兔\s*[:：]\s*/g, 'LD50 / Dermal / Rabbit: ');
-  t = t.replace(/（此值仅用于有可吸入的颗粒形成的情况。?）/g, '(applicable only where respirable aerosols are formed)');
+  t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*[/／]\s*(?:豚鼠|Guinea\s*pig)\s*[:：]\s*/gi, 'LD50 / Dermal / Guinea pig: ');
+  t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*[/／]\s*(?:家兔|兔|Rabbit)\s*[:：]\s*/gi, 'LD50 / Dermal / Rabbit: ');
+  t = t.replace(/[（(]?此值仅用于有可吸入的颗粒形成的情况[.。]?[）)]?/g, '(applicable only where respirable aerosols are formed)');
+  t = t.replace(/N,N[－-]二甲基乙酰胺(?:\s*[（(]DMAC[）)])?/g, 'N,N-Dimethylacetamide (DMAC)');
   t = t.replace(/[（(]\s*鼠\s*[）)]\s*LD50\s*[:：]\s*/g, '(Rat) LD50: ');
   t = t.replace(/＞/g, '> ');
+  t = t.replace(/＜/g, '< ');
 
   // 皮肤与眼睛刺激
-  t = t.replace(/物种\s*[:：]\s*兔子?/g, 'Species: Rabbit');
-  t = t.replace(/物种\s*[:：]\s*小鼠/g, 'Species: Mouse');
-  t = t.replace(/物种\s*[:：]\s*大鼠/g, 'Species: Rat');
-  t = t.replace(/分类\s*[:：]\s*刺激皮肤/g, 'Classification: Irritating to skin');
-  t = t.replace(/结果\s*[:：]\s*(?:轻度的皮肤刺激|轻度皮肤刺激)/g, 'Result: Mild skin irritation');
-  t = t.replace(/结果\s*[:：]\s*造成皮肤刺激/g, 'Result: Causes skin irritation');
-  t = t.replace(/分类\s*[:：]\s*刺激眼睛/g, 'Classification: Irritating to eyes');
-  t = t.replace(/结果\s*[:：]\s*(?:轻度的眼睛刺激|轻度眼睛刺激)/g, 'Result: Mild eye irritation');
-  t = t.replace(/结果\s*[:：]\s*严重的眼睛刺激/g, 'Result: Causes serious eye irritation');
+  t = t.replace(/(?:物种|Species)\s*[:：]\s*(?:兔子?|家兔)/gi, 'Species: Rabbit');
+  t = t.replace(/(?:物种|Species)\s*[:：]\s*小鼠/gi, 'Species: Mouse');
+  t = t.replace(/(?:物种|Species)\s*[:：]\s*大鼠/gi, 'Species: Rat');
+  t = t.replace(/(?:物种|Species)\s*[:：]\s*人类/gi, 'Species: Human');
+  t = t.replace(/(?:分类|Classification)\s*[:：]\s*刺激皮肤[.。]?/gi, 'Classification: Irritating to skin.');
+  t = t.replace(/(?:结果|Result)\s*[:：]\s*(?:轻度的皮肤刺激|轻度皮肤刺激)[.。]?/gi, 'Result: Mild skin irritation.');
+  t = t.replace(/(?:结果|Result)\s*[:：]\s*造成皮肤刺激[.。]?/gi, 'Result: Causes skin irritation.');
+  t = t.replace(/(?:分类|Classification)\s*[:：]\s*刺激眼睛[.。]?/gi, 'Classification: Irritating to eyes.');
+  t = t.replace(/(?:结果|Result)\s*[:：]\s*(?:轻度的眼睛刺激|轻度眼睛刺激)[.。]?/gi, 'Result: Mild eye irritation.');
+  t = t.replace(/(?:结果|Result)\s*[:：]\s*严重的眼睛刺激[.。]?/gi, 'Result: Causes serious eye irritation.');
 
   // 致敏性
-  t = t.replace(/物种\s*[:：]\s*豚鼠/g, 'Species: Guinea pig');
-  t = t.replace(/物种\s*[:：]\s*人类/g, 'Species: Human');
-  t = t.replace(/分类\s*[:：]\s*不是皮肤过敏物质/g, 'Classification: Not a skin sensitizer');
-  t = t.replace(/结果\s*[:：]\s*未引起实验室动物过敏/g, 'Result: Did not cause sensitization in laboratory animals');
-  t = t.replace(/结果\s*[:：]\s*对志愿者做的皮肤接触试验证明没有过敏特性/g, 'Result: Patch test on human volunteers demonstrated no sensitizing properties');
+  t = t.replace(/(?:物种|Species)\s*[:：]\s*豚鼠/gi, 'Species: Guinea pig');
+  t = t.replace(/(?:物种|Species)\s*[:：]\s*人类/gi, 'Species: Human');
+  t = t.replace(/(?:分类|Classification)\s*[:：]\s*不是皮肤过敏物质[.。]?/gi, 'Classification: Not a skin sensitizer.');
+  t = t.replace(/(?:结果|Result)\s*[:：]\s*未引起实验室动物过敏[.。]?/gi, 'Result: Did not cause sensitization in laboratory animals.');
+  t = t.replace(/(?:结果|Result)\s*[:：]\s*对志愿者做的皮肤接触试验证明没有过敏特性[.。]?/gi, 'Result: Patch test on human volunteers demonstrated no sensitizing properties.');
 
   // 致突变性、致癌性
-  t = t.replace(/在细菌细胞培养中没有引起基因损害。?/g, 'Did not cause genetic damage in bacterial cell culture. ');
-  t = t.replace(/在哺乳类细胞培养中没有引起基因损害。?/g, 'Did not cause genetic damage in mammalian cell culture. ');
-  t = t.replace(/有证据认为此物质不会在动物中引起基因损伤。?/g, 'Evidence indicates substance does not cause genetic damage in animals.');
-  t = t.replace(/对细菌或哺乳动物细胞培养未见致突变影响。?\s*动物试验中未见致突变性影响。?/g, 'No mutagenic effects observed in bacterial or mammalian cell cultures. No mutagenic effects observed in animal studies.');
-  t = t.replace(/在动物试验中未见致癌影响。?/g, 'No carcinogenic effects observed in animal studies.');
+  t = t.replace(/在细菌细胞培养中没有引起基因损害[.。]?/g, 'Did not cause genetic damage in bacterial cell culture. ');
+  t = t.replace(/在哺乳类细胞培养中没有引起基因损害[.。]?/g, 'Did not cause genetic damage in mammalian cell culture. ');
+  t = t.replace(/有证据认为此物质不会在动物中引起基因损伤[.。]?/g, 'Evidence indicates substance does not cause genetic damage in animals.');
+  t = t.replace(/对细菌或哺乳动物细胞培养未见致突变影响[.。]?\s*动物试验中未见致突变性影响[.。]?/g, 'No mutagenic effects observed in bacterial or mammalian cell cultures. No mutagenic effects observed in animal studies.');
+  t = t.replace(/在动物试验中未见致癌影响[.。]?/g, 'No carcinogenic effects observed in animal studies.');
 
   // 生殖毒性
-  t = t.replace(/动物试验表明无生殖毒性。?/g, 'Animal testing showed no reproductive toxicity. ');
-  t = t.replace(/动物实验表明在低于那些引起母体中毒的量时，对胚胎有影响。?/g, 'Animal experiments showed effects on the embryo at levels below those causing maternal toxicity. ');
-  t = t.replace(/降低了胚胎胎儿的成活力，胎儿发育缓慢[（(]变异[）)]，胎儿畸形。?/g, 'Reduced embryo-fetal viability, slow fetal development (variations), fetal malformations.');
-  t = t.replace(/在动物试验中，发现仅在射入高剂量的此物质后才有损坏生育的风险。?/g, 'Animal experiments showed risks of impaired fertility only at high doses. ');
-  t = t.replace(/在动物试验显现出致畸效应。?/g, 'Animal experiments showed teratogenic effects. ');
-  t = t.replace(/可能对胎儿造成伤害。?/g, 'May damage the unborn child.');
+  t = t.replace(/动物试验(?:表明|显示)?无生殖毒性[.。]?/g, 'Animal testing showed no reproductive toxicity. ');
+  t = t.replace(/动物实验表明在低于那些引起母体中毒的量时[，, ]*对胚胎有影响[.。]?/g, 'Animal experiments showed effects on the embryo at levels below those causing maternal toxicity. ');
+  t = t.replace(/降低了胚胎胎儿的成活力[，, ]*胎儿发育缓慢[（(]变异[）)][，, ]*胎儿畸形[.。]?/g, 'Reduced embryo-fetal viability, slow fetal development (variations), fetal malformations.');
+  t = t.replace(/在动物试验中[，, ]*发现仅在射入高剂量的此物质后才有损坏生育的风险[.。]?/g, 'Animal experiments showed risks of impaired fertility only at high doses. ');
+  t = t.replace(/在动物试验显现出致畸效应[.。]?/g, 'Animal experiments showed teratogenic effects. ');
+  t = t.replace(/可能对胎儿造成伤害[.。]?/g, 'May damage the unborn child.');
 
   // STOT 与 附加信息
-  t = t.replace(/可能造成呼吸道刺激。?/g, 'May cause respiratory irritation.');
-  t = t.replace(/饮酒精饮料会加剧毒性影响。?/g, 'Consumption of alcoholic beverages may aggravate toxic effects.\n');
-  t = t.replace(/N[－-]甲基吡咯烷酮有经皮吸收危险。?/g, 'Risk of cutaneous absorption of N-Methyl-2-pyrrolidone (NMP).');
+  t = t.replace(/可能造成呼吸道刺激[.。]?/g, 'May cause respiratory irritation.');
+  t = t.replace(/饮酒精饮料会加剧毒性影响[.。]?/g, 'Consumption of alcoholic beverages may aggravate toxic effects.\n');
+  t = t.replace(/N[－-]甲基吡咯烷酮有经皮吸收危险[.。]?/g, 'Risk of cutaneous absorption of N-Methyl-2-pyrrolidone (NMP).');
   t = t.replace(/重复剂量中毒\s*[:：]\s*经口/g, 'Repeated dose toxicity: Oral;');
-  t = t.replace(/病理变化\s*[:：]\s*胃，睾丸，肝，肾，红血球异常减少。?/g, 'Pathological changes: stomach, testes, liver, kidneys, abnormal reduction of red blood cells.\n');
+  t = t.replace(/病理变化\s*[:：]\s*胃[，, ]*睾丸[，, ]*肝[，, ]*肾[，, ]*红血球异常减少[.。]?/g, 'Pathological changes: stomach, testes, liver, kidneys, abnormal reduction of red blood cells.\n');
+  t = t.replace(/病理变化\s*[:：]\s*胃[，, ]*睾丸[，, ]*肝[，, ]*肾[，, ]*红血球异常减少[.。]?/g, 'Pathological changes: stomach, testes, liver, kidneys, abnormal reduction of red blood cells.\n');
   t = t.replace(/重复剂量中毒\s*[:：]\s*吸入/g, 'Repeated dose toxicity: Inhalation;');
-  t = t.replace(/病理变化\s*[:：]\s*肾、肝影响，视网膜损伤。?/g, 'Pathological changes: kidney and liver effects, retinal damage.');
+  t = t.replace(/病理变化\s*[:：]\s*肾[、，, ]*肝影响[，, ]*视网膜损伤[.。]?/g, 'Pathological changes: kidney and liver effects, retinal damage.');
 
   t = t.replace(/；/g, '; ');
   t = t.replace(/[－—]/g, '-');
@@ -4224,18 +4233,92 @@ export async function batchExportDeliverables({
 /**
  * 门面接口：四阶流水线一步原子完成 (Zero Scripting Facade)
  */
-export async function executeEightDeliverablesPipeline({
+
+/**
+ * 智能解析企业预设实体 (从 DB、内置矩阵或传入对象中解析标准模型)
+ */
+async function resolvePresetEntity(presetOrId) {
+  if (typeof presetOrId === 'object' && presetOrId !== null) {
+    return presetOrId;
+  }
+  const idStr = String(presetOrId || '').trim();
+  if (!idStr) return null;
+
+  // 1. 优先从 SQLite 数据库查询
+  try {
+    const dbPreset = getPresetById(idStr);
+    if (dbPreset) return dbPreset;
+  } catch (e) {}
+
+  // 2. 匹配内置企业矩阵 ENTITY_MATRIX
+  const key = idStr.replace(/^preset_/, '').replace(/_(?:cn|en)$/i, '').toUpperCase();
+  if (ENTITY_MATRIX[key]) {
+    const em = ENTITY_MATRIX[key];
+    return {
+      id: `preset_${key.toLowerCase()}`,
+      name: em.cn.name,
+      isBuiltin: true,
+      entityData: {
+        name_zh: em.cn.name,
+        name_en: em.en.name,
+        shortName_zh: em.cn.shortName,
+        shortName_en: em.en.shortName,
+        address_zh: em.cn.address,
+        address_en: em.en.address,
+        tel: em.cn.tel,
+        fax: em.cn.fax,
+        emergencyTel_zh: em.cn.tel,
+        emergencyTel_en: em.en.tel
+      }
+    };
+  }
+
+  // 3. 遍历数据库所有预设做模糊/名称匹配
+  try {
+    const all = listPresets();
+    const found = all.find(p => p.id === idStr || p.name === idStr);
+    if (found) return found;
+  } catch (e) {}
+
+  return null;
+}
+
+/**
+ * 自适应多格式流水线引擎 (Adaptive Deliverables Pipeline)
+ * 彻底打破硬编码双主体(冠志/国彩)与固定 8 格式枷锁，
+ * 根据传入的 Presets × Languages × Formats 动态计算笛卡尔积并精准交付！
+ *
+ * @param {Object} options
+ * @param {string} options.modelCode - 产品型号代码 (如 "PA-3655")
+ * @param {string} [options.cnGroundTruthPath] - 中文源文件物理路径
+ * @param {ArrayBuffer} [options.cnGroundTruthBuffer] - 中文源文件内存 Buffer
+ * @param {Array<string|Object>} [options.presetIds] - 预设 ID 列表或实体对象列表
+ * @param {Array<string>} [options.languages] - 目标语言列表 (如 ['CN', 'EN'] 或 ['CN'] 或 ['EN'])
+ * @param {Array<string>} [options.formats] - 交付格式列表 (如 ['docx', 'pdf'] 或 ['docx'] 或 ['pdf'])
+ * @param {string} [options.targetDir] - 导出物理目录
+ * @param {Object} [options.facts] - 提取或覆写的事实参数
+ * @param {string} [options.revisionDate] - 修订日期覆写
+ * @returns {Promise<Object>} { success, model, targetDir, totalFiles, deliverables }
+ */
+export async function executeAdaptiveDeliverablesPipeline({
   modelCode,
-  cnGroundTruthPath,
-  cnGroundTruthBuffer,
-  targetDir,
+  cnGroundTruthPath = null,
+  cnGroundTruthBuffer = null,
+  presetIds = ['preset_guanzhi_cn', 'preset_guocai_cn'],
+  languages = ['CN', 'EN'],
+  formats = ['docx', 'pdf'],
+  targetDir = null,
   facts = {},
   revisionDate = null
 }) {
   const startTime = Date.now();
   const preservedFiles = [];
 
-  // 0. 源文件绝对无损安全防御：流水线第一步，若指定了源文件物理路径，立即提前封存留存源文件及对应 PDF
+  if (!modelCode) {
+    throw new Error('【流水线致命拦截】缺少必需的 modelCode 型号参数！');
+  }
+
+  // 0. 源文件绝对无损安全留存防御
   if (cnGroundTruthPath) {
     const docxBackup = await preserveOriginalFileBackup(cnGroundTruthPath);
     if (docxBackup) preservedFiles.push(docxBackup);
@@ -4247,7 +4330,36 @@ export async function executeEightDeliverablesPipeline({
     if (pdfBackup) preservedFiles.push(pdfBackup);
   }
 
-  // 1. 做基础 1 (中文基准)
+  // 1. 标准化请求参数与笛卡尔积维度
+  const rawLangs = Array.isArray(languages) && languages.length > 0 ? languages : ['CN', 'EN'];
+  const normLangs = [...new Set(rawLangs.map(l => String(l).toUpperCase().replace('ZH', 'CN')))].filter(l => l === 'CN' || l === 'EN');
+  if (normLangs.length === 0) normLangs.push('CN', 'EN');
+
+  const rawFormats = Array.isArray(formats) && formats.length > 0 ? formats : ['docx', 'pdf'];
+  const normFormats = [...new Set(rawFormats.map(f => String(f).toLowerCase()))].filter(f => f === 'docx' || f === 'pdf');
+  if (normFormats.length === 0) normFormats.push('docx', 'pdf');
+
+  // 解析并去重目标预设列表
+  const rawPresetIds = Array.isArray(presetIds) && presetIds.length > 0 ? presetIds : ['preset_guanzhi_cn', 'preset_guocai_cn'];
+  const resolvedPresets = [];
+  const seenPresetIds = new Set();
+
+  for (const pid of rawPresetIds) {
+    const p = await resolvePresetEntity(pid);
+    if (p && !seenPresetIds.has(p.id)) {
+      seenPresetIds.add(p.id);
+      resolvedPresets.push(p);
+    } else if (!p) {
+      console.warn(`[AdaptivePipeline] 无法找到匹配企业预设: ${pid}，跳过`);
+    }
+  }
+
+  if (resolvedPresets.length === 0) {
+    const fallbackPreset = await resolvePresetEntity('GUANZHI');
+    if (fallbackPreset) resolvedPresets.push(fallbackPreset);
+  }
+
+  // 2. 建立中文基准引擎 (Base Chinese Engine 作为全书单一事实真理源)
   const baseCnEngine = await buildBaseChineseEngine({
     modelCode,
     cnGroundTruthPath,
@@ -4258,91 +4370,26 @@ export async function executeEightDeliverablesPipeline({
   });
 
   const todayDateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '/');
-  const isOutdated = !baseCnEngine._adaptiveRevisionDate || baseCnEngine._adaptiveRevisionDate.startsWith('2023') || baseCnEngine._adaptiveRevisionDate.startsWith('2024') || baseCnEngine._adaptiveRevisionDate.startsWith('2025');
+  const isOutdated = !baseCnEngine._adaptiveRevisionDate || 
+    baseCnEngine._adaptiveRevisionDate.startsWith('2023') || 
+    baseCnEngine._adaptiveRevisionDate.startsWith('2024') || 
+    baseCnEngine._adaptiveRevisionDate.startsWith('2025');
   const effectiveDate = revisionDate || (!isOutdated ? baseCnEngine._adaptiveRevisionDate : todayDateStr);
 
-  // 2. 做基础 2 (英文基准：以中文基准为源事实，驱动英文模板识别与同构装配)
-  const baseEnEngine = await buildBaseEnglishEngine({
-    modelCode,
-    baseCnEngine,
-    facts,
-    revisionDate: effectiveDate
-  });
-
-  // 3. 应用预设产出指定预设格式 (国彩双语派生)
-  const { cnPresetEngine, enPresetEngine } = await derivePresetEngines({
-    modelCode,
-    baseCnEngine,
-    baseEnEngine,
-    entityId: 'GUOCAI',
-    revisionDate: effectiveDate
-  });
-
-  // 3.4 全局强化表格边框规范 (外框实线，内框统一虚线) 与理化指标序号自增同步
-  for (const eng of [baseCnEngine, baseEnEngine, cnPresetEngine, enPresetEngine]) {
-    const isEn = eng === baseEnEngine || eng === enPresetEngine;
-    for (const record of eng.records) {
-      if (record.kind === 'table') {
-        enforceTableStandardBorders(record);
-      }
-    }
-    // 表格跨页自然断行放开 (REQ-02): 默认允许所有数据行跨页断行，消除章节与表格间的大空白断层
-    if (eng.documentXml) {
-      enableCrossPageBreaksForAllSections(eng);
-    }
-
-    applyGlobalTypographyProjection(eng, isEn);
-    // 强制执行结构性题头与标签加粗法定不变量加固 (INV-BOLD-S2-S15)
-    enforceStructuralTypographyInvariants(eng, isEn);
-    const s8Rec = eng.records.find(r => r.sectionNumber === 8);
-    if (s8Rec) {
-      // Section 8 中文手部防护缩进规范: 统一采用 420 dxa 左缩进，与 8.1 暴字与 9.1 外观绝对铅垂对齐 (REQ-SUB-PARENT-ALIGN)
-      const handRowCn = s8Rec.rows.find(row => /手部防护/i.test(row.cells[0]?.text || ''));
-      if (handRowCn && handRowCn.cells[0]?.node) {
-        const c0 = handRowCn.cells[0].node;
-        const inds = Array.from(c0.getElementsByTagNameNS(W_NS, 'ind'));
-        inds.forEach(ind => {
-          ind.setAttribute('w:left', '420');
-          ind.removeAttribute('w:firstLine');
-          ind.removeAttribute('w:firstLineChars');
-          ind.removeAttribute('w:hanging');
-          ind.removeAttribute('w:hangingChars');
-          ind.removeAttribute('w:leftChars');
-          ind.removeAttributeNS(W_NS, 'leftChars');
-          ind.setAttributeNS(W_NS, 'w:leftChars', '0');
-        });
-      }
-    }
-    // 4. Section 13 废弃处置段落对齐规范 (INV-S13-01): 英文版内容严格纯左对齐 (left)，中文版保持两端对齐 (both)
-    const s13Rec = eng.records.find(r => r.sectionNumber === 13);
-    if (s13Rec && isEn) {
-      for (const row of s13Rec.rows) {
-        for (const cell of row.cells) {
-          if (cell?.node) {
-            const jcs = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'jc'));
-            for (const jc of jcs) {
-              if (jc.getAttribute('w:val') === 'both') {
-                jc.setAttribute('w:val', 'left');
-              }
-            }
-          }
-        }
-      }
-    }
-    const s9 = eng.records.find(r => r.sectionNumber === 9);
-    if (s9) renumberRecord(s9);
-    const s10 = eng.records.find(r => r.sectionNumber === 10);
-    if (s10) renumberRecord(s10);
-
-    // 全局统一表格标签与值格纯左对齐硬保底 (REQ-LABEL-ALIGN-02)
-    enforceGlobalLeftAlignmentAndCleanIndent(eng, isEn);
+  // 3. 按需建立英文基准引擎 (Base English Engine)
+  let baseEnEngine = null;
+  if (normLangs.includes('EN')) {
+    baseEnEngine = await buildBaseEnglishEngine({
+      modelCode,
+      baseCnEngine,
+      facts,
+      revisionDate: effectiveDate
+    });
+    // 中英文事实一致性交叉质检门禁
+    assertBilingualIntegrity(baseCnEngine, baseEnEngine);
   }
 
-  // 3.5 真实性交叉质检门禁（防止再犯：拦截任何模板残留或中英文不一致）
-  assertBilingualIntegrity(baseCnEngine, baseEnEngine);
-
-  // 3.6 执行交付前全量硬性质量门禁 (Gate 1~5)
-  // 动态探知源文件的 Section 12 说明行数量
+  // 4. 探知说明行数量并准备硬性质量门禁事实
   const s12RecordForAudit = baseCnEngine.records.find(r => r.sectionNumber === 12);
   let expectedS12PreamblesCount = 0;
   if (s12RecordForAudit) {
@@ -4373,40 +4420,286 @@ export async function executeEightDeliverablesPipeline({
     isNonHazardousComposite
   };
 
-  assertDeliverableQuality(baseCnEngine, 'Base Chinese (冠志)', false, sourceFactsForAudit);
-  assertDeliverableQuality(cnPresetEngine, 'Preset Chinese (国彩)', false, sourceFactsForAudit);
-  assertDeliverableQuality(baseEnEngine, 'Base English (Guanzhi)', true, sourceFactsForAudit);
-  assertDeliverableQuality(enPresetEngine, 'Preset English (Guocai)', true, sourceFactsForAudit);
+  // 5. 动态装配 Presets × Languages 各变体引擎
+  const generatedVariants = [];
 
+  for (const preset of resolvedPresets) {
+    const entityData = preset.entityData || preset.entity || preset;
 
-  // 4. 导出成 Word 与 PDF
-  const deliverables = await batchExportDeliverables({
-    modelCode,
-    targetDir,
-    cnGroundTruthPath,
-    engines: {
-      cnGuanzhi: baseCnEngine,
-      cnGuocai: cnPresetEngine,
-      enGuanzhi: baseEnEngine,
-      enGuocai: enPresetEngine
+    // A. 派生装配中文版
+    if (normLangs.includes('CN')) {
+      const companyNameZh = entityData.name_zh || preset.name_zh || preset.name;
+      const shortNameZh = entityData.shortName_zh || preset.shortName_zh || preset.shortName || companyNameZh;
+      const fileName = `${modelCode} msds_CN ${shortNameZh}.docx`;
+
+      const cnBuf = await baseCnEngine.exportArrayBuffer();
+      const eng = await loadDocx(cnBuf, fileName);
+
+      bindEntityPresetToDocument(eng, preset, { isEnglish: false, modelCode, revisionDate: effectiveDate });
+      updateHeaderFooterData(eng, {
+        model: modelCode,
+        company: companyNameZh,
+        title: '物料安全数据表',
+        version: 'V1.0',
+        docCode: `${modelCode}-MSDS`,
+        revisionDate: effectiveDate,
+        language: 'CN',
+        entity: shortNameZh
+      });
+
+      for (const record of eng.records) {
+        if (record.kind === 'table') enforceTableStandardBorders(record);
+      }
+      if (eng.documentXml) enableCrossPageBreaksForAllSections(eng);
+      applyGlobalTypographyProjection(eng, false);
+      enforceStructuralTypographyInvariants(eng, false);
+
+      const s8Rec = eng.records.find(r => r.sectionNumber === 8);
+      if (s8Rec) {
+        const handRowCn = s8Rec.rows.find(row => /手部防护/i.test(row.cells[0]?.text || ''));
+        if (handRowCn && handRowCn.cells[0]?.node) {
+          const c0 = handRowCn.cells[0].node;
+          const inds = Array.from(c0.getElementsByTagNameNS(W_NS, 'ind'));
+          inds.forEach(ind => {
+            ind.setAttribute('w:left', '420');
+            ind.removeAttribute('w:firstLine');
+            ind.removeAttribute('w:firstLineChars');
+            ind.removeAttribute('w:hanging');
+            ind.removeAttribute('w:hangingChars');
+            ind.removeAttribute('w:leftChars');
+            ind.removeAttributeNS(W_NS, 'leftChars');
+            ind.setAttributeNS(W_NS, 'w:leftChars', '0');
+          });
+        }
+      }
+
+      const s9 = eng.records.find(r => r.sectionNumber === 9);
+      if (s9) renumberRecord(s9);
+      const s10 = eng.records.find(r => r.sectionNumber === 10);
+      if (s10) renumberRecord(s10);
+
+      enforceGlobalLeftAlignmentAndCleanIndent(eng, false);
+      assertDeliverableQuality(eng, fileName, false, sourceFactsForAudit);
+
+      generatedVariants.push({
+        eng,
+        fileName,
+        lang: 'CN',
+        preset,
+        shortName: shortNameZh
+      });
     }
-  });
+
+    // B. 派生装配英文版
+    if (normLangs.includes('EN') && baseEnEngine) {
+      const companyNameEn = entityData.name_en || preset.name_en || preset.name;
+      const shortNameEn = entityData.shortName_en || preset.shortName_en || preset.shortName || companyNameEn;
+      const fileName = `${modelCode} msds_EN ${shortNameEn}.docx`;
+
+      const enBuf = await baseEnEngine.exportArrayBuffer();
+      const eng = await loadDocx(enBuf, fileName);
+
+      bindEntityPresetToDocument(eng, preset, { isEnglish: true, modelCode, revisionDate: effectiveDate });
+      updateHeaderFooterData(eng, {
+        model: modelCode,
+        company: companyNameEn,
+        title: 'MATERIAL SAFETY DATA SHEET',
+        version: 'V1.0',
+        docCode: `${modelCode}-MSDS`,
+        revisionDate: effectiveDate,
+        language: 'EN',
+        entity: shortNameEn
+      });
+
+      standardizeEnglishTypographyAndLabels(eng);
+      const s9 = eng.records.find(r => r.sectionNumber === 9);
+      if (s9) renumberRecord(s9);
+
+      for (const record of eng.records) {
+        if (record.kind === 'table') enforceTableStandardBorders(record);
+      }
+      if (eng.documentXml) enableCrossPageBreaksForAllSections(eng);
+      applyGlobalTypographyProjection(eng, true);
+      enforceStructuralTypographyInvariants(eng, true);
+
+      const s13Rec = eng.records.find(r => r.sectionNumber === 13);
+      if (s13Rec) {
+        for (const row of s13Rec.rows) {
+          for (const cell of row.cells) {
+            if (cell?.node) {
+              const jcs = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'jc'));
+              for (const jc of jcs) {
+                if (jc.getAttribute('w:val') === 'both') {
+                  jc.setAttribute('w:val', 'left');
+                }
+              }
+            }
+          }
+        }
+      }
+
+      const s10 = eng.records.find(r => r.sectionNumber === 10);
+      if (s10) renumberRecord(s10);
+
+      enforceGlobalLeftAlignmentAndCleanIndent(eng, true);
+      assertZeroChinese(eng, fileName);
+      assertDeliverableQuality(eng, fileName, true, sourceFactsForAudit);
+
+      generatedVariants.push({
+        eng,
+        fileName,
+        lang: 'EN',
+        preset,
+        shortName: shortNameEn
+      });
+    }
+  }
+
+  // 6. 批量极速写入与并行 PDF 转换
+  if (targetDir) {
+    await fs.mkdir(targetDir, { recursive: true });
+  }
+
+  const results = [];
+  const convertInputs = [];
+
+  for (const variant of generatedVariants) {
+    const buf = await variant.eng.exportArrayBuffer();
+    const docxPath = targetDir ? path.join(targetDir, variant.fileName) : null;
+    if (docxPath && normFormats.includes('docx')) {
+      await safeWriteFileWithLockGuard(docxPath, Buffer.from(buf));
+    }
+
+    if (normFormats.includes('docx')) {
+      results.push({
+        name: variant.fileName,
+        format: 'docx',
+        size: buf.byteLength,
+        path: docxPath,
+        lang: variant.lang,
+        presetId: variant.preset.id
+      });
+    }
+
+    if (normFormats.includes('pdf')) {
+      convertInputs.push({
+        docxBuffer: buf,
+        fileName: variant.fileName,
+        lang: variant.lang,
+        presetId: variant.preset.id
+      });
+    }
+  }
+
+  // 批量高速无头转译 PDF (如果请求了 pdf)
+  if (convertInputs.length > 0) {
+    const pdfOutputs = await convertBatchDocxToPdf(convertInputs.map(ci => ({
+      docxBuffer: ci.docxBuffer,
+      fileName: ci.fileName
+    })));
+
+    for (let i = 0; i < pdfOutputs.length; i++) {
+      const p = pdfOutputs[i];
+      const ci = convertInputs[i];
+      const finalPdfPath = targetDir ? path.join(targetDir, p.pdfName) : null;
+      if (finalPdfPath && p.pdfBuffer) {
+        await safeWriteFileWithLockGuard(finalPdfPath, p.pdfBuffer);
+      }
+      results.push({
+        name: p.pdfName,
+        format: 'pdf',
+        size: p.size,
+        durationMs: p.durationMs,
+        path: finalPdfPath,
+        lang: ci?.lang || (p.pdfName.includes('_EN') ? 'EN' : 'CN'),
+        presetId: ci?.presetId || null
+      });
+    }
+  }
+
+  // 交付目录绝对纯净清场：清理非标准历史碎片
+  if (targetDir) {
+    try {
+      const canonicalNames = new Set(results.map(r => r.name));
+      const dirEntries = await fs.readdir(targetDir, { withFileTypes: true });
+      for (const entry of dirEntries) {
+        if (entry.isFile()) {
+          const fileName = entry.name;
+          if (!canonicalNames.has(fileName)) {
+            if (fileName.includes('_源文件留存') || fileName.includes('_原版留存')) {
+              const archiveSubdir = path.join(targetDir, '源文件留存');
+              await fs.mkdir(archiveSubdir, { recursive: true }).catch(() => {});
+              await fs.rename(path.join(targetDir, fileName), path.join(archiveSubdir, fileName)).catch(() => {});
+              console.log(`[CleanSweep] 安全归档源文件留存至子目录: ${fileName} -> 源文件留存/`);
+            } else if (
+              fileName.includes('(最新)') ||
+              fileName.includes('(更新)') ||
+              fileName.includes('(临时更新)') ||
+              fileName.includes('手做改版材料') ||
+              fileName.includes('当前匹配结果')
+            ) {
+              await fs.unlink(path.join(targetDir, fileName)).catch(() => {});
+              console.log(`[CleanSweep] 清除交付目录非标准历史碎片: ${fileName}`);
+            }
+          }
+        }
+      }
+    } catch (cleanErr) {
+      console.warn(`[CleanSweep] 清场异常: ${cleanErr.message}`);
+    }
+  }
+
+  // Gate 12: 双极双层深度审计 (当生成了标准的 8 交付物时执行全景审计)
+  if (targetDir && results.length === 8 && results.every(r => r.name.includes('冠志') || r.name.includes('Guanzhi') || r.name.includes('国彩') || r.name.includes('Guocai'))) {
+    try {
+      const auditModule = await import('../scripts/audit_bipolar_bilayer.mjs');
+      if (auditModule?.runBipolarBilayerAudit) {
+        const auditRes = await auditModule.runBipolarBilayerAudit(targetDir, modelCode);
+        if (!auditRes.success) {
+          throw new Error(`【质量门禁拦截 (Gate 12)】${modelCode} 产出物双极双层全景深度审计未通过，存在 ${auditRes.failCount} 项严重违章！立即阻断交付。`);
+        }
+      }
+    } catch (auditErr) {
+      if (auditErr.message?.includes('质量门禁拦截')) throw auditErr;
+      console.warn(`[Pipeline] 深度审计模块执行提示: ${auditErr.message}`);
+    }
+  }
 
   return {
     success: true,
     model: modelCode,
     targetDir,
+    totalFiles: results.length,
     durationMs: Date.now() - startTime,
     preservedFiles,
-    deliverables
+    deliverables: results
   };
 }
 
-
 /**
- * 结构性题头与标签加粗法定不变量加固引擎 (INV-BOLD-S2-S15)
- * 物理杜绝 Section 2 标签加粗丢失、Section 15 结构性题头加粗丢失与 Section 8.1 格式偏差
+ * 门面接口：四阶流水线一步原子完成 (向后兼容经典 8 格式门面)
  */
+export async function executeEightDeliverablesPipeline({
+  modelCode,
+  cnGroundTruthPath,
+  cnGroundTruthBuffer,
+  targetDir,
+  facts = {},
+  revisionDate = null
+}) {
+  return executeAdaptiveDeliverablesPipeline({
+    modelCode,
+    cnGroundTruthPath,
+    cnGroundTruthBuffer,
+    targetDir,
+    presetIds: ['preset_guanzhi_cn', 'preset_guocai_cn'],
+    languages: ['CN', 'EN'],
+    formats: ['docx', 'pdf'],
+    facts,
+    revisionDate
+  });
+}
+
 export function enforceStructuralTypographyInvariants(eng, isEn = false) {
   if (!eng?.documentXml) return;
   const doc = eng.documentXml;
