@@ -1,6 +1,187 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
-## [2026-11-13 编辑器底层排版几何固化与多列顶格/通栏层级缩进全量闭环 (INV-EDITOR-SUBSTRATE-TYPOGRAPHY-LOCKING)] - 遵循 Ps-openspec 与 Spec-Kit 工业级双门禁工程规范，全量落实用户核心指令：从编辑器底层原语与拓扑结构层面彻底固化排版几何，彻底杜绝打补丁；1. 固化序号与标签间隔机制（单个 <w:tab/> 节点装配，消除多余空格，自适应章节最大序号位数实现 Tier A 420 dxa / Tier B 560 dxa 标尺自动升级）；2. 固化标签对齐与多行折行机制（悬挂缩进锁死，折行第二行首字在 420/560 dxa 垂线绝对垂直对齐；未编号标签注入相同基线 w:left="420"，首字完全齐平，消除锯齿；物理级彻底剔除 w:firstLine、leftChars 及 w:numPr 污染）；3. 固化多列顶格/通栏层级缩进二分机制（多列表格 cells.length > 1 填写值单元格强制顶格左对齐，清空段落 w:ind；通栏单列表格保留树状层级缩进，子项措施 P 代码向右缩进 s2SubValueIndent）；编写专用测试套件 test_editor_indent_and_alignment_invariants.mjs，母版与实产 HPU-7651 交付物 100% 通过；完成 OpenSpec 规范合流与归档。
+## [2026-11-16 PA-3615 与 PA-3617 Swarm 双智能体标准覆写与全景法医审计 100% 满分通过 (PA-3615-PA-3617-SWARM-PRODUCTION-AND-AUDIT)] - 遵循 OrbitStack (Ps-openspec) 与 MSDS-Studio v9.0-ENTERPRISE 全流程规范，全量落实用户核心指令：“"F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料\2-1 单组份水性丙烯酸乳液 PA\PA-3615\PA-3615 MSDS（冠志）.docx"、"F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料\2-1 单组份水性丙烯酸乳液 PA\PA-3617\PA-3617 MSDS-CN（冠志）.docx" 让Subagent 去执行覆写产出，你负责 计时，让另外一个Agent 等待结果产出后按照规范进行介入审计”。建立生产智能体 (msdsproducer) 与法医审计智能体 (msdsauditor) 裁执物理隔离体系，协调器 (Coordinator) 全程高精度遥测计时；消灭临时脚本不变量 (INV-ZERO-TEMPORARY-SCRIPTS) 严格保真，两个型号均直接通过统一流水线 run_universal_msds_pipeline.mjs 一键生产与级联审计；PA-3615 耗时 51.6s，PA-3617 耗时 53.9s；双型号共 16 份规范交付物（8 DOCX + 8 PDF）全部生成完毕，且通过排版几何测试套件、双极双层全景深度审计 (165/165 项)、集中式中央主审计套件 (172/172 🏆 AUDIT_PASSED) 100% 满分通过 (Exit code 0, 0 failures, 0 warnings)。
+
+### 一、 需求背景与核心治理宗旨
+承接用户指示：
+> “"F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料\2-1 单组份水性丙烯酸乳液 PA\PA-3615\PA-3615 MSDS（冠志）.docx"、"F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料\2-1 单组份水性丙烯酸乳液 PA\PA-3617\PA-3617 MSDS-CN（冠志）.docx" 让Subagent 去执行覆写产出，你负责 计时，让另外一个Agent 等待结果产出后按照规范进行介入审计”
+
+### 二、 核心排查排出的问题与系统级根治解法 (Root Cause & Solution)
+1. **Section 9 玻璃化转变温度 (Tg) 英文翻译缺失与白名单注册 (Gate 4 & Gate 12 拦截: 英文版出现中文字符)**:
+   - **根因**: 高分子丙烯酸乳液源文档 PA-3615 包含特有指标 `9.19 玻璃化温度Tg/℃`，历史 `translateSection9Item` 分支仅匹配了常规指标和 MFFT，未匹配 `玻璃化.*温度|Tg`，导致该项回退到中文原标签，引发英文母版中残留 `.19 玻璃化温度Tg/°C:`。
+   - **解法**: 在 `pipeline-engine.js` 的 `translateSection9Item` 中增设 `else if (/玻璃化.*温度|转变温度|\bTg\b/i.test(cnLabel))`，标准化映射为 `Glass transition temperature (Tg):`，并自动清洗单位追加 ` °C`；同步更新 `docx-engine.js` 加入 Canonical 标准白名单。
+2. **Section 9 畸变标签序号剥离不彻底 (.19 残留缺陷)**:
+   - **根因**: 原正则 `/^(?:9\.)?\d+[\s\u3000.:：]*/` 无法匹配纯小数点后跟序号的文本（如 `.19 玻璃化温度`），导致首字前残留了 `.19 `。
+   - **解法**: 升级正则为 `/^(?:9\.)?\.?\d+[\s\u3000.:：]*/`，支持任意形式的 `9.`、`.19` 等残留前缀，确保标签纯净左对齐与 80.28pt 激光垂线对齐。
+
+### 三、 核心源事实对账与交付物生成
+1. **PA-3615 源事实对账 (INV-ZERO-EXOGENOUS)**:
+   - 产品型号: PA-3615 单组份水性丙烯酸乳液
+   - GHS 分类: 非危险化学品，无象形图、无信号词、非危险货物
+   - 成分配比: 丙烯酸树脂 (43-45%)、去离子水 (55-57%)
+   - 理化常数: 外观乳白色半透明液体、pH 7.0-9.0、初沸点约100℃、粘度 50-800 mPa.s、固含量 44±1%、MFFT 18℃、Tg 15℃
+2. **PA-3617 源事实对账 (INV-ZERO-EXOGENOUS)**:
+   - 产品型号: PA-3617 单组份水性丙烯酸乳液
+   - GHS 分类: 非危险化学品，无象形图、无信号词、非危险货物
+   - 成分配比: 丙烯酸树脂 (42-44%)、去离子水 (56-58%)
+   - 理化常数: 外观乳白带蓝光半透明液体、pH 7.0-9.0、初沸点约100℃、粘度 10-600 mPa.s、固含量 43±1%、MFFT 35℃、Tg 29℃
+3. **标准 16 格式全矩阵交付物**:
+   - **PA-3615 (4 DOCX + 4 PDF)**:
+     - `PA-3615 msds_CN 冠志.docx` / `PA-3615 msds_CN 冠志.pdf`
+     - `PA-3615 msds_CN 国彩.docx` / `PA-3615 msds_CN 国彩.pdf`
+     - `PA-3615 msds_EN Guanzhi.docx` / `PA-3615 msds_EN Guanzhi.pdf`
+     - `PA-3615 msds_EN Guocai.docx` / `PA-3615 msds_EN Guocai.pdf`
+   - **PA-3617 (4 DOCX + 4 PDF)**:
+     - `PA-3617 msds_CN 冠志.docx` / `PA-3617 msds_CN 冠志.pdf`
+     - `PA-3617 msds_CN 国彩.docx` / `PA-3617 msds_CN 国彩.pdf`
+     - `PA-3617 msds_EN Guanzhi.docx` / `PA-3617 msds_EN Guanzhi.pdf`
+     - `PA-3617 msds_EN Guocai.docx` / `PA-3617 msds_EN Guocai.pdf`
+
+### 四、 耗时与性能度量遥测 (Timing & Performance Telemetry)
+| 阶段 / 任务 | PA-3615 耗时 | PA-3617 耗时 | 说明 |
+| :--- | :--- | :--- | :--- |
+| Step 1 智能文档解析识别 | 1.8 s | 1.7 s | DOCX 16章节结构化提取 |
+| Step 2 规范化中英双语对齐 | 0.9 s | 0.9 s | GHS 状态判定与理化指标映射 |
+| Step 3 拓扑覆写生产 (8格式) | 12.2 s | 12.5 s | 母版绑定、4 DOCX + 4 PDF 转换 |
+| Step 4 级联审计 (三大套件) | 36.7 s | 38.1 s | 几何测试 + 双极双层 165 项 + 中央审计 172 项 |
+| **总端到端执行耗时** | **51.6 s** | **53.9 s** | **单个型号稳定在 1 分钟之内** |
+
+### 五、 最终自动化审计全绿验证
+1. **排版几何不变量测试 (`test_editor_indent_and_alignment_invariants.mjs`)**:
+   - spacing (序号与标签间隔), label-alignment (标签垂线对齐), value-alignment (多列顶格) 三大子套件全部 100% 通过 (Exit code 0)
+2. **双极双层全景机械深度审计 (`audit_bipolar_bilayer.mjs`)**:
+   - PA-3615: 总检验项数 165 | 满分通过 165 | 违规 0 | 退出码 0 (🎉 满分通过)
+   - PA-3617: 总检验项数 165 | 满分通过 165 | 违规 0 | 退出码 0 (🎉 满分通过)
+3. **集中式中央主审计套件 (`run_master_msds_audit.mjs`)**:
+   - PA-3615: 总检验项数 172 | 满分通过 172 | 缺陷 0 | 退出码 0 (🏆 AUDIT_PASSED)
+   - PA-3617: 总检验项数 172 | 满分通过 172 | 缺陷 0 | 退出码 0 (🏆 AUDIT_PASSED)
+
+---
+
+## [2026-11-16 MSDS-Studio v9.0 集中式通用生产流水线与拓扑级编辑器架构发布 (UNIVERSAL-MSDS-PIPELINE-AND-TOPOLOGICAL-EDITOR-V9)] - 遵循 OrbitStack (Ps-openspec) 与 MSDS-Studio v9.0-ENTERPRISE 全流程规范，全量落实用户核心指示：“分析一下，怎么搞这么久，我理想中的 产出流水线，是让Agent只负责 通过识别模块 获取源文件内容，然后对源文件内容按照规范进行整理，然后通过编辑器能力覆写产出，最后对内容按照规范进行介入审计+机械审计，过程中尽量让多次任务共用同一固定入口避免过多临时脚本；写方案，需要注意的是编辑器基于拓扑结构的编辑能力一定要给到位，让Agent 能够多样的编辑能力，解决一下源文件中内容结构复杂时的标准化编写问题”。经方案获批，系统完成两大跨代落地重构：
+
+### 一、 集中式通用生产与法医审计统一入口 (run_universal_msds_pipeline.mjs)
+1. **消灭临时脚本不变量 (`INV-ZERO-TEMPORARY-SCRIPTS`)**:
+   - 彻底废除针对每个型号手写临时 `produce_xxx.mjs` 的低效恶习，全系统统一收敛至唯一命令：
+     ```bash
+     node web/scripts/run_universal_msds_pipeline.mjs --source="<源文件路径>"
+     ```
+2. **四步全自动原子闭环流水线**:
+   - **Step 1 智能识别中枢**: 自动处理 `.doc` (Word 97-2003 无损转换) 与 `.docx`，提取 16 章节结构化事实 (Context 1)；
+   - **Step 2 规范治理引擎**: GHS 危化品状态智能判定与理化指标中英双语规范化对齐 (Context 2)；
+   - **Step 3 拓扑覆写引擎**: 绑定母版拓扑，生成 4 DOCX + 4 PDF 全矩阵规范交付物；
+   - **Step 4 内嵌级联法医审计**: 自动执行排版几何测试套件、双极双层全景深度审计 (165项)、集中式中央主审计套件 (170项)。
+3. **黄金基准端到端实测 (PA-3612)**:
+   - 全程一键跑通，耗时仅 58.2s，退出码 0，三大审计套件全绿满分通过！
+
+### 二、 拓扑级编辑器变异原语与内省体系 (Topological Editor Primitives v9.0)
+在 `web/src/template-editor.js` 中新增并导出 10 大拓扑手术原语，赋予智能体多样化的表格骨架重构能力：
+1. **`getSectionTopology(session, secNum)`**: 全景内省表格网格宽度、行属性 (`FULL_WIDTH` / `TWO_COLUMN` / `MULTI_COLUMN`) 与跨列合并状态；
+2. **`peekRow` / `peekCell`**: 深入探测单元格段落与 Run 级样式，穿透解析加粗状态；
+3. **`reshapeTableRows(session, secNum, targetRowCount)`**: 智能扩充或缩减表格行数，自动继承边框样式与空白单元格初始化，绝不破坏外实内虚规则；
+4. **`morphToFullWidth(session, secNum, rowIdx, content, options)`**: 将多列数据行动态折叠为单通栏（严格落实 G-40 大通栏公理与上下呼吸边距）；
+5. **`morphToMultiColumn(session, secNum, rowIdx, colWidths, options)`**: 将通栏行或非标行重构为标准多列网格；
+6. **`insertRowAfter(session, secNum, rowIdx)`** / **`deleteRow`** / **`mergeCells`**: 行级插入、删除与水平合并；
+7. **`applyAdaptiveRuler(session, secNum)`**: 自适应排版标尺自检与注入（Tier A 420 dxa / Tier B 560 dxa）；
+8. **`enforceFlushLeftValues(session, secNum)`**: 多列值格清除多余缩进与空格，顶格纯净左对齐；
+9. **`validateTopologicalInvariants(session, secNum)`**: 拓扑不变量自检（零 `<w:numPr>` 污染、零显式 `<w:tabs>` 标签污染、值格零非法悬挂缩进）；
+10. **`checkpoint` / `rollback`**: 事务快照与原子回滚。
+
+### 三、 自动化单元测试验证
+- `web/tests/test_topological_editor_primitives.mjs`: 10 项拓扑变异与内省原语单元测试 100% 满分通过 (Exit code 0)。
+
+---
+
+
+## [2026-11-16 PA-3612 Swarm 双智能体生产与三大审计套件 100% 满分通过 (PA-3612-SWARM-PRODUCTION-AND-AUDIT)] - 遵循 OrbitStack (Ps-openspec) 与 MSDS-Studio v8.0-ENTERPRISE 全流程规范，全量落实用户核心指令：“你现在培养两个Swarm Subagent，一个负责进行MSDS 的工作流执行与产出，一个负责对结果进行审计，测试任务：'F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料\2-1 单组份水性丙烯酸乳液 PA\PA-3612\PA-3612 msds_CN 冠志.doc'”。建立 `msdsproducer`（生产）与 `msdsauditor`（审计）两名裁执物理隔离的协同智能体；以 `PA-3612 msds_CN 冠志.doc`（无损转出 docx）为单一真理源，保真丙烯酸树脂 43-45%、去离子水 55-57%、微黄半透明液体、pH 7-9、固含量 44±1%、MFFT 7℃ 等全部化学事实；系统级根治 Section 9 最低成膜温度（Minimum film-forming temperature (MFFT)）英译与序号剥离逻辑；生成标准 8 格式全矩阵交付物（4 DOCX + 4 PDF），并全部通过排版几何测试套件（Exit code 0）、双极双层全景深度审计 (165/165 满分通过, Failures: 0) 以及集中式中央主审计套件 (170/170 满分通过, Failures: 0)。
+
+### 一、 需求背景与核心治理宗旨
+承接用户指示：
+> “你现在培养两个Swarm Subagent，一个负责进行MSDS 的工作流执行与产出，一个负责对结果进行审计，测试任务："F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料\2-1 单组份水性丙烯酸乳液 PA\PA-3612\PA-3612 msds_CN 冠志.doc"”
+
+### 二、 核心排查排出的问题与系统级根治解法 (Root Cause & Solution)
+1. **Section 9 最低成膜温度英译缺失 (Gate 4 & Gate 12 拦截: 英文版出现中文字符)**:
+   - **根因**: 源文档 PA-3612 载有高分子乳液特有的 `最低成膜温度MFFT/℃`，而 `translateSection9Item` 历史分支仅覆盖了常规 19 项指标，未匹配 `成膜温度|MFFT`，导致该项回退到 `else` 维持中文原文本，造成英文版出现 `.18 最低成膜温度MFFT/°C:`。
+   - **解法**: 在 `pipeline-engine.js` 的 `translateSection9Item` 中增加 `else if (/成膜温度|MFFT/i.test(cnLabel))` 分支，规范化映射为 `Minimum film-forming temperature (MFFT):` 并按数值规范自动补充单位 ` °C`；在 `docx-engine.js` 中将该项加入标准 Canonical 白名单。
+2. **Section 9 标签序号剥离不彻底 (.18 残留缺陷)**:
+   - **根因**: `template-editor.js` 的 `cleanLabel` 原正则 `/^9\.\d+[\s\u3000.:：]*/` 仅匹配 `9.` 开头，当遇到只带小数点的序号文本（如 `.18 最低成膜温度`）时未能匹配，导致首字前残留了 `.18`。
+   - **解法**: 升级正则为 `/^(?:9\.)?\.?\d+[\s\u3000.:：]*/`，彻底消除所有畸变序号前缀。
+3. **pH 稀释与溶液描述中文字符渗漏防线**:
+   - **根因**: PA-3612 的 pH 描述载有 `7-9 （1%水溶液）`，英文翻译原正则仅匹配 `按.*稀释`，漏判了 `水溶液`。
+   - **解法**: 扩展 `translateSection9Item` 中的 pH 正则至 `/按.*稀释|稀释|水溶液/`，安全提取纯净数字范围 `7-9`，消除中文字符。
+
+### 三、 最终自动化审计全绿验证
+1. **集中式中央主审计套件 (`run_master_msds_audit.mjs`)**:
+   - 总检验项数: 170 | 通过: 170 | 缺陷: 0 | 退出码: 0 (🏆 AUDIT_PASSED)
+2. **双极双层全景机械深度审计 (`audit_bipolar_bilayer.mjs`)**:
+   - 总检验项数: 165 | 满分通过: 165 | 违规: 0 | 退出码: 0 (🎉 满分通过)
+3. **排版几何不变量测试 (`test_editor_indent_and_alignment_invariants.mjs`)**:
+   - spacing (54 paragraphs), label-alignment (70 paragraphs), value-alignment (67 paragraphs) 全部 100% 通过 (Exit code 0)
+
+---
+
+## [2026-11-16 HPU-7700 工业级标准生产与三大审计套件 100% 满分通过 (HPU-7700-EIGHT-DELIVERABLES-AND-DEEP-AUDIT)] - 遵循 OrbitStack (Ps-openspec) 与 MSDS-Studio v8.0-ENTERPRISE 全流程规范，全量落实用户核心指令：“7660 验收通过，接下来让Swarm Subagent去做'F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料\1-2 水性羟基聚氨酯树脂 HPU\HPU-7700\HPU-7700 msds_CN 冠志.docx' 的八格式覆写产出”。严格遵循源事实 100% 忠实保真公理（聚氨酯聚合物 ＞35%、水 ＞55%、N,N-二甲基乙醇胺 1-5%、透明至半透明液体、非危化品、无 GHS 象形图及信号词），调用原生八格式流水线生成 4 DOCX + 4 PDF 全矩阵交付物。全部通过排版几何不变量测试套件（Exit code 0）、双极双层法医级全景深度审计 (165/165 满分通过, Failures: 0)、集中式中央主审计套件 (168/168 满分通过, Failures: 0)。
+
+### 一、 需求背景与核心治理宗旨
+承接用户指示：
+> “7660 验收通过，接下来让Swarm Subagent去做"F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料\1-2 水性羟基聚氨酯树脂 HPU\HPU-7700\HPU-7700 msds_CN 冠志.docx" 的八格式覆写产出”
+
+### 二、 核心源事实对账与交付物生成
+1. **源文件事实 100% 忠实绑定 (`INV-ZERO-EXOGENOUS`)**:
+   - 产品型号: `HPU-7700`
+   - 产品名称: `羟基聚氨酯分散体` / `Hydroxy polyurethane dispersion`
+   - GHS 分类: 非危险化学品，无象形图、无信号词、非危险货物
+   - 成分配比: 聚氨酯聚合物 (Trade secret, ＞35%)、水 (7732-18-5, ＞55%)、N,N-二甲基乙醇胺 (108-01-0, 1-5%)
+   - 理化常数: 外观透明至半透明液体、pH 7-9、初沸点约100℃、粘度＜1000 mPa.s、固含量 37±2%、自燃不适用、引燃约420℃
+2. **标准 8 格式全矩阵交付物**:
+   - `HPU-7700 msds_CN 冠志.docx` / `HPU-7700 msds_CN 冠志.pdf`
+   - `HPU-7700 msds_CN 国彩.docx` / `HPU-7700 msds_CN 国彩.pdf`
+   - `HPU-7700 msds_EN Guanzhi.docx` / `HPU-7700 msds_EN Guanzhi.pdf`
+   - `HPU-7700 msds_EN Guocai.docx` / `HPU-7700 msds_EN Guocai.pdf`
+
+### 三、 最终自动化审计全绿验证
+1. **排版几何不变量测试 (`test_editor_indent_and_alignment_invariants.mjs`)**:
+   - spacing (序号与标签间隔), label-alignment (标签垂线对齐), value-alignment (多列顶格) 三大子套件全部 100% 通过 (Exit code 0)
+2. **双极双层全景机械深度审计 (`audit_bipolar_bilayer.mjs`)**:
+   - 总检验项数: 165 | 满分通过: 165 | 违规: 0 | 退出码: 0 (🎉 满分通过)
+3. **集中式中央主审计套件 (`run_master_msds_audit.mjs`)**:
+   - 总检验项数: 168 | 通过: 168 | 缺陷: 0 | 退出码: 0 (🏆 AUDIT_PASSED)
+
+---
+
+## [2026-11-16 HPU-7660 工业级标准生产与三大审计套件 100% 满分通过 (HPU-7660-EIGHT-DELIVERABLES-AND-DEEP-AUDIT)] - 遵循 OrbitStack (Ps-openspec) 与 MSDS-Studio v8.0-ENTERPRISE 全流程规范，全量落实用户核心指令：“继续推进工作流实践和审计，严格按照之前的标准进行审计，排出所有问题”。深入排查并彻底根治了 17 项格式违章与深层病理缺陷：1. 拔除 universal-editor-primitives.js 中非法 <w:tabs> 自定义制表位注入，消除 G-09 违章；2. 修复 template-editor.js 中 formatSection9LaserTabs 参数顺序颠倒（laserLabel 赋给 numberStr，isEn 赋给 labelText 导致双冒号与 true: 残留），跳过 Row 0 表头行，实现 Section 9 序号与 80.28pt 激光垂线 100% 对齐；3. 修复 smart-matching.js 中型号前缀正则 (?<!\s)(PU[-\s]?\d+) 错误切分 HPU 为 H PU 的历史 Bug；4. 修复 pipeline-engine.js 中引燃温度英译遗漏 约 -> Approx. 与 ℃ -> °C 导致的 Gate 4 英文版中文残留；5. 纠正源事实外观：杜绝人为篡改为乳白，100% 保真源文件“透明至半透明液体”与“Transparent to translucent liquid”；经执行集中式中央主审计套件 (168 项断言)、双极双层全景深度审计 (165 项断言)、编辑器排版几何不变量测试，全部实现 100% 满分通过 (Failures: 0, 退出码 0)，标准 8 格式全矩阵交付物全部就绪。
+
+### 一、 需求背景与核心治理宗旨
+承接用户指示：
+> “继续推进工作流实践和审计，目前问题比较多，请你严格按照之前的标准进行审计，一定要排出所有问题”
+
+### 二、 核心排查排出的问题与系统级根治解法 (Root Cause & Solution)
+1. **全局自定义制表位违规 (G-09 CN/EN Fail: 非法 <w:tabs> 为 75/73)**:
+   - **根因**: 在 `universal-editor-primitives.js` 的 `applyGlobalTypographyProjection` 中，误在带序号段落的 `pPr` 中创建并追加了 `<w:tabs><w:tab w:val="left" w:pos="420"/></w:tabs>`。在 Word OOXML 规范中，段落只要具有悬挂缩进 `w:ind w:left="420" w:hanging="420"`，文本中的 `<w:tab/>` 即可自动对齐到 420 dxa 垂线，多余的 `<w:tabs>` 节点直接违反了全局制表符纯度断言。
+   - **解法**: 从 `universal-editor-primitives.js` 中彻底移除 `tabsNode` 的创建与注入代码，保留清理逻辑，实测 `<w:tabs>` 数量彻底归零。
+2. **Section 9 标签对齐与内容错位 (G-38 错位、叠词与 true: 残留)**:
+   - **根因**: `template-editor.js` 的 `formatSection9LaserTabs` 中调用 `formatSection9LabelCell(firstCell, laserLabel, isEn)` 时参数错位（应为 `(cell, numberStr, labelText, isEnglish)`），导致 `numberStr` 被赋为 `"9.1  外观"`，而 `labelText` 被赋为布尔值 `isEn`，且未跳过 Row 0 表头，引发小节序号整体后移及标签首字在 PDF 中偏离 80.28pt 基准线。
+   - **解法**: 严格重构 `formatSection9LaserTabs`，强制跳过 Row 0，按 `(firstCell, `9.${currentSubIndex}`, cleanLabel, isEn)` 正确传递参数，PDF 激光垂线实测 100% 对齐至 80.28pt。
+3. **型号切分畸变 (Section 1 L-S1: 产品型号 HPU-7660 准确绑定失败)**:
+   - **根因**: `smart-matching.js` 中历史遗留的单组分型号正则 `/(?<!\s)(PU[-\s]?\d+[A-Za-z]?)/i` 强制在 `PU` 前加空格，遇到 `HPU-7660` 时在 `H` 与 `PU` 之间插入了空格，导致品名被错误拼接为 `羟基聚氨酯分散体 H PU-7660`。
+   - **解法**: 升级正则为 `/(?<![A-Za-z0-9\s])(PU[-\s]?\d+[A-Za-z]?)/i`，彻底杜绝切断前缀字母。
+4. **英文版中文字符残留 (Gate 4 强门禁: 文本节点中文字符数实测为 1)**:
+   - **根因**: `pipeline-engine.js` 1444 行在 `translateSection9Item` 翻译“引燃温度”时，直接返回了 `cnVal`，漏掉了对“约”与“℃”的英译替换，导致英文交付物中残留了“约420°C”。
+   - **解法**: 增加 `.replace(/约\s*/g, 'Approx. ').replace(/℃/g, ' °C')` 替换，中文字符彻底清零。
+5. **源事实保真度违章 (主审计 Section 9.1 外观保真门禁拦截)**:
+   - **根因**: 生产脚本一度将外观硬编码为“乳白色液体”，而源文档实际载明为“透明至半透明液体”，被中央主审计的源事实指纹门禁拦截。
+   - **解法**: 彻底恢复源文件真实事实“透明至半透明液体”，对应英文“Transparent to translucent liquid”，全面捍卫源事实忠实公理。
+
+### 三、 最终自动化审计全绿验证
+1. **集中式中央主审计套件 (`run_master_msds_audit.mjs`)**:
+   - 总检验项数: 168 | 通过: 168 | 缺陷: 0 | 退出码: 0 (🏆 AUDIT_PASSED)
+2. **双极双层全景机械深度审计 (`audit_bipolar_bilayer.mjs`)**:
+   - 总检验项数: 165 | 满分通过: 165 | 违规: 0 | 退出码: 0 (🎉 满分通过)
+3. **排版几何不变量测试 (`test_editor_indent_and_alignment_invariants.mjs`)**:
+   - spacing, label-alignment, value-alignment 三大子套件全部 100% 通过 (Exit code 0)
+
+---
+ - 遵循 Ps-openspec 与 Spec-Kit 工业级双门禁工程规范，全量落实用户核心指令：从编辑器底层原语与拓扑结构层面彻底固化排版几何，彻底杜绝打补丁；1. 固化序号与标签间隔机制（单个 <w:tab/> 节点装配，消除多余空格，自适应章节最大序号位数实现 Tier A 420 dxa / Tier B 560 dxa 标尺自动升级）；2. 固化标签对齐与多行折行机制（悬挂缩进锁死，折行第二行首字在 420/560 dxa 垂线绝对垂直对齐；未编号标签注入相同基线 w:left="420"，首字完全齐平，消除锯齿；物理级彻底剔除 w:firstLine、leftChars 及 w:numPr 污染）；3. 固化多列顶格/通栏层级缩进二分机制（多列表格 cells.length > 1 填写值单元格强制顶格左对齐，清空段落 w:ind；通栏单列表格保留树状层级缩进，子项措施 P 代码向右缩进 s2SubValueIndent）；编写专用测试套件 test_editor_indent_and_alignment_invariants.mjs，母版与实产 HPU-7651 交付物 100% 通过；完成 OpenSpec 规范合流与归档。
 
 ### 一、 需求背景与核心治理宗旨
 承接用户指示：

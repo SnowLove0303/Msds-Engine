@@ -1,6 +1,7 @@
 import assert from 'assert';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { JSDOM } from 'jsdom';
 
 if (!globalThis.DOMParser || !globalThis.XMLSerializer) {
@@ -12,16 +13,39 @@ if (!globalThis.DOMParser || !globalThis.XMLSerializer) {
 import { loadDocx, W_NS } from '../src/docx-engine.js';
 import { applyGlobalTypographyProjection, MSDS_DESIGN_TOKENS } from '../src/universal-editor-primitives.js';
 
-const TPL_CN = 'web/public/templates/正式模板_MSDS_CN_冠志(1).docx';
-const TPL_EN = 'web/public/templates/正式模板_MSDS_EN_冠志(1).docx';
-const HPU_CN = '算法训练材料/TDS MSDS 重写版/01-2 水性羟基聚氨酯树脂 HPU/HPU-7651/HPU-7651 msds_CN 冠志.docx';
-const HPU_EN = '算法训练材料/TDS MSDS 重写版/01-2 水性羟基聚氨酯树脂 HPU/HPU-7651/HPU-7651 msds_EN Guanzhi.docx';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(__dirname, '../..');
+
+const TPL_CN = path.resolve(REPO_ROOT, 'web/public/templates/正式模板_MSDS_CN_冠志(1).docx');
+const TPL_EN = path.resolve(REPO_ROOT, 'web/public/templates/正式模板_MSDS_EN_冠志(1).docx');
+const HPU_CN = path.resolve(REPO_ROOT, '算法训练材料/TDS MSDS 重写版/01-2 水性羟基聚氨酯树脂 HPU/HPU-7651/HPU-7651 msds_CN 冠志.docx');
+const HPU_EN = path.resolve(REPO_ROOT, '算法训练材料/TDS MSDS 重写版/01-2 水性羟基聚氨酯树脂 HPU/HPU-7651/HPU-7651 msds_EN Guanzhi.docx');
+const HPU7660_CN = path.resolve(REPO_ROOT, '算法训练材料/TDS MSDS 重写版/01-2 水性羟基聚氨酯树脂 HPU/HPU-7660/HPU-7660 msds_CN 冠志.docx');
+const HPU7660_EN = path.resolve(REPO_ROOT, '算法训练材料/TDS MSDS 重写版/01-2 水性羟基聚氨酯树脂 HPU/HPU-7660/HPU-7660 msds_EN Guanzhi.docx');
+const HPU7700_CN = path.resolve(REPO_ROOT, '算法训练材料/TDS MSDS 重写版/01-2 水性羟基聚氨酯树脂 HPU/HPU-7700/HPU-7700 msds_CN 冠志.docx');
+const HPU7700_EN = path.resolve(REPO_ROOT, '算法训练材料/TDS MSDS 重写版/01-2 水性羟基聚氨酯树脂 HPU/HPU-7700/HPU-7700 msds_EN Guanzhi.docx');
+const PA3612_CN = path.resolve(REPO_ROOT, '算法训练材料/TDS MSDS 重写版/02-1 单组份水性丙烯酸乳液 PA/PA-3612/PA-3612 msds_CN 冠志.docx');
+const PA3612_EN = path.resolve(REPO_ROOT, '算法训练材料/TDS MSDS 重写版/02-1 单组份水性丙烯酸乳液 PA/PA-3612/PA-3612 msds_EN Guanzhi.docx');
+const PA3615_CN = path.resolve(REPO_ROOT, '算法训练材料/TDS MSDS 重写版/02-1 单组份水性丙烯酸乳液 PA/PA-3615/PA-3615 msds_CN 冠志.docx');
+const PA3615_EN = path.resolve(REPO_ROOT, '算法训练材料/TDS MSDS 重写版/02-1 单组份水性丙烯酸乳液 PA/PA-3615/PA-3615 msds_EN Guanzhi.docx');
+const PA3617_CN = path.resolve(REPO_ROOT, '算法训练材料/TDS MSDS 重写版/02-1 单组份水性丙烯酸乳液 PA/PA-3617/PA-3617 msds_CN 冠志.docx');
+const PA3617_EN = path.resolve(REPO_ROOT, '算法训练材料/TDS MSDS 重写版/02-1 单组份水性丙烯酸乳液 PA/PA-3617/PA-3617 msds_EN Guanzhi.docx');
 
 const TEST_FILES = [
   { path: TPL_CN, needProjection: true },
   { path: TPL_EN, needProjection: true },
   { path: HPU_CN, needProjection: false },
   { path: HPU_EN, needProjection: false },
+  { path: HPU7660_CN, needProjection: false },
+  { path: HPU7660_EN, needProjection: false },
+  { path: HPU7700_CN, needProjection: false },
+  { path: HPU7700_EN, needProjection: false },
+  { path: PA3612_CN, needProjection: false },
+  { path: PA3612_EN, needProjection: false },
+  { path: PA3615_CN, needProjection: false },
+  { path: PA3615_EN, needProjection: false },
+  { path: PA3617_CN, needProjection: false },
+  { path: PA3617_EN, needProjection: false },
 ];
 
 /**

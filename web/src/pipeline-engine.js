@@ -611,7 +611,7 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
         } else if (/自燃温度/i.test(lbl)) {
           sec9Facts.auto_ignition = /不适用/i.test(val) ? 'Not applicable' : val;
         } else if (/引燃温度/i.test(lbl)) {
-          sec9Facts.ignition_temp = /不适用/i.test(val) ? 'Not applicable' : (/无数据/i.test(val) ? 'No data available.' : val);
+          sec9Facts.ignition_temp = /不适用/i.test(val) ? 'Not applicable' : (/无数据/i.test(val) ? 'No data available.' : val.replace(/约\s*/g, 'Approx. ').replace(/℃/g, ' °C'));
         } else if (/动力粘度|粘度/i.test(lbl)) {
           sec9Facts.viscosity = val.replace(/＜/g, '< ').replace(/＞/g, '> ');
         } else if (/固体含量|固含/i.test(lbl)) {
@@ -1355,7 +1355,9 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
   if (/外\s*观/i.test(cnLabel)) {
     enLabel = 'Appearance:';
     if (/淡黄.*至.*黄.*透明|淡黄.*黄.*透明/i.test(cnVal)) enVal = 'Transparent liquid, light yellow to yellow';
+    else if (/透明.*至.*半透明|透明.*半透明/i.test(cnVal)) enVal = 'Transparent to translucent liquid';
     else if (/黄色.*透明.*半透明|黄.*半透明/i.test(cnVal)) enVal = 'Yellow transparent to translucent liquid';
+    else if (/微黄.*半透明|淡黄.*半透明/i.test(cnVal)) enVal = 'Slightly yellowish translucent liquid';
     else if (/黄色至浅褐色透明液体|黄.*浅褐.*透明/i.test(cnVal)) enVal = 'Yellow to light brown transparent liquid';
     else if (/乳白.*蓝光|蓝光.*乳液/i.test(cnVal)) enVal = 'Milky white emulsion with bluish tint';
     else if (/乳白.*乳液/i.test(cnVal)) enVal = 'Milky white emulsion';
@@ -1380,7 +1382,7 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
   } else if (/pH/i.test(cnLabel)) {
     enLabel = 'pH value:';
     if (/无数据|无资料/.test(cnVal)) enVal = 'No data available.';
-    else if (/按.*稀释|稀释/.test(cnVal)) {
+    else if (/按.*稀释|稀释|水溶液/.test(cnVal)) {
       const m = cnVal.match(/[\d.-]+/);
       enVal = m ? m[0] : cnVal;
     }
@@ -1441,7 +1443,7 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
     else enVal = cnVal.replace(/约\s*/g, 'Approx. ').replace(/℃/g, ' °C').replace(/＞/g, '> ').replace(/(\d+)\s*°C/, '$1 °C');
   } else if (/引燃温度/i.test(cnLabel)) {
     enLabel = 'Ignition temperature:';
-    enVal = /不适用/.test(cnVal) ? 'Not applicable' : (/无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal);
+    enVal = /不适用/.test(cnVal) ? 'Not applicable' : (/无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal.replace(/约\s*/g, 'Approx. ').replace(/℃/g, ' °C'));
   } else if (/分解温度/i.test(cnLabel)) {
     enLabel = 'Decomposition temperature:';
     enVal = /无数据|无资料/.test(cnVal) ? 'No data available.' : cnVal;
@@ -1454,6 +1456,12 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
   } else if (/固体含量|固含/i.test(cnLabel)) {
     enLabel = 'Solid content:';
     enVal = cnVal.replace(/约\s*/g, 'Approx. ');
+  } else if (/成膜温度|MFFT/i.test(cnLabel)) {
+    enLabel = 'Minimum film-forming temperature (MFFT):';
+    enVal = cnVal.includes('°C') || cnVal.includes('℃') ? cnVal.replace(/约\s*/g, 'Approx. ').replace(/℃/g, ' °C') : `${cnVal} °C`;
+  } else if (/玻璃化.*温度|转变温度|\bTg\b/i.test(cnLabel)) {
+    enLabel = 'Glass transition temperature (Tg):';
+    enVal = cnVal.includes('°C') || cnVal.includes('℃') ? cnVal.replace(/约\s*/g, 'Approx. ').replace(/℃/g, ' °C') : `${cnVal} °C`;
   } else if (/密度/i.test(cnLabel)) {
     enLabel = /25/i.test(cnLabel) ? 'Density at 25 °C:' : 'Density:';
     enVal = cnVal.replace(/约\s*/g, 'Approx. ').replace(/g\/cm3/gi, ' g/cm³');
@@ -5147,6 +5155,10 @@ function formatEnglishLabelCell(cell, W_NS, sectionNumber, customIndent) {
     cleanLabel = 'Saturated vapour pressure:';
   } else if (/Firefighting precautions/i.test(cleanLabel)) {
     cleanLabel = 'Firefighting precautions and protective equipment:';
+  } else if (/Minimum film-forming|film forming|MFFT/i.test(cleanLabel)) {
+    cleanLabel = 'Minimum film-forming temperature (MFFT):';
+  } else if (/Glass transition|玻璃化|转变温度|\bTg\b/i.test(cleanLabel)) {
+    cleanLabel = 'Glass transition temperature (Tg):';
   } else {
     // 通用连续重复词清洗
     cleanLabel = cleanLabel

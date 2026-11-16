@@ -2449,7 +2449,6 @@ export function applyStandardHangingIndent(cell, leftVal = '420', hangingVal = '
   ind.setAttributeNS(W_NS, 'w:left', String(leftVal));
   ind.setAttributeNS(W_NS, 'w:leftChars', '0');
   ind.setAttributeNS(W_NS, 'w:hanging', String(hangingVal));
-  ind.setAttributeNS(W_NS, 'w:firstLineChars', '0');
   pPr.appendChild(ind);
 
   // 严格杜绝两端对齐 (both) 或居中对齐 (center) 引发的词间距横向拉伸走样，统一纯左对齐 (left)
@@ -3129,6 +3128,10 @@ export function formatSection9LabelCell(cell, numberStr, labelText, isEnglish = 
       cleanLabel = 'Decomposition temperature:';
     } else if (/Saturated vapour/i.test(cleanLabel)) {
       cleanLabel = 'Saturated vapour pressure:';
+    } else if (/Minimum film-forming|film forming|MFFT/i.test(cleanLabel)) {
+      cleanLabel = 'Minimum film-forming temperature (MFFT):';
+    } else if (/Glass transition|玻璃化|转变温度|\bTg\b/i.test(cleanLabel)) {
+      cleanLabel = 'Glass transition temperature (Tg):';
     } else {
       if (!cleanLabel.endsWith(':')) cleanLabel += ':';
     }

@@ -217,7 +217,15 @@ export async function inspectTemplateSchema(templateKey = 'CN_Guanzhi') {
       'checkpoint',
       'rollback',
       'applyCompanyPreset',
-      'saveSession'
+      'saveSession',
+      'getSectionTopology',
+      'reshapeTableRows',
+      'morphToFullWidth',
+      'morphToMultiColumn',
+      'insertRowAfter',
+      'applyAdaptiveRuler',
+      'enforceFlushLeftValues',
+      'validateTopologicalInvariants'
     ]
   };
 }
@@ -299,12 +307,15 @@ export function peekCellInSession(session, { sectionNumber, rowIndex, cellIndex 
     || cell.node?.getElementsByTagName?.('w:tcW')?.[0];
   const widthTwips = tcWNode?.getAttributeNS?.(W_NS, 'w') || tcWNode?.getAttribute?.('w:w') || null;
 
+  const runs = (cell.paragraphs || []).flatMap(p => p.runs || []);
+  const isBold = cell.bold !== undefined ? Boolean(cell.bold) : runs.some(r => r.bold);
+
   return {
     sectionNumber,
     rowIndex,
     cellIndex,
     text: cell.text || '',
-    bold: cell.bold,
+    bold: isBold,
     gridSpan,
     widthTwips
   };
@@ -491,6 +502,7 @@ export function formatSection9LaserTabs(session) {
   const isEn = session.isEnglish;
 
   for (let rIdx = 0; rIdx < (record.rows || []).length; rIdx++) {
+    if (rIdx === 0) continue;
     const row = record.rows[rIdx];
     const firstCell = row?.cells?.[0];
     if (!firstCell) continue;
@@ -498,11 +510,10 @@ export function formatSection9LaserTabs(session) {
     const rawText = (firstCell.text || '').trim();
     if (!rawText || /理化特性|Physical\s*and\s*chemical/i.test(rawText)) continue;
 
-    const cleanLabel = rawText.replace(/^9\.\d+[\s\u3000.:：]*/, '').trim();
+    const cleanLabel = rawText.replace(/^(?:9\.)?\.?\d+[\s\u3000.:：]*/, '').replace(/[:：]$/, '').trim();
     if (!cleanLabel) continue;
 
-    const laserLabel = `9.${currentSubIndex}  ${cleanLabel}`;
-    formatSection9LabelCell(firstCell, laserLabel, isEn);
+    formatSection9LabelCell(firstCell, `9.${currentSubIndex}`, cleanLabel, isEn);
     currentSubIndex++;
   }
 
@@ -566,4 +577,451 @@ export async function saveSession(session, outputPath) {
   const arrayBuf = await session.engine.exportArrayBuffer();
   fs.writeFileSync(outputPath, Buffer.from(arrayBuf));
   return { success: true, outputPath };
+}
+
+// =========================================================================
+// 拓扑级编辑器变异与内省原语 (Topological Editor Mutation & Introspection Primitives v9.0)
+// =========================================================================
+
+/**
+ * 结构探测器：返回指定章节的完整网格与行拓扑指纹
+ * @param {Object} session
+ * @param {number} secNum
+ */
+export function getSectionTopology(session, secNum) {
+  const record = (session.engine.records || []).find(r => r.sectionNumber === secNum);
+  if (!record) throw new Error(`Section ${secNum} not found in session`);
+
+  const tblNode = record.tableNode || record.node || record.rows?.[0]?.node?.parentNode;
+  const gridCols = tblNode ? Array.from(tblNode.getElementsByTagNameNS(W_NS, 'gridCol')) : [];
+  const gridWidths = gridCols.map(c => Number(c.getAttributeNS(W_NS, 'w') || c.getAttribute('w:w') || 0));
+  const totalGridWidth = gridWidths.reduce((a, b) => a + b, 0);
+
+  const rows = (record.rows || []).map((row, rIdx) => {
+    const cells = (row.cells || []).map((cell, cIdx) => {
+      const gsNode = cell.node?.getElementsByTagNameNS?.(W_NS, 'gridSpan')?.[0]
+        || cell.node?.getElementsByTagName?.('w:gridSpan')?.[0];
+      const gridSpan = Number(gsNode?.getAttributeNS?.(W_NS, 'val') || gsNode?.getAttribute?.('w:val') || 1);
+
+      const tcWNode = cell.node?.getElementsByTagNameNS?.(W_NS, 'tcW')?.[0]
+        || cell.node?.getElementsByTagName?.('w:tcW')?.[0];
+      const width = Number(tcWNode?.getAttributeNS?.(W_NS, 'w') || tcWNode?.getAttribute?.('w:w') || 0);
+
+      const runs = (cell.paragraphs || []).flatMap(p => p.runs || []);
+      const isBold = cell.bold !== undefined ? Boolean(cell.bold) : runs.some(r => r.bold);
+
+      return {
+        cellIndex: cIdx,
+        text: (cell.text || '').trim(),
+        gridSpan,
+        widthTwips: width,
+        bold: isBold
+      };
+    });
+
+    let type = 'MULTI_COLUMN';
+    if (cells.length === 1 || (cells[0] && cells[0].gridSpan >= (gridCols.length || 2))) {
+      type = 'FULL_WIDTH';
+    } else if (cells.length === 2) {
+      type = 'TWO_COLUMN';
+    }
+
+    return {
+      rowIndex: rIdx,
+      type,
+      cellCount: cells.length,
+      cells
+    };
+  });
+
+  return {
+    sectionNumber: secNum,
+    title: record.title || '',
+    rowCount: rows.length,
+    columnCount: gridCols.length || (record.columns || 2),
+    gridWidthsTwips: gridWidths,
+    totalWidthTwips: totalGridWidth,
+    rows
+  };
+}
+
+/**
+ * 触觉透视行 (Peek Row - 便捷重载通道)
+ */
+export function peekRow(session, ...args) {
+  if (typeof args[0] === 'object' && args[0] !== null) {
+    return peekRowInSession(session, args[0]);
+  }
+  const [sectionNumber, rowIndex] = args;
+  return peekRowInSession(session, { sectionNumber, rowIndex });
+}
+
+/**
+ * 触觉透视单元格 (Peek Cell - 便捷重载通道)
+ */
+export function peekCell(session, ...args) {
+  if (typeof args[0] === 'object' && args[0] !== null) {
+    return peekCellInSession(session, args[0]);
+  }
+  const [sectionNumber, rowIndex, cellIndex] = args;
+  return peekCellInSession(session, { sectionNumber, rowIndex, cellIndex });
+}
+
+/**
+ * 行级重塑器：智能扩充或缩减表格行数，新增行自动继承邻近数据行的边框样式与内边距，严禁破坏外实内虚规则
+ * @param {Object} session
+ * @param {number} secNum
+ * @param {number} targetRowCount
+ */
+export function reshapeTableRows(session, secNum, targetRowCount) {
+  if (targetRowCount <= 0) throw new Error(`targetRowCount must be > 0, received ${targetRowCount}`);
+  const initialRecord = (session.engine.records || []).find(r => r.sectionNumber === secNum);
+  if (!initialRecord) throw new Error(`Section ${secNum} not found in session`);
+
+  const currentRowCount = initialRecord.rows?.length || 0;
+  if (currentRowCount === targetRowCount) {
+    return { success: true, sectionNumber: secNum, previousRowCount: currentRowCount, newRowCount: targetRowCount };
+  }
+
+  if (targetRowCount > currentRowCount) {
+    const toAdd = targetRowCount - currentRowCount;
+    for (let i = 0; i < toAdd; i++) {
+      const currentRecord = (session.engine.records || []).find(r => r.sectionNumber === secNum);
+      const insertedIdx = currentRecord.rows.length;
+      const cloneFromIdx = Math.max(1, currentRecord.rows.length - 1);
+      cloneAndInsertRow(session.engine, currentRecord, insertedIdx, cloneFromIdx);
+    }
+  } else {
+    const toRemove = currentRowCount - targetRowCount;
+    for (let i = 0; i < toRemove; i++) {
+      const currentRecord = (session.engine.records || []).find(r => r.sectionNumber === secNum);
+      const removeIdx = currentRecord.rows.length - 1;
+      deleteDocxRow(session.engine, currentRecord, removeIdx);
+    }
+  }
+
+  session.modifiedSections.add(secNum);
+  const finalRecord = (session.engine.records || []).find(r => r.sectionNumber === secNum);
+  return {
+    success: true,
+    sectionNumber: secNum,
+    previousRowCount: currentRowCount,
+    newRowCount: finalRecord?.rows?.length || targetRowCount
+  };
+}
+
+/**
+ * 单行通栏裂变器：将多列数据行动态折叠为单通栏大通栏（如 Section 2 分类或 Section 3 说明行）
+ * @param {Object} session
+ * @param {number} secNum
+ * @param {number} rowIdx
+ * @param {string} content
+ * @param {Object} options
+ */
+export function morphToFullWidth(session, secNum, rowIdx, content = '', options = {}) {
+  const record = (session.engine.records || []).find(r => r.sectionNumber === secNum);
+  if (!record) throw new Error(`Section ${secNum} not found in session`);
+  if (!record.rows?.[rowIdx]) throw new Error(`Row ${rowIdx} not found in Section ${secNum}`);
+
+  renderFullWidthRow(record, rowIdx, content, {
+    isEnglish: session.isEnglish,
+    isSection2: secNum === 2,
+    ...options
+  });
+
+  session.modifiedSections.add(secNum);
+  return { success: true, sectionNumber: secNum, rowIndex: rowIdx };
+}
+
+/**
+ * 单行多列重构器：将通栏行或非标行拆分重构为标准多列网格
+ * @param {Object} session
+ * @param {number} secNum
+ * @param {number} rowIdx
+ * @param {Array<number>} colWidths
+ * @param {Object} options
+ */
+export function morphToMultiColumn(session, secNum, rowIdx, colWidths = null, options = {}) {
+  const record = (session.engine.records || []).find(r => r.sectionNumber === secNum);
+  if (!record) throw new Error(`Section ${secNum} not found in session`);
+  const row = record.rows?.[rowIdx];
+  if (!row?.node) throw new Error(`Row ${rowIdx} not found in Section ${secNum}`);
+
+  const doc = row.node.ownerDocument;
+  const tblNode = record.tableNode || record.node || row.node.parentNode;
+  let targetWidths = colWidths;
+  if (!targetWidths || targetWidths.length === 0) {
+    const gridCols = tblNode ? Array.from(tblNode.getElementsByTagNameNS(W_NS, 'gridCol')) : [];
+    if (gridCols.length > 0) {
+      targetWidths = gridCols.map(c => Number(c.getAttributeNS(W_NS, 'w') || c.getAttribute('w:w') || 0));
+    } else {
+      targetWidths = [2400, 7381];
+    }
+  }
+
+  const existingTcs = Array.from(row.node.getElementsByTagNameNS(W_NS, 'tc'));
+  existingTcs.forEach(tc => row.node.removeChild(tc));
+
+  row.cells = [];
+
+  targetWidths.forEach((width, cIdx) => {
+    const tcNode = doc.createElementNS(W_NS, 'w:tc');
+    row.node.appendChild(tcNode);
+
+    const tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+    tcNode.appendChild(tcPr);
+
+    const tcW = doc.createElementNS(W_NS, 'w:tcW');
+    tcW.setAttributeNS(W_NS, 'w:w', String(width));
+    tcW.setAttributeNS(W_NS, 'w:type', 'dxa');
+    tcPr.appendChild(tcW);
+
+    const vAlign = doc.createElementNS(W_NS, 'w:vAlign');
+    vAlign.setAttributeNS(W_NS, 'w:val', 'center');
+    tcPr.appendChild(vAlign);
+
+    const tcBorders = doc.createElementNS(W_NS, 'w:tcBorders');
+    tcPr.appendChild(tcBorders);
+
+    const isFirstCol = cIdx === 0;
+    const isLastCol = cIdx === targetWidths.length - 1;
+    const isFirstRow = rowIdx === 0;
+    const isLastRow = rowIdx === (record.rows?.length || 1) - 1;
+
+    const bTop = doc.createElementNS(W_NS, 'w:top');
+    bTop.setAttributeNS(W_NS, 'w:val', isFirstRow ? 'single' : 'dotted');
+    bTop.setAttributeNS(W_NS, 'w:sz', '4');
+    bTop.setAttributeNS(W_NS, 'w:space', '0');
+    bTop.setAttributeNS(W_NS, 'w:color', 'auto');
+    tcBorders.appendChild(bTop);
+
+    const bBottom = doc.createElementNS(W_NS, 'w:bottom');
+    bBottom.setAttributeNS(W_NS, 'w:val', isLastRow ? 'single' : 'dotted');
+    bBottom.setAttributeNS(W_NS, 'w:sz', '4');
+    bBottom.setAttributeNS(W_NS, 'w:space', '0');
+    bBottom.setAttributeNS(W_NS, 'w:color', 'auto');
+    tcBorders.appendChild(bBottom);
+
+    const bLeft = doc.createElementNS(W_NS, 'w:left');
+    bLeft.setAttributeNS(W_NS, 'w:val', isFirstCol ? 'single' : 'dotted');
+    bLeft.setAttributeNS(W_NS, 'w:sz', '4');
+    bLeft.setAttributeNS(W_NS, 'w:space', '0');
+    bLeft.setAttributeNS(W_NS, 'w:color', 'auto');
+    tcBorders.appendChild(bLeft);
+
+    const bRight = doc.createElementNS(W_NS, 'w:right');
+    bRight.setAttributeNS(W_NS, 'w:val', isLastCol ? 'single' : 'dotted');
+    bRight.setAttributeNS(W_NS, 'w:sz', '4');
+    bRight.setAttributeNS(W_NS, 'w:space', '0');
+    bRight.setAttributeNS(W_NS, 'w:color', 'auto');
+    tcBorders.appendChild(bRight);
+
+    const pNode = doc.createElementNS(W_NS, 'w:p');
+    tcNode.appendChild(pNode);
+
+    const newCell = {
+      node: tcNode,
+      text: '',
+      bold: isFirstCol && rowIdx > 0
+    };
+    row.cells.push(newCell);
+  });
+
+  session.modifiedSections.add(secNum);
+  return { success: true, sectionNumber: secNum, rowIndex: rowIdx, columnCount: targetWidths.length };
+}
+
+/**
+ * 行插入通道 (Insert Row After - 便捷通道)
+ */
+export function insertRowAfter(session, secNum, rowIdx, cloneFromRowIdx = null) {
+  const record = (session.engine.records || []).find(r => r.sectionNumber === secNum);
+  if (!record) throw new Error(`Section ${secNum} not found in session`);
+
+  const targetIdx = rowIdx + 1;
+  const cloneSource = cloneFromRowIdx !== null ? cloneFromRowIdx : rowIdx;
+  cloneAndInsertRow(session.engine, record, targetIdx, cloneSource);
+
+  session.modifiedSections.add(secNum);
+  return { success: true, sectionNumber: secNum, insertedRowIndex: targetIdx };
+}
+
+/**
+ * 物理行删除通道 (Delete Row - 便捷通道)
+ */
+export function deleteRow(session, secNum, rowIdx) {
+  return deleteRowFromSession(session, { sectionNumber: secNum, rowIndex: rowIdx });
+}
+
+/**
+ * 单元格合并通道 (Merge Cells - 便捷通道)
+ */
+export function mergeCells(session, secNum, rowIdx, fromCol, toCol) {
+  const colSpan = (toCol - fromCol) + 1;
+  return mergeCellsInSession(session, { sectionNumber: secNum, rowIndex: rowIdx, colStart: fromCol, colSpan });
+}
+
+/**
+ * 自适应排版标尺自检与注入 (Adaptive Ruler)
+ * 探测章节最大序号位数：<=3 位为 Tier A (420 dxa)，>=4 位升级为 Tier B (560 dxa)
+ */
+export function applyAdaptiveRuler(session, secNum) {
+  const record = (session.engine.records || []).find(r => r.sectionNumber === secNum);
+  if (!record) return { success: false, reason: `Section ${secNum} not found` };
+
+  let maxDigits = 0;
+  for (const row of record.rows || []) {
+    const c0Text = (row.cells?.[0]?.text || '').trim();
+    const m = c0Text.match(/^(\d+(?:\.\d+)+)/);
+    if (m) {
+      const digits = m[1].replace(/\D/g, '');
+      if (digits.length > maxDigits) maxDigits = digits.length;
+    }
+  }
+
+  const targetIndent = maxDigits >= 4 ? '560' : '420';
+
+  for (let rIdx = 1; rIdx < (record.rows || []).length; rIdx++) {
+    const row = record.rows[rIdx];
+    const c0 = row.cells?.[0];
+    if (!c0?.node) continue;
+
+    const ps = Array.from(c0.node.getElementsByTagNameNS(W_NS, 'p'));
+    for (const p of ps) {
+      const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
+      if (!pPr) continue;
+
+      const ind = pPr.getElementsByTagNameNS(W_NS, 'ind')?.[0];
+      if (ind) {
+        ind.setAttributeNS(W_NS, 'w:left', targetIndent);
+        ind.setAttributeNS(W_NS, 'w:hanging', targetIndent);
+      }
+
+      const tabsNodes = Array.from(pPr.getElementsByTagNameNS(W_NS, 'tabs'));
+      tabsNodes.forEach(n => pPr.removeChild(n));
+    }
+  }
+
+  session.modifiedSections.add(secNum);
+  return { success: true, sectionNumber: secNum, maxDigits, targetIndentDxa: targetIndent };
+}
+
+/**
+ * 多列值格顶格左对齐强制规范 (Enforce Flush Left Values)
+ */
+export function enforceFlushLeftValues(session, secNum) {
+  const record = (session.engine.records || []).find(r => r.sectionNumber === secNum);
+  if (!record) return { success: false, reason: `Section ${secNum} not found` };
+
+  for (let rIdx = 1; rIdx < (record.rows || []).length; rIdx++) {
+    const row = record.rows[rIdx];
+    for (let cIdx = 1; cIdx < (row.cells || []).length; cIdx++) {
+      const cell = row.cells[cIdx];
+      if (!cell?.node) continue;
+
+      const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
+      for (const p of ps) {
+        const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
+        if (pPr) {
+          const ind = pPr.getElementsByTagNameNS(W_NS, 'ind')?.[0];
+          if (ind) {
+            pPr.removeChild(ind);
+          }
+          const tabsNodes = Array.from(pPr.getElementsByTagNameNS(W_NS, 'tabs'));
+          tabsNodes.forEach(n => pPr.removeChild(n));
+        }
+
+        const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+        for (const r of runs) {
+          const tabs = Array.from(r.getElementsByTagNameNS(W_NS, 'tab'));
+          tabs.forEach(t => r.removeChild(t));
+        }
+      }
+    }
+  }
+
+  session.modifiedSections.add(secNum);
+  return { success: true, sectionNumber: secNum };
+}
+
+/**
+ * 拓扑不变量自检器 (Validate Topological Invariants)
+ * 严格审查: 零 <w:numPr> 污染、零显式 <w:tabs> 标签污染、值格零非法悬挂缩进
+ */
+export function validateTopologicalInvariants(session, secNum = null) {
+  const records = secNum !== null
+    ? (session.engine.records || []).filter(r => r.sectionNumber === secNum)
+    : (session.engine.records || []);
+
+  const violations = [];
+
+  for (const record of records) {
+    const sNum = record.sectionNumber;
+    const tblNode = record.tableNode || record.node || record.rows?.[0]?.node?.parentNode;
+    if (!tblNode) continue;
+
+    // 1. 零 <w:numPr> 污染
+    const numPrs = tblNode.getElementsByTagNameNS(W_NS, 'numPr');
+    if (numPrs.length > 0) {
+      violations.push({
+        sectionNumber: sNum,
+        code: 'NUMPR_POLLUTION',
+        message: `Section ${sNum} contains ${numPrs.length} prohibited <w:numPr> nodes`
+      });
+    }
+
+    // 2. 零显式 <w:tabs> 标签污染 (G-09 铁律)
+    const tabsNodes = tblNode.getElementsByTagNameNS(W_NS, 'tabs');
+    if (tabsNodes.length > 0) {
+      violations.push({
+        sectionNumber: sNum,
+        code: 'EXPLICIT_TABS_TAG_DETECTED',
+        message: `Section ${sNum} contains ${tabsNodes.length} prohibited <w:tabs> nodes`
+      });
+    }
+
+    // 3. 值单元格零非法悬挂缩进
+    for (let rIdx = 1; rIdx < (record.rows || []).length; rIdx++) {
+      const row = record.rows[rIdx];
+      if (row.cells.length <= 1) continue;
+
+      for (let cIdx = 1; cIdx < row.cells.length; cIdx++) {
+        const cell = row.cells[cIdx];
+        const ps = Array.from(cell.node?.getElementsByTagNameNS(W_NS, 'p') || []);
+        for (const p of ps) {
+          const ind = p.getElementsByTagNameNS(W_NS, 'ind')?.[0];
+          const hanging = ind?.getAttributeNS(W_NS, 'hanging') || ind?.getAttribute('w:hanging');
+          if (hanging && Number(hanging) > 0) {
+            violations.push({
+              sectionNumber: sNum,
+              rowIndex: rIdx,
+              cellIndex: cIdx,
+              code: 'VALUE_CELL_HANGING_INDENT',
+              message: `Section ${sNum} Row ${rIdx} Cell ${cIdx} has illegal hanging indent: ${hanging}`
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    valid: violations.length === 0,
+    violationCount: violations.length,
+    violations
+  };
+}
+
+/**
+ * 事务快照通道 (Checkpoint - 便捷别名)
+ */
+export function checkpoint(session, name = 'default') {
+  return createCheckpoint(session, name);
+}
+
+/**
+ * 事务回滚通道 (Rollback - 便捷别名)
+ */
+export function rollback(session, name = 'default') {
+  return rollbackSession(session, name);
 }
