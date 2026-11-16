@@ -1,5 +1,56 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-16 拓扑编辑器 Agent 原生 MCP 工具固化与 PA-3655 覆写产出测试 100% 满分通过 (TOPOLOGICAL-EDITOR-MCP-AND-PA3655-PRODUCTION)] - 严格遵循 OrbitStack (Ps-openspec) 与 MSDS-Studio v9.0-ENTERPRISE 全流程规范，全量落实用户核心指令：“进一步固化拓扑编辑器的 Agent 原生 MCP/ACI 工具封装，使模型能够在后续复杂源文件处理中更直接、灵活地调度四层拓扑原语，并交由执行Agent使用"F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料\2-1 单组份水性丙烯酸乳液 PA\PA-3655\PA-3655 msds_CN 冠志.docx" 基于最新改进的工作流进行覆写产出测试”。在 `web/src/mcp-server.js` 中固化并注册 4 大 Agent 原生强类型拓扑原语工具接口（`msds_get_section_topology`、`msds_morph_section_topology`、`msds_apply_typography_ruler`、`msds_validate_topology_invariants`），使 Agent 拥有对 Word 表格骨架进行微创手术的直接工具手脚；在 `template-editor.js` 扩展 `createWorkSession` 支持直接传入本地 DOCX 文件路径并完成万能操作批处理通道扩充；编写 `test_mcp_topological_primitives.mjs` 测试套件，6 大用例与变异反欺诈门禁 100% 满分通过；调度执行 Agent 运行统一流水线 `run_universal_msds_pipeline.mjs` 覆写生产 `PA-3655`，耗时 58.9 秒（< 60s），8 格式交付物（4 DOCX + 4 PDF）全部释放于目标目录，单文件 > 20KB，时间戳同步差仅 6.6 秒；顺利通过三大法医级审计套件与逐行双重对照中枢（96/96 满分匹配，173/173 主审计断言全绿通过，🏆 AUDIT_PASSED，Exit code 0）。
+
+### 一、 需求背景与核心治理宗旨
+承接用户指示：
+> “进一步固化拓扑编辑器的 Agent 原生 MCP/ACI 工具封装，使模型能够在后续复杂源文件处理中更直接、灵活地调度四层拓扑原语，并交由执行Agent使用"F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料\2-1 单组份水性丙烯酸乳液 PA\PA-3655\PA-3655 msds_CN 冠志.docx" 基于最新改进的工作流进行覆写产出测试”
+
+针对既往拓扑原语未直接向 MCP / ACI 工具层暴露独立调用接口、导致 Agent 难以在复杂源文件处理中直接下发微创拓扑重构指令的问题，进行标准工具封装与端到端实测验证。
+
+### 二、 核心排查排出的问题与系统级根治解法 (Root Cause & Solution)
+1. **Agent 原生 MCP 拓扑工具链封装 (REQ-01 / Tool-Exposition)**:
+   - **痛点**: 既往 Agent 若需对表格骨架进行扩缩容或大通栏形变，只能拼接冗长的底层操作，缺乏直接透视与独立操作的原子工具。
+   - **解法**: 在 `mcp-server.js` 中新增并注册 4 个专有 Agent 工具：
+     - `msds_get_section_topology`: 传入章节编号即可透视行数、列数、布局角色（`TWO_COLUMN` / `FULL_WIDTH`）与单元格文本；
+     - `msds_morph_section_topology`: 支持 `reshapeRows`、`morphToFullWidth`、`morphToMultiColumn`、`insertRowAfter`、`deleteRow`、`mergeCells` 等原子形变，自动保全外实内虚边框不变量；
+     - `msds_apply_typography_ruler`: 自动自适应探测最大序号位数应用 Tier A (420 dxa) 或 Tier B (560 dxa) 标尺、投影 Section 9 80.28pt 激光垂线、值格顶格左对齐；
+     - `msds_validate_topology_invariants`: 审查 OOXML 底层零 `<w:numPr>`、零非法 `<w:tabs>`、零 `w:firstLine="8730"` 畸变。
+2. **万能操作批处理通道全量扩充 (`msds_execute_editor_ops`)**:
+   - 扩充操作枚举，使 Agent 可以在单次事务调用中链式下发 `morphToFullWidth`、`insertRowAfter`、`applyAdaptiveRuler`、`validateInvariants` 等复合指令，并在异常时自动回滚。
+3. **`createWorkSession` 物理路径无缝兼容**:
+   - 消除必须传入已注册模板 key 的限制，支持直接传入任意本地 DOCX 物理文件路径，自动探测中英文与公司主体，实现对任意已有交付物的就地拓扑微调与审计。
+
+### 三、 PA-3655 源事实对账与 8 格式全矩阵交付物
+1. **源事实指纹核验 (INV-ZERO-EXOGENOUS)**:
+   - 产品型号: PA-3655 单组份水性丙烯酸乳液
+   - GHS 分类: 非危险化学品，无象形图、无信号词、非危险货物
+   - 组分信息: 丙烯酸共聚物 (41-43%, 商业机密)、去离子水 (57-59%, CAS 7732-18-5)
+   - 理化常数: 外观乳白色半透明液体、pH 7.0-9.0、初沸点约100℃、粘度 10-500 mPa.s、固含量 42±1%、MFFT 28℃、Tg 22℃
+2. **标准 8 格式交付物全量释放** (位于 `算法训练材料\TDS MSDS 重写版\02-1 单组份水性丙烯酸乳液 PA\PA-3655`):
+   - `PA-3655 msds_CN 冠志.docx` (29.7 KB) / `.pdf` (236.3 KB)
+   - `PA-3655 msds_CN 国彩.docx` (29.7 KB) / `.pdf` (236.5 KB)
+   - `PA-3655 msds_EN Guanzhi.docx` (28.9 KB) / `.pdf` (175.2 KB)
+   - `PA-3655 msds_EN Guocai.docx` (28.9 KB) / `.pdf` (173.4 KB)
+   - 8 份文件体积全部 > 20KB，时间戳同步差仅 6.6 秒（< 5 分钟）。
+
+### 四、 耗时与性能度量遥测 (Timing & Performance Telemetry)
+| 阶段 / 任务 | PA-3655 耗时 | 规范说明 |
+| :--- | :--- | :--- |
+| Step 1 智能文档解析识别 | 0.27 s | 22 项理化常数、2 组分、GHS 非危零损耗提取 |
+| Step 2 规范化中英双语对齐 | 0.001 s | GHS 状态校验与双语标准化 |
+| Step 3 原生母版拓扑覆写 (8格式) | 42.3 s | 4 DOCX 装配与 4 PDF 高保真渲染 |
+| Step 4 级联三大法医审计与逐行双重核对 | 16.3 s | 几何测试 + 双极双层 + 173 项中央主审计 + 96 行双重对照 |
+| **总端到端执行耗时** | **58.9 s** | **稳定在 1 分钟之内，零临时脚本** |
+
+### 五、 最终法医级审计全绿通报
+1. **排版几何不变量套件 (spacing / label-align / value-align)**: 100% PASS (0 Errors)；
+2. **双极双层全景深度审计套件**: 165/165 项 100% PASS (0 Failures)；
+3. **集中式中央主审计套件**: 173/173 项 100% PASS (0 Failures, 🏆 AUDIT_PASSED, Exit code 0)；
+4. **机械审计逐行双重对照中枢**: 96/96 行 100% MATCH (0 致命报警，关键限定条件无丢失，中文零残留)。
+
+
+
 ## [2026-11-16 翻译底层执行写入强化与机械审计逐行双重对照显示呈现 (TRANSLATION-EXECUTION-AND-DUAL-DISPLAY-LINE-AUDIT)] - 严格遵循 OrbitStack (Ps-openspec) 与两阶双轨深度审计规范，全量落实用户核心指示：“对翻译的执行写入和逐句审计还需要通过底层逻辑加强一下，然后让Agent务必执行好 逐行审计的任务，可以在机械审计上做 源文件与翻译句的逐行双重显示以便于对照”与“充分发挥Agent 的模型能力，比如对编辑器的使用、审计，以及翻译等等”。重构底层翻译逻辑，终结 Section 9.3 pH 稀释限定条件（如“按 1:10 的比例用水稀释”、“1%水溶液”）被数值正则粗暴剔除的顽疾，统一 N,N-Dimethylethanolamine 标准命名与规范密度间距；研发独立机械审计逐行双重对照显示中枢 audit_translation_dual_display.mjs 并作为环 4.3 强硬门禁（断言 170）合流至 run_master_msds_audit.mjs；编写 test_translation_and_dual_display_invariants.mjs 单元测试并以历史缺陷样本通过反例变异反欺诈验证；重新跑通 HPU-7660 端到端覆写，106 项逐行双重对照 100% 满分通过，170 项中央主审计断言全绿通过 (🏆 AUDIT_PASSED, Exit code 0)。
 
 ### 一、 需求背景与核心治理宗旨

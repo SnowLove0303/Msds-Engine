@@ -31,7 +31,17 @@ import {
   peekCellInSession,
   peekRowInSession,
   createCheckpoint,
-  rollbackSession
+  rollbackSession,
+  getSectionTopology,
+  reshapeTableRows,
+  morphToFullWidth,
+  morphToMultiColumn,
+  insertRowAfter,
+  deleteRow,
+  mergeCells,
+  applyAdaptiveRuler,
+  enforceFlushLeftValues,
+  validateTopologicalInvariants
 } from './template-editor.js';
 import { planAuditTargets, verifyAuditContract } from './audit-planner.js';
 
@@ -206,6 +216,13 @@ const TOOLS = [
                   'deleteColumn',
                   'mergeCells',
                   'insertRow',
+                  'insertRowAfter',
+                  'reshapeRows',
+                  'morphToFullWidth',
+                  'morphToMultiColumn',
+                  'applyAdaptiveRuler',
+                  'enforceFlushLeftValues',
+                  'validateInvariants',
                   'checkpoint',
                   'rollback'
                 ]
@@ -218,6 +235,12 @@ const TOOLS = [
               colSpan: { type: 'number' },
               targetRowIndex: { type: 'number' },
               cloneFromRowIndex: { type: 'number' },
+              targetRowCount: { type: 'number' },
+              rowIdx: { type: 'number' },
+              colWidths: { type: 'array', items: { type: 'number' } },
+              fromCol: { type: 'number' },
+              toCol: { type: 'number' },
+              rule: { type: 'string' },
               text: { type: 'string' },
               content: { type: 'string' },
               chemicalFormula: { type: 'string' },
@@ -290,6 +313,103 @@ const TOOLS = [
         }
       },
       required: ['targetDir', 'modelCode']
+    }
+  },
+  {
+    name: 'msds_get_section_topology',
+    description: '透视指定 MSDS 模板或 DOCX 文件的特定章节（1~16）的表格骨架拓扑指纹（总行数、列数、布局形态 TWO_COLUMN/FULL_WIDTH/MULTI_COLUMN、单元格跨列属性与文本快照）。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        templateKey: {
+          type: 'string',
+          description: '模板标识（如 CN_Guanzhi, EN_Guanzhi, CN_Guocai, EN_Guocai）'
+        },
+        docxPath: {
+          type: 'string',
+          description: '待透视的目标 DOCX 文件绝对路径（若提供则优先于 templateKey）'
+        },
+        sectionNumber: {
+          type: 'number',
+          description: '章节编号 (1~16)'
+        }
+      },
+      required: ['sectionNumber']
+    }
+  },
+  {
+    name: 'msds_morph_section_topology',
+    description: '对指定 MSDS 模板或 DOCX 文件的特定章节执行外科手术式拓扑形变操作（行数扩缩容 reshapeRows、大通栏单行重构 morphToFullWidth、多列拆分 morphToMultiColumn、插入行 insertRowAfter、删除行 deleteRow、合并单元格 mergeCells），并导出合规 DOCX。自带边框外实内虚保全。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        templateKey: {
+          type: 'string',
+          description: '母版标识（如 CN_Guanzhi 等）'
+        },
+        docxPath: {
+          type: 'string',
+          description: '输入源 DOCX 物理文件路径（若提供则优先于 templateKey）'
+        },
+        outputPath: {
+          type: 'string',
+          description: '产出的目标 DOCX 文件完整绝对路径'
+        },
+        sectionNumber: {
+          type: 'number',
+          description: '目标章节编号 (1~16)'
+        },
+        action: {
+          type: 'string',
+          enum: ['reshapeRows', 'morphToFullWidth', 'morphToMultiColumn', 'insertRowAfter', 'deleteRow', 'mergeCells'],
+          description: '拓扑形变动作'
+        },
+        params: {
+          type: 'object',
+          description: '动作专属参数',
+          properties: {
+            targetRowCount: { type: 'number', description: 'reshapeRows 目标行数' },
+            rowIdx: { type: 'number', description: '目标行索引（从 0 开始）' },
+            content: { type: 'string', description: 'morphToFullWidth 单格内容' },
+            colWidths: { type: 'array', items: { type: 'number' }, description: 'morphToMultiColumn 列宽定义' },
+            fromCol: { type: 'number', description: 'mergeCells 起始列' },
+            toCol: { type: 'number', description: 'mergeCells 终止列' },
+            cloneFromRowIdx: { type: 'number', description: 'insertRowAfter 样式克隆源行索引' }
+          }
+        }
+      },
+      required: ['outputPath', 'sectionNumber', 'action']
+    }
+  },
+  {
+    name: 'msds_apply_typography_ruler',
+    description: '对指定模板或 DOCX 文件施加排版几何标尺投影与对齐硬锁（根据章节最大序号位数自适应投影 Tier A 420dxa 或 Tier B 560dxa 标尺、投影 Section 9 80.28pt 黄金基准激光制表位、或多列表格值单元格顶格左对齐）。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        templateKey: { type: 'string' },
+        docxPath: { type: 'string' },
+        outputPath: { type: 'string', description: '产出的目标 DOCX 文件完整绝对路径' },
+        sectionNumber: { type: 'number', description: '章节编号 (1~16)，留空或0表示全篇' },
+        rule: {
+          type: 'string',
+          enum: ['adaptiveRuler', 'laserTabsSection9', 'flushLeftValues', 'allRules'],
+          description: '需应用的排版规则'
+        }
+      },
+      required: ['outputPath', 'rule']
+    }
+  },
+  {
+    name: 'msds_validate_topology_invariants',
+    description: '对目标 DOCX 交付物执行底层 OOXML 拓扑物理不变量深度审计（外框实线 single 内框虚线 dotted、全文档零 <w:numPr> 列表定义残留、页脚零 w:firstLine="8730" 畸变缩进、跨页断行放开等）。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        docxPath: { type: 'string', description: '待审计的 DOCX 交付物绝对路径' },
+        templateKey: { type: 'string' },
+        sectionNumber: { type: 'number', description: '可选的特定章节编号 (1~16)' }
+      }
     }
   }
 ];
@@ -531,6 +651,24 @@ async function handleToolCall(name, args) {
           await createCheckpoint(session, op.checkpointId || 'default');
         } else if (op.op === 'rollback') {
           await rollbackSession(session, op.checkpointId || 'default');
+        } else if (op.op === 'insertRowAfter') {
+          insertRowAfter(session, op.sectionNumber, op.rowIndex !== undefined ? op.rowIndex : (op.rowIdx || 0), op.cloneFromRowIndex);
+        } else if (op.op === 'reshapeRows') {
+          reshapeTableRows(session, op.sectionNumber, op.targetRowCount || op.rowCount || 2);
+        } else if (op.op === 'morphToFullWidth') {
+          morphToFullWidth(session, op.sectionNumber, op.rowIndex !== undefined ? op.rowIndex : (op.rowIdx || 0), op.content || op.text || '', op.options || {});
+        } else if (op.op === 'morphToMultiColumn') {
+          morphToMultiColumn(session, op.sectionNumber, op.rowIndex !== undefined ? op.rowIndex : (op.rowIdx || 0), op.colWidths || null, op.options || {});
+        } else if (op.op === 'applyAdaptiveRuler') {
+          applyAdaptiveRuler(session, op.sectionNumber);
+        } else if (op.op === 'enforceFlushLeftValues') {
+          enforceFlushLeftValues(session, op.sectionNumber);
+        } else if (op.op === 'validateInvariants') {
+          const invRes = validateTopologicalInvariants(session, op.sectionNumber);
+          if (!invRes.valid) {
+            const errs = (invRes.violations || []).map(v => v.message).join('; ');
+            throw new Error(`拓扑不变量校验失败: ${errs}`);
+          }
         }
       }
 
@@ -579,6 +717,95 @@ async function handleToolCall(name, args) {
       success: masterRes.success && bilayerRes.success,
       masterAudit: masterRes,
       bilayerAudit: bilayerRes
+    };
+  }
+
+  if (name === 'msds_get_section_topology') {
+    const session = await createWorkSession(args.docxPath || args.templateKey || 'CN_Guanzhi');
+    return getSectionTopology(session, args.sectionNumber);
+  }
+
+  if (name === 'msds_morph_section_topology') {
+    const session = await createWorkSession(args.docxPath || args.templateKey || 'CN_Guanzhi');
+    const secNum = args.sectionNumber;
+    const action = args.action;
+    const p = args.params || {};
+
+    let morphRes;
+    if (action === 'reshapeRows') {
+      morphRes = reshapeTableRows(session, secNum, p.targetRowCount || p.rowCount || 2);
+    } else if (action === 'morphToFullWidth') {
+      morphRes = morphToFullWidth(session, secNum, p.rowIdx !== undefined ? p.rowIdx : 0, p.content || '', p.options || {});
+    } else if (action === 'morphToMultiColumn') {
+      morphRes = morphToMultiColumn(session, secNum, p.rowIdx !== undefined ? p.rowIdx : 0, p.colWidths || null, p.options || {});
+    } else if (action === 'insertRowAfter') {
+      morphRes = insertRowAfter(session, secNum, p.rowIdx !== undefined ? p.rowIdx : 0, p.cloneFromRowIdx);
+    } else if (action === 'deleteRow') {
+      morphRes = deleteRow(session, secNum, p.rowIdx !== undefined ? p.rowIdx : 0);
+    } else if (action === 'mergeCells') {
+      morphRes = mergeCells(session, secNum, p.rowIdx !== undefined ? p.rowIdx : 0, p.fromCol || 0, p.toCol || 1);
+    } else {
+      throw new Error(`未知的拓扑形变动作: ${action}`);
+    }
+
+    const saveRes = await saveSession(session, args.outputPath);
+    return {
+      success: true,
+      action,
+      sectionNumber: secNum,
+      morphResult: morphRes,
+      topologyAfter: getSectionTopology(session, secNum),
+      outputPath: saveRes.outputPath,
+      sizeBytes: saveRes.sizeBytes
+    };
+  }
+
+  if (name === 'msds_apply_typography_ruler') {
+    const session = await createWorkSession(args.docxPath || args.templateKey || 'CN_Guanzhi');
+    const secNum = args.sectionNumber || 0;
+    const rule = args.rule;
+
+    if (rule === 'adaptiveRuler') {
+      if (secNum > 0) applyAdaptiveRuler(session, secNum);
+      else {
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].forEach(s => applyAdaptiveRuler(session, s));
+      }
+    } else if (rule === 'laserTabsSection9') {
+      formatSection9LaserTabs(session);
+      applyAdaptiveRuler(session, 9);
+      enforceFlushLeftValues(session, 9);
+    } else if (rule === 'flushLeftValues') {
+      if (secNum > 0) enforceFlushLeftValues(session, secNum);
+      else {
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].forEach(s => enforceFlushLeftValues(session, s));
+      }
+    } else if (rule === 'allRules') {
+      formatSection9LaserTabs(session);
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].forEach(s => {
+        applyAdaptiveRuler(session, s);
+        enforceFlushLeftValues(session, s);
+      });
+    }
+
+    const saveRes = await saveSession(session, args.outputPath);
+    return {
+      success: true,
+      appliedRule: rule,
+      sectionNumber: secNum,
+      outputPath: saveRes.outputPath,
+      sizeBytes: saveRes.sizeBytes
+    };
+  }
+
+  if (name === 'msds_validate_topology_invariants') {
+    const session = await createWorkSession(args.docxPath || args.templateKey || 'CN_Guanzhi');
+    const res = validateTopologicalInvariants(session, args.sectionNumber !== undefined ? args.sectionNumber : null);
+    return {
+      passed: res.valid,
+      valid: res.valid,
+      violationCount: res.violationCount,
+      violations: res.violations,
+      errors: res.violations
     };
   }
 

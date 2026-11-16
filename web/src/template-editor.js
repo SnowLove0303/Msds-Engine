@@ -234,7 +234,20 @@ export async function inspectTemplateSchema(templateKey = 'CN_Guanzhi') {
  * 创建独立工作会话 (Create Isolated Work Session)
  */
 export async function createWorkSession(templateKey = 'CN_Guanzhi', workingDir = null) {
-  const tplInfo = TEMPLATE_LIBRARY[templateKey] || TEMPLATE_LIBRARY.CN_Guanzhi;
+  let tplInfo;
+  if (typeof templateKey === 'string' && fs.existsSync(templateKey)) {
+    const isEn = /_EN|English/i.test(templateKey);
+    const isGc = /国彩|Guocai/i.test(templateKey);
+    tplInfo = {
+      key: 'custom_path',
+      name: path.basename(templateKey, '.docx'),
+      language: isEn ? 'en' : 'zh',
+      company: isGc ? 'Guocai' : 'Guanzhi',
+      templatePath: path.resolve(templateKey)
+    };
+  } else {
+    tplInfo = TEMPLATE_LIBRARY[templateKey] || TEMPLATE_LIBRARY.CN_Guanzhi;
+  }
   if (!fs.existsSync(tplInfo.templatePath)) {
     throw new Error(`Template file not found: ${tplInfo.templatePath}`);
   }
