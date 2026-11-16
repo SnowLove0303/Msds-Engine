@@ -1,5 +1,49 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-16 翻译底层执行写入强化与机械审计逐行双重对照显示呈现 (TRANSLATION-EXECUTION-AND-DUAL-DISPLAY-LINE-AUDIT)] - 严格遵循 OrbitStack (Ps-openspec) 与两阶双轨深度审计规范，全量落实用户核心指示：“对翻译的执行写入和逐句审计还需要通过底层逻辑加强一下，然后让Agent务必执行好 逐行审计的任务，可以在机械审计上做 源文件与翻译句的逐行双重显示以便于对照”与“充分发挥Agent 的模型能力，比如对编辑器的使用、审计，以及翻译等等”。重构底层翻译逻辑，终结 Section 9.3 pH 稀释限定条件（如“按 1:10 的比例用水稀释”、“1%水溶液”）被数值正则粗暴剔除的顽疾，统一 N,N-Dimethylethanolamine 标准命名与规范密度间距；研发独立机械审计逐行双重对照显示中枢 audit_translation_dual_display.mjs 并作为环 4.3 强硬门禁（断言 170）合流至 run_master_msds_audit.mjs；编写 test_translation_and_dual_display_invariants.mjs 单元测试并以历史缺陷样本通过反例变异反欺诈验证；重新跑通 HPU-7660 端到端覆写，106 项逐行双重对照 100% 满分通过，170 项中央主审计断言全绿通过 (🏆 AUDIT_PASSED, Exit code 0)。
+
+### 一、 需求背景与核心治理宗旨
+针对用户明确提出的核心诉求：
+1. 依据《HPU-7660_MSDS_中英文逐项翻译核对报告_Section2-16.md》排查的翻译漏失与不严谨点，通过底层逻辑强化翻译写入与逐句审计；
+2. 强化 Agent 认知审计与机械审计结合，在机械审计中建立中英文逐行双重对照显示，使“源文本”与“译文结果”并列呈现；
+3. 贯彻落实充分发挥 Agent 模型能力的指导思想，推进拓扑编辑器灵活调度、法医级反向审计、智能领域翻译三位一体架构。
+
+### 二、 核心排查排出的问题与系统级根治解法 (Root Cause & Solution)
+1. **Section 9.3 pH 稀释与测试条件丢失根因与解法 (INV-PRESERVE-TRANSLATION-CONDITIONS)**:
+   - **根因**: 原 `translateSection9Item` 提取数值正则 `const m = cnVal.match(/[\d.-]+/); enVal = m ? m[0] : cnVal;` 将括号内的稀释限定条件 `（按 1:10 的比例用水稀释）` 或 `（1%水溶液）` 强行剔除，导致译文中仅剩下干瘪数值 `7-9`，严重丧失法定物理测试依据。
+   - **解法**: 在 `pipeline-engine.js` 中重写 pH 提取逻辑，探测 `combined = `${cnLabel} ${cnVal}``，捕获稀释比例与水溶液关键词，标准输出 `7-9 (diluted with water at a ratio of 1:10).` 或 `7.0-9.0 (1% aqueous solution).`；并在 `context-governor.js` 注册比例正则转译器，确保任意比例（如 1:5, 1:10, 1:20）无损转译。
+2. **Section 3.2 化学品规范英文名统一 (P03 / CAS 108-01-0)**:
+   - **根因**: 历史字典存在 `2-二甲氨基乙醇` 与 `二甲基乙醇胺` 多种变体，存在命名不一致风险。
+   - **解法**: 在 `context-governor.js` 中确立 IUPAC 与 MSDS 标准名称 `N,N-Dimethylethanolamine` 为唯一法定英文映射，彻底清除拼写漂移。
+3. **机械审计逐行双重对照显示引擎 (`audit_translation_dual_display.mjs`)**:
+   - **架构**: 遍历 Section 2 至 Section 16 的全部表格与行段落，实时提取 `[CN Source]` 与 `[EN Deliverable]` 形成对齐对并列输出。
+   - **三大告警探针**:
+     - `CONDITION_MISSING_ALARM`: 检测中文源句含有的关键限定词（如“稀释”、“1%水溶液”、“OECD”）在英文中是否存在对应语义映射；
+     - `CHINESE_RESIDUE_ALARM`: 阻断任何汉字在英文译文中的非受控渗透；
+     - `NUMERIC_DRIFT_WARNING`: 监控数值范围是否在转译过程中发生漂移。
+   - **集中式审计合流**: 将其作为 Ring 4.3 门禁（断言 170）无缝嵌入 `run_master_msds_audit.mjs`，确保 `dualAuditSummary.alarms === 0` 作为交付物发布的充要准出条件。
+4. **防回退与反例变异元审计杀伤力验证 (`test_translation_and_dual_display_invariants.mjs`)**:
+   - 4 项测试用例全部通过，其中 Test 4 对未修复的历史 PA-3615 产出物执行变异攻击，审计工具成功捕获 1 项限定条件丢失报警并产生真实退出码 1，证明审计断言非弱断言，反欺诈门禁成立。
+
+### 三、 HPU-7660 端到端实测验证
+- **逐行双重对照核验**: 106/106 行对齐通过 (100.0% MATCH, Alarms: 0, Warnings: 0)；
+- **集中式主审计套件**: 170/170 项断言全部满分通过 (🏆 AUDIT_PASSED, Exit code 0)；
+- **核心事实检验**:
+  - Section 9.3: `pH value: 7-9 (diluted with water at a ratio of 1:10).` 完整保留；
+  - Section 3.2: `N,N-Dimethylethanolamine` 规范名准确填报；
+  - Section 9.11: `Relative density: Approx. 1.06 g/cm³` 标签与数值空格隔离完好。
+
+### 四、 发挥 Agent 模型能力的体系化赋能演进方案
+响应用户关于“充分发挥 Agent 模型能力，比如对编辑器的使用、审计，以及翻译等等”的指导，明确三大赋能支柱：
+1. **编辑器智能调度 (Topological Editor Primitives for Agent)**:
+   - 摒弃脆弱的全局替换，向 Agent 开放基于 DOM/OOXML 的拓扑操作工具 (`morphToFullWidth`, `reshapeTableRows`, `insertRowAfter`, `deleteRow`, `applyAdaptiveRuler`)，使 Agent 具备微创手术级别的版式掌控力；
+2. **法医级认知反向审计 (Adversarial Cognitive Audit)**:
+   - 实行“机械审计为基底准入 + Agent 认知审计为深度证伪”的双轨机制，Agent 充当敌手专门排查化学常理违背、隐性外生虚增、细微语义漂移；
+3. **化学领域智能模型翻译 (Model-Driven Chemical Translation)**:
+   - 由硬编码词典演进为“权威化学术语表（约束承重墙）+ LLM 上下文感知翻译（长句与条件限定）”混合架构，彻底杜绝粗暴截断，保全复杂工况与法规描述。
+
+
+
 ## [2026-11-16 PA-3615 与 PA-3617 Swarm 双智能体标准覆写与全景法医审计 100% 满分通过 (PA-3615-PA-3617-SWARM-PRODUCTION-AND-AUDIT)] - 遵循 OrbitStack (Ps-openspec) 与 MSDS-Studio v9.0-ENTERPRISE 全流程规范，全量落实用户核心指令：“"F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料\2-1 单组份水性丙烯酸乳液 PA\PA-3615\PA-3615 MSDS（冠志）.docx"、"F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料\2-1 单组份水性丙烯酸乳液 PA\PA-3617\PA-3617 MSDS-CN（冠志）.docx" 让Subagent 去执行覆写产出，你负责 计时，让另外一个Agent 等待结果产出后按照规范进行介入审计”。建立生产智能体 (msdsproducer) 与法医审计智能体 (msdsauditor) 裁执物理隔离体系，协调器 (Coordinator) 全程高精度遥测计时；消灭临时脚本不变量 (INV-ZERO-TEMPORARY-SCRIPTS) 严格保真，两个型号均直接通过统一流水线 run_universal_msds_pipeline.mjs 一键生产与级联审计；PA-3615 耗时 51.6s，PA-3617 耗时 53.9s；双型号共 16 份规范交付物（8 DOCX + 8 PDF）全部生成完毕，且通过排版几何测试套件、双极双层全景深度审计 (165/165 项)、集中式中央主审计套件 (172/172 🏆 AUDIT_PASSED) 100% 满分通过 (Exit code 0, 0 failures, 0 warnings)。
 
 ### 一、 需求背景与核心治理宗旨

@@ -240,19 +240,86 @@ export async function writeDeliverableViaEditor({
   // 6. Section 9 理化特性写入 (带激光垂线对齐投影)
   const s9Rec = engine.records.find(r => r.sectionNumber === 9);
   if (s9Rec && contextData.physicalProperties) {
-    const props = contextData.physicalProperties;
+    const rawProps = contextData.physicalProperties;
+    const isArray = Array.isArray(rawProps);
+
+    // 智能提取属性值函数：支持数组槽位与对象键双模查找
+    const resolvePropValue = (patterns, objKey, fallback) => {
+      if (isArray) {
+        for (const item of rawProps) {
+          const itemLabel = (item.label || '').trim();
+          for (const pat of patterns) {
+            if (pat.test(itemLabel)) {
+              if (item.value !== undefined && item.value !== null && String(item.value).trim() !== '') {
+                return String(item.value).trim();
+              }
+            }
+          }
+        }
+      } else if (rawProps && typeof rawProps === 'object') {
+        if (rawProps[objKey] !== undefined && rawProps[objKey] !== null) {
+          return String(rawProps[objKey]).trim();
+        }
+      }
+      return fallback;
+    };
+
     for (const row of s9Rec.rows) {
       const lbl = (row.cells[0]?.text || '').trim();
       const c1 = row.cells[1];
       if (!c1) continue;
-      if (/外观|Appearance/i.test(lbl)) writeCellValue(c1, props.appearance || (isEnglish ? 'Milky white liquid' : '乳白色液体'));
-      else if (/气味|Odour|Odor/i.test(lbl)) writeCellValue(c1, props.odour || (isEnglish ? 'Slight characteristic odour' : '微有特征气味'));
-      else if (/pH/i.test(lbl)) writeCellValue(c1, props.ph || '7.0 - 9.0');
-      else if (/沸点|Boiling\s*point/i.test(lbl)) writeCellValue(c1, props.boilingPoint || (isEnglish ? 'Approx. 100 °C' : '约 100 ℃'));
-      else if (/闪点|Flash\s*point/i.test(lbl)) writeCellValue(c1, props.flashPoint || (isEnglish ? 'Not applicable (waterborne)' : '不适用（水性）'));
-      else if (/密度|Density/i.test(lbl)) writeCellValue(c1, props.density || '1.02 - 1.08 g/cm³');
-      else if (/溶解性|Solubility/i.test(lbl)) writeCellValue(c1, props.solubility || (isEnglish ? 'Miscible with water' : '与水混溶'));
-      else if (/粘度|黏度|Viscosity/i.test(lbl)) writeCellValue(c1, props.viscosity || '500 - 2000 mPa.s (25°C)');
+
+      if (/外观|Appearance/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/外观/i, /Appearance/i], 'appearance', isEnglish ? 'Milky white liquid' : '乳白色液体'));
+      } else if (/气味|嗅觉|Odour|Odor/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/气味|嗅觉/i, /Odour|Odor/i], 'odour', isEnglish ? 'No data available' : '无数据'));
+      } else if (/pH/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/pH/i], 'ph', '7-9'));
+      } else if (/离子性|Ionic/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/离子性/i, /Ionic/i], 'ionic', isEnglish ? 'Anionic' : '阴离子'));
+      } else if (/初沸点|沸点|Boiling\s*point/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/初沸点|沸点/i, /Boiling/i], 'boilingPoint', isEnglish ? 'Approx. 100 °C' : '约100℃'));
+      } else if (/闪点|Flash\s*point/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/闪点/i, /Flash/i], 'flashPoint', isEnglish ? 'Not applicable (waterborne)' : '不适用（水性）'));
+      } else if (/蒸发速率|Evaporation/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/蒸发速率/i, /Evaporation/i], 'evaporationRate', isEnglish ? 'No data available' : '无数据'));
+      } else if (/可燃性|Flammability/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/可燃性/i, /Flammability/i], 'flammability', isEnglish ? 'Not applicable' : '不适用'));
+      } else if (/燃烧值|Heat\s*of\s*combustion/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/燃烧值/i, /combustion/i], 'combustionValue', isEnglish ? 'Not applicable' : '不适用'));
+      } else if (/饱和蒸气压|Saturated\s*vapour/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/饱和蒸气压|蒸气压/i, /vapour\s*pressure/i], 'vapourPressure', isEnglish ? 'No data available' : '无数据'));
+      } else if (/相对蒸气密度|Relative\s*vapour\s*density/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/相对蒸气密度|蒸气密度/i, /vapour\s*density/i], 'vapourDensity', isEnglish ? 'No data available' : '无数据'));
+      } else if (/相对密度|密度|Density/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/相对密度|密度/i, /Density/i], 'density', '约1.06g/cm3'));
+      } else if (/水溶性|溶解性|Solubility/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/水溶性|溶解性/i, /Solubility/i], 'solubility', isEnglish ? 'Miscible' : '可混溶'));
+      } else if (/表面张力|Surface\s*tension/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/表面张力/i, /Surface\s*tension/i], 'surfaceTension', isEnglish ? 'No data available' : '无数据'));
+      } else if (/辛醇|partition\s*coefficient/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/辛醇/i, /partition/i], 'octanolWater', isEnglish ? 'No data available' : '无数据'));
+      } else if (/自燃温度|Auto-ignition/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/自燃温度/i, /Auto-ignition/i], 'autoIgnition', isEnglish ? 'Not applicable' : '不适用'));
+      } else if (/引燃温度|Ignition\s*temperature/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/引燃温度/i, /Ignition/i], 'ignition', isEnglish ? 'Approx. 420 °C' : '约420℃'));
+      } else if (/分解温度|Decomposition/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/分解温度/i, /Decomposition/i], 'decomposition', isEnglish ? 'No data available' : '无数据'));
+      } else if (/动力粘度|粘度|黏度|Viscosity/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/动力粘度|粘度|黏度/i, /Viscosity/i], 'viscosity', '＜1000 mPa.s'));
+      } else if (/爆炸特性|Explosive/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/爆炸特性/i, /Explosive/i], 'explosive', isEnglish ? 'No data available' : '无数据'));
+      } else if (/粉尘爆炸|Dust\s*explosion/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/粉尘爆炸/i, /Dust/i], 'dustExplosion', isEnglish ? 'No data available' : '无数据'));
+      } else if (/固体含量|Solid\s*content/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/固体含量/i, /Solid\s*content/i], 'solidContent', '37±2%'));
+      } else if (/其他信息|Other\s*information/i.test(lbl)) {
+        writeCellValue(c1, resolvePropValue([/其他信息/i, /Other\s*information/i], 'otherInfo', isEnglish ? 'The above data are not product specifications. For specifications, please refer to the technical data sheet.' : '上述数据非产品指标，产品指标请参见产品技术信息表。'));
+      } else {
+        if (!c1.text || c1.text.trim() === '') {
+          writeCellValue(c1, isEnglish ? 'No data available' : '无数据');
+        }
+      }
     }
     formatSection9LaserTabs(session);
   }

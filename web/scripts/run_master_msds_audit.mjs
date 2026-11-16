@@ -15,6 +15,7 @@ if (!globalThis.DOMParser || !globalThis.XMLSerializer) {
 
 import { loadDocx } from '../src/docx-engine.js';
 import { verifySentenceCountFidelity } from '../src/sentence-translator.js';
+import { auditTranslationDualDisplay } from './audit_translation_dual_display.mjs';
 
 /**
  * MSDS Studio 工业级集中式中央主审计套件 (Universal Master MSDS Audit Suite)
@@ -1963,6 +1964,27 @@ export async function runMasterMsdsAudit(options = {}) {
     ['源文档实验细节在英文翻译时被过度精简截断']
   );
 
+  // 环 4.3: 机械审计逐行双重对照显示与条件保留硬门禁 (REQ-TRANS-DUAL-DISPLAY)
+  let dualAuditSummary = { alarms: 0, passed: 0, totalRowsAudited: 0 };
+  const enGzDocx = path.join(targetDir, `${model} msds_EN Guanzhi.docx`);
+  try {
+    dualAuditSummary = await auditTranslationDualDisplay(cnGzDocx, enGzDocx, { silent: false });
+  } catch (err) {
+    console.error(`[DualDisplayAudit Error]: ${err.message}`);
+    dualAuditSummary.alarms = 1;
+    dualAuditSummary.error = err.message;
+  }
+
+  assert(
+    dualAuditSummary.alarms === 0,
+    '环4',
+    '机械审计逐行双重对照显示与条件无损零告警硬门禁 (INV-DUAL-DISPLAY-ZERO-ALARM)',
+    'Section 2 至 16 逐行双重对照核查中，不得发生任何条件丢失告警 (CONDITION_MISSING_ALARM) 或中文字符残留',
+    dualAuditSummary.alarms === 0 ? `逐行双重对照核验 ${dualAuditSummary.totalRowsAudited} 条全部满分匹配` : `存在 ${dualAuditSummary.alarms} 项致命告警`,
+    'Dual-Display Line Audit',
+    ['翻译过程丢失条件或英文版中文字符残留']
+  );
+
   // ======================================================================
   // 终审总结与 1:1 双向物理核销清算表输出
   // ======================================================================
@@ -2018,6 +2040,8 @@ if (process.argv[1] && process.argv[1].endsWith('run_master_msds_audit.mjs')) {
     else if (arg === '--model' && args[i + 1]) model = args[++i];
     else if (arg.startsWith('--targetDir=')) targetDir = arg.slice(12);
     else if (arg === '--targetDir' && args[i + 1]) targetDir = args[++i];
+    else if (arg.startsWith('--target=')) targetDir = arg.slice(9);
+    else if (arg === '--target' && args[i + 1]) targetDir = args[++i];
     else if (arg.startsWith('--sourceDocx=')) sourceDocx = arg.slice(13);
     else if (arg === '--sourceDocx' && args[i + 1]) sourceDocx = args[++i];
   }

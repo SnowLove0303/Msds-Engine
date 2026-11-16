@@ -62,7 +62,9 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '乙基吡咯烷酮': '1-Ethylpyrrolidin-2-one (NEP)',
   '三乙胺': 'Triethylamine',
   '氢氧化钠': 'Sodium hydroxide',
-  '二甲基乙醇胺': '2-Dimethylaminoethanol',
+  '二甲基乙醇胺': 'N,N-Dimethylethanolamine',
+  'N,N-二甲基乙醇胺': 'N,N-Dimethylethanolamine',
+  '羟基聚氨酯分散体': 'Hydroxy polyurethane dispersion',
   '商业机密': 'Trade secret',
   '商业秘密': 'Trade secret',
 
@@ -80,6 +82,14 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '黄色透明液体': 'Yellow transparent liquid',
   '微黄至黄色液体': 'Slightly yellow to yellow liquid',
   '透明液体': 'Transparent liquid',
+  '透明至半透明液体': 'Transparent to translucent liquid',
+  '初沸点以下无闪点': 'No flash point below initial boiling point',
+  '约100℃': 'Approx. 100 °C',
+  '约420℃': 'Approx. 420 °C',
+  '约1.06g/cm3': 'Approx. 1.06 g/cm³',
+  '可混溶': 'Miscible',
+  '7-9 （按1:10的比例用水稀释）': '7-9 (diluted with water at a ratio of 1:10).',
+  '上述数据非产品指标，产品指标请参见产品技术信息表。': 'The above data are not product specifications. For specifications, please refer to the technical data sheet.',
   '无特殊气味': 'Odorless',
   '微弱气味': 'Slight odor',
   '轻微特征气味': 'Slight characteristic odor',
@@ -124,6 +134,23 @@ export function translateChemicalTerm(term) {
   }
 
   // 模式模糊匹配
+  if (/透明.*半透明/i.test(trimmed)) return 'Transparent to translucent liquid';
+  if (/初沸点以下无闪点/i.test(trimmed)) return 'No flash point below initial boiling point';
+  if (/可混溶/i.test(trimmed)) return 'Miscible';
+  if (/(?:按\s*)?(\d+:\d+)(?:.*比例)?.*稀释/i.test(trimmed)) {
+    const mRatio = trimmed.match(/(\d+:\d+)/);
+    const numMatch = trimmed.match(/[\d.-]+/);
+    const numRange = numMatch ? numMatch[0] : '7-9';
+    const ratio = mRatio ? mRatio[1] : '1:10';
+    return `${numRange} (diluted with water at a ratio of ${ratio}).`;
+  }
+  if (/1%水溶液|1%.*溶液/i.test(trimmed)) {
+    const numMatch = trimmed.match(/[\d.-]+/);
+    const numRange = numMatch ? numMatch[0] : '7-9';
+    return `${numRange} (1% aqueous solution).`;
+  }
+  if (/上述数据非产品指标/i.test(trimmed)) return 'The above data are not product specifications. For specifications, please refer to the technical data sheet.';
+  if (/羟基聚氨酯/i.test(trimmed)) return 'Hydroxy polyurethane dispersion';
   if (/微黄.*半透明/i.test(trimmed)) return 'Light yellow, semi-transparent liquid';
   if (/微黄.*透明/i.test(trimmed)) return 'Light yellow transparent liquid';
   if (/丙烯酸.*共聚物/i.test(trimmed)) return 'Waterborne acrylic copolymer emulsion';

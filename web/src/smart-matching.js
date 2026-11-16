@@ -3610,8 +3610,8 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
                   if (modelVal && !injectVal.includes(modelVal)) {
                     injectVal = `${injectVal} ${modelVal}`;
                   }
-                  // 规范化：确保中文产品名与型号之间有且仅有一个半角空格
-                  injectVal = injectVal.replace(/(?<!\s)(PU[-\s]?\d+[A-Za-z]?)/i, ' $1').trim();
+                  // 规范化：确保中文产品名与型号之间有且仅有一个半角空格（避免切断 HPU 前缀）
+                  injectVal = injectVal.replace(/(?<![A-Za-z0-9\s])(PU[-\s]?\d+[A-Za-z]?)/i, ' $1').trim();
                 }
                 if (s === 5) {
                   if (matchedItem.key === 'special_hazards' && injectVal) {

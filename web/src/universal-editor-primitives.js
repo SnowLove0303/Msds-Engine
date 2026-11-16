@@ -545,12 +545,6 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
 
               const existingTabsInPPr = Array.from(pPr.getElementsByTagNameNS(W_NS, 'tabs'));
               existingTabsInPPr.forEach(n => pPr.removeChild(n));
-              const tabsNode = doc.createElementNS(W_NS, 'w:tabs');
-              const tabDef = doc.createElementNS(W_NS, 'w:tab');
-              tabDef.setAttributeNS(W_NS, 'w:val', 'left');
-              tabDef.setAttributeNS(W_NS, 'w:pos', targetIndent);
-              tabsNode.appendChild(tabDef);
-              pPr.appendChild(tabsNode);
 
               if (mSeq) {
                 const seqStr = mSeq[1];

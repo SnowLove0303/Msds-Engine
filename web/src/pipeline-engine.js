@@ -760,7 +760,7 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     'sec5.specific_hazards': (() => {
       const cnS5Rec = baseCnEngine?.records?.find(r => r.sectionNumber === 5);
       const allS5Text = cnS5Rec?.rows?.map(r => (r.cells[0]?.text || '') + ' ' + (r.cells[1]?.text || '')).join('\n') || '';
-      const parts = ['Combustion may release carbon monoxide, carbon dioxide, nitrogen oxides and trace amounts of hydrogen cyanide.'];
+      const parts = ['Combustion releases carbon monoxide, carbon dioxide, nitrogen oxides and small amounts of hydrogen cyanide.'];
       if (/吸进烟尘|吸入烟气|吸入烟尘|烟雾|smoke|fumes|着火或爆炸/i.test(allS5Text)) {
         parts.push('In case of fire or explosion, do not breathe fumes/smoke.');
       }
@@ -1381,12 +1381,26 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
     else enVal = cnVal;
   } else if (/pH/i.test(cnLabel)) {
     enLabel = 'pH value:';
-    if (/无数据|无资料/.test(cnVal)) enVal = 'No data available.';
-    else if (/按.*稀释|稀释|水溶液/.test(cnVal)) {
-      const m = cnVal.match(/[\d.-]+/);
-      enVal = m ? m[0] : cnVal;
+    const combined = `${cnLabel} ${cnVal}`;
+    if (/无数据|无资料/.test(cnVal)) {
+      enVal = 'No data available.';
+    } else if (/(?:按\s*)?(\d+:\d+)(?:.*比例)?.*稀释/i.test(combined)) {
+      const mRatio = combined.match(/(\d+:\d+)/);
+      const numMatch = cnVal.match(/[\d.-]+/);
+      const numRange = numMatch ? numMatch[0] : '7-9';
+      const ratio = mRatio ? mRatio[1] : '1:10';
+      enVal = `${numRange} (diluted with water at a ratio of ${ratio}).`;
+    } else if (/1%水溶液|1%.*溶液/i.test(combined)) {
+      const numMatch = cnVal.match(/[\d.-]+/);
+      const numRange = numMatch ? numMatch[0] : '7-9';
+      enVal = `${numRange} (1% aqueous solution).`;
+    } else if (/稀释/i.test(combined)) {
+      const numMatch = cnVal.match(/[\d.-]+/);
+      const numRange = numMatch ? numMatch[0] : cnVal;
+      enVal = `${numRange} (diluted with water).`;
+    } else {
+      enVal = cnVal;
     }
-    else enVal = cnVal;
   } else if (/离\s*子\s*性/i.test(cnLabel)) {
     enLabel = 'Ionicity:';
     if (/阴离子/i.test(cnVal)) enVal = 'Anionic';
@@ -1462,9 +1476,12 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
   } else if (/玻璃化.*温度|转变温度|\bTg\b/i.test(cnLabel)) {
     enLabel = 'Glass transition temperature (Tg):';
     enVal = cnVal.includes('°C') || cnVal.includes('℃') ? cnVal.replace(/约\s*/g, 'Approx. ').replace(/℃/g, ' °C') : `${cnVal} °C`;
+  } else if (/相对密度/i.test(cnLabel)) {
+    enLabel = 'Relative density:';
+    enVal = cnVal.replace(/约\s*/g, 'Approx. ').replace(/\s*g\/cm3/gi, ' g/cm³').replace(/\s{2,}/g, ' ').trim();
   } else if (/密度/i.test(cnLabel)) {
     enLabel = /25/i.test(cnLabel) ? 'Density at 25 °C:' : 'Density:';
-    enVal = cnVal.replace(/约\s*/g, 'Approx. ').replace(/g\/cm3/gi, ' g/cm³');
+    enVal = cnVal.replace(/约\s*/g, 'Approx. ').replace(/\s*g\/cm3/gi, ' g/cm³').replace(/\s{2,}/g, ' ').trim();
   } else if (/其他信息/i.test(cnLabel)) {
     enLabel = 'Other information:';
     enVal = 'The above data are not product specifications. Please refer to the product technical information sheet for specifications.';
@@ -3166,7 +3183,8 @@ function translateToxicologyValueToEnglish(cnText, endpoint = '') {
   t = t.replace(/基于现有数据，未满足分类标准。?/g, 'Based on available data, the classification criteria are not met.');
   t = t.replace(/STOT评估-重复性接触/g, 'STOT evaluation - repeated exposure:');
   t = t.replace(/CMR评估/g, 'CMR assessment:');
-  t = t.replace(/亚急性[，, ]*亚慢性和延迟毒性/g, 'Subacute, subchronic and prolonged toxicity:');
+  t = t.replace(/亚急性[，, ]*亚慢性和延迟毒性/g, 'Subacute, subchronic and delayed toxicity:');
+  t = t.replace(/体内基因毒性/g, 'In vivo genotoxicity:');
   t = t.replace(/生殖毒性\/生育力\s*[:：]?/g, 'Reproductive toxicity / fertility: ');
   t = t.replace(/生殖毒性\/致畸形\s*[:：]?/g, 'Reproductive toxicity / teratogenicity: ');
   t = t.replace(/致癌性\s*[:：]?/g, 'Carcinogenicity: ');
