@@ -1,7 +1,7 @@
 # footer-layout-and-preset Specification
 
 ## Purpose
-TBD - created by archiving change 2026-11-17-footer-y-alignment-pagenum-font-and-guocai-entity-unification. Update Purpose after archive.
+Governs the layout, typography, and preset unification for MSDS document footers, ensuring vertical baseline alignment between entity and revision date, standard 9pt page numbers, and authoritative enterprise preset naming.
 
 ## Requirements
 
