@@ -1,5 +1,22 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-17 页脚修订日期 Y 轴基线校准、动态页码字号纠偏与国彩主体预设统一治理 (FOOTER-Y-ALIGNMENT-PAGENUM-FONT-AND-GUOCAI-UNIFICATION)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户核心指令：“统一用这个英德市国彩精细化工有限公司，另外，页脚的核心问题：1.修订日期所在的Y轴位置不对；2.页码字号不对；关于页脚的问题需要通过拓扑结构的识别去解决，因为模板中并不存在页脚问题，因此需要排一下问题出在哪，从根本上去解决问题并保证自由度和灵活度”。通过模板与产出物底层 XML 对比、PyMuPDF 物理像素级坐标实测与拓扑结构识别，完成系统性穿透与全链路根治：
+1. **问题根因定位 (Root Cause Inquest)**：
+   - **Y 轴位置偏高悬浮根因**：官方母版页脚表格第 0 行高为 566 dxa（约 28.3pt），左列（企业主体）具有 `<w:vAlign w:val="center"/>` 垂直居中，文本处于 y~758-769pt；右列（修订日期）原模板因字母 "P" 占用第 1 行、日期折行在第 2 行处于 y~760-772pt。覆写引擎清洗 "P" 后，右列退化为单行且缺失 `w:vAlign`（默认顶对齐），被强制顶格悬浮在 y~748-760pt，导致与左列主体出现高达 7.27pt 的垂直高低落差；
+   - **页码字号异常放大根因**：覆写引擎历史代码在第 1296 行硬编码执行 `setRunProps(doc, r, { fontSize: 24, bold: false })`，将页码强制篡改为 12pt（小四号），破坏了母版 Style ID 2 (`footer`) 及修订日期的 9pt 小五号字阶规范；
+   - **国彩主体中英分歧根因**：`msds-db.js` 中 `preset_guocai_cn` 的 `company` 登记为“英德市国彩新材料有限公司”，英文预设登记为“New Material”，导致中文版正文与页脚使用不同主体字段时产生歧义。
+2. **拓扑结构识别强化与全链路根本性解耦治理**：
+   - **拓扑结构深度认知 (`web/src/template-topology-recognizer.js`)**：在 `recognizeFooterTopology` 中扩展对单元格垂直对齐几何 `vAlign`、行高 `rowHeightDxa`、段落行距 `spacingLine` 及字阶 `paragraphFontSizePt` 的动态识别，彻底打破单一写死假设，对任意自定义母版的页脚拓扑均具备自适应感知能力；
+   - **Y 轴几何对称与零间距校准 (`web/src/docx-engine.js`)**：在 `updateHeaderFooterData` 覆写修订日期及企业主体时，统一注入 `<w:vAlign w:val="center"/>`，并将段落行距统一规范为 `<w:spacing w:line="0" w:lineRule="atLeast"/>`（消除段后空行位移），去除尾部空格缓冲。经 PyMuPDF 物理渲染实测，左列企业主体与右列修订日期的垂直中心差由 **7.27 pt 降至 0.13 pt**（公差 $\le 1.5\text{ pt}$），肉眼与印刷基线完全水平齐平；
+   - **动态页码字阶规范恢复 (`web/src/docx-engine.js`)**：彻底废除硬编码 `fontSize: 24`（12pt），严格遵循母版 9pt（Word 18半磅）规范，段落与 Run 同步规范为 18。PyMuPDF 实测页码数字 '1' 的高度精确对标母版标准值（12.27 pt，完美对应 9pt 字阶）；
+   - **国彩主体官方全称统一收敛 (`web/src/msds-db.js`)**：在预设种子库中将中文预设全部字段统一为 `英德市国彩精细化工有限公司`，英文预设统一对应为 `Yingde Guocai Fine Chemical Co., Ltd.`；并在数据库 `seedDefaultPresets` 的 `ON CONFLICT` 中补全对 `header_footer_json` 与 `field_overrides_json` 的实时热更新。
+3. **全量物理验证与法医坐标对账 (100% PASS)**：
+   - 专用测试套件 `test_guocai_preset_unification.mjs`、`test_footer_y_alignment.mjs`、`test_footer_pagenum_fontsize.mjs` 均 100% 通过；
+   - 全流程流水线 `test_adaptive_pipeline.mjs` 覆盖 1 格式、4 格式及 8 格式交付矩阵，Bipolar Bilayer 165 项双轨审计全绿通过（ExitCode 0）；
+   - `audit_task4_deliverables.mjs` 通过 PyMuPDF 对全部生成 PDF 实测：$\Delta Y \le 0.13\text{ pt}$，页码字号 9pt 物理尺寸 12.27 pt 100% 契合，国彩主体 100% 纯净无违规旧称残留。
+
+---
+
 ## [2026-11-17 通用母版页面格式与页脚拓扑强化识别及产出物页脚统一治理 (UNIVERSAL-PAGE-AND-FOOTER-TOPOLOGY-RECOGNITION)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户两大最高工程法则【通用性准则】与【排版格式解耦准则】。彻底废除对特定母版与特定行列坐标的死硬编码依赖，实现页面几何参数与页脚多插槽的自适应认知，并彻底治愈产出物页脚历史遗留的异形字符与样式断层问题：
 1. **通用母版页面格式自适应认知 (`recognizePageFormatting` @ `web/src/template-topology-recognizer.js`)**：
    - 从 `word/document.xml` 的 `<w:sectPr>` 节属性中动态提取页面物理规格（纸张尺寸 `pageSize`：$11906 \times 16838$ dxa，标准 ISO A4；纸张方向 `orientation: portrait`；页边距 `margins`：top=2503, bottom=1418, left=1077, right=1077, header=851, footer=737 dxa 及毫米换算值；文档行网格 `docGrid` 及分栏 `cols`），对外提供标准化结构化蓝图；

@@ -1220,8 +1220,20 @@ export function updateHeaderFooterData(engine, patch = {}) {
                 if (!p) continue;
                 const cellText = (p.textContent || '').trim();
 
-                // 1. 探测并覆写“修订日期”插槽 (支持模式匹配或首行右格)
+                // 1. 探测并覆写“修订日期”插槽 (支持模式匹配或首行右格，继承垂直居中对齐与零间距标尺)
                 if (!dateUpdated && formattedDate && (/(?:修订日期|生效日期|编制日期|发布日期|Revision\s*Date|Date)/i.test(cellText) || /\d{4}[年\-\/.\s]\d{1,2}[月\-\/.\s]\d{1,2}日?/.test(cellText) || (rIdx === 0 && cIdx === 1))) {
+                  let tcPr = cell.getElementsByTagNameNS(W_NS, 'tcPr')[0];
+                  if (!tcPr) {
+                    tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+                    cell.insertBefore(tcPr, cell.firstChild);
+                  }
+                  let vAlign = tcPr.getElementsByTagNameNS(W_NS, 'vAlign')[0];
+                  if (!vAlign) {
+                    vAlign = doc.createElementNS(W_NS, 'w:vAlign');
+                    tcPr.appendChild(vAlign);
+                  }
+                  vAlign.setAttributeNS(W_NS, 'w:val', 'center');
+
                   let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
                   if (!pPr) {
                     pPr = doc.createElementNS(W_NS, 'w:pPr');
@@ -1232,6 +1244,16 @@ export function updateHeaderFooterData(engine, patch = {}) {
                     pPr.removeChild(oldInd);
                     modified = true;
                   }
+
+                  let spacing = pPr.getElementsByTagNameNS(W_NS, 'spacing')[0];
+                  if (!spacing) {
+                    spacing = doc.createElementNS(W_NS, 'w:spacing');
+                    pPr.appendChild(spacing);
+                  }
+                  spacing.setAttributeNS(W_NS, 'w:line', '0');
+                  spacing.setAttributeNS(W_NS, 'w:lineRule', 'atLeast');
+                  spacing.removeAttributeNS(W_NS, 'before');
+                  spacing.removeAttributeNS(W_NS, 'after');
 
                   let jc = pPr.getElementsByTagNameNS(W_NS, 'w:jc')[0];
                   if (!jc) {
@@ -1247,7 +1269,7 @@ export function updateHeaderFooterData(engine, patch = {}) {
                       t = doc.createElementNS(W_NS, 'w:t');
                       runs[0].appendChild(t);
                     }
-                    t.textContent = `${formattedDate}   `;
+                    t.textContent = formattedDate;
                     setRunProps(doc, runs[0], { fontSize: 18, bold: false, color: '7F7F7F', fontFamily: isEnDoc ? 'Arial' : '楷体_GB2312' });
                     for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
                     dateUpdated = true;
@@ -1255,13 +1277,35 @@ export function updateHeaderFooterData(engine, patch = {}) {
                   }
                 }
 
-                // 2. 探测并覆写“企业主体与型号-MSDS”插槽
+                // 2. 探测并覆写“企业主体与型号-MSDS”插槽 (与右列保持同基线垂直居中)
                 if (!entityUpdated && (targetCompany || targetModel) && (/-MSDS|有限公司|Company|Technology|Co\.,\s*Ltd/i.test(cellText) || (rIdx === 0 && cIdx === 0))) {
+                  let tcPr = cell.getElementsByTagNameNS(W_NS, 'tcPr')[0];
+                  if (!tcPr) {
+                    tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+                    cell.insertBefore(tcPr, cell.firstChild);
+                  }
+                  let vAlign = tcPr.getElementsByTagNameNS(W_NS, 'vAlign')[0];
+                  if (!vAlign) {
+                    vAlign = doc.createElementNS(W_NS, 'w:vAlign');
+                    tcPr.appendChild(vAlign);
+                  }
+                  vAlign.setAttributeNS(W_NS, 'w:val', 'center');
+
                   let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
                   if (!pPr) {
                     pPr = doc.createElementNS(W_NS, 'w:pPr');
                     p.insertBefore(pPr, p.firstChild);
                   }
+                  let spacing = pPr.getElementsByTagNameNS(W_NS, 'spacing')[0];
+                  if (!spacing) {
+                    spacing = doc.createElementNS(W_NS, 'w:spacing');
+                    pPr.appendChild(spacing);
+                  }
+                  spacing.setAttributeNS(W_NS, 'w:line', '0');
+                  spacing.setAttributeNS(W_NS, 'w:lineRule', 'atLeast');
+                  spacing.removeAttributeNS(W_NS, 'before');
+                  spacing.removeAttributeNS(W_NS, 'after');
+
                   let jc = pPr.getElementsByTagNameNS(W_NS, 'w:jc')[0];
                   if (!jc) {
                     jc = doc.createElementNS(W_NS, 'w:jc');
@@ -1287,13 +1331,23 @@ export function updateHeaderFooterData(engine, patch = {}) {
                   }
                 }
 
-                // 3. 动态页码样式继承 (对标 12pt 右对齐)
+                // 3. 动态页码样式继承 (忠实继承母版 9pt 小五号字阶与样式，消除 12pt 强制放大)
                 const fldSimples = Array.from(p.getElementsByTagNameNS(W_NS, 'fldSimple'));
                 const instrTextStr = Array.from(p.getElementsByTagNameNS(W_NS, 'instrText')).map(it => it.textContent || '').join(' ');
                 if (fldSimples.some(fs => /PAGE/i.test(fs.getAttributeNS(W_NS, 'instr') || '')) || /PAGE/i.test(instrTextStr) || (rIdx === 1 && cIdx === 1)) {
+                  let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+                  if (pPr) {
+                    let pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
+                    if (pRPr) {
+                      let sz = pRPr.getElementsByTagNameNS(W_NS, 'sz')[0];
+                      if (sz) sz.setAttributeNS(W_NS, 'w:val', '18');
+                      let szCs = pRPr.getElementsByTagNameNS(W_NS, 'szCs')[0];
+                      if (szCs) szCs.setAttributeNS(W_NS, 'w:val', '18');
+                    }
+                  }
                   const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
                   for (const r of runs) {
-                    setRunProps(doc, r, { fontSize: 24, bold: false });
+                    setRunProps(doc, r, { fontSize: 18, bold: false, fontFamily: isEnDoc ? 'Arial' : '楷体_GB2312' });
                   }
                   modified = true;
                 }

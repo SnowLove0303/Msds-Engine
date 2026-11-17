@@ -522,7 +522,7 @@ export const BUILTIN_COMPANY_PRESETS = [
     enabledForExport: true,
     entityData: {
       name_zh: '英德市国彩精细化工有限公司',
-      name_en: 'Yingde Guocai New Material Co., Ltd.',
+      name_en: 'Yingde Guocai Fine Chemical Co., Ltd.',
       shortName_zh: '国彩',
       shortName_en: 'Guocai',
       address_zh: '广东省英德市白沙镇太平村更古坑凯迪工业园区',
@@ -533,7 +533,7 @@ export const BUILTIN_COMPANY_PRESETS = [
       emergencyTel_en: '86-763-2811205'
     },
     headerFooterOverrides: {
-      company: '英德市国彩新材料有限公司',
+      company: '英德市国彩精细化工有限公司',
       title: '物料安全数据表',
       version: 'V1.0',
       customFileNamePattern: '{model} msds_CN 国彩.docx',
@@ -559,7 +559,7 @@ export const BUILTIN_COMPANY_PRESETS = [
     enabledForExport: true,
     entityData: {
       name_zh: '英德市国彩精细化工有限公司',
-      name_en: 'Yingde Guocai New Material Co., Ltd.',
+      name_en: 'Yingde Guocai Fine Chemical Co., Ltd.',
       shortName_zh: '国彩',
       shortName_en: 'Guocai',
       address_zh: '广东省英德市白沙镇太平村更古坑凯迪工业园区',
@@ -570,13 +570,13 @@ export const BUILTIN_COMPANY_PRESETS = [
       emergencyTel_en: '86-763-2811205'
     },
     headerFooterOverrides: {
-      company: 'Yingde Guocai New Material Co., Ltd.',
+      company: 'Yingde Guocai Fine Chemical Co., Ltd.',
       title: 'SAFETY DATA SHEET',
       version: 'V1.0',
       customFileNamePattern: '{model} msds_EN Guocai.docx',
     },
     fieldOverrides: {
-      supplier_name: 'Yingde Guocai New Material Co., Ltd.',
+      supplier_name: 'Yingde Guocai Fine Chemical Co., Ltd.',
       supplier_address: 'Kaidi Industrial Park, Genggukeng, Taiping Village, Baisha Town, Yingde City, Guangdong Province',
       emergency_phone: '86-763-2811205',
       phone: '86-763-2811205',
@@ -597,6 +597,8 @@ export function seedDefaultPresets(db = getDb()) {
       ON CONFLICT(id) DO UPDATE SET
         name = excluded.name,
         entity_json = excluded.entity_json,
+        header_footer_json = excluded.header_footer_json,
+        field_overrides_json = excluded.field_overrides_json,
         is_builtin = excluded.is_builtin,
         is_default = CASE WHEN presets.is_default = 1 THEN 1 ELSE excluded.is_default END
     `);

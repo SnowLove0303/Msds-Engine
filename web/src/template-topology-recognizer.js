@@ -278,14 +278,22 @@ export async function recognizeFooterTopology(zip, doc, parser = new DOMParser()
     };
 
     trNodes.forEach((tr, rIdx) => {
+      const trH = tr.getElementsByTagNameNS(W_NS, 'trPr')?.[0]?.getElementsByTagNameNS(W_NS, 'trHeight')?.[0]?.getAttributeNS(W_NS, 'val');
       const tcNodes = Array.from(tr.getElementsByTagNameNS(W_NS, 'tc'));
       tcNodes.forEach((tc, cIdx) => {
-        const tcW = tc.getElementsByTagNameNS(W_NS, 'tcPr')?.[0]?.getElementsByTagNameNS(W_NS, 'tcW')?.[0]?.getAttributeNS(W_NS, 'w');
+        const tcPr = tc.getElementsByTagNameNS(W_NS, 'tcPr')?.[0];
+        const tcW = tcPr?.getElementsByTagNameNS(W_NS, 'tcW')?.[0]?.getAttributeNS(W_NS, 'w');
+        const tcVAlign = tcPr?.getElementsByTagNameNS(W_NS, 'vAlign')?.[0]?.getAttributeNS(W_NS, 'val') || null;
         const ps = Array.from(tc.getElementsByTagNameNS(W_NS, 'p'));
         
         ps.forEach((p, pIdx) => {
           const text = (p.textContent || '').trim();
-          const jc = p.getElementsByTagNameNS(W_NS, 'pPr')?.[0]?.getElementsByTagNameNS(W_NS, 'jc')?.[0]?.getAttributeNS(W_NS, 'val') || 'left';
+          const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
+          const jc = pPr?.getElementsByTagNameNS(W_NS, 'jc')?.[0]?.getAttributeNS(W_NS, 'val') || 'left';
+          const pStyle = pPr?.getElementsByTagNameNS(W_NS, 'pStyle')?.[0]?.getAttributeNS(W_NS, 'val') || null;
+          const pPrSz = pPr?.getElementsByTagNameNS(W_NS, 'rPr')?.[0]?.getElementsByTagNameNS(W_NS, 'sz')?.[0]?.getAttributeNS(W_NS, 'val') || null;
+          const spacingNode = pPr?.getElementsByTagNameNS(W_NS, 'spacing')?.[0];
+          const spacingLine = spacingNode?.getAttributeNS(W_NS, 'line') || null;
           
           // 提取 run 的格式属性
           const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
@@ -319,6 +327,10 @@ export async function recognizeFooterTopology(zip, doc, parser = new DOMParser()
               paragraphIndex: pIdx,
               widthDxa: tcW ? Number(tcW) : null,
               alignment: jc,
+              vAlign: tcVAlign,
+              rowHeightDxa: trH ? Number(trH) : null,
+              pStyle,
+              spacingLine,
               style: runProps,
               templateText: text
             };
@@ -335,6 +347,10 @@ export async function recognizeFooterTopology(zip, doc, parser = new DOMParser()
               paragraphIndex: pIdx,
               widthDxa: tcW ? Number(tcW) : null,
               alignment: jc,
+              vAlign: tcVAlign,
+              rowHeightDxa: trH ? Number(trH) : null,
+              pStyle,
+              spacingLine,
               style: runProps,
               templateText: text
             };
@@ -354,6 +370,9 @@ export async function recognizeFooterTopology(zip, doc, parser = new DOMParser()
               paragraphIndex: pIdx,
               widthDxa: tcW ? Number(tcW) : null,
               alignment: jc,
+              vAlign: tcVAlign,
+              pStyle,
+              paragraphFontSizePt: pPrSz ? Number(pPrSz) / 2 : null,
               style: runProps,
               templateText: text
             };
