@@ -1,5 +1,26 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-17 通用母版页面格式与页脚拓扑强化识别及产出物页脚统一治理 (UNIVERSAL-PAGE-AND-FOOTER-TOPOLOGY-RECOGNITION)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户两大最高工程法则【通用性准则】与【排版格式解耦准则】。彻底废除对特定母版与特定行列坐标的死硬编码依赖，实现页面几何参数与页脚多插槽的自适应认知，并彻底治愈产出物页脚历史遗留的异形字符与样式断层问题：
+1. **通用母版页面格式自适应认知 (`recognizePageFormatting` @ `web/src/template-topology-recognizer.js`)**：
+   - 从 `word/document.xml` 的 `<w:sectPr>` 节属性中动态提取页面物理规格（纸张尺寸 `pageSize`：$11906 \times 16838$ dxa，标准 ISO A4；纸张方向 `orientation: portrait`；页边距 `margins`：top=2503, bottom=1418, left=1077, right=1077, header=851, footer=737 dxa 及毫米换算值；文档行网格 `docGrid` 及分栏 `cols`），对外提供标准化结构化蓝图；
+2. **通用页脚拓扑几何与多插槽模式探测 (`recognizeFooterTopology` @ `web/src/template-topology-recognizer.js`)**：
+   - 自动解析 `word/_rels/document.xml.rels` 与 `<w:footerReference>`，动态定位生效正文页脚部件（如 `word/footer1.xml`）；
+   - 递归穿透表格容器或纯段落容器，通过正则模式匹配自适应捕获三大标准语义插槽：
+     - `slots.revisionDate`：修订日期插槽（捕获容器类型、相对行列坐标、9pt 灰字对齐及原始文本）；
+     - `slots.entityModel`：主体企业与型号-MSDS 插槽（左对齐，10.5pt）；
+     - `slots.pageNumber`：动态页码域插槽（右对齐，12pt，识别 `PAGE` / `NUMPAGES` 域代码）；
+3. **覆写引擎页脚治理与插槽动态注入解耦 (`web/src/docx-engine.js`)**：
+   - 重构 `extractHeaderFooterData` 与 `updateHeaderFooterData`，优先基于插槽模式动态寻址，彻底废除写死 `rows[0].cells[1]` 的硬编码假设；
+   - **产出物页脚异形瑕疵彻底清洗**：引入前缀清洗正则 `.replace(/^P(?=[修订日期|Revision|Date|\d])/i, '')` 与全角/窄空格清洗，根除产出物中残留的“P修订日期”历史包袱；
+   - **多语言与预设正交解耦**：企业主体名称严格取自当前生效的 Preset，中文统一规范为 `修订日期：YYYY年MM月DD日`，英文自动转换为 `Revision Date: YYYY-MM-DD`，绝不将单一企业主体名称（冠志/国彩）硬编码在底层逻辑中；
+   - 样式严格继承模板原生定义的字号（9pt）、颜色（#7F7F7F）与靠右对齐。
+4. **自动化全量测试与法医验证 (`web/tests/test_universal_page_and_footer_topology.mjs` & `test_adaptive_pipeline.mjs`)**：
+   - 专用测试套件对中文母版、英文母版及自定义母版进行拓扑识别断言覆盖（100% PASS）；
+   - 导出交付物页脚法医审查：确认 0 处 "P" 字符残留、0 处异形窄空格、主体与预设 100% 对齐；
+   - 运行全量自适应流水线回归测试（1 格式、4 格式及 8 格式矩阵）与双极双层 165 项深度审计，全部满分全绿通过（Exit code 0）。
+
+---
+
 ## [2026-11-16 02-2 水性羟基丙烯酸乳液全量 13 型号受控生产与底座通用缺陷法医根治 (02-2-HYDROXY-ACRYLIC-BATCH-PRODUCTION)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户两大核心最高准则【通用性准则】（零型号特判硬编码、化工领域模型级抽象）与【内容来源于源文件准则】（100% 原始事实溯源、零外部捏造篡改）。针对法医调查报告反映的底座品类通用缺陷与批处理执行期暴露的问题，进行了彻底的领域级工程根治：
 1. **Section 3 化工聚合物实体通用词典与模式匹配扩充 (`web/src/context-governor.js`)**：在 `CHEMICAL_TRANSLATION_DICT` 中收录水性双组份交联体系专用的 `羟基丙烯酸` (`Hydroxy acrylic polymer`)、`水性羟基丙烯酸乳液` (`Waterborne hydroxy acrylic emulsion`) 及 `丙烯酸聚合物` (`Acrylic polymer`)，并在 `translateChemicalTerm` 中建立通用正则匹配，彻底消除水性羟基丙烯酸品类组分英译盲区；
 2. **Section 9 理化特性国标/ISO 羟基指标通用判定链扩充 (`web/src/pipeline-engine.js`)**：在 `translateSection9Item` 判定链中新增 `/羟基含量|羟基值|羟基/i` 分支，映射为法定标准西文标签 `Hydroxyl content:` / `Hydroxyl value:`，数值 100% 取自源文件单元格，同时自然解毒前缀残留叠词；

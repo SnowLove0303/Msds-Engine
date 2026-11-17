@@ -880,32 +880,35 @@ export function extractHeaderFooterData(engine) {
         const tbl = doc.getElementsByTagNameNS(W_NS, 'tbl')[0];
         if (tbl) {
           const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
-          if (rows[0]) {
-            const cells = Array.from(rows[0].getElementsByTagNameNS(W_NS, 'tc'));
-            // cell 0: 公司 + 型号-MSDS
-            if (cells[0]) {
-              const c0Text = cells[0].textContent?.trim() || '';
-              // 公司提取
-              if (/国彩|Guocai/i.test(c0Text)) {
-                data.company = /Guocai/i.test(c0Text) ? 'Yingde Guocai New Material Co., Ltd.' : '英德市国彩新材料有限公司';
-                data.entity = '国彩';
-              } else if (/冠志|Guanzhi/i.test(c0Text)) {
-                data.company = /Guanzhi/i.test(c0Text) ? 'Guangzhou Guanzhi New Material Technology Co., Ltd.' : '广州冠志新材料科技有限公司';
-                data.entity = '冠志';
+          for (const row of rows) {
+            const cells = Array.from(row.getElementsByTagNameNS(W_NS, 'tc'));
+            for (const cell of cells) {
+              const cText = cell.textContent?.trim() || '';
+              // 1. 公司与型号提取 (模式探测)
+              if (!data.docCode && /-MSDS/i.test(cText)) {
+                const codeM = cText.match(/([A-Za-z0-9_-]+)-MSDS/i);
+                if (codeM) {
+                  data.docCode = codeM[0];
+                  if (!data.model) data.model = codeM[1];
+                }
               }
-              // 型号与编号提取
-              const codeM = c0Text.match(/([A-Za-z0-9_-]+)-MSDS/i);
-              if (codeM) {
-                data.docCode = codeM[0];
-                if (!data.model) data.model = codeM[1];
+              if (!data.companyExplicit && /有限公司|Co\.,\s*Ltd|Company|Technology/i.test(cText)) {
+                if (/国彩|Guocai/i.test(cText)) {
+                  data.company = /Guocai/i.test(cText) ? 'Yingde Guocai New Material Co., Ltd.' : '英德市国彩新材料有限公司';
+                  data.entity = '国彩';
+                  data.companyExplicit = true;
+                } else if (/冠志|Guanzhi/i.test(cText)) {
+                  data.company = /Guanzhi/i.test(cText) ? 'Guangzhou Guanzhi New Material Technology Co., Ltd.' : '广州冠志新材料科技有限公司';
+                  data.entity = '冠志';
+                  data.companyExplicit = true;
+                }
               }
-            }
-            // cell 1: 修订日期
-            if (cells[1]) {
-              const c1Text = cells[1].textContent?.trim() || '';
-              const dm = c1Text.match(/(\d{4}[年\-\/.\s]\d{1,2}[月\-\/.\s]\d{1,2}日?|\d{4}-\d{1,2}-\d{1,2})/);
-              if (dm) {
-                data.revisionDate = dm[1].trim();
+              // 2. 修订日期提取 (模式探测)
+              if (!data.revisionDate && (/(?:修订日期|生效日期|编制日期|发布日期|Revision\s*Date|Date)/i.test(cText) || /\d{4}[年\-\/.\s]\d{1,2}[月\-\/.\s]\d{1,2}日?/.test(cText))) {
+                const dm = cText.match(/(\d{4}[年\-\/.\s]\d{1,2}[月\-\/.\s]\d{1,2}日?|\d{4}-\d{1,2}-\d{1,2})/);
+                if (dm) {
+                  data.revisionDate = dm[1].trim();
+                }
               }
             }
           }
@@ -997,14 +1000,22 @@ export function updateHeaderFooterData(engine, patch = {}) {
   const targetTitle = String(next.title || '').trim();
 
   const isGlobalEn = /^en$/i.test(next.language || '') || /^en$/i.test(engine?.headerFooterData?.language || '') || /_EN_|EN\b/i.test(engine?.filename || '');
-  const cleanDateStr = targetDate.replace(/^[P\s]+/, '').trim();
+  const cleanDateStr = targetDate
+    .replace(/^P(?=[修订日期|Revision|Date|\d])/i, '')
+    .replace(/[\u2000-\u200B\u202F\u205F\u3000]/g, ' ')
+    .trim();
   let formattedDate = cleanDateStr;
-  if (isGlobalEn) {
-    const pureDate = cleanDateStr.replace(/^(?:revision\s*date|修订日期|日期)[：:\s]*/i, '').trim();
-    formattedDate = `Revision Date: ${pureDate}`;
-  } else {
-    const pureDate = cleanDateStr.replace(/^(?:修订日期|revision\s*date|日期)[：:\s]*/i, '').trim();
-    formattedDate = `修订日期：${pureDate}`;
+  if (cleanDateStr) {
+    if (isGlobalEn) {
+      let pureDate = cleanDateStr.replace(/^(?:revision\s*date|修订日期|编制日期|生效日期|日期)[：:\s]*/i, '').trim();
+      if (/年|月|日/.test(pureDate)) {
+        pureDate = pureDate.replace(/年|月/g, '-').replace(/日/g, '').trim();
+      }
+      formattedDate = `Revision Date: ${pureDate}`;
+    } else {
+      const pureDate = cleanDateStr.replace(/^(?:修订日期|revision\s*date|编制日期|生效日期|日期)[：:\s]*/i, '').trim();
+      formattedDate = `修订日期：${pureDate}`;
+    }
   }
 
   function setRunProps(doc, rNode, { fontSize = null, bold = null, color = null, fontFamily = null }) {
@@ -1067,14 +1078,22 @@ export function updateHeaderFooterData(engine, patch = {}) {
       const isEnDoc = /^en$/i.test(next.language || '') || /^en$/i.test(engine?.headerFooterData?.language || '') || /EN|English/i.test(partName) || /_EN_|EN\b/i.test(engine?.filename || '');
 
       // 格式化修订日期：去除残留 P 前缀与异形空格，确保 EN 下 Revision Date 严格首字母大写
-      const cleanDateStr = targetDate.replace(/^[P\s]+/, '').trim();
+      const cleanDateStr = targetDate
+        .replace(/^P(?=[修订日期|Revision|Date|\d])/i, '')
+        .replace(/[\u2000-\u200B\u202F\u205F\u3000]/g, ' ')
+        .trim();
       let formattedDate = cleanDateStr;
-      if (isEnDoc) {
-        const pureDate = cleanDateStr.replace(/^(?:revision\s*date|修订日期|日期)[：:\s]*/i, '').trim();
-        formattedDate = `Revision Date: ${pureDate}`;
-      } else {
-        const pureDate = cleanDateStr.replace(/^(?:修订日期|revision\s*date|日期)[：:\s]*/i, '').trim();
-        formattedDate = `修订日期：${pureDate}`;
+      if (cleanDateStr) {
+        if (isEnDoc) {
+          let pureDate = cleanDateStr.replace(/^(?:revision\s*date|修订日期|编制日期|生效日期|日期)[：:\s]*/i, '').trim();
+          if (/年|月|日/.test(pureDate)) {
+            pureDate = pureDate.replace(/年|月/g, '-').replace(/日/g, '').trim();
+          }
+          formattedDate = `Revision Date: ${pureDate}`;
+        } else {
+          const pureDate = cleanDateStr.replace(/^(?:修订日期|revision\s*date|编制日期|生效日期|日期)[：:\s]*/i, '').trim();
+          formattedDate = `修订日期：${pureDate}`;
+        }
       }
 
       if (/header/i.test(partName)) {
@@ -1185,113 +1204,131 @@ export function updateHeaderFooterData(engine, patch = {}) {
           }
         }
       } else if (/footer/i.test(partName)) {
-        const tbl = doc.getElementsByTagNameNS(W_NS, 'tbl')[0];
-        if (tbl) {
-          const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
-          if (rows[0]) {
-            const cells = Array.from(rows[0].getElementsByTagNameNS(W_NS, 'tc'));
-            // 1. Footer Row 0 Cell 0: 公司 + 型号-MSDS (对标 BL-8129A: 10.5pt 左对齐)
-            if (cells[0] && (targetCompany || targetModel)) {
-              const p = cells[0].getElementsByTagNameNS(W_NS, 'p')[0];
-              if (p) {
-                let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
-                if (!pPr) {
-                  pPr = doc.createElementNS(W_NS, 'w:pPr');
-                  p.insertBefore(pPr, p.firstChild);
-                }
-                let jc = pPr.getElementsByTagNameNS(W_NS, 'w:jc')[0];
-                if (!jc) {
-                  jc = doc.createElementNS(W_NS, 'w:jc');
-                  pPr.appendChild(jc);
-                }
-                jc.setAttributeNS(W_NS, 'w:val', 'left');
+        const tblNodes = Array.from(doc.getElementsByTagNameNS(W_NS, 'tbl'));
+        let dateUpdated = false;
+        let entityUpdated = false;
 
-                let comp = targetCompany || current.company || (isEnDoc ? 'Guangzhou Guanzhi New Material Technology Co., Ltd.' : '广州冠志新材料科技有限公司');
-                if (isEnDoc) {
-                  if (/国彩|Guocai/i.test(comp)) {
-                    comp = 'Yingde Guocai New Material Co., Ltd.';
-                  } else {
-                    comp = 'Guangzhou Guanzhi New Material Technology Co., Ltd.';
+        if (tblNodes.length > 0) {
+          for (let tIdx = 0; tIdx < tblNodes.length; tIdx++) {
+            const tbl = tblNodes[tIdx];
+            const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
+            for (let rIdx = 0; rIdx < rows.length; rIdx++) {
+              const cells = Array.from(rows[rIdx].getElementsByTagNameNS(W_NS, 'tc'));
+              for (let cIdx = 0; cIdx < cells.length; cIdx++) {
+                const cell = cells[cIdx];
+                const p = cell.getElementsByTagNameNS(W_NS, 'p')[0];
+                if (!p) continue;
+                const cellText = (p.textContent || '').trim();
+
+                // 1. 探测并覆写“修订日期”插槽 (支持模式匹配或首行右格)
+                if (!dateUpdated && formattedDate && (/(?:修订日期|生效日期|编制日期|发布日期|Revision\s*Date|Date)/i.test(cellText) || /\d{4}[年\-\/.\s]\d{1,2}[月\-\/.\s]\d{1,2}日?/.test(cellText) || (rIdx === 0 && cIdx === 1))) {
+                  let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+                  if (!pPr) {
+                    pPr = doc.createElementNS(W_NS, 'w:pPr');
+                    p.insertBefore(pPr, p.firstChild);
+                  }
+                  const oldInd = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
+                  if (oldInd) {
+                    pPr.removeChild(oldInd);
+                    modified = true;
+                  }
+
+                  let jc = pPr.getElementsByTagNameNS(W_NS, 'w:jc')[0];
+                  if (!jc) {
+                    jc = doc.createElementNS(W_NS, 'w:jc');
+                    pPr.appendChild(jc);
+                  }
+                  jc.setAttributeNS(W_NS, 'w:val', 'right');
+
+                  const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+                  if (runs.length > 0) {
+                    let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
+                    if (!t) {
+                      t = doc.createElementNS(W_NS, 'w:t');
+                      runs[0].appendChild(t);
+                    }
+                    t.textContent = `${formattedDate}   `;
+                    setRunProps(doc, runs[0], { fontSize: 18, bold: false, color: '7F7F7F', fontFamily: isEnDoc ? 'Arial' : '楷体_GB2312' });
+                    for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
+                    dateUpdated = true;
+                    modified = true;
                   }
                 }
-                const mod = targetModel || current.model || '';
 
-                const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
-                if (runs.length > 0) {
-                  let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
-                  if (!t) {
-                    t = doc.createElementNS(W_NS, 'w:t');
-                    runs[0].appendChild(t);
+                // 2. 探测并覆写“企业主体与型号-MSDS”插槽
+                if (!entityUpdated && (targetCompany || targetModel) && (/-MSDS|有限公司|Company|Technology|Co\.,\s*Ltd/i.test(cellText) || (rIdx === 0 && cIdx === 0))) {
+                  let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+                  if (!pPr) {
+                    pPr = doc.createElementNS(W_NS, 'w:pPr');
+                    p.insertBefore(pPr, p.firstChild);
                   }
-                  t.textContent = mod ? `${comp} ${mod}-MSDS` : comp;
-                  setRunProps(doc, runs[0], { fontSize: 21, bold: false, fontFamily: isEnDoc ? 'Arial' : '宋体' });
-                  for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
-                  modified = true;
-                }
-              }
-            }
-
-            // 2. Footer Row 0 Cell 1: 修订日期 (对标 BL-8129A: 10pt 灰字 右对齐 空3格)
-            if (cells[1] && formattedDate) {
-              const p = cells[1].getElementsByTagNameNS(W_NS, 'p')[0];
-              if (p) {
-                let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
-                if (!pPr) {
-                  pPr = doc.createElementNS(W_NS, 'w:pPr');
-                  p.insertBefore(pPr, p.firstChild);
-                }
-                const oldInd = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
-                if (oldInd) {
-                  pPr.removeChild(oldInd);
-                  modified = true;
-                }
-
-                let jc = pPr.getElementsByTagNameNS(W_NS, 'w:jc')[0];
-                if (!jc) {
-                  jc = doc.createElementNS(W_NS, 'w:jc');
-                  pPr.appendChild(jc);
-                }
-                jc.setAttributeNS(W_NS, 'w:val', 'right');
-
-                const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
-                if (runs.length > 0) {
-                  let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
-                  if (!t) {
-                    t = doc.createElementNS(W_NS, 'w:t');
-                    runs[0].appendChild(t);
+                  let jc = pPr.getElementsByTagNameNS(W_NS, 'w:jc')[0];
+                  if (!jc) {
+                    jc = doc.createElementNS(W_NS, 'w:jc');
+                    pPr.appendChild(jc);
                   }
-                  t.textContent = `${formattedDate}   `;
-                  setRunProps(doc, runs[0], { fontSize: 20, bold: false, color: '7F7F7F', fontFamily: isEnDoc ? 'Arial' : '楷体_GB2312' });
-                  for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
+                  jc.setAttributeNS(W_NS, 'w:val', 'left');
+
+                  let comp = targetCompany || current.company || (isEnDoc ? 'Guangzhou Guanzhi New Material Technology Co., Ltd.' : '广州冠志新材料科技有限公司');
+                  const mod = targetModel || current.model || '';
+
+                  const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+                  if (runs.length > 0) {
+                    let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
+                    if (!t) {
+                      t = doc.createElementNS(W_NS, 'w:t');
+                      runs[0].appendChild(t);
+                    }
+                    t.textContent = mod ? `${comp} ${mod}-MSDS` : comp;
+                    setRunProps(doc, runs[0], { fontSize: 21, bold: false, fontFamily: isEnDoc ? 'Arial' : '宋体' });
+                    for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
+                    entityUpdated = true;
+                    modified = true;
+                  }
+                }
+
+                // 3. 动态页码样式继承 (对标 12pt 右对齐)
+                const fldSimples = Array.from(p.getElementsByTagNameNS(W_NS, 'fldSimple'));
+                const instrTextStr = Array.from(p.getElementsByTagNameNS(W_NS, 'instrText')).map(it => it.textContent || '').join(' ');
+                if (fldSimples.some(fs => /PAGE/i.test(fs.getAttributeNS(W_NS, 'instr') || '')) || /PAGE/i.test(instrTextStr) || (rIdx === 1 && cIdx === 1)) {
+                  const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+                  for (const r of runs) {
+                    setRunProps(doc, r, { fontSize: 24, bold: false });
+                  }
                   modified = true;
                 }
               }
             }
           }
-
-          // 3. Footer Row 1 Cell 1: 动态页码 (对标 BL-8129A: 12pt 右对齐)
-          if (rows[1]) {
-            const pageCells = Array.from(rows[1].getElementsByTagNameNS(W_NS, 'tc'));
-            if (pageCells[1]) {
-              const p = pageCells[1].getElementsByTagNameNS(W_NS, 'p')[0];
-              if (p) {
-                const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
-                for (const r of runs) {
-                  setRunProps(doc, r, { fontSize: 24, bold: false });
+        } else {
+          // 纯段落容器
+          const rootPs = Array.from(doc.getElementsByTagNameNS(W_NS, 'p'));
+          for (const p of rootPs) {
+            const pText = (p.textContent || '').trim();
+            if (!dateUpdated && formattedDate && (/(?:修订日期|生效日期|编制日期|发布日期|Revision\s*Date|Date)/i.test(pText) || /\d{4}[年\-\/.\s]\d{1,2}[月\-\/.\s]\d{1,2}日?/.test(pText))) {
+              const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+              if (runs.length > 0) {
+                let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
+                if (!t) {
+                  t = doc.createElementNS(W_NS, 'w:t');
+                  runs[0].appendChild(t);
                 }
+                t.textContent = formattedDate;
+                setRunProps(doc, runs[0], { fontSize: 18, bold: false, color: '7F7F7F', fontFamily: isEnDoc ? 'Arial' : '楷体_GB2312' });
+                dateUpdated = true;
                 modified = true;
               }
             }
           }
         }
       }
-
       if (modified) {
         let serialized = serializer().serializeToString(doc);
         if (targetModel) {
           serialized = serialized.replace(/P\s*EA\s*-\s*4139/g, targetModel)
                                  .replace(/PEA\s*-\s*4139/g, targetModel);
         }
+        serialized = serialized.replace(/P修订日期/g, '修订日期');
         engine.supportingXml[partName] = serialized;
       }
     } catch (e) {

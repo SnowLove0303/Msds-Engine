@@ -1,9 +1,9 @@
 /**
  * MSDS-Engine: 通用母版拓扑识别层 (Template Topology Recognizer)
  * 
- * 核心公理与使命 (REQ-TOPO-02 & REQ-TOPO-03):
+ * 核心公理与使命 (REQ-TOPO-02 & REQ-TOPO-03 & REQ-GEN-03):
  * 1. 彻底解耦: 废除上层代码对特定母版网格、行数、列宽的死硬编码假设；
- * 2. 动态认知: 自动解析任意 DOCX 母版，提取 16 章节表格几何、行列分布、单元格语义角色与插槽蓝图；
+ * 2. 动态认知: 自动解析任意 DOCX 母版，提取页面几何 (w:sectPr)、页脚插槽 (slots) 及 16 章节表格几何；
  * 3. 拓扑随动: 当底模版式调整或更换时，拓扑识别层输出新拓扑蓝图，下游覆写管线随新母版几何自动同构适配！
  */
 
@@ -18,6 +18,7 @@ const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, '../..');
 
 const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+const R_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 
 /**
  * 从单元格文本推断标准化 Slot Key
@@ -113,6 +114,294 @@ export function inferCellSemanticRole(cellNode, rowIndex, cellIndex, totalRows, 
   return 'VALUE';
 }
 
+/**
+ * 从 Word document DOM 识别通用页面格式几何参数 (Page Formatting)
+ * 提取 w:sectPr 中的尺寸、边距与网格，解耦特定模板几何假设
+ */
+export function recognizePageFormatting(doc) {
+  if (!doc) return null;
+  const sectPrNodes = Array.from(doc.getElementsByTagNameNS(W_NS, 'sectPr'));
+  if (sectPrNodes.length === 0) return null;
+
+  // 使用生效的节属性（通常为正文最底部的 sectPr）
+  const sectPr = sectPrNodes[sectPrNodes.length - 1];
+
+  // 1. 纸张尺寸
+  const pgSzNode = sectPr.getElementsByTagNameNS(W_NS, 'pgSz')?.[0];
+  const widthDxa = Number(pgSzNode?.getAttributeNS(W_NS, 'w') || pgSzNode?.getAttribute('w:w') || 11906);
+  const heightDxa = Number(pgSzNode?.getAttributeNS(W_NS, 'h') || pgSzNode?.getAttribute('w:h') || 16838);
+  const orient = pgSzNode?.getAttributeNS(W_NS, 'orient') || pgSzNode?.getAttribute('w:orient') || 'portrait';
+
+  // 2. 页边距标尺
+  const pgMarNode = sectPr.getElementsByTagNameNS(W_NS, 'pgMar')?.[0];
+  const topDxa = Number(pgMarNode?.getAttributeNS(W_NS, 'top') || pgMarNode?.getAttribute('w:top') || 1440);
+  const bottomDxa = Number(pgMarNode?.getAttributeNS(W_NS, 'bottom') || pgMarNode?.getAttribute('w:bottom') || 1440);
+  const leftDxa = Number(pgMarNode?.getAttributeNS(W_NS, 'left') || pgMarNode?.getAttribute('w:left') || 1440);
+  const rightDxa = Number(pgMarNode?.getAttributeNS(W_NS, 'right') || pgMarNode?.getAttribute('w:right') || 1440);
+  const headerDxa = Number(pgMarNode?.getAttributeNS(W_NS, 'header') || pgMarNode?.getAttribute('w:header') || 720);
+  const footerDxa = Number(pgMarNode?.getAttributeNS(W_NS, 'footer') || pgMarNode?.getAttribute('w:footer') || 720);
+  const gutterDxa = Number(pgMarNode?.getAttributeNS(W_NS, 'gutter') || pgMarNode?.getAttribute('w:gutter') || 0);
+
+  // 3. 文档网格
+  const docGridNode = sectPr.getElementsByTagNameNS(W_NS, 'docGrid')?.[0];
+  const linePitchDxa = Number(docGridNode?.getAttributeNS(W_NS, 'linePitch') || docGridNode?.getAttribute('w:linePitch') || 312);
+  const charSpaceDxa = Number(docGridNode?.getAttributeNS(W_NS, 'charSpace') || docGridNode?.getAttribute('w:charSpace') || 0);
+  const gridType = docGridNode?.getAttributeNS(W_NS, 'type') || docGridNode?.getAttribute('w:type') || 'lines';
+
+  // 4. 分栏
+  const colsNode = sectPr.getElementsByTagNameNS(W_NS, 'cols')?.[0];
+  const colsNum = Number(colsNode?.getAttributeNS(W_NS, 'num') || colsNode?.getAttribute('w:num') || 1);
+  const colsSpaceDxa = Number(colsNode?.getAttributeNS(W_NS, 'space') || colsNode?.getAttribute('w:space') || 425);
+
+  return {
+    pageSize: {
+      widthDxa,
+      heightDxa,
+      orientation: orient,
+      widthMm: Number((widthDxa / 56.7).toFixed(1)),
+      heightMm: Number((heightDxa / 56.7).toFixed(1)),
+      widthPt: Number((widthDxa / 20).toFixed(1)),
+      heightPt: Number((heightDxa / 20).toFixed(1))
+    },
+    margins: {
+      topDxa,
+      bottomDxa,
+      leftDxa,
+      rightDxa,
+      headerDxa,
+      footerDxa,
+      gutterDxa,
+      topMm: Number((topDxa / 56.7).toFixed(1)),
+      bottomMm: Number((bottomDxa / 56.7).toFixed(1)),
+      leftMm: Number((leftDxa / 56.7).toFixed(1)),
+      rightMm: Number((rightDxa / 56.7).toFixed(1)),
+      headerMm: Number((headerDxa / 56.7).toFixed(1)),
+      footerMm: Number((footerDxa / 56.7).toFixed(1))
+    },
+    docGrid: {
+      linePitchDxa,
+      charSpaceDxa,
+      type: gridType
+    },
+    cols: {
+      num: colsNum,
+      spaceDxa: colsSpaceDxa
+    }
+  };
+}
+
+/**
+ * 动态识别母版页脚几何结构与插槽角色 (Footer Topology)
+ * 能够穿透表格或纯段落，自适应识别修订日期槽、企业型号槽及页码槽
+ */
+export async function recognizeFooterTopology(zip, doc, parser = new DOMParser()) {
+  if (!zip || !doc) {
+    return { found: false, partName: null, containerType: 'NONE', slots: {} };
+  }
+
+  // 1. 扫描 document.xml.rels
+  const relsMap = {};
+  if (zip.file('word/_rels/document.xml.rels')) {
+    try {
+      const relsXml = await zip.file('word/_rels/document.xml.rels').async('text');
+      const relsDoc = parser.parseFromString(relsXml, 'application/xml');
+      const relNodes = Array.from(relsDoc.getElementsByTagName('Relationship'));
+      for (const r of relNodes) {
+        relsMap[r.getAttribute('Id')] = {
+          type: r.getAttribute('Type'),
+          target: r.getAttribute('Target')
+        };
+      }
+    } catch (e) {}
+  }
+
+  // 2. 从 sectPr 获取生效的页脚引用
+  const sectPrNodes = Array.from(doc.getElementsByTagNameNS(W_NS, 'sectPr'));
+  const sectPr = sectPrNodes[sectPrNodes.length - 1];
+  let targetFooterPart = null;
+  let footerRefType = 'default';
+
+  if (sectPr) {
+    const footerRefs = Array.from(sectPr.getElementsByTagNameNS(W_NS, 'footerReference'));
+    let chosenRef = footerRefs.find(fr => (fr.getAttributeNS(W_NS, 'type') || fr.getAttribute('w:type')) === 'default');
+    if (!chosenRef && footerRefs.length > 0) chosenRef = footerRefs[0];
+
+    if (chosenRef) {
+      const rId = chosenRef.getAttributeNS(R_NS, 'id') || chosenRef.getAttribute('r:id');
+      footerRefType = chosenRef.getAttributeNS(W_NS, 'type') || chosenRef.getAttribute('w:type') || 'default';
+      const target = relsMap[rId]?.target;
+      if (target) {
+        targetFooterPart = target.startsWith('word/') ? target : `word/${target}`;
+      }
+    }
+  }
+
+  // 兜底：若 sectPr 未指定有效目标，探测 zip 中的 word/footer*.xml
+  if (!targetFooterPart || !zip.file(targetFooterPart)) {
+    const footerFiles = Object.keys(zip.files).filter(k => /^word\/footer\d+\.xml$/.test(k));
+    targetFooterPart = footerFiles.find(f => f === 'word/footer1.xml') || footerFiles[0] || null;
+  }
+
+  if (!targetFooterPart || !zip.file(targetFooterPart)) {
+    return {
+      found: false,
+      partName: null,
+      containerType: 'NONE',
+      slots: {}
+    };
+  }
+
+  let footerXml = '';
+  try {
+    footerXml = await zip.file(targetFooterPart).async('text');
+  } catch (e) {
+    return { found: false, partName: targetFooterPart, containerType: 'NONE', slots: {} };
+  }
+
+  const fdoc = parser.parseFromString(footerXml, 'application/xml');
+  const tblNodes = Array.from(fdoc.getElementsByTagNameNS(W_NS, 'tbl'));
+
+  const slots = {};
+  let containerType = 'NONE';
+  let tableMetrics = null;
+
+  if (tblNodes.length > 0) {
+    containerType = 'table';
+    const mainTbl = tblNodes[0];
+    const trNodes = Array.from(mainTbl.getElementsByTagNameNS(W_NS, 'tr'));
+    const tblW = mainTbl.getElementsByTagNameNS(W_NS, 'tblPr')?.[0]?.getElementsByTagNameNS(W_NS, 'tblW')?.[0]?.getAttributeNS(W_NS, 'w');
+    
+    tableMetrics = {
+      totalRows: trNodes.length,
+      totalCols: trNodes[0] ? Array.from(trNodes[0].getElementsByTagNameNS(W_NS, 'tc')).length : 0,
+      tableWidthDxa: tblW ? Number(tblW) : null
+    };
+
+    trNodes.forEach((tr, rIdx) => {
+      const tcNodes = Array.from(tr.getElementsByTagNameNS(W_NS, 'tc'));
+      tcNodes.forEach((tc, cIdx) => {
+        const tcW = tc.getElementsByTagNameNS(W_NS, 'tcPr')?.[0]?.getElementsByTagNameNS(W_NS, 'tcW')?.[0]?.getAttributeNS(W_NS, 'w');
+        const ps = Array.from(tc.getElementsByTagNameNS(W_NS, 'p'));
+        
+        ps.forEach((p, pIdx) => {
+          const text = (p.textContent || '').trim();
+          const jc = p.getElementsByTagNameNS(W_NS, 'pPr')?.[0]?.getElementsByTagNameNS(W_NS, 'jc')?.[0]?.getAttributeNS(W_NS, 'val') || 'left';
+          
+          // 提取 run 的格式属性
+          const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+          let runProps = { fontSizePt: null, color: null, fontFamily: {} };
+          for (const r of runs) {
+            const rPr = r.getElementsByTagNameNS(W_NS, 'rPr')?.[0];
+            if (rPr) {
+              const szVal = rPr.getElementsByTagNameNS(W_NS, 'sz')?.[0]?.getAttributeNS(W_NS, 'val');
+              const colorVal = rPr.getElementsByTagNameNS(W_NS, 'color')?.[0]?.getAttributeNS(W_NS, 'val');
+              const rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')?.[0];
+              if (szVal) runProps.fontSizePt = Number(szVal) / 2;
+              if (colorVal) runProps.color = colorVal;
+              if (rFonts) {
+                runProps.fontFamily = {
+                  eastAsia: rFonts.getAttributeNS(W_NS, 'eastAsia') || '',
+                  ascii: rFonts.getAttributeNS(W_NS, 'ascii') || ''
+                };
+              }
+              if (runProps.fontSizePt) break;
+            }
+          }
+
+          // 模式探测: 1. 修订日期
+          if (!slots.revisionDate && (/(?:修订日期|生效日期|编制日期|发布日期|Revision\s*Date|Date)/i.test(text) || /\d{4}[年\-\/.]\d{1,2}[月\-\/.]\d{1,2}/.test(text))) {
+            slots.revisionDate = {
+              found: true,
+              container: 'table',
+              tableIndex: 0,
+              rowIndex: rIdx,
+              cellIndex: cIdx,
+              paragraphIndex: pIdx,
+              widthDxa: tcW ? Number(tcW) : null,
+              alignment: jc,
+              style: runProps,
+              templateText: text
+            };
+          }
+
+          // 模式探测: 2. 企业与型号
+          if (!slots.entityModel && (/-MSDS|有限公司|Company|Technology|Co\.,\s*Ltd/i.test(text))) {
+            slots.entityModel = {
+              found: true,
+              container: 'table',
+              tableIndex: 0,
+              rowIndex: rIdx,
+              cellIndex: cIdx,
+              paragraphIndex: pIdx,
+              widthDxa: tcW ? Number(tcW) : null,
+              alignment: jc,
+              style: runProps,
+              templateText: text
+            };
+          }
+
+          // 模式探测: 3. 动态页码
+          const fldSimples = Array.from(p.getElementsByTagNameNS(W_NS, 'fldSimple'));
+          const instrTexts = runs.map(r => r.getElementsByTagNameNS(W_NS, 'instrText')?.[0]?.textContent || '').join(' ');
+          const hasPageField = fldSimples.some(fs => /PAGE/i.test(fs.getAttributeNS(W_NS, 'instr') || '')) || /PAGE/i.test(instrTexts);
+          if (!slots.pageNumber && (hasPageField || /PAGE\s*\d+\s*\/\s*NUMPAGES/i.test(text))) {
+            slots.pageNumber = {
+              found: true,
+              container: 'table',
+              tableIndex: 0,
+              rowIndex: rIdx,
+              cellIndex: cIdx,
+              paragraphIndex: pIdx,
+              widthDxa: tcW ? Number(tcW) : null,
+              alignment: jc,
+              style: runProps,
+              templateText: text
+            };
+          }
+        });
+      });
+    });
+  } else {
+    // 纯段落容器
+    const rootPs = Array.from(fdoc.getElementsByTagNameNS(W_NS, 'p'));
+    if (rootPs.length > 0) {
+      containerType = 'paragraph';
+      rootPs.forEach((p, pIdx) => {
+        const text = (p.textContent || '').trim();
+        const jc = p.getElementsByTagNameNS(W_NS, 'pPr')?.[0]?.getElementsByTagNameNS(W_NS, 'jc')?.[0]?.getAttributeNS(W_NS, 'val') || 'left';
+        
+        if (!slots.revisionDate && (/(?:修订日期|生效日期|编制日期|发布日期|Revision\s*Date|Date)/i.test(text) || /\d{4}[年\-\/.]\d{1,2}[月\-\/.]\d{1,2}/.test(text))) {
+          slots.revisionDate = {
+            found: true,
+            container: 'paragraph',
+            paragraphIndex: pIdx,
+            alignment: jc,
+            templateText: text
+          };
+        }
+        if (!slots.entityModel && (/-MSDS|有限公司|Company|Technology|Co\.,\s*Ltd/i.test(text))) {
+          slots.entityModel = {
+            found: true,
+            container: 'paragraph',
+            paragraphIndex: pIdx,
+            alignment: jc,
+            templateText: text
+          };
+        }
+      });
+    }
+  }
+
+  return {
+    found: true,
+    partName: targetFooterPart,
+    footerRefType,
+    containerType,
+    tableMetrics,
+    slots
+  };
+}
+
 const STANDARD_TEMPLATES = {
   'CN_Guanzhi': 'web/public/templates/正式模板_MSDS_CN_冠志(1).docx',
   'CN_Guocai': 'web/public/templates/正式模板_MSDS_CN_冠志(1).docx',
@@ -122,6 +411,7 @@ const STANDARD_TEMPLATES = {
 
 /**
  * 动态识别 DOCX 母版几何与语义拓扑蓝图
+ * 包含通用页面格式 (pageFormat)、页脚插槽 (footerTopology) 及 16 章节表格几何
  * 
  * @param {Buffer|string} templateSource - 母版 DOCX Buffer 或文件物理路径
  * @param {Object} [options={}] - 配置项
@@ -165,7 +455,13 @@ export async function recognizeTemplateTopology(templateSource, options = {}) {
   const docXmlText = await zip.file('word/document.xml').async('text');
   const doc = parser.parseFromString(docXmlText, 'application/xml');
 
-  // 2. 提取表格并建立拓扑
+  // 2. 识别通用页面格式几何 (Page Formatting)
+  const pageFormat = recognizePageFormatting(doc);
+
+  // 3. 识别通用页脚拓扑几何与插槽 (Footer Topology)
+  const footerTopology = await recognizeFooterTopology(zip, doc, parser);
+
+  // 4. 提取表格并建立拓扑
   const tblNodes = Array.from(doc.getElementsByTagNameNS(W_NS, 'tbl'));
   const sectionsTopology = [];
 
@@ -298,6 +594,8 @@ export async function recognizeTemplateTopology(templateSource, options = {}) {
     templateKey,
     recognizedAt: new Date().toISOString(),
     isTopologyDynamic: true,
+    pageFormat,
+    footerTopology,
     sectionsCount: sectionsTopology.filter(s => s.found).length,
     sections: sectionsTopology
   };
