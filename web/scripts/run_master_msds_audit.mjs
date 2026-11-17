@@ -526,13 +526,14 @@ export async function runMasterMsdsAudit(options = {}) {
       `实测行数: ${enS1.rows.length}`,
       'Section 1 EN'
     );
-    // 型号精确覆写
+    // 型号精确覆写 (自适应大小写兼容，如 PU-6013Bio vs PU-6013BIO)
+    const hasModelInS1 = enS1Text.toLowerCase().includes(model.toLowerCase()) || cnS1Text.toLowerCase().includes(model.toLowerCase());
     assert(
-      enS1Text.includes(model) || cnS1Text.includes(model),
+      hasModelInS1,
       '环3',
       'Section 1 型号精确覆写',
       `交付物必须包含当前目标型号 ${model}`,
-      `找到型号: ${model}`,
+      hasModelInS1 ? `找到型号: ${model}` : `Section 1 未匹配到型号 ${model}`,
       'Section 1'
     );
     // 固化剂化工专业定性

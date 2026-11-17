@@ -165,6 +165,11 @@ export function translateChemicalTerm(term) {
   }
   if (/上述数据非产品指标/i.test(trimmed)) return 'The above data are not product specifications. For specifications, please refer to the technical data sheet.'
   if (/羟基聚氨酯/i.test(trimmed)) return 'Hydroxy polyurethane dispersion'
+  if (/生物基.*聚氨酯.*分散体/i.test(trimmed)) return 'Bio-based polyurethane dispersion'
+  if (/生物基.*聚氨酯/i.test(trimmed)) return 'Bio-based polyurethane'
+  if (/聚氨酯.*分散体/i.test(trimmed)) return 'Polyurethane dispersion'
+  if (/水性.*聚氨酯/i.test(trimmed)) return 'Waterborne polyurethane'
+  if (/聚氨酯/i.test(trimmed)) return 'Polyurethane'
   if (/微黄.*半透明/i.test(trimmed)) return 'Light yellow, semi-transparent liquid'
   if (/微黄.*透明/i.test(trimmed)) return 'Light yellow transparent liquid'
   if (/水性.*羟基.*丙烯酸/i.test(trimmed)) return 'Waterborne hydroxy acrylic emulsion'
