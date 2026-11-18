@@ -509,22 +509,77 @@ try {
  * 固定用户配置目录与导出 filter，使同一运行时下的导出可复现。
  */
 async function convertViaLibreOffice(soffice, inputPaths, tmpDir, timeoutMs = 60000) {
-  const profileDir = resolveProfileDir();
-  await fs.mkdir(profileDir, { recursive: true });
-  const args = [
-    `-env:UserInstallation=${pathToFileURL(profileDir).href}`,
-    '--headless',
-    '--norestore',
-    '--nolockcheck',
-    '--nodefault',
-    '--nologo',
-    '--convert-to',
-    EXPORT_FILTER,
-    ...inputPaths,
-    '--outdir',
-    tmpDir,
-  ];
-  await execFileAsync(soffice, args, { timeout: timeoutMs, windowsHide: true });
+  if (!inputPaths || inputPaths.length === 0) return;
+
+  // 单文件无并发需要，直接走固定 Profile 运行
+  if (inputPaths.length === 1) {
+    const profileDir = resolveProfileDir();
+    await fs.mkdir(profileDir, { recursive: true });
+    const args = [
+      `-env:UserInstallation=${pathToFileURL(profileDir).href}`,
+      '--headless',
+      '--norestore',
+      '--nolockcheck',
+      '--nodefault',
+      '--nologo',
+      '--convert-to',
+      EXPORT_FILTER,
+      inputPaths[0],
+      '--outdir',
+      tmpDir,
+    ];
+    await execFileAsync(soffice, args, { timeout: timeoutMs, windowsHide: true });
+    return;
+  }
+
+  // 多文件：多进程隔离并发转译 (每个子进程分配独立的 -env:UserInstallation 用户配置目录)
+  try {
+    const parallelTasks = inputPaths.map(async (inputPath, idx) => {
+      const isolatedProfileDir = path.join(
+        os.tmpdir(),
+        `msds-lo-profile-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`
+      );
+      await fs.mkdir(isolatedProfileDir, { recursive: true });
+      try {
+        const args = [
+          `-env:UserInstallation=${pathToFileURL(isolatedProfileDir).href}`,
+          '--headless',
+          '--norestore',
+          '--nolockcheck',
+          '--nodefault',
+          '--nologo',
+          '--convert-to',
+          EXPORT_FILTER,
+          inputPath,
+          '--outdir',
+          tmpDir,
+        ];
+        await execFileAsync(soffice, args, { timeout: timeoutMs, windowsHide: true });
+      } finally {
+        await fs.rm(isolatedProfileDir, { recursive: true, force: true }).catch(() => {});
+      }
+    });
+
+    await Promise.all(parallelTasks);
+  } catch (parallelErr) {
+    console.warn(`[PDF-CONVERT] 多进程并发转译捕获异常，安全降级至单进程批处理:`, parallelErr.message);
+    const profileDir = resolveProfileDir();
+    await fs.mkdir(profileDir, { recursive: true });
+    const fallbackArgs = [
+      `-env:UserInstallation=${pathToFileURL(profileDir).href}`,
+      '--headless',
+      '--norestore',
+      '--nolockcheck',
+      '--nodefault',
+      '--nologo',
+      '--convert-to',
+      EXPORT_FILTER,
+      ...inputPaths,
+      '--outdir',
+      tmpDir,
+    ];
+    await execFileAsync(soffice, fallbackArgs, { timeout: timeoutMs, windowsHide: true });
+  }
 }
 
 /**

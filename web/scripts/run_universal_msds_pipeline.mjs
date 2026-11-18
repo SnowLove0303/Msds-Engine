@@ -259,6 +259,7 @@ async function main() {
   // Step 3: 原生流水线拓扑覆写产出 (Execute Eight Deliverables Pipeline)
   // =========================================================================
   console.log(`>>> [Step 3/4] 启动原生母版拓扑覆写引擎，生成 4 DOCX + 4 PDF...`);
+  console.log(`    • [3.1] 启动母版拓扑覆写与 Fast-Fail 前置合规断言...`);
   const t3 = Date.now();
   const sourceBuffer = fs.readFileSync(docxSourcePath);
   const pipelineResult = await executeEightDeliverablesPipeline({
@@ -268,7 +269,7 @@ async function main() {
     targetDir,
     facts: pipelineFacts
   });
-  console.log(`    ✓ 8 格式全矩阵交付物生成完毕，共交付 ${pipelineResult.deliverables?.length || 8} 份文件 (${Date.now() - t3} ms)`);
+  console.log(`    • [3.2] 8 格式全矩阵交付物生成完毕 (4 DOCX + 4 PDF 隔离多进程并发转译)，共交付 ${pipelineResult.deliverables?.length || 8} 份文件 (${Date.now() - t3} ms)`);
 
   // =========================================================================
   // Step 4: 内嵌级联全景深度审计 (In-line Cascade Audits)
@@ -299,9 +300,9 @@ async function main() {
       process.exit(1);
     }
 
-    // 4.3 集中式中央主审计套件 (170项)
-    console.log(`    • [4.3] 执行集中式中央主审计套件 (170 项)...`);
-    const masterAuditCmd = `node "${path.resolve(REPO_ROOT, 'web/scripts/run_master_msds_audit.mjs')}" --model=${modelCode} --targetDir="${targetDir}" --sourceDocx="${docxSourcePath}"`;
+    // 4.3 集中式中央主审计套件 (170项) - 采用归一化 --source 别名验证
+    console.log(`    • [4.3] 执行集中式中央主审计套件 (170 项，验证 --source 归一化别名)...`);
+    const masterAuditCmd = `node "${path.resolve(REPO_ROOT, 'web/scripts/run_master_msds_audit.mjs')}" --model=${modelCode} --targetDir="${targetDir}" --source="${docxSourcePath}"`;
     try {
       execSync(masterAuditCmd, { stdio: 'inherit' });
       console.log(`      ✅ 集中式中央主审计套件 100% 满分通过 (🏆 AUDIT_PASSED)！`);

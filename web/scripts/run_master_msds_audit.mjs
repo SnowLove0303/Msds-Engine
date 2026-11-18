@@ -2045,6 +2045,8 @@ if (process.argv[1] && process.argv[1].endsWith('run_master_msds_audit.mjs')) {
     else if (arg === '--target' && args[i + 1]) targetDir = args[++i];
     else if (arg.startsWith('--sourceDocx=')) sourceDocx = arg.slice(13);
     else if (arg === '--sourceDocx' && args[i + 1]) sourceDocx = args[++i];
+    else if (arg.startsWith('--source=')) sourceDocx = arg.slice(9);
+    else if (arg === '--source' && args[i + 1]) sourceDocx = args[++i];
   }
 
   runMasterMsdsAudit({ model, targetDir, sourceDocx }).then(res => {
