@@ -14,6 +14,9 @@
 // 通用化工与聚合物高保真英译字典
 export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   // 聚合物与树脂
+  '脂肪族聚碳化二亚胺': 'Aliphatic polycarbodiimide',
+  '聚碳化二亚胺': 'Polycarbodiimide',
+  '碳化二亚胺交联剂': 'Carbodiimide crosslinker',
   '噁唑啉改性丙烯酸聚合物': 'Oxazoline-modified acrylic polymer',
   '水性噁唑啉聚合物分散体': 'Oxazoline-modified polymer aqueous dispersion',
   '环氧改性丙烯酸聚合物': 'Epoxy modified acrylic polymer',
@@ -114,12 +117,14 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '无特殊气味': 'Odorless',
   '微弱气味': 'Slight odor',
   '轻微特征气味': 'Slight characteristic odor',
+  '溶剂气味': 'Solvent odor',
   '全溶于水': 'Completely soluble in water',
   '溶于水': 'Soluble in water',
   '部分溶于水': 'Partially soluble in water',
   '不溶于水': 'Insoluble in water',
   '完全混溶': 'Completely miscible',
   '阴离子': 'Anionic',
+  '非离子': 'Non-ionic',
   '不适用': 'Not applicable',
   '无可用数据': 'No data available',
   '无数据': 'No data available',
@@ -155,6 +160,12 @@ export function translateChemicalTerm(term) {
   }
 
   // 模式模糊匹配
+  if (/碳化二亚胺/i.test(trimmed)) {
+    if (/脂肪族/i.test(trimmed)) return 'Aliphatic polycarbodiimide'
+    if (/交联剂/i.test(trimmed)) return 'Carbodiimide crosslinker'
+    return 'Polycarbodiimide'
+  }
+  if (/溶剂.*气味|溶剂/i.test(trimmed)) return 'Solvent odor'
   if (/半透明.*(?:粘稠|粘性)|(?:粘稠|粘性).*半透明/i.test(trimmed)) return 'Translucent viscous liquid'
   if (/透明.*(?:粘稠|粘性)|(?:粘稠|粘性).*透明/i.test(trimmed)) return 'Transparent viscous liquid'
   if (/粘稠.*液体|粘性.*液体/i.test(trimmed)) return 'Viscous liquid'
