@@ -1,0 +1,4743 @@
+import JSZip from 'jszip';
+
+export const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+export const A_NS = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+export const R_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+export const PKG_REL_NS = 'http://schemas.openxmlformats.org/package/2006/relationships';
+export const WP_NS = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing';
+
+const parser = () => new DOMParser();
+const serializer = () => new XMLSerializer();
+
+export class DocxEngineError extends Error {
+  constructor(message, code = 'DOCX_ERROR') {
+    super(message);
+    this.name = 'DocxEngineError';
+    this.code = code;
+  }
+}
+
+const localName = (node) => (node?.localName || node?.nodeName || '').split(':').pop();
+const directChildren = (node, name) => Array.from(node?.childNodes || []).filter((child) => child.nodeType === 1 && (!name || localName(child) === name));
+const descendants = (node, name) => Array.from(node?.getElementsByTagNameNS?.(W_NS, name) || []);
+const descendantsAny = (node, name) => Array.from(node?.getElementsByTagName?.(`w:${name}`) || []);
+const firstChild = (node, name) => directChildren(node, name)[0] || null;
+
+function attr(node, namespace, name, fallback = null) {
+  if (!node) return fallback;
+  return node.getAttributeNS?.(namespace, name)
+    ?? node.getAttribute?.(`w:${name}`)
+    ?? node.getAttribute?.(name)
+    ?? fallback;
+}
+
+function anyAttr(node, namespace, name, fallback = null) {
+  if (!node) return fallback;
+  return node.getAttributeNS?.(namespace, name)
+    ?? node.getAttribute?.(name)
+    ?? fallback;
+}
+
+function boolValue(node, fallback = true) {
+  if (!node) return fallback;
+  const value = attr(node, W_NS, 'val');
+  return value == null || !['0', 'false', 'off', 'no'].includes(String(value).toLowerCase());
+}
+
+function numberValue(node, name) {
+  const value = attr(node, W_NS, name);
+  return value == null ? null : Number.isNaN(Number(value)) ? value : Number(value);
+}
+
+function parseXml(text, label) {
+  const xml = parser().parseFromString(text, 'application/xml');
+  const parserError = xml.getElementsByTagName?.('parsererror')?.[0];
+  if (parserError) throw new DocxEngineError(`${label} 不是有效的 XML：${parserError.textContent}`, 'INVALID_XML');
+  return xml;
+}
+
+function formatNumber(value, format) {
+  const number = Number(value || 1);
+  if (format === 'lowerLetter' || format === 'upperLetter') {
+    let result = '';
+    let current = number;
+    while (current > 0) {
+      current -= 1;
+      result = String.fromCharCode(97 + (current % 26)) + result;
+      current = Math.floor(current / 26);
+    }
+    return format === 'upperLetter' ? result.toUpperCase() : result;
+  }
+  if (format === 'lowerRoman' || format === 'upperRoman') {
+    const values = [[1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'], [100, 'c'], [90, 'xc'], [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i']];
+    let result = '';
+    let current = number;
+    for (const [unit, glyph] of values) {
+      while (current >= unit) {
+        result += glyph;
+        current -= unit;
+      }
+    }
+    return format === 'upperRoman' ? result.toUpperCase() : result;
+  }
+  return String(number);
+}
+
+function parseNumberingDefinitions(xmlText) {
+  if (!xmlText) return { nums: new Map(), abstracts: new Map() };
+  const xml = parseXml(xmlText, 'word/numbering.xml');
+  const abstracts = new Map();
+  for (const abstract of descendants(xml, 'abstractNum')) {
+    const id = attr(abstract, W_NS, 'abstractNumId');
+    const levels = new Map();
+    for (const level of directChildren(abstract, 'lvl')) {
+      const ilvl = Number(attr(level, W_NS, 'ilvl') || 0);
+      levels.set(ilvl, {
+        start: Number(attr(firstChild(level, 'start'), W_NS, 'val') || 1),
+        format: attr(firstChild(level, 'numFmt'), W_NS, 'val') || 'decimal',
+        text: attr(firstChild(level, 'lvlText'), W_NS, 'val') || `%${ilvl + 1}`,
+      });
+    }
+    abstracts.set(String(id), levels);
+  }
+  const nums = new Map();
+  for (const num of descendants(xml, 'num')) {
+    const id = attr(num, W_NS, 'numId');
+    const abstractId = attr(firstChild(num, 'abstractNumId'), W_NS, 'val');
+    nums.set(String(id), abstracts.get(String(abstractId)) || new Map());
+  }
+  return { nums, abstracts };
+}
+
+function numberingTextForParagraph(paragraph, numbering) {
+  if (!numbering?.definitions) return '';
+  const pPr = firstChild(paragraph, 'pPr');
+  const numPr = firstChild(pPr, 'numPr');
+  if (!numPr) return '';
+  const numId = attr(firstChild(numPr, 'numId'), W_NS, 'val');
+  const ilvl = Number(attr(firstChild(numPr, 'ilvl'), W_NS, 'val') || 0);
+  const levels = numbering.definitions.nums.get(String(numId));
+  const level = levels?.get(ilvl);
+  if (!level) return '';
+  const key = String(numId);
+  const counters = numbering.state[key] || (numbering.state[key] = []);
+  const previous = counters[ilvl] || 0;
+  counters[ilvl] = previous ? previous + 1 : level.start;
+  for (let index = ilvl + 1; index < counters.length; index += 1) counters[index] = 0;
+  const label = level.text.replace(/%(\d+)/g, (_, token) => {
+    const index = Number(token) - 1;
+    const referenced = levels.get(index) || level;
+    return formatNumber(counters[index] || referenced.start, referenced.format);
+  });
+  return label;
+}
+
+function directProperties(node) {
+  if (!node) return {};
+  return Object.fromEntries(directChildren(node).map((child) => [localName(child), Object.fromEntries(
+    Array.from(child.attributes || []).map((item) => [localName(item), item.value]),
+  )]));
+}
+
+function parseRunFormat(run) {
+  const props = firstChild(run, 'rPr');
+  const fonts = firstChild(props, 'rFonts');
+  const color = firstChild(props, 'color');
+  const size = firstChild(props, 'sz');
+  const format = {
+    bold: boolValue(firstChild(props, 'b'), false),
+    italic: boolValue(firstChild(props, 'i'), false),
+    underline: attr(firstChild(props, 'u'), W_NS, 'val'),
+    strike: boolValue(firstChild(props, 'strike'), false),
+    font: attr(fonts, W_NS, 'eastAsia') || attr(fonts, W_NS, 'ascii'),
+    sizeHalfPoints: attr(size, W_NS, 'val'),
+    color: attr(color, W_NS, 'val'),
+    highlight: attr(firstChild(props, 'highlight'), W_NS, 'val'),
+    verticalAlignment: attr(firstChild(props, 'vertAlign'), W_NS, 'val'),
+    direct: directProperties(props),
+  };
+  return format;
+}
+
+function parseParagraphFormat(paragraph) {
+  const props = firstChild(paragraph, 'pPr');
+  const indent = firstChild(props, 'ind');
+  const spacing = firstChild(props, 'spacing');
+  return {
+    style: attr(firstChild(props, 'pStyle'), W_NS, 'val'),
+    alignment: attr(firstChild(props, 'jc'), W_NS, 'val'),
+    indent: Object.fromEntries(['left', 'right', 'firstLine', 'hanging'].map((name) => [name, attr(indent, W_NS, name)])),
+    spacing: Object.fromEntries(['before', 'after', 'line', 'lineRule'].map((name) => [name, attr(spacing, W_NS, name)])),
+    direct: directProperties(props),
+  };
+}
+
+function parseBorderSet(node) {
+  const result = {};
+  for (const border of directChildren(node)) {
+    result[localName(border)] = {
+      val: attr(border, W_NS, 'val'),
+      size: attr(border, W_NS, 'sz'),
+      color: attr(border, W_NS, 'color'),
+      space: attr(border, W_NS, 'space'),
+    };
+  }
+  return result;
+}
+
+function parseTableProperties(tbl) {
+  const props = firstChild(tbl, 'tblPr');
+  const borders = firstChild(props, 'tblBorders');
+  const shading = firstChild(props, 'shd');
+  const width = firstChild(props, 'tblW');
+  return {
+    width: { value: attr(width, W_NS, 'w'), type: attr(width, W_NS, 'type') },
+    alignment: attr(firstChild(props, 'jc'), W_NS, 'val'),
+    layout: attr(firstChild(props, 'tblLayout'), W_NS, 'type'),
+    borders: parseBorderSet(borders),
+    shading: { fill: attr(shading, W_NS, 'fill'), pattern: attr(shading, W_NS, 'val') },
+    direct: directProperties(props),
+  };
+}
+
+function parseRowProperties(row) {
+  const props = firstChild(row, 'trPr');
+  const height = firstChild(props, 'trHeight');
+  return {
+    height: { value: attr(height, W_NS, 'val'), rule: attr(height, W_NS, 'hRule') },
+    cantSplit: boolValue(firstChild(props, 'cantSplit'), false),
+    header: boolValue(firstChild(props, 'tblHeader'), false),
+    gridBefore: numberValue(firstChild(props, 'gridBefore'), 'val') || 0,
+    gridAfter: numberValue(firstChild(props, 'gridAfter'), 'val') || 0,
+    direct: directProperties(props),
+  };
+}
+
+function parseCellProperties(cell) {
+  const props = firstChild(cell, 'tcPr');
+  const width = firstChild(props, 'tcW');
+  const span = firstChild(props, 'gridSpan');
+  const vertical = firstChild(props, 'vMerge');
+  const shading = firstChild(props, 'shd');
+  const margins = firstChild(props, 'tcMar');
+  return {
+    width: { value: attr(width, W_NS, 'w'), type: attr(width, W_NS, 'type') },
+    gridSpan: Math.max(1, Number(attr(span, W_NS, 'val') || 1)),
+    vMerge: vertical ? (attr(vertical, W_NS, 'val') || 'continue') : null,
+    shading: { fill: attr(shading, W_NS, 'fill'), pattern: attr(shading, W_NS, 'val') },
+    margins: Object.fromEntries(directChildren(margins).map((item) => [localName(item), {
+      value: attr(item, W_NS, 'w'), type: attr(item, W_NS, 'type'),
+    }])),
+    borders: parseBorderSet(firstChild(props, 'tcBorders')),
+    verticalAlignment: attr(firstChild(props, 'vAlign'), W_NS, 'val'),
+    direct: directProperties(props),
+  };
+}
+
+function parseRun(run) {
+  const textNodes = descendants(run, 't');
+  const textParts = [];
+  for (const child of Array.from(run.childNodes || [])) {
+    if (child.nodeType !== 1) continue;
+    if (localName(child) === 't') textParts.push(child.textContent || '');
+    if (localName(child) === 'tab') textParts.push('\t');
+    if (localName(child) === 'br' || localName(child) === 'cr') textParts.push('\n');
+  }
+  const blips = Array.from(run.getElementsByTagNameNS?.(A_NS, 'blip') || []);
+  const images = blips.map((blip) => ({
+    rid: blip.getAttributeNS?.(R_NS, 'embed') || blip.getAttribute?.('r:embed'),
+    node: blip,
+    extent: (() => {
+      const drawing = blip.parentNode?.parentNode?.parentNode;
+      const extent = drawing?.getElementsByTagNameNS?.(WP_NS, 'extent')?.[0];
+      return extent ? { widthEmu: extent.getAttribute('cx'), heightEmu: extent.getAttribute('cy') } : null;
+    })(),
+  })).filter((image) => image.rid);
+  return {
+    node: run,
+    textNodes,
+    text: textParts.join(''),
+    bold: parseRunFormat(run).bold,
+    format: parseRunFormat(run),
+    images,
+  };
+}
+
+function parseParagraph(paragraph, numbering = null) {
+  const runs = descendants(paragraph, 'r').map(parseRun);
+  const segments = [];
+  for (const run of runs) {
+    if (run.text) segments.push({ type: 'text', text: run.text, run });
+    for (const image of run.images) segments.push({ type: 'image', image, run });
+  }
+  let rawText = segments.filter((segment) => segment.type === 'text').map((segment) => segment.text).join('');
+  if (!rawText && segments.some((segment) => segment.type === 'image')) {
+    rawText = '[象形图]';
+  }
+  const numberingText = numberingTextForParagraph(paragraph, numbering);
+  return {
+    node: paragraph,
+    text: `${numberingText}${rawText}`,
+    rawText,
+    numberingText,
+    runs,
+    segments,
+    format: parseParagraphFormat(paragraph),
+  };
+}
+
+function cellText(cell) {
+  return cell.paragraphs.map((paragraph) => paragraph.text).join('\r\n').trim();
+}
+
+function isPunctuationOnly(str) {
+  return !str || /^[。.,:：;；、\-—\s/／()（）\[\]【】"'“”‘’!！?？]+$/.test(str.trim());
+}
+
+function isSectionTitle(str) {
+  return /^\s*(?:v)?\d{1,2}[\.、\s]/i.test(str) && /(?:标识|概述|成分|急救|消防|泄漏|操作|接触|理化|稳定|毒|生态|废弃|运输|法规|其他|Identification|Hazards|Composition|First|Fire|Accidental|Handling|Exposure|Physical|Stability|Toxicological|Ecological|Disposal|Transport|Regulatory|Other)/i.test(str);
+}
+
+export function cellRole(cell) {
+  const labelParts = [];
+  const valueParts = [];
+  const labelNodes = [];
+  const valueNodes = [];
+
+  const allRunsAreBold = cell.paragraphs.length > 0 && cell.paragraphs.every((p) => p.runs.length > 0 && p.runs.every((r) => r.bold));
+  const cellEndsWithColon = /[：:]$/.test(cell.text.trim());
+  const isPureMultiLineLabel = cell.col === 0 && allRunsAreBold && cellEndsWithColon;
+
+  for (const paragraph of cell.paragraphs) {
+    const boldRuns = paragraph.runs.filter((run) => run.bold);
+    const notBoldRuns = paragraph.runs.filter((run) => !run.bold);
+    const boldText = boldRuns.map((run) => run.text).join('').trim();
+    const notBoldText = notBoldRuns.map((run) => run.text).join('').trim();
+    const num = paragraph.numberingText?.trim();
+
+    if (notBoldRuns.length > 0 && !num) {
+      if (notBoldText) valueParts.push(notBoldText);
+      valueNodes.push(...notBoldRuns.flatMap((r) => r.textNodes));
+    }
+
+    if (boldText) {
+      // 1. Pure punctuation filter (e.g. "。")
+      if (isPunctuationOnly(boldText)) {
+        valueParts.push(boldText);
+        valueNodes.push(...boldRuns.flatMap((r) => r.textNodes));
+        continue;
+      }
+
+      if (isPureMultiLineLabel) {
+        const hasNumInBold = /^\s*(?:v)?\d+(?:[\.．、]\d+)*[\.．、\s]/i.test(boldText);
+        const fullLabel = (num && !hasNumInBold) ? `${num}  ${boldText}` : boldText;
+        labelParts.push(fullLabel);
+        labelNodes.push(...boldRuns.flatMap((r) => r.textNodes));
+        continue;
+      }
+
+      // 2. Check for inline colon separating label and value within fully bold paragraph
+      const inlineColon = boldText.match(/^([^：:\r\n]{1,50}[：:])\s*(.+)$/);
+      if (inlineColon) {
+        const fullLabel = (num && !/^\s*(?:v)?\d+(?:[\.．、]\d+)*[\.．、\s]/i.test(inlineColon[1]))
+          ? `${num}  ${inlineColon[1]}`
+          : inlineColon[1];
+        labelParts.push(fullLabel);
+        valueParts.push(inlineColon[2]);
+        labelNodes.push(...boldRuns.flatMap((r) => r.textNodes));
+        valueNodes.push(...boldRuns.flatMap((r) => r.textNodes));
+        continue;
+      }
+
+      // 3. Header and structural keyword protection: Table headers and sublabels are never values!
+      const isHeaderKeyword = /^(?:CAS编号|CAS\s*(?:NO\.?|Number)?|化学品名称|Chemical\s*name|含量|Concentration|物质|Substance|依据|Basis|类型|Type|数值|Value|项目|Item|指标|Index|规格|Specification|成分|Component|Ingredient|Ingredients|防护手套|Protective\s*gloves|生育力|Fertility|致畸形|Teratogenicity|体外遗传毒性|In\s*vitro\s*genotoxicity|经口|Oral|经皮|Dermal|吸入|Inhalation|工作场所组分控制参数|Control\s*parameters\s*(?:for\s*workplace\s*components)?|工作场所|Workplace)/i.test(boldText.trim());
+
+      // 4. Col > 0 context: In data/value columns, demote to value ONLY if NOT a header keyword and length > 12
+      if (cell.col > 0 && !isHeaderKeyword) {
+        const isExplicitSubLabel = (/[：:]$/.test(boldText) && (/[a-zA-Z]/.test(boldText) ? boldText.length <= 40 : boldText.length <= 15)) || boldText.length <= 8;
+        if (!isExplicitSubLabel) {
+          valueParts.push(boldText);
+          valueNodes.push(...boldRuns.flatMap((r) => r.textNodes));
+          continue;
+        }
+      }
+
+      // 5. Character count rule: labels are short (<= 15 chars for CN, <= 60 for EN) or end with colon or are section titles or have property number prefix or num
+      const endsWithColon = /[：:]$/.test(boldText) || /[：:]$/.test(paragraph.text?.trim() || '');
+      const isSecTitle = isSectionTitle(boldText) || (num && isSectionTitle(`${num} ${boldText}`));
+      const isShortLabel = (/[a-zA-Z]/.test(boldText) ? boldText.length <= 60 : boldText.length <= 15) || isHeaderKeyword;
+      const hasPropertyNumberPrefix = /^\s*(?:v)?\d+(?:[\.．、]\d+)*[\.．、\s]/i.test(boldText) && (/[a-zA-Z]/.test(boldText) ? boldText.length <= 70 : boldText.length <= 25);
+      const isNumbered = Boolean(num) && (boldText.length <= 35 || endsWithColon);
+
+      if (!isShortLabel && !endsWithColon && !isSecTitle && !hasPropertyNumberPrefix && !isNumbered) {
+        // Demote to value! This is a long bold sentence/paragraph (e.g. "根据EC指令...", "在着火或爆炸情况下..."), not a slot label
+        const fullVal = (num && !/^\s*(?:v)?\d+(?:[\.．、]\d+)*[\.．、\s]/i.test(boldText))
+          ? `${num}  ${boldText}`
+          : boldText;
+        valueParts.push(fullVal);
+        valueNodes.push(...boldRuns.flatMap((r) => r.textNodes));
+      } else {
+        // Legitimate label
+        const hasNumInBold = /^\s*(?:v)?\d+(?:[\.．、]\d+)*[\.．、\s]/i.test(boldText);
+        const fullLabel = (num && !hasNumInBold) ? `${num}  ${boldText}` : boldText;
+        labelParts.push(fullLabel);
+        labelNodes.push(...boldRuns.flatMap((r) => r.textNodes));
+      }
+    } else if (num) {
+      const raw = paragraph.rawText?.trim() || '';
+      const hasNumInRaw = /^\s*(?:v)?\d+(?:[\.．、]\d+)*[\.．、\s]/i.test(raw);
+      const fullLabel = (num && !hasNumInRaw) ? `${num}  ${raw}` : (raw || num);
+      labelParts.push(fullLabel);
+      labelNodes.push(...paragraph.runs.flatMap((r) => r.textNodes));
+    }
+  }
+
+  const labelText = labelParts.join('\r\n').trim();
+  const valueText = valueParts.join('\r\n').trim();
+  const labelLike = labelText || (!valueText && /[：:]$/.test(cell.text) && cell.text.length < 100);
+  const explicitLabelSequence = cell.col === 0 && Boolean(labelLike) && /^\s*(?:v)?\d+(?:[\.．、]\d+)*(?=\s|[、）:：.]|[\u4e00-\u9fffA-Za-z]|$)/i.test(cell.text);
+  const sequence = Boolean(explicitLabelSequence) || cell.paragraphs.some((p) => Boolean(p.numberingText?.trim()));
+
+  return {
+    labelText,
+    valueText,
+    valueNodes,
+    labelNodes,
+    sequence,
+    kind: labelLike && valueText ? 'label-value' : labelLike ? 'label-only' : cell.paragraphs.length === 1 && !labelText ? 'note' : valueText ? 'value-only' : 'structure',
+  };
+}
+
+function parseCell(tc, rowIndex, column, span, rowNode, numbering = null) {
+  const paragraphs = directChildren(tc, 'p').map((paragraph) => parseParagraph(paragraph, numbering));
+  const nestedTables = descendants(tc, 'tbl').length;
+  const images = paragraphs.flatMap((paragraph) => paragraph.segments.filter((segment) => segment.type === 'image').map((segment) => segment.image));
+  const cell = {
+    node: tc,
+    row: rowIndex,
+    col: column,
+    colspan: span,
+    rowspan: 1,
+    rowNode,
+    paragraphs,
+    text: cellText({ paragraphs }),
+    images,
+    format: parseCellProperties(tc),
+    align: paragraphs[0]?.format?.alignment || 'left',
+  };
+  Object.assign(cell, cellRole(cell));
+  cell.nestedTableCount = nestedTables;
+  return cell;
+}
+
+function textOfRecord(record) {
+  return [record.title, ...record.rows.flatMap((row) => row.cells.map((cell) => cell.text))].filter(Boolean).join(' ');
+}
+
+function sectionInfo(title, tableIndex) {
+  const rawTitle = String(title || '');
+  const match = rawTitle.match(/^\s*v?(\d{1,2})\s*[\.、\s]/i);
+  let sectionNumber = match ? Number(match[1]) : null;
+  if (!sectionNumber) {
+    const normalized = String(title || '').replace(/[\s/]+/g, ' ').trim().toLowerCase();
+    const aliases = [
+      [/^(物料及供应商标识|产品及公司标识|identification)/i, 1],
+      [/^(危险性概述|hazards identification)/i, 2],
+      [/^(组成\/成分信息|composition)/i, 3],
+      [/^(急救措施|first aid)/i, 4],
+      [/^(消防措施|fire fighting)/i, 5],
+      [/^(泄漏应急处理|accidental leakage)/i, 6],
+      [/^(操作处置与储存|operation and storage)/i, 7],
+      [/^(接触控制|exposure control)/i, 8],
+      [/^(理化特性|physical and chemical properties)/i, 9],
+      [/^(稳定性和反应性|stability and reactivity)/i, 10],
+      [/^(毒理学资料|toxicity information)/i, 11],
+      [/^(生态学资料|ecological information)/i, 12],
+      [/^(废弃处置|handling precautions)/i, 13],
+      [/^(运输信息|transportation information)/i, 14],
+      [/^(法规信息|regulatory information)/i, 15],
+      [/^(其他信息|other information)/i, 16],
+    ];
+    sectionNumber = aliases.find(([pattern]) => pattern.test(normalized))?.[1] || null;
+  }
+  return {
+    sectionNumber,
+    section: sectionNumber ? `第 ${sectionNumber} 部分` : '未分类',
+    title: sectionNumber === 1 ? rawTitle.replace(/^\s*v1\s*[\.、]/i, '1.') : (title || `表格 ${tableIndex + 1}`),
+  };
+}
+
+function buildFieldCandidates(rows) {
+  const candidates = [];
+  rows.forEach((row, rowIndex) => {
+    row.cells.forEach((cell, cellIndex) => {
+      if (!cell.text) return;
+      const colon = cell.text.match(/^([^：:\r\n\t]{1,80})[：:]/);
+      const next = row.cells[cellIndex + 1];
+      if (next && (colon || cell.labelText) && next.text) {
+        candidates.push({
+          label: (colon?.[1] || cell.labelText).trim(),
+          value: next.text,
+          method: 'adjacent_cells',
+          source: { label_cell: { row: rowIndex, column: cell.col }, value_cell: { row: rowIndex, column: next.col } },
+          evidence: { bold_label: Boolean(cell.labelText), explicit_delimiter: colon?.[0]?.slice(-1) || null },
+        });
+      }
+      if (colon && colon[0].length < cell.text.length) {
+        candidates.push({
+          label: colon[1].trim(),
+          value: cell.text.slice(colon[0].length).trim(),
+          method: 'same_cell_colon',
+          source: { label_cell: { row: rowIndex, column: cell.col } },
+        });
+      }
+    });
+  });
+  return candidates;
+}
+
+function buildTableRecord(table, tableIndex, partName, relationshipMap, prefix = '', numbering = null) {
+  const grid = firstChild(table, 'tblGrid');
+  const columns = directChildren(grid, 'gridCol').length || 1;
+  const rows = [];
+  const activeMerges = new Map();
+  const rowNodes = directChildren(table, 'tr');
+  rowNodes.forEach((rowNode, rowIndex) => {
+    const properties = parseRowProperties(rowNode);
+    let column = properties.gridBefore;
+    const cells = [];
+    const nextMerges = new Map();
+    for (const tc of directChildren(rowNode, 'tc')) {
+      const format = parseCellProperties(tc);
+      const span = format.gridSpan;
+      const key = `${column}|${span}`;
+      if (format.vMerge && format.vMerge !== 'restart' && activeMerges.has(key)) {
+        const origin = activeMerges.get(key);
+        origin.rowspan += 1;
+        nextMerges.set(key, origin);
+      } else {
+        const cell = parseCell(tc, rowIndex, column, span, rowNode, numbering);
+        cell.format = format;
+        cells.push(cell);
+        if (format.vMerge) nextMerges.set(key, cell);
+      }
+      column += span;
+    }
+    rows.push({ node: rowNode, index: rowIndex, properties, cells });
+    activeMerges.clear();
+    nextMerges.forEach((value, key) => activeMerges.set(key, value));
+  });
+  const title = rows.flatMap((row) => row.cells).map((cell) => cell.text).find(Boolean) || `表格 ${tableIndex + 1}`;
+  const info = sectionInfo(title, tableIndex);
+  const record = {
+    id: `${partName}-table-${tableIndex}`,
+    kind: 'table',
+    part: partName,
+    tableIndex,
+    title: info.title,
+    section: prefix || info.section,
+    sectionNumber: info.sectionNumber,
+    rows,
+    columns,
+    fieldCandidates: buildFieldCandidates(rows),
+    structure: {
+      gridWidthsTwips: directChildren(grid, 'gridCol').map((col) => attr(col, W_NS, 'w')),
+      table: parseTableProperties(table),
+      rowProperties: rows.map((row) => row.properties),
+      rowLayout: rows.map((row) => ({ row: row.index, cells: row.cells.length })),
+    },
+  };
+  record.searchText = textOfRecord(record);
+  record.aliases = [];
+  if (/H(?:316|320|332)\b/i.test(record.searchText)) record.aliases.push('GHS07', '感叹号', '刺激', '吸入有害', '有害');
+  if (/H(?:360|370|373)\b/i.test(record.searchText)) record.aliases.push('GHS08', '健康危害', '生殖毒性', '靶器官');
+  record.searchText = `${record.searchText} ${record.aliases.join(' ')}`;
+  for (const row of rows) {
+    const isHeaderRow = row.index === 0 ||
+      /(?:化学品名称.*CAS编号|物质.*依据.*类型|Chemical\s*name.*CAS|Substance.*Basis.*Type)/i.test(row.cells.map((c) => c.text).join(' ')) ||
+      (info.sectionNumber === 3 && row.cells.some((c) => /(?:CAS编号|化学品名称|CAS\s*NO|Chemical\s*name)/i.test(c.text)));
+
+    for (const cell of row.cells) {
+      cell.record = record;
+      cell.relationships = cell.images.map((image) => ({ ...image, target: relationshipMap.get(image.rid) || null }));
+
+      // Section 8 手部防护脏模板残留彻底净化（中英文通用，文本与底层 XML textNodes 同步）
+      if (info.sectionNumber === 8 && /(?:手部防护|Hand\s*protection)[：:]\s*喷涂过程中要求有呼吸防护设备/i.test(cell.text)) {
+        const isEn = /Hand\s*protection/i.test(cell.text);
+        const cleanLabel = isEn ? 'Hand protection：' : '手部防护：';
+        cell.text = cleanLabel;
+        cell.labelText = cleanLabel;
+        cell.valueText = '';
+        cell.valueNodes = [];
+        cell.kind = 'label-only';
+        for (const p of cell.paragraphs) {
+          for (const run of p.runs) {
+            for (const tn of run.textNodes) {
+              if (tn.textContent.includes('喷涂过程中要求有呼吸防护设备')) {
+                tn.textContent = tn.textContent.replace(/[\t\s]*喷涂过程中要求有呼吸防护设备[。.]?/, '');
+              }
+            }
+          }
+        }
+      }
+
+      if (isHeaderRow) {
+        cell.editable = false;
+        cell.protectedReason = '表头行受保护';
+        cell.role = 'table-header';
+        cell.fontRole = 'label-header';
+        cell.kind = 'label-only';
+        if (!cell.labelText && cell.text) {
+          cell.labelText = cell.text;
+          cell.valueText = '';
+          cell.labelNodes = cell.paragraphs.flatMap((p) => p.runs.flatMap((r) => r.textNodes));
+          cell.valueNodes = [];
+        }
+        for (const p of cell.paragraphs) {
+          for (const r of p.runs) {
+            r.bold = true;
+            if (r.format) r.format.bold = true;
+            if (r.node && r.node.ownerDocument) {
+              let rPr = firstChild(r.node, 'rPr');
+              if (!rPr) {
+                rPr = r.node.ownerDocument.createElementNS(W_NS, 'w:rPr');
+                r.node.insertBefore(rPr, r.node.firstChild);
+              }
+              if (!firstChild(rPr, 'b')) {
+                const bEl = r.node.ownerDocument.createElementNS(W_NS, 'w:b');
+                rPr.appendChild(bEl);
+              }
+            }
+          }
+        }
+      } else {
+        // 单列无标签独立说明行（如 Section 13 废弃处置、Section 15 法规清单、Section 16 免责声明）识别为 value-only
+        const isSingleColValueRow = row.cells.length === 1 && (
+          (info.sectionNumber === 13 && /必需遵守适用的国标|处理方法|废弃/i.test(cell.text)) ||
+          (info.sectionNumber === 15 && !cell.text.endsWith('：')) ||
+          (info.sectionNumber === 16 && /就我们所掌握的知识/i.test(cell.text))
+        );
+        if (isSingleColValueRow) {
+          cell.role = 'value-only';
+          cell.fontRole = 'value';
+        }
+
+        // Section 11 生殖毒性子项（生育力、致畸形、体外遗传毒性）及 Section 8 建议 行右侧值格特别允许写入
+        const isS11SubValueCell = info.sectionNumber === 11 &&
+          row.cells.length >= 2 &&
+          cell === row.cells[row.cells.length - 1] &&
+          row.cells.some((c) => /生育力|致畸形|体外遗传毒性|Fertility|Teratogenicity|In\s*vitro\s*genotoxicity/i.test(c.text));
+
+        const isS8RecoValueCell = info.sectionNumber === 8 &&
+          row.cells.length >= 2 &&
+          cell === row.cells[row.cells.length - 1] &&
+          row.cells.some((c) => /(?:建议|Recommendation)[：:]/i.test(c.text));
+
+        // 统一规则：多列数据行末尾非标签格均作为可编辑值格（即使模板初始为空）
+        const isEndValueCell = row.cells.length > 1 &&
+          cell === row.cells[row.cells.length - 1] &&
+          cell.kind !== 'label-only' &&
+          !cell.sequence;
+
+        if (isS11SubValueCell || isS8RecoValueCell || isEndValueCell) {
+          cell.editable = true;
+          cell.protectedReason = null;
+          if (cell.kind === 'label-only') cell.kind = 'note';
+        } else {
+          cell.editable = cell.valueNodes.length > 0 && !cell.sequence && cell.kind !== 'label-only';
+          cell.protectedReason = cell.sequence ? '序号/结构内容受保护' : cell.kind === 'label-only' ? '标签默认锁定' : null;
+        }
+      }
+    }
+  }
+  return record;
+}
+
+function buildRelationshipMap(text) {
+  if (!text) return new Map();
+  const xml = parseXml(text, '关系文件');
+  return new Map(Array.from(xml.getElementsByTagNameNS?.(PKG_REL_NS, 'Relationship') || []).map((item) => [
+    item.getAttribute('Id'), item.getAttribute('Target'),
+  ]));
+}
+
+function partXmlKey(name) {
+  return name.startsWith('/') ? name.slice(1) : name;
+}
+
+function sourceOoxml(engine) {
+  const result = {
+    'word/document.xml': serializer().serializeToString(engine.documentXml),
+  };
+  for (const [name, xml] of Object.entries(engine.supportingXml || {})) result[name] = xml;
+  return result;
+}
+
+function deriveRoleStyles(records) {
+  let label = null;
+  let value = null;
+  for (const record of records || []) {
+    if (record.kind !== 'table' || record.part !== 'word/document.xml') continue;
+    for (const row of record.rows) {
+      if (row.index === 0) continue;
+      for (const cell of row.cells) {
+        for (const paragraph of cell.paragraphs) {
+          for (const run of paragraph.runs) {
+            if (!run.text?.trim()) continue;
+            if (!label && run.bold) label = { ...run.format };
+            if (!value && !run.bold) value = { ...run.format };
+            if (label && value) break;
+          }
+          if (label && value) break;
+        }
+        if (label && value) break;
+      }
+      if (label && value) break;
+    }
+    if (label && value) break;
+  }
+  return {
+    label: {
+      font: label?.font || '宋体',
+      sizeHalfPoints: '24',
+      bold: true,
+    },
+    value: {
+      font: value?.font || label?.font || '宋体',
+      sizeHalfPoints: '24',
+      bold: false,
+    },
+  };
+}
+
+function parsePartRecords(xml, partName, relationshipMap, prefix = '', numbering = null) {
+  const root = xml.documentElement;
+  const records = [];
+  let tableIndex = 0;
+  for (const child of directChildren(root, 'body').flatMap((body) => directChildren(body))) {
+    if (localName(child) === 'tbl') {
+      records.push(buildTableRecord(child, tableIndex, partName, relationshipMap, prefix, numbering));
+      tableIndex += 1;
+    } else if (localName(child) === 'p') {
+      const paragraph = parseParagraph(child, numbering);
+      if (paragraph.text || paragraph.segments.length) {
+        records.push({
+          id: `${partName}-paragraph-${records.length}`,
+          kind: 'text',
+          part: partName,
+          title: paragraph.text.slice(0, 80) || '文档正文',
+          text: paragraph.text,
+          content: paragraph.segments,
+          paragraph,
+          section: prefix || '文档正文',
+          sectionNumber: null,
+          searchText: paragraph.text,
+        });
+      }
+    }
+  }
+  // Header/footer XML has a flat part root instead of w:body.
+  if (!records.length) {
+    for (const child of directChildren(root)) {
+      if (localName(child) === 'tbl') records.push(buildTableRecord(child, tableIndex++, partName, relationshipMap, prefix, numbering));
+      if (localName(child) === 'p') {
+        const paragraph = parseParagraph(child, numbering);
+        if (paragraph.text) records.push({ id: `${partName}-paragraph-${records.length}`, kind: 'text', part: partName, title: paragraph.text.slice(0, 80), text: paragraph.text, content: paragraph.segments, paragraph, section: prefix || '正文', sectionNumber: null, searchText: paragraph.text });
+      }
+    }
+  }
+  return records;
+}
+
+function countUnsupported(xmlText) {
+  const unsupported = ['instrText', 'delText', 'sym', 'object', 'pict'];
+  const xml = parseXml(xmlText, '文档 XML');
+  return unsupported.flatMap((name) => {
+    const count = descendants(xml, name).length || descendantsAny(xml, name).length;
+    return count ? [{ code: 'source_ooxml_not_normalized', element: `w:${name}`, count, message: '元素原样保存在 DOCX 包中，当前结构化视图未展开该元素。' }] : [];
+  });
+}
+
+function allXmlEntries(zip) {
+  return Object.values(zip.files).filter((entry) => !entry.dir && entry.name.endsWith('.xml'));
+}
+
+function portableParagraph(paragraph) {
+  return {
+    text: paragraph.text,
+    format: paragraph.format,
+    content: paragraph.segments.map((segment) => segment.type === 'text' ? {
+      type: 'text', text: segment.text, runFormat: segment.run.format,
+    } : { type: 'image', image: { rid: segment.image.rid } }),
+  };
+}
+
+function portableCell(cell) {
+  return {
+    row: cell.row,
+    col: cell.col,
+    colspan: cell.colspan,
+    rowspan: cell.rowspan,
+    text: cell.text,
+    images: cell.relationships?.map((image) => ({ rid: image.rid, target: image.target })) || [],
+    paragraphs: cell.paragraphs.map(portableParagraph),
+    format: cell.format,
+    role: cell.kind,
+    editable: cell.editable,
+    protectedReason: cell.protectedReason,
+  };
+}
+
+function portableRecord(record) {
+  const base = {
+    id: record.id,
+    kind: record.kind,
+    part: record.part,
+    title: record.title,
+    section: record.section,
+    sectionNumber: record.sectionNumber,
+    searchText: record.searchText,
+  };
+  if (record.kind === 'table') {
+    return {
+      ...base,
+      rows: record.rows.map((row) => ({ index: row.index, properties: row.properties, cells: row.cells.map(portableCell) })),
+      columns: record.columns,
+      fieldCandidates: record.fieldCandidates,
+      structure: record.structure,
+    };
+  }
+  return { ...base, text: record.text, content: record.content?.map((segment) => segment.type === 'text' ? { type: 'text', text: segment.text } : { type: 'image', image: { rid: segment.image.rid } }) };
+}
+
+export function portableModel(engine) {
+  return {
+    schema_version: '1.0',
+    name: engine.sourceName,
+    source_type: 'docx',
+    records: engine.records.map(portableRecord),
+    source_ooxml: sourceOoxml(engine),
+    recognition_warnings: engine.warnings,
+    coverage: engine.coverage,
+  };
+}
+
+function allTablesInDocument(documentXml) {
+  return descendants(documentXml, 'tbl');
+}
+
+
+/**
+ * 从引擎中解析结构化页眉页脚数据
+ */
+export function extractHeaderFooterData(engine) {
+  if (!engine) return null;
+  const data = {
+    title: '物料安全数据表',
+    version: 'V1.0',
+    model: '',
+    company: '广州冠志新材料科技有限公司',
+    docCode: '',
+    revisionDate: '',
+    language: 'CN',
+    entity: '冠志',
+  };
+
+  // 1. 扫描 supportingXml 中的 header 与 footer
+  for (const [partName, xmlText] of Object.entries(engine.supportingXml || {})) {
+    if (!/^word\/(?:header|footer)\d+\.xml$/.test(partName) || !xmlText) continue;
+    try {
+      const doc = parseXml(xmlText, partName);
+      if (/header/i.test(partName)) {
+        // 段落 0: 标题
+        const pars = Array.from(doc.getElementsByTagNameNS(W_NS, 'p'));
+        if (pars[0]) {
+          const t = pars[0].textContent?.trim();
+          if (t) {
+            data.title = t;
+            if (/MATERIAL SAFETY|SAFETY DATA/i.test(t)) {
+              data.language = 'EN';
+            }
+          }
+        }
+        // 段落 1: 版本号
+        if (pars[1]) {
+          const t = pars[1].textContent?.trim();
+          const vm = t.match(/Version[：:\s]*(V?[\d.]+)/i);
+          if (vm) data.version = vm[1].startsWith('V') ? vm[1] : `V${vm[1]}`;
+        }
+        // 表格 0: 型号
+        const tbl = doc.getElementsByTagNameNS(W_NS, 'tbl')[0];
+        if (tbl) {
+          const m = tbl.textContent?.trim();
+          if (m && !/^(?:PEA-4139|示例型号)$/i.test(m)) {
+            data.model = m;
+          } else if (!data.model && m) {
+            data.model = m;
+          }
+        }
+      } else if (/footer/i.test(partName)) {
+        const tbl = doc.getElementsByTagNameNS(W_NS, 'tbl')[0];
+        if (tbl) {
+          const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
+          if (rows[0]) {
+            const cells = Array.from(rows[0].getElementsByTagNameNS(W_NS, 'tc'));
+            // cell 0: 公司 + 型号-MSDS
+            if (cells[0]) {
+              const c0Text = cells[0].textContent?.trim() || '';
+              // 公司提取
+              if (/国彩|Guocai/i.test(c0Text)) {
+                data.company = /Guocai/i.test(c0Text) ? 'Yingde Guocai New Material Co., Ltd.' : '英德市国彩新材料有限公司';
+                data.entity = '国彩';
+              } else if (/冠志|Guanzhi/i.test(c0Text)) {
+                data.company = /Guanzhi/i.test(c0Text) ? 'Guangzhou Guanzhi New Material Technology Co., Ltd.' : '广州冠志新材料科技有限公司';
+                data.entity = '冠志';
+              }
+              // 型号与编号提取
+              const codeM = c0Text.match(/([A-Za-z0-9_-]+)-MSDS/i);
+              if (codeM) {
+                data.docCode = codeM[0];
+                if (!data.model) data.model = codeM[1];
+              }
+            }
+            // cell 1: 修订日期
+            if (cells[1]) {
+              const c1Text = cells[1].textContent?.trim() || '';
+              const dm = c1Text.match(/(\d{4}[年\-\/.\s]\d{1,2}[月\-\/.\s]\d{1,2}日?|\d{4}-\d{1,2}-\d{1,2})/);
+              if (dm) {
+                data.revisionDate = dm[1].trim();
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 2. 辅以 Section 1 的补充推断
+  const sec1 = engine.records?.find((r) => r.sectionNumber === 1);
+  if (sec1) {
+    if (!data.model) {
+      data.model = extractProductModelFromEngine(engine);
+    }
+    const allSec1 = sec1.rows?.flatMap((r) => r.cells.map((c) => c.text || '')).join(' ') || '';
+    if (/国彩|Guocai/i.test(allSec1)) {
+      data.company = /Guocai/i.test(allSec1) ? 'Yingde Guocai New Material Co., Ltd.' : '英德市国彩新材料有限公司';
+      data.entity = '国彩';
+    }
+  }
+
+  // 3. 辅以 sourceName 提取
+  if (!data.model && engine.sourceName) {
+    data.model = extractModelFromText(engine.sourceName);
+  }
+
+  if (data.model && !data.docCode) {
+    data.docCode = `${data.model}-MSDS`;
+  }
+
+  if (!data.revisionDate) {
+    const d = new Date();
+    data.revisionDate = `${d.getFullYear()}年${String(d.getMonth() + 1).padStart(2, '0')}月${String(d.getDate()).padStart(2, '0')}日`;
+  }
+
+  return data;
+}
+
+/**
+ * 结构化安全更新页眉与页脚，并持久化到 supportingXml 与内存模型
+ */
+
+export function normalizeDateString(raw) {
+  if (!raw) return '';
+  const m = String(raw).match(/(\d{4})\s*[年\/\-\.]\s*(\d{1,2})\s*[月\/\-\.]?\s*(\d{1,2})?/);
+  if (!m) return String(raw).trim();
+  const y = m[1];
+  const mon = m[2].padStart(2, '0');
+  const d = (m[3] || '01').padStart(2, '0');
+  return `${y}/${mon}/${d}`;
+}
+
+export function extractAdaptiveRevisionDate(engine) {
+  if (!engine) return '';
+  // 1. 扫描 supportingXml 中的所有 footer
+  for (const [partName, xmlText] of Object.entries(engine.supportingXml || {})) {
+    if (!/footer/i.test(partName) || !xmlText) continue;
+    const plainText = xmlText.replace(/<[^>]+>/g, ' ');
+    const m = plainText.match(/(?:修订日期|生效日期|编制日期|发布日期|Revision Date|Date)[^0-9]{0,30}?(\d{4}\s*[年\/\-\.]\s*\d{1,2}\s*[月\/\-\.]\s*\d{1,2}\s*日?)/i)
+      || plainText.match(/(\d{4}\s*[\/\-]\s*\d{1,2}\s*[\/\-]\s*\d{1,2})/);
+    if (m && m[1]) {
+      const norm = normalizeDateString(m[1]);
+      if (norm) return norm;
+    }
+  }
+  // 2. 扫描 supportingXml 中的 header
+  for (const [partName, xmlText] of Object.entries(engine.supportingXml || {})) {
+    if (!/header/i.test(partName) || !xmlText) continue;
+    const plainText = xmlText.replace(/<[^>]+>/g, ' ');
+    const m = plainText.match(/(?:修订日期|Revision Date|Date)[^0-9]{0,30}?(\d{4}\s*[年\/\-\.]\s*\d{1,2}\s*[月\/\-\.]\s*\d{1,2}\s*日?)/i)
+      || plainText.match(/(\d{4}\s*[\/\-]\s*\d{1,2}\s*[\/\-]\s*\d{1,2})/);
+    if (m && m[1]) {
+      const norm = normalizeDateString(m[1]);
+      if (norm) return norm;
+    }
+  }
+  return '';
+}
+
+export function updateHeaderFooterData(engine, patch = {}) {
+  if (!engine) return null;
+  const current = extractHeaderFooterData(engine) || {};
+  const next = { ...current, ...patch };
+
+  const targetModel = String(next.model || '').trim();
+  const targetCompany = String(next.company || '').trim();
+  const targetDate = String(next.revisionDate || '').trim();
+  const targetVersion = String(next.version || '').trim();
+  const targetTitle = String(next.title || '').trim();
+
+  // 格式化修订日期：去除残留 P 前缀与异形空格，确保 EN 下 Revision Date 严格首字母大写
+  const cleanDateStr = targetDate.replace(/^[P\s]+/, '').trim();
+  let formattedDate = cleanDateStr;
+  if (next.language === 'EN') {
+    const pureDate = cleanDateStr.replace(/^(?:revision\s*date|修订日期|日期)[：:\s]*/i, '').trim();
+    formattedDate = `Revision Date: ${pureDate}`;
+  } else {
+    const pureDate = cleanDateStr.replace(/^(?:修订日期|revision\s*date|日期)[：:\s]*/i, '').trim();
+    formattedDate = `修订日期：${pureDate}`;
+  }
+
+  for (const [partName, xmlText] of Object.entries(engine.supportingXml || {})) {
+    if (!/^word\/(?:header|footer)\d+\.xml$/.test(partName) || !xmlText) continue;
+    try {
+      const doc = parseXml(xmlText, partName);
+      let modified = false;
+
+      if (/header/i.test(partName)) {
+        const pars = Array.from(doc.getElementsByTagNameNS(W_NS, 'p'));
+        // 1. Header 标题
+        if (targetTitle && pars[0]) {
+          const p = pars[0];
+          const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+          if (runs.length > 0) {
+            let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
+            if (!t) {
+              t = doc.createElementNS(W_NS, 'w:t');
+              runs[0].appendChild(t);
+            }
+            t.textContent = targetTitle.startsWith(' ') ? targetTitle : `  ${targetTitle}`;
+            for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
+            modified = true;
+          }
+        }
+
+        // 2. Header 版本号
+        if (targetVersion && pars[1]) {
+          const p = pars[1];
+          const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+          if (runs.length > 0) {
+            let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
+            if (!t) {
+              t = doc.createElementNS(W_NS, 'w:t');
+              runs[0].appendChild(t);
+            }
+            const cleanV = targetVersion.replace(/^Version[：:\s]*/i, '');
+            const isEnDoc = /^en$/i.test(next.language || '') || /^en$/i.test(engine?.headerFooterData?.language || '') || /EN|English/i.test(partName) || /_EN_|EN\b/i.test(engine?.filename || '');
+            t.textContent = isEnDoc ? `Version: ${cleanV}` : `Version：${cleanV}`;
+            for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
+            modified = true;
+          }
+        }
+
+        // 3. Header 表格型号
+        if (targetModel) {
+          const tbl = doc.getElementsByTagNameNS(W_NS, 'tbl')[0];
+          if (tbl) {
+            const tc = tbl.getElementsByTagNameNS(W_NS, 'tc')[0];
+            const p = tc?.getElementsByTagNameNS(W_NS, 'p')[0];
+            if (p) {
+              const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+              if (runs.length > 0) {
+                let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
+                if (!t) {
+                  t = doc.createElementNS(W_NS, 'w:t');
+                  runs[0].appendChild(t);
+                }
+                t.textContent = targetModel;
+                for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
+                modified = true;
+              }
+            }
+          }
+        }
+      } else if (/footer/i.test(partName)) {
+        const tbl = doc.getElementsByTagNameNS(W_NS, 'tbl')[0];
+        if (tbl) {
+          const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
+          if (rows[0]) {
+            const cells = Array.from(rows[0].getElementsByTagNameNS(W_NS, 'tc'));
+            // 1. Footer Row 0 Cell 0: 公司 + 型号-MSDS (强制左对齐 w:jc left)
+            if (cells[0] && (targetCompany || targetModel)) {
+              const p = cells[0].getElementsByTagNameNS(W_NS, 'p')[0];
+              if (p) {
+                let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+                if (!pPr) {
+                  pPr = doc.createElementNS(W_NS, 'w:pPr');
+                  p.insertBefore(pPr, p.firstChild);
+                }
+                let jc = pPr.getElementsByTagNameNS(W_NS, 'w:jc')[0];
+                if (!jc) {
+                  jc = doc.createElementNS(W_NS, 'w:jc');
+                  pPr.appendChild(jc);
+                }
+                jc.setAttributeNS(W_NS, 'w:val', 'left');
+
+                const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+                if (runs.length > 0) {
+                  let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
+                  if (!t) {
+                    t = doc.createElementNS(W_NS, 'w:t');
+                    runs[0].appendChild(t);
+                  }
+                  const comp = targetCompany || current.company || '广州冠志新材料科技有限公司';
+                  const mod = targetModel || current.model || '';
+                  t.textContent = mod ? `${comp} ${mod}-MSDS` : comp;
+                  for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
+                  modified = true;
+                }
+              }
+            }
+
+            // 2. Footer Row 0 Cell 1: 修订日期 (强制右对齐 w:jc right)
+            if (cells[1] && formattedDate) {
+              const p = cells[1].getElementsByTagNameNS(W_NS, 'p')[0];
+              if (p) {
+                let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+                if (!pPr) {
+                  pPr = doc.createElementNS(W_NS, 'w:pPr');
+                  p.insertBefore(pPr, p.firstChild);
+                }
+                // 必须彻底清除任何残留的 w:ind（如 w:firstLine="8730"），避免无头 PDF 引擎右边界截断首字符！
+                const oldInd = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
+                if (oldInd) {
+                  pPr.removeChild(oldInd);
+                  modified = true;
+                }
+
+                let jc = pPr.getElementsByTagNameNS(W_NS, 'w:jc')[0];
+                if (!jc) {
+                  jc = doc.createElementNS(W_NS, 'w:jc');
+                  pPr.appendChild(jc);
+                }
+                jc.setAttributeNS(W_NS, 'w:val', 'right');
+
+                const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+                if (runs.length > 0) {
+                  let t = runs[0].getElementsByTagNameNS(W_NS, 't')[0];
+                  if (!t) {
+                    t = doc.createElementNS(W_NS, 'w:t');
+                    runs[0].appendChild(t);
+                  }
+                  t.textContent = `${formattedDate}   `;
+                  for (let i = 1; i < runs.length; i++) p.removeChild(runs[i]);
+                  modified = true;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (modified) {
+        engine.supportingXml[partName] = serializer().serializeToString(doc);
+      }
+    } catch (e) {
+      console.warn('Failed to update header/footer part', partName, e);
+    }
+  }
+
+  // 同步正文 documentXml 中的示例型号 (如果包含 PEA-4139 等)
+  if (targetModel) {
+    try {
+      const tNodes = Array.from(engine.documentXml.getElementsByTagNameNS(W_NS, 't'));
+      for (const t of tNodes) {
+        if (/PEA-4139/i.test(t.textContent)) {
+          t.textContent = t.textContent.replace(/PEA-4139/g, targetModel);
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 刷新内存记录中的 Header/Footer 单元格文本
+  engine.headerFooterData = next;
+  for (const record of (engine.records || [])) {
+    if (record.part && /header/i.test(record.part)) {
+      if (record.kind === 'table' && record.rows?.[0]?.cells?.[0] && targetModel) {
+        record.rows[0].cells[0].text = targetModel;
+      }
+    } else if (record.part && /footer/i.test(record.part)) {
+      if (record.kind === 'table' && record.rows?.[0]?.cells) {
+        if (record.rows[0].cells[0] && (targetCompany || targetModel)) {
+          const comp = targetCompany || current.company || '广州冠志新材料科技有限公司';
+          const mod = targetModel || current.model || '';
+          record.rows[0].cells[0].text = mod ? `${comp} ${mod}-MSDS` : comp;
+        }
+        if (record.rows[0].cells[1] && formattedDate) {
+          record.rows[0].cells[1].text = formattedDate;
+        }
+      }
+    }
+  }
+
+  return next;
+}
+
+export function stampDocumentIdentity(engine, info = {}) {
+  if (!engine) return;
+  const patch = typeof info === 'string' ? { model: info } : { ...info };
+  if (patch.date && !patch.revisionDate) patch.revisionDate = patch.date;
+  return updateHeaderFooterData(engine, patch);
+}
+
+export async function loadDocx(source, sourceName = 'document.docx') {
+  let safeName = String(sourceName || 'document.docx');
+  if (!safeName.toLowerCase().endsWith('.docx')) {
+    safeName += '.docx';
+  }
+  let bytes;
+  if (source instanceof ArrayBuffer) bytes = new Uint8Array(source);
+  else if (ArrayBuffer.isView(source)) bytes = new Uint8Array(source.buffer, source.byteOffset, source.byteLength);
+  else if (source?.arrayBuffer) bytes = new Uint8Array(await source.arrayBuffer());
+  else throw new DocxEngineError('未能读取 DOCX 文件内容。', 'INVALID_SOURCE');
+  let zip;
+  try {
+    zip = await JSZip.loadAsync(bytes);
+  } catch (error) {
+    throw new DocxEngineError(`DOCX 压缩包读取失败：${error.message}`, 'INVALID_PACKAGE');
+  }
+  const documentEntry = zip.file('word/document.xml');
+  if (!documentEntry) throw new DocxEngineError('DOCX 包中缺少 word/document.xml。', 'MISSING_DOCUMENT_XML');
+  const documentText = await documentEntry.async('string');
+  const documentXml = parseXml(documentText, 'word/document.xml');
+  const relsText = await zip.file('word/_rels/document.xml.rels')?.async('string');
+  const relationshipMap = buildRelationshipMap(relsText);
+  const supportingXml = {};
+  for (const name of ['word/styles.xml', 'word/settings.xml', 'word/numbering.xml']) {
+    if (zip.file(name)) supportingXml[name] = await zip.file(name).async('string');
+  }
+  for (const entry of allXmlEntries(zip)) {
+    if (/^word\/(?:header|footer)\d+\.xml$/.test(entry.name)) supportingXml[entry.name] = await entry.async('string');
+  }
+  const numberingDefinitions = parseNumberingDefinitions(supportingXml['word/numbering.xml']);
+  const mediaFiles = new Map();
+  for (const [name, file] of Object.entries(zip.files)) {
+    if (name.startsWith('word/media/') && !file.dir) {
+      mediaFiles.set(name, await file.async('uint8array'));
+    }
+  }
+  const engine = {
+    sourceName,
+    originalBytes: new Uint8Array(bytes),
+    zip,
+    documentXml,
+    supportingXml,
+    numberingDefinitions,
+    relationshipMap,
+    records: [],
+    warnings: [],
+    coverage: {},
+    roleStyles: { label: { bold: true }, value: { bold: false } },
+    headerFooterData: null,
+    relsText: relsText || '',
+    mediaFiles,
+    refresh() {
+      this.records = [];
+      this.warnings = [];
+      const numbering = { definitions: this.numberingDefinitions, state: {} };
+      this.records.push(...parsePartRecords(this.documentXml, 'word/document.xml', this.relationshipMap, '', numbering));
+      for (const [partName, xmlText] of Object.entries(this.supportingXml)) {
+        if (!/^word\/(?:header|footer)\d+\.xml$/.test(partName)) continue;
+        const partXml = parseXml(xmlText, partName);
+        const partRelsName = `word/_rels/${partName.split('/').pop()}.rels`;
+        const relText = this.supportingXml[partRelsName];
+        this.records.unshift(...parsePartRecords(partXml, partName, buildRelationshipMap(relText), '第 0 部分：页眉 + 页脚', { definitions: this.numberingDefinitions, state: {} }));
+      }
+      this.roleStyles = deriveRoleStyles(this.records);
+      const bodyTables = allTablesInDocument(this.documentXml);
+      this.coverage = {
+        body_table_xml_count: bodyTables.length,
+        normalized_body_table_count: this.records.filter((record) => record.part === 'word/document.xml' && record.kind === 'table').length,
+        table_count_matches: bodyTables.length === this.records.filter((record) => record.part === 'word/document.xml' && record.kind === 'table').length,
+        normalized_cell_count: this.records.filter((record) => record.kind === 'table').reduce((sum, record) => sum + record.rows.reduce((rowSum, row) => rowSum + row.cells.length, 0), 0),
+      };
+      for (const entry of allXmlEntries(this.zip)) {
+        if (!entry.name.startsWith('word/') || entry.name.endsWith('.rels')) continue;
+        // Warnings are diagnostic only; they never modify the package.
+        const xml = entry.name === 'word/document.xml' ? serializer().serializeToString(this.documentXml) : this.supportingXml[entry.name];
+        if (xml) this.warnings.push(...countUnsupported(xml));
+      }
+      for (const record of this.records) {
+        record.engine = this;
+      }
+      this.headerFooterData = extractHeaderFooterData(this);
+      // enableCrossPageBreaksForAllSections(this);
+      healAllTableTopologies(this.documentXml);
+      return this;
+    },
+    async exportArrayBuffer() {
+      suppressOversizedRowHeights(this);
+      suppressTrailingDocumentParagraph(this);
+      // enableCrossPageBreaksForAllSections(this);
+      const output = await JSZip.loadAsync(this.originalBytes);
+      output.file('word/document.xml', serializer().serializeToString(this.documentXml));
+      if (this.relsText) {
+        output.file('word/_rels/document.xml.rels', this.relsText);
+      }
+      if (this.mediaFiles && this.mediaFiles.size > 0) {
+        for (const [name, bytes] of this.mediaFiles.entries()) {
+          output.file(name, bytes);
+        }
+        // OPC 完备性保障 (G-39)：同步更新 [Content_Types].xml 注入媒体扩展名声明，防止外部解析器 KeyError
+        const ctFile = output.file('[Content_Types].xml');
+        if (ctFile) {
+          let ctText = await ctFile.async('text');
+          const extensions = new Set();
+          for (const name of this.mediaFiles.keys()) {
+            const ext = name.split('.').pop().toLowerCase();
+            if (ext) extensions.add(ext);
+          }
+          const mimeMap = {
+            png: 'image/png',
+            jpg: 'image/jpeg',
+            jpeg: 'image/jpeg',
+            gif: 'image/gif',
+            svg: 'image/svg+xml',
+            webp: 'image/webp'
+          };
+          let modified = false;
+          for (const ext of extensions) {
+            if (!ctText.includes(`Extension="${ext}"`) && mimeMap[ext]) {
+              const defaultTag = `<Default Extension="${ext}" ContentType="${mimeMap[ext]}"/>`;
+              ctText = ctText.replace('</Types>', `${defaultTag}</Types>`);
+              modified = true;
+            }
+          }
+          if (modified) {
+            output.file('[Content_Types].xml', ctText);
+          }
+        }
+      }
+      for (const [name, text] of Object.entries(this.supportingXml)) {
+        if (/^word\/(?:header|footer)\d+\.xml$/.test(name)) {
+          output.file(name, text);
+        }
+      }
+      return output.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE' });
+    },
+    async exportArrayBufferOld() {
+      const output = await JSZip.loadAsync(this.originalBytes);
+      output.file('word/document.xml', serializer().serializeToString(this.documentXml));
+      for (const [name, text] of Object.entries(this.supportingXml)) {
+        if (/^word\/(?:header|footer)\d+\.xml$/.test(name)) {
+          output.file(name, text);
+        }
+      }
+      return output.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE' });
+    },
+    stampIdentity(info) {
+      stampDocumentIdentity(this, info);
+      return this;
+    },
+    async getImageDataUrl(target) {
+      const normalized = String(target || '').replace(/^\//, '');
+      const entryName = normalized.startsWith('word/') ? normalized : `word/${normalized}`;
+      const mediaBytes = this.mediaFiles?.get(entryName);
+      if (mediaBytes) {
+        const extension = entryName.split('.').pop().toLowerCase();
+        const mime = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp' }[extension] || 'application/octet-stream';
+        const base64 = typeof Buffer !== 'undefined' ? Buffer.from(mediaBytes).toString('base64') : btoa(String.fromCharCode(...mediaBytes));
+        return `data:${mime};base64,${base64}`;
+      }
+      const entry = this.zip ? this.zip.file(entryName) : null;
+      if (!entry) return null;
+      const extension = entryName.split('.').pop().toLowerCase();
+      const mime = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp' }[extension] || 'application/octet-stream';
+      return `data:${mime};base64,${await entry.async('base64')}`;
+    },
+    toJSON() { return portableModel(this); },
+  };
+  engine.refresh();
+  return engine;
+}
+
+function combinedNodeText(nodes) {
+  return nodes.map((node) => node.textContent || '').join('');
+}
+
+function refreshParagraphContent(paragraph) {
+  const runs = descendants(paragraph.node, 'r').map(parseRun);
+  const segments = [];
+  for (const run of runs) {
+    if (run.text) segments.push({ type: 'text', text: run.text, run });
+    for (const image of run.images) segments.push({ type: 'image', image, run });
+  }
+  const rawText = segments.filter((segment) => segment.type === 'text').map((segment) => segment.text).join('');
+  paragraph.runs = runs;
+  paragraph.segments = segments;
+  paragraph.rawText = rawText;
+  paragraph.text = `${paragraph.numberingText || ''}${rawText}`;
+}
+
+function refreshCellText(cell) {
+  for (const paragraph of cell.paragraphs) refreshParagraphContent(paragraph);
+  cell.text = cell.paragraphs.map((paragraph) => paragraph.text).join('\n').trim();
+  const role = cellRole(cell);
+  cell.labelText = role.labelText;
+  cell.valueText = role.valueText;
+  cell.valueNodes = role.valueNodes;
+  cell.labelNodes = role.labelNodes;
+  cell.kind = role.kind;
+  cell.sequence = role.sequence;
+  if (role.valueNodes.length > 0 && !cell.sequence && cell.row > 0) {
+    cell.editable = true;
+  }
+}
+
+function distributeText(nodes, value) {
+  if (!nodes.length) return;
+  const clean = String(value ?? '').replace(/\r\n?/g, '\r\n');
+  const weights = nodes.map((node) => Math.max((node.textContent || '').length, 1));
+  const total = weights.reduce((sum, item) => sum + item, 0);
+  let offset = 0;
+  nodes.forEach((node, index) => {
+    const end = index === nodes.length - 1 ? clean.length : offset + Math.round(clean.length * weights[index] / total);
+    node.textContent = clean.slice(offset, end);
+    if (/^\s|\s$/.test(node.textContent)) node.setAttribute('xml:space', 'preserve');
+    offset = end;
+  });
+}
+
+const RUN_PROPERTY_ORDER = [
+  'rStyle', 'rFonts', 'b', 'bCs', 'i', 'iCs', 'caps', 'smallCaps', 'strike', 'dstrike',
+  'outline', 'shadow', 'emboss', 'imprint', 'noProof', 'snapToGrid', 'vanish', 'webHidden',
+  'color', 'spacing', 'w', 'kern', 'position', 'sz', 'szCs', 'highlight', 'u', 'effect',
+  'bdr', 'shd', 'fitText', 'vertAlign', 'rtl', 'cs', 'em', 'lang', 'eastAsianLayout',
+  'specVanish', 'oMath',
+];
+
+function ensureRunProperties(run) {
+  let properties = firstChild(run, 'rPr');
+  if (properties) return properties;
+  properties = run.ownerDocument.createElementNS(W_NS, 'w:rPr');
+  run.insertBefore(properties, run.firstChild);
+  return properties;
+}
+
+function ensureRunProperty(properties, name) {
+  const existing = firstChild(properties, name);
+  if (existing) return existing;
+  const property = properties.ownerDocument.createElementNS(W_NS, `w:${name}`);
+  const rank = RUN_PROPERTY_ORDER.indexOf(name);
+  const next = directChildren(properties).find((item) => {
+    const itemRank = RUN_PROPERTY_ORDER.indexOf(localName(item));
+    return itemRank > rank;
+  });
+  if (next) properties.insertBefore(property, next);
+  else properties.appendChild(property);
+  return property;
+}
+
+function setWordValue(element, value) {
+  element.setAttributeNS(W_NS, 'w:val', String(value));
+}
+
+function runForTextNode(node) {
+  let current = node?.parentNode || null;
+  while (current && localName(current) !== 'r') current = current.parentNode;
+  return current;
+}
+
+function isSequenceOnlyRun(run) {
+  const text = descendants(run, 't').map((node) => node.textContent || '').join('');
+  return /^\s*\d+(?:[.．、]\d+)+\s*$/.test(text);
+}
+
+function applyRoleTypography(nodes, roleStyle, defaultBold) {
+  const font = roleStyle?.font || '宋体';
+  const size = roleStyle?.sizeHalfPoints || '24';
+  const bold = roleStyle?.bold ?? defaultBold;
+  const runs = new Set(nodes.map(runForTextNode).filter(Boolean));
+  for (const run of runs) {
+    const properties = ensureRunProperties(run);
+    const fonts = ensureRunProperty(properties, 'rFonts');
+    fonts.setAttributeNS(W_NS, 'w:eastAsia', font);
+    if (!isSequenceOnlyRun(run)) {
+      setWordValue(ensureRunProperty(properties, 'sz'), size);
+      setWordValue(ensureRunProperty(properties, 'szCs'), size);
+    }
+    setWordValue(ensureRunProperty(properties, 'b'), bold ? '1' : '0');
+    setWordValue(ensureRunProperty(properties, 'bCs'), bold ? '1' : '0');
+  }
+}
+
+function paragraphForNode(node) {
+  let current = node?.parentNode || null;
+  while (current && localName(current) !== 'p') current = current.parentNode;
+  return current;
+}
+
+function clearRunTextContent(run) {
+  for (const child of directChildren(run)) {
+    if (['t', 'br', 'cr', 'tab'].includes(localName(child))) run.removeChild(child);
+  }
+}
+
+function writeRunTextContent(run, value) {
+  clearRunTextContent(run);
+  const text = String(value ?? '').replace(/\r\n?/g, '\n');
+  const tokens = text.split(/(\n|\t)/);
+  const anchor = directChildren(run).find((child) => localName(child) !== 'rPr') || null;
+  const insert = (node) => run.insertBefore(node, anchor);
+  for (const token of tokens) {
+    if (token === '\n') {
+      insert(run.ownerDocument.createElementNS(W_NS, 'w:br'));
+      continue;
+    }
+    if (token === '\t') {
+      insert(run.ownerDocument.createElementNS(W_NS, 'w:tab'));
+      continue;
+    }
+    if (token || tokens.length === 1) {
+      const textNode = run.ownerDocument.createElementNS(W_NS, 'w:t');
+      textNode.textContent = token;
+      if (/^\s|\s$/.test(token)) textNode.setAttribute('xml:space', 'preserve');
+      insert(textNode);
+    }
+  }
+}
+
+function paragraphHasContent(paragraph) {
+  for (const child of directChildren(paragraph)) {
+    const childName = localName(child);
+    if (childName === 'pPr') continue;
+    if (childName !== 'r') return true;
+    for (const runChild of directChildren(child)) {
+      const runChildName = localName(runChild);
+      if (runChildName === 'rPr') continue;
+      if (runChildName === 't' && !(runChild.textContent || '').length) continue;
+      return true;
+    }
+  }
+  return false;
+}
+
+
+function createBoldRun(doc, text, isEnglish = false) {
+  const r = doc.createElementNS(W_NS, 'w:r');
+  const rPr = doc.createElementNS(W_NS, 'w:rPr');
+  const rFonts = doc.createElementNS(W_NS, 'w:rFonts');
+  if (isEnglish) {
+    rFonts.setAttributeNS(W_NS, 'w:ascii', 'Arial');
+    rFonts.setAttributeNS(W_NS, 'w:hAnsi', 'Arial');
+  } else {
+    rFonts.setAttributeNS(W_NS, 'w:ascii', '宋体');
+    rFonts.setAttributeNS(W_NS, 'w:hAnsi', '宋体');
+    rFonts.setAttributeNS(W_NS, 'w:eastAsia', '宋体');
+  }
+  rPr.appendChild(rFonts);
+  const b = doc.createElementNS(W_NS, 'w:b');
+  rPr.appendChild(b);
+  const sz = doc.createElementNS(W_NS, 'w:sz');
+  sz.setAttributeNS(W_NS, 'w:val', isEnglish ? '19' : '24');
+  rPr.appendChild(sz);
+  r.appendChild(rPr);
+  const t = doc.createElementNS(W_NS, 'w:t');
+  t.setAttribute('xml:space', 'preserve');
+  t.textContent = text;
+  r.appendChild(t);
+  return r;
+}
+
+function createRegularRun(doc, text, isEnglish = false) {
+  const r = doc.createElementNS(W_NS, 'w:r');
+  const rPr = doc.createElementNS(W_NS, 'w:rPr');
+  const rFonts = doc.createElementNS(W_NS, 'w:rFonts');
+  if (isEnglish) {
+    rFonts.setAttributeNS(W_NS, 'w:ascii', 'Arial');
+    rFonts.setAttributeNS(W_NS, 'w:hAnsi', 'Arial');
+  } else {
+    rFonts.setAttributeNS(W_NS, 'w:ascii', '宋体');
+    rFonts.setAttributeNS(W_NS, 'w:hAnsi', '宋体');
+    rFonts.setAttributeNS(W_NS, 'w:eastAsia', '宋体');
+  }
+  rPr.appendChild(rFonts);
+  const b = doc.createElementNS(W_NS, 'w:b');
+  b.setAttributeNS(W_NS, 'w:val', '0');
+  rPr.appendChild(b);
+  const sz = doc.createElementNS(W_NS, 'w:sz');
+  sz.setAttributeNS(W_NS, 'w:val', '24');
+  rPr.appendChild(sz);
+  r.appendChild(rPr);
+  const t = doc.createElementNS(W_NS, 'w:t');
+  t.setAttribute('xml:space', 'preserve');
+  t.textContent = text;
+  r.appendChild(t);
+  return r;
+}
+
+export function writeStructuredToxicologyCellValue(cell, value, options = {}) {
+  if (!cell?.node) return;
+  const isEnglish = Boolean(options.isEnglish || /^[A-Za-z0-9\s:;,./()%-]+$/.test(String(value || '').slice(0, 30)));
+  const text = String(value || '').trim();
+  if (!text) {
+    replaceCellValueContent(cell, '');
+    return;
+  }
+
+  // 1. 拆分为独立的子条目 (支持换行符或分号拆分)
+  let rawItems = [];
+  if (text.includes('\n')) {
+    rawItems = text.split('\n').map(l => l.trim()).filter(Boolean);
+  } else if (text.includes('；') || text.includes(';')) {
+    rawItems = text.split(/[；;]/).map(l => l.trim()).filter(Boolean);
+  } else {
+    const splitted = text.split(/(?=(?:物种|Species|重复剂量中毒|Repeated dose toxicity)[：:])/i).map(l => l.trim()).filter(Boolean);
+    if (splitted.length > 1) {
+      rawItems = splitted;
+    } else {
+      rawItems = [text];
+    }
+  }
+
+  const flattenedItems = [];
+  for (const it of rawItems) {
+    if (it.includes('；') || it.includes(';')) {
+      const subParts = it.split(/[；;]/).map(p => p.trim()).filter(Boolean);
+      flattenedItems.push(...subParts);
+    } else {
+      flattenedItems.push(it);
+    }
+  }
+
+  // 2. 净化条目：剔除冗余的“致敏性：”、“Sensitization:”前缀
+  const cleanItems = flattenedItems.map(it => {
+    return it.replace(/^(?:致敏性|Sensitization)[:：\s]*/i, '').trim();
+  }).filter(Boolean);
+
+  const doc = cell.node.ownerDocument;
+  const tcPr = cell.node.getElementsByTagNameNS(W_NS, 'tcPr')[0];
+  const oldChildren = Array.from(cell.node.childNodes);
+  for (const child of oldChildren) {
+    if (child !== tcPr) {
+      cell.node.removeChild(child);
+    }
+  }
+
+  for (const itemText of cleanItems) {
+    const p = doc.createElementNS(W_NS, 'w:p');
+    const pPr = doc.createElementNS(W_NS, 'w:pPr');
+    const spacing = doc.createElementNS(W_NS, 'w:spacing');
+    spacing.setAttributeNS(W_NS, 'w:line', '300');
+    spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
+    pPr.appendChild(spacing);
+    const ind = doc.createElementNS(W_NS, 'w:ind');
+    ind.setAttributeNS(W_NS, 'w:right', '480');
+    pPr.appendChild(ind);
+    const jc = doc.createElementNS(W_NS, 'w:jc');
+    jc.setAttributeNS(W_NS, 'w:val', 'left');
+    pPr.appendChild(jc);
+    const pRPr = doc.createElementNS(W_NS, 'w:rPr');
+    const pSz = doc.createElementNS(W_NS, 'w:sz');
+    pSz.setAttributeNS(W_NS, 'w:val', '24');
+    pRPr.appendChild(pSz);
+    pPr.appendChild(pRPr);
+    p.appendChild(pPr);
+
+    // 填写值整行全为常规体（Regular，严禁加粗，严格遵守表格二元分类法则与值格字体分离公理 G-29）
+    const rVal = createRegularRun(doc, itemText, isEnglish);
+    p.appendChild(rVal);
+
+    cell.node.appendChild(p);
+  }
+
+  cell.paragraphs = directChildren(cell.node, 'p').map((p) => parseParagraph(p));
+  refreshCellText(cell);
+}
+
+export function formatSection11PreambleRow(row, text, isEnglish = false, leftIndentTwips = 34) {
+  if (!row?.node) return;
+  const doc = row.node.ownerDocument;
+  const tcs = Array.from(row.node.getElementsByTagNameNS(W_NS, 'tc'));
+  if (tcs.length === 0) return;
+  for (let i = 1; i < tcs.length; i++) {
+    row.node.removeChild(tcs[i]);
+  }
+  const tc = tcs[0];
+  let tcPr = tc.getElementsByTagNameNS(W_NS, 'tcPr')[0];
+  if (!tcPr) {
+    tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+    tc.insertBefore(tcPr, tc.firstChild);
+  }
+  let gridSpan = tcPr.getElementsByTagNameNS(W_NS, 'w:gridSpan')[0];
+  if (!gridSpan) {
+    gridSpan = doc.createElementNS(W_NS, 'w:gridSpan');
+    tcPr.appendChild(gridSpan);
+  }
+  gridSpan.setAttributeNS(W_NS, 'w:val', '4');
+
+  let tcW = tcPr.getElementsByTagNameNS(W_NS, 'w:tcW')[0];
+  if (!tcW) {
+    tcW = doc.createElementNS(W_NS, 'w:tcW');
+    tcPr.appendChild(tcW);
+  }
+  tcW.setAttributeNS(W_NS, 'w:w', '9781');
+  tcW.setAttributeNS(W_NS, 'w:type', 'dxa');
+
+  const oldPs = Array.from(tc.getElementsByTagNameNS(W_NS, 'p'));
+  for (const p of oldPs) tc.removeChild(p);
+
+  // G-35: 英文版说明行统一采用 9.5pt (sz="19", szCs="19")，中文版维持五号字 12pt (sz="24")
+  const targetSz = isEnglish ? '19' : '24';
+
+  const p = doc.createElementNS(W_NS, 'w:p');
+  const pPr = doc.createElementNS(W_NS, 'w:pPr');
+  const spacing = doc.createElementNS(W_NS, 'w:spacing');
+  spacing.setAttributeNS(W_NS, 'w:line', '300');
+  spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
+  pPr.appendChild(spacing);
+
+  if (leftIndentTwips > 0) {
+    const ind = doc.createElementNS(W_NS, 'w:ind');
+    ind.setAttributeNS(W_NS, 'w:left', String(leftIndentTwips));
+    ind.setAttributeNS(W_NS, 'w:leftChars', '16');
+    ind.setAttributeNS(W_NS, 'w:right', '480');
+    pPr.appendChild(ind);
+  }
+
+  const jc = doc.createElementNS(W_NS, 'w:jc');
+  jc.setAttributeNS(W_NS, 'w:val', 'left');
+  pPr.appendChild(jc);
+
+  const pRPr = doc.createElementNS(W_NS, 'w:rPr');
+  const pSz = doc.createElementNS(W_NS, 'w:sz');
+  pSz.setAttributeNS(W_NS, 'w:val', targetSz);
+  pRPr.appendChild(pSz);
+  pPr.appendChild(pRPr);
+  p.appendChild(pPr);
+
+  const r = doc.createElementNS(W_NS, 'w:r');
+  const rPr = doc.createElementNS(W_NS, 'w:rPr');
+  const rFonts = doc.createElementNS(W_NS, 'w:rFonts');
+  if (isEnglish) {
+    rFonts.setAttributeNS(W_NS, 'w:ascii', 'Arial');
+    rFonts.setAttributeNS(W_NS, 'w:hAnsi', 'Arial');
+    rFonts.setAttributeNS(W_NS, 'w:cs', 'Arial');
+  } else {
+    rFonts.setAttributeNS(W_NS, 'w:ascii', '宋体');
+    rFonts.setAttributeNS(W_NS, 'w:hAnsi', '宋体');
+    rFonts.setAttributeNS(W_NS, 'w:eastAsia', '宋体');
+    rFonts.setAttributeNS(W_NS, 'w:cs', '宋体');
+  }
+  rPr.appendChild(rFonts);
+  const b = doc.createElementNS(W_NS, 'w:b');
+  b.setAttributeNS(W_NS, 'w:val', '0');
+  rPr.appendChild(b);
+  const sz = doc.createElementNS(W_NS, 'w:sz');
+  sz.setAttributeNS(W_NS, 'w:val', targetSz);
+  rPr.appendChild(sz);
+  const szCs = doc.createElementNS(W_NS, 'w:szCs');
+  szCs.setAttributeNS(W_NS, 'w:val', targetSz);
+  rPr.appendChild(szCs);
+  r.appendChild(rPr);
+
+  const t = doc.createElementNS(W_NS, 'w:t');
+  t.setAttribute('xml:space', 'preserve');
+  t.textContent = text;
+  r.appendChild(t);
+  p.appendChild(r);
+
+  tc.appendChild(p);
+  if (row.cells && row.cells.length > 0) {
+    row.cells[0].text = text;
+    row.cells[0].node = tc;
+    row.cells.length = 1;
+  }
+}
+
+/**
+ * G-35: 英文版表格说明行与前言行字号统一赋值器 (除 Section 2 外均一化为 9.5pt sz="19")
+ */
+export function setCellPreambleTypography(cell, isEnglish = false) {
+  if (!cell?.node) return;
+  const targetSz = isEnglish ? '19' : '24';
+
+  const allSz = Array.from(cell.node.getElementsByTagName('w:sz'));
+  for (const s of allSz) {
+    s.setAttribute('w:val', targetSz);
+  }
+  const allSzCs = Array.from(cell.node.getElementsByTagName('w:szCs'));
+  for (const s of allSzCs) {
+    s.setAttribute('w:val', targetSz);
+  }
+}
+
+function replaceCellValueContent(cell, value, roleStyle) {
+  const valStr = String(value || "");
+  if (cell?.record?.sectionNumber === 11 && (/物种|Species|重复剂量|Repeated dose/i.test(valStr))) {
+    writeStructuredToxicologyCellValue(cell, valStr);
+    return;
+  }
+  const nonBoldRun = cell.paragraphs
+    .flatMap((paragraph) => paragraph.runs)
+    .find((run) => !run.bold && run.node);
+
+  let destinationRun = nonBoldRun?.node || null;
+  let destinationParagraph = nonBoldRun ? paragraphForNode(nonBoldRun.node) : null;
+
+  if (!destinationRun) {
+    const targetP = cell.paragraphs[cell.paragraphs.length - 1]?.node || cell.node.getElementsByTagNameNS(W_NS, 'p')[0];
+    if (!targetP) throw new DocxEngineError('无法定位该值的 Word 文本段落。', 'VALUE_RUN_NOT_FOUND');
+    const newRun = cell.node.ownerDocument.createElementNS(W_NS, 'w:r');
+    targetP.appendChild(newRun);
+    destinationRun = newRun;
+    destinationParagraph = targetP;
+  }
+
+  // 严格只清除非加粗运行区，绝不碰任何加粗标签
+  const editableRuns = new Set(cell.paragraphs.flatMap((paragraph) => paragraph.runs
+    .filter((run) => !run.bold && (run.textNodes.length || /[\r\n\t]/.test(run.text || '')))
+    .map((run) => run.node)));
+  for (const run of editableRuns) clearRunTextContent(run);
+  writeRunTextContent(destinationRun, value);
+  applyRoleTypography(Array.from(destinationRun.getElementsByTagNameNS(W_NS, 't')), roleStyle, false);
+
+  const keptParagraphs = [];
+  for (const paragraph of cell.paragraphs) {
+    if (paragraph.node === destinationParagraph || paragraphHasContent(paragraph.node)) {
+      keptParagraphs.push(paragraph);
+    } else {
+      paragraph.node.parentNode?.removeChild(paragraph.node);
+    }
+  }
+  cell.paragraphs = keptParagraphs;
+}
+
+/**
+ * 跨文档图片迁移：从源文档复制 drawing 节点及对应的图片二进制文件与 relationships 关系
+ */
+/**
+ * 全量移除所有表格行上的 <w:cantSplit/> 限制，强制激活全16章节表格跨页断行能力
+ */
+
+/**
+ * 模板无关的表格标签平整化引擎 (Label Flattening & De-wrapping Engine)
+ * 1. 合并多段标签文本，英文字词边界补充空格，杜绝粘连（如 'anddegradability'）
+ * 2. 清除所有 <w:br> 软回车与除首段外的多余段落
+ * 3. 严格分立排版：编号 Times New Roman 10.5pt Bold，标签体 Arial (EN) / 黑体 (CN) 12pt Bold
+ * 4. 统一注入标准悬挂缩进 457 dxa 与制表位 459 dxa，彻底消除 9.22 固体含量等历史 420 缩进不齐问题
+ */
+export function harmonizeTableLabels(engine) {
+  if (!engine?.documentXml) return;
+  const isEn = /Identification|SECTION|Composition/i.test(engine.records?.[0]?.title || '')
+    || engine.records?.some((r) => /IDENTIFICATION/i.test(r.title || ''));
+
+  const tables = Array.from(engine.documentXml.getElementsByTagNameNS(W_NS, 'tbl'));
+  for (const tbl of tables) {
+    const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
+    for (let rIdx = 1; rIdx < rows.length; rIdx++) {
+      const row = rows[rIdx];
+      const cells = Array.from(row.getElementsByTagNameNS(W_NS, 'tc'));
+      if (cells.length === 0) continue;
+
+      const labelCell = cells[0];
+      const ps = Array.from(labelCell.getElementsByTagNameNS(W_NS, 'p'));
+      if (ps.length === 0) continue;
+
+      let fullText = '';
+      const pTexts = [];
+      for (const p of ps) {
+        const textNodes = Array.from(p.getElementsByTagNameNS(W_NS, 't'));
+        let pText = textNodes.map((t) => t.textContent || '').join('').trim();
+        if (pText) pTexts.push(pText);
+      }
+
+      if (pTexts.length === 0) continue;
+
+      if (pTexts.length > 1) {
+        fullText = pTexts.reduce((acc, cur) => {
+          if (!acc) return cur;
+          if (/[a-zA-Z0-9]$/.test(acc) && /^[a-zA-Z0-9]/.test(cur)) {
+            return `${acc} ${cur}`;
+          }
+          return `${acc} ${cur}`;
+        }, '');
+      } else {
+        fullText = pTexts[0];
+      }
+
+      fullText = fullText.replace(/\s+/g, ' ').trim();
+
+      const seqMatch = fullText.match(/^(\d+(?:\.\d+)+)(?:\s+|[：:])*(.*)$/);
+      if (seqMatch || ps.length > 1) {
+        const primaryP = ps[0];
+        for (let i = 1; i < ps.length; i++) {
+          labelCell.removeChild(ps[i]);
+        }
+
+        const existingRuns = Array.from(primaryP.getElementsByTagNameNS(W_NS, 'r'));
+        existingRuns.forEach((r) => primaryP.removeChild(r));
+
+        let pPr = primaryP.getElementsByTagNameNS(W_NS, 'pPr')[0];
+        if (!pPr) {
+          pPr = primaryP.ownerDocument.createElementNS(W_NS, 'w:pPr');
+          primaryP.insertBefore(pPr, primaryP.firstChild);
+        }
+
+        // 物理清除任何继承的自动编号属性 (numPr)，杜绝 Word/WPS 动态编号与静态序号双重渲染 (REQ-S3-DUP-PURGE)
+  const existingNumPrs = Array.from(pPr.getElementsByTagNameNS(W_NS, 'numPr'));
+  existingNumPrs.forEach(node => pPr.removeChild(node));
+  const localNumPrs = Array.from(pPr.getElementsByTagName('numPr'));
+  localNumPrs.forEach(node => pPr.removeChild(node));
+
+  const existingInds = Array.from(pPr.getElementsByTagNameNS(W_NS, 'ind'));
+        existingInds.forEach((n) => pPr.removeChild(n));
+        const ind = primaryP.ownerDocument.createElementNS(W_NS, 'w:ind');
+        ind.setAttributeNS(W_NS, 'w:left', '457');
+        ind.setAttributeNS(W_NS, 'w:hanging', '457');
+        pPr.appendChild(ind);
+
+        const existingTabs = Array.from(pPr.getElementsByTagNameNS(W_NS, 'tabs'));
+        existingTabs.forEach((n) => pPr.removeChild(n));
+        const tabs = primaryP.ownerDocument.createElementNS(W_NS, 'w:tabs');
+        const tab = primaryP.ownerDocument.createElementNS(W_NS, 'w:tab');
+        tab.setAttributeNS(W_NS, 'w:val', 'left');
+        tab.setAttributeNS(W_NS, 'w:pos', '459');
+        tabs.appendChild(tab);
+        pPr.appendChild(tabs);
+
+        if (seqMatch) {
+          const numStr = seqMatch[1];
+          let labelBody = seqMatch[2].trim();
+          if (isEn && !labelBody.endsWith(':') && !labelBody.endsWith('?')) {
+            labelBody += ':';
+          } else if (!isEn && !labelBody.endsWith('：') && !labelBody.endsWith('?') && !labelBody.includes('其他危害')) {
+            labelBody += '：';
+          }
+
+          // 1. 编号 Run: Times New Roman, 10.5pt (sz=21), Bold (b=1)
+          const runNum = primaryP.ownerDocument.createElementNS(W_NS, 'w:r');
+          const rPrNum = primaryP.ownerDocument.createElementNS(W_NS, 'w:rPr');
+          const rFontsNum = primaryP.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+          rFontsNum.setAttributeNS(W_NS, 'w:ascii', 'Times New Roman');
+          rFontsNum.setAttributeNS(W_NS, 'w:hAnsi', 'Times New Roman');
+          rFontsNum.setAttributeNS(W_NS, 'w:eastAsia', isEn ? 'Times New Roman' : '宋体');
+          rPrNum.appendChild(rFontsNum);
+          const bNum = primaryP.ownerDocument.createElementNS(W_NS, 'w:b');
+          rPrNum.appendChild(bNum);
+          const szNum = primaryP.ownerDocument.createElementNS(W_NS, 'w:sz');
+          szNum.setAttributeNS(W_NS, 'w:val', '21');
+          rPrNum.appendChild(szNum);
+          const szCsNum = primaryP.ownerDocument.createElementNS(W_NS, 'w:szCs');
+          szCsNum.setAttributeNS(W_NS, 'w:val', '21');
+          rPrNum.appendChild(szCsNum);
+          runNum.appendChild(rPrNum);
+
+          const tNum = primaryP.ownerDocument.createElementNS(W_NS, 'w:t');
+          tNum.textContent = numStr;
+          runNum.appendChild(tNum);
+          const tabNode = primaryP.ownerDocument.createElementNS(W_NS, 'w:tab');
+          runNum.appendChild(tabNode);
+          primaryP.appendChild(runNum);
+
+          // 2. 标签文本 Run: Arial (EN) / 黑体 (CN), 12pt (sz=24), Bold (b=1)
+          const runBody = primaryP.ownerDocument.createElementNS(W_NS, 'w:r');
+          const rPrBody = primaryP.ownerDocument.createElementNS(W_NS, 'w:rPr');
+          const rFontsBody = primaryP.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+          const bodyFont = isEn ? 'Arial' : '黑体';
+          rFontsBody.setAttributeNS(W_NS, 'w:ascii', bodyFont);
+          rFontsBody.setAttributeNS(W_NS, 'w:hAnsi', bodyFont);
+          rFontsBody.setAttributeNS(W_NS, 'w:eastAsia', bodyFont);
+          rPrBody.appendChild(rFontsBody);
+          const bBody = primaryP.ownerDocument.createElementNS(W_NS, 'w:b');
+          rPrBody.appendChild(bBody);
+          const szBody = primaryP.ownerDocument.createElementNS(W_NS, 'w:sz');
+          szBody.setAttributeNS(W_NS, 'w:val', '24');
+          rPrBody.appendChild(szBody);
+          const szCsBody = primaryP.ownerDocument.createElementNS(W_NS, 'w:szCs');
+          szCsBody.setAttributeNS(W_NS, 'w:val', '24');
+          rPrBody.appendChild(szCsBody);
+          runBody.appendChild(rPrBody);
+
+          const tBody = primaryP.ownerDocument.createElementNS(W_NS, 'w:t');
+          tBody.textContent = labelBody;
+          runBody.appendChild(tBody);
+          primaryP.appendChild(runBody);
+        } else {
+          const run = primaryP.ownerDocument.createElementNS(W_NS, 'w:r');
+          const rPr = primaryP.ownerDocument.createElementNS(W_NS, 'w:rPr');
+          const rFonts = primaryP.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+          const bodyFont = isEn ? 'Arial' : '黑体';
+          rFonts.setAttributeNS(W_NS, 'w:ascii', bodyFont);
+          rFonts.setAttributeNS(W_NS, 'w:hAnsi', bodyFont);
+          rFonts.setAttributeNS(W_NS, 'w:eastAsia', bodyFont);
+          rPr.appendChild(rFonts);
+          const b = primaryP.ownerDocument.createElementNS(W_NS, 'w:b');
+          rPr.appendChild(b);
+          const sz = primaryP.ownerDocument.createElementNS(W_NS, 'w:sz');
+          sz.setAttributeNS(W_NS, 'w:val', '24');
+          rPr.appendChild(sz);
+          run.appendChild(rPr);
+          const t = primaryP.ownerDocument.createElementNS(W_NS, 'w:t');
+          t.textContent = fullText;
+          run.appendChild(t);
+          primaryP.appendChild(run);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * 消除底模中遗留的 26pt (sz=52) 等异常超大字号，防止空行或空格撑爆行高
+ */
+export function suppressOversizedRowHeights(engine) {
+  if (!engine?.documentXml) return;
+  const szNodes = Array.from(engine.documentXml.getElementsByTagNameNS(W_NS, 'sz') || []);
+  for (const node of szNodes) {
+    const val = parseInt(node.getAttributeNS(W_NS, 'val') || node.getAttribute('w:val') || '0', 10);
+    if (val > 28) {
+      const p = node.parentNode?.parentNode;
+      const tNodes = p ? Array.from(p.getElementsByTagNameNS(W_NS, 't')) : [];
+      const text = tNodes.map((t) => t.textContent || '').join('').trim();
+      if (!text || text.length < 30) {
+        node.setAttributeNS(W_NS, 'w:val', '24');
+      }
+    }
+  }
+  const szCsNodes = Array.from(engine.documentXml.getElementsByTagNameNS(W_NS, 'szCs') || []);
+  for (const node of szCsNodes) {
+    const val = parseInt(node.getAttributeNS(W_NS, 'val') || node.getAttribute('w:val') || '0', 10);
+    if (val > 28) {
+      const p = node.parentNode?.parentNode;
+      const tNodes = p ? Array.from(p.getElementsByTagNameNS(W_NS, 't')) : [];
+      const text = tNodes.map((t) => t.textContent || '').join('').trim();
+      if (!text || text.length < 30) {
+        node.setAttributeNS(W_NS, 'w:val', '24');
+      }
+    }
+  }
+}
+
+
+/**
+ * 消除文档末尾空段落导致的孤儿空白末页 (G-40 避免末页纯空门禁)
+ * 在 Word/OpenXML 规范中，表格末尾必须紧跟一个段落。若该空段落采用常规字号或默认行距，
+ * 在表格恰好占满前一页时将溢出至下一页，导致产出物末页出现“仅有页眉页脚、无任何主体内容”的空白页。
+ * 本函数定位文档末尾所有位于 sectPr 前且无文本内容的段落，
+ * 将其字号压制为 1pt (sz=2)，行距设为严格 20 twips (1pt exact)，段前段后为 0，彻底根除末页空白页。
+ */
+export function suppressTrailingDocumentParagraph(engine) {
+  if (!engine?.documentXml) return;
+  const body = engine.documentXml.getElementsByTagNameNS(W_NS, 'body')?.[0]
+    || engine.documentXml.getElementsByTagName('body')?.[0];
+  if (!body) return;
+
+  const children = Array.from(body.childNodes || []).filter(n => n.nodeType === 1);
+  if (children.length === 0) return;
+
+  for (let i = children.length - 1; i >= 0; i--) {
+    const node = children[i];
+    const localName = node.localName || node.nodeName.split(':').pop();
+    if (localName === 'sectPr') continue;
+    if (localName === 'p') {
+      const text = (node.textContent || '').trim();
+      const drawings = node.getElementsByTagNameNS ? node.getElementsByTagNameNS(W_NS, 'drawing') : [];
+      if (!text && drawings.length === 0) {
+        let pPr = node.getElementsByTagNameNS ? node.getElementsByTagNameNS(W_NS, 'pPr')?.[0] : null;
+        if (!pPr) {
+          pPr = engine.documentXml.createElementNS(W_NS, 'w:pPr');
+          node.insertBefore(pPr, node.firstChild);
+        }
+        const existingSpacings = Array.from(pPr.getElementsByTagNameNS ? pPr.getElementsByTagNameNS(W_NS, 'spacing') : []);
+        existingSpacings.forEach(s => pPr.removeChild(s));
+
+        const spacing = engine.documentXml.createElementNS(W_NS, 'w:spacing');
+        spacing.setAttributeNS(W_NS, 'w:before', '0');
+        spacing.setAttributeNS(W_NS, 'w:after', '0');
+        spacing.setAttributeNS(W_NS, 'w:line', '20');
+        spacing.setAttributeNS(W_NS, 'w:lineRule', 'exact');
+        pPr.appendChild(spacing);
+
+        let rPr = pPr.getElementsByTagNameNS ? pPr.getElementsByTagNameNS(W_NS, 'rPr')?.[0] : null;
+        if (!rPr) {
+          rPr = engine.documentXml.createElementNS(W_NS, 'w:rPr');
+          pPr.appendChild(rPr);
+        }
+        const sz = engine.documentXml.createElementNS(W_NS, 'w:sz');
+        sz.setAttributeNS(W_NS, 'w:val', '2');
+        rPr.appendChild(sz);
+        const szCs = engine.documentXml.createElementNS(W_NS, 'w:szCs');
+        szCs.setAttributeNS(W_NS, 'w:val', '2');
+        rPr.appendChild(szCs);
+      }
+    } else {
+      break;
+    }
+  }
+}
+
+export function enableCrossPageBreaksForAllSections(engine) {
+  // 法定跨页断行放开机制 (REQ-02): 默认允许所有数据行跨页断行，消除章节与表格间的大空白断层
+  // 仅保留 Row 0 (章节标题行) 的 cantSplit 避免孤行表头，数据行全量清除 cantSplit
+  if (!engine?.documentXml) return;
+  const tables = Array.from(engine.documentXml.getElementsByTagNameNS(W_NS, 'tbl'));
+  for (const tbl of tables) {
+    const trs = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
+    for (let rIdx = 1; rIdx < trs.length; rIdx++) {
+      const tr = trs[rIdx];
+      const trPr = tr.getElementsByTagNameNS(W_NS, 'trPr')[0];
+      if (trPr) {
+        const cantSplits = Array.from(trPr.getElementsByTagNameNS(W_NS, 'cantSplit'));
+        cantSplits.forEach(cs => trPr.removeChild(cs));
+      }
+    }
+  }
+}
+
+export function transferDrawingToCell(srcEngine, targetEngine, srcDrawingNodes, targetCell) {
+  if (!srcDrawingNodes || !targetCell?.node) return false;
+  const nodes = Array.isArray(srcDrawingNodes) ? srcDrawingNodes : [srcDrawingNodes];
+  if (nodes.length === 0) return false;
+
+  const srcEng = srcEngine?.engine || srcEngine;
+  const tgtEng = targetEngine?.engine || targetEngine;
+  if (!srcEng || !tgtEng) return false;
+
+  let p = targetCell.node.getElementsByTagNameNS(W_NS, 'p')[0];
+  if (!p) {
+    p = targetCell.node.ownerDocument.createElementNS(W_NS, 'w:p');
+    targetCell.node.appendChild(p);
+  }
+  const existingRuns = [...p.getElementsByTagNameNS(W_NS, 'r')];
+  existingRuns.forEach((r) => p.removeChild(r));
+
+  targetCell.images = [];
+  targetCell.relationships = [];
+
+  let count = 0;
+  for (const srcDrawingNode of nodes) {
+    const blip = srcDrawingNode.getElementsByTagNameNS('*', 'blip')[0];
+    if (!blip) continue;
+    const embedId = blip.getAttribute('r:embed') || blip.getAttributeNS(R_NS, 'embed') || blip.getAttribute('ns1:embed');
+    if (!embedId) continue;
+
+    const rel = srcEng.relationshipMap?.get(embedId) || 'media/image1.png';
+    let targetPath = rel.startsWith('word/') ? rel : `word/${rel.replace(/^\//, '')}`;
+    const imgBytes = overrideImageBytes || srcEng.mediaFiles?.get(targetPath);
+    if (!imgBytes) continue;
+
+    const ext = overrideExt || targetPath.split('.').pop() || 'png';
+    const relsText = tgtEng.relsText || '';
+    const rIdNums = [...relsText.matchAll(/Id=["']rId(\d+)["']/g)].map((m) => parseInt(m[1], 10));
+    const maxRId = Math.max(0, ...rIdNums);
+    const newRId = `rId${maxRId + 10 + count}`;
+    const newMediaPath = `word/media/image_ghs_${Date.now()}_${count}.${ext}`;
+    const newRelTarget = `media/${newMediaPath.split('/').pop()}`;
+
+    if (!tgtEng.mediaFiles) tgtEng.mediaFiles = new Map();
+    tgtEng.mediaFiles.set(newMediaPath, imgBytes);
+    tgtEng.zip?.file(newMediaPath, imgBytes);
+    tgtEng.relationshipMap?.set(newRId, newRelTarget);
+
+    const newRelTag = `<Relationship Id="${newRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${newRelTarget}"/>`;
+    tgtEng.relsText = relsText.includes('</Relationships>')
+      ? relsText.replace('</Relationships>', `${newRelTag}</Relationships>`)
+      : `${relsText}\r\n${newRelTag}`;
+
+    const clonedDrawing = targetCell.node.ownerDocument.importNode(srcDrawingNode, true);
+    const clonedBlip = clonedDrawing.getElementsByTagNameNS('*', 'blip')[0];
+    if (clonedBlip) {
+      clonedBlip.setAttributeNS(R_NS, 'r:embed', newRId);
+    }
+
+    const run = targetCell.node.ownerDocument.createElementNS(W_NS, 'w:r');
+    run.appendChild(clonedDrawing);
+    p.appendChild(run);
+
+    targetCell.images.push({
+      rid: newRId,
+      node: clonedDrawing,
+      extent: { cx: 1080135, cy: 1035050 }
+    });
+    targetCell.relationships.push({
+      rid: newRId,
+      target: newRelTarget
+    });
+    count++;
+  }
+
+  targetCell.text = '';
+  targetCell.valueText = '';
+  return count > 0;
+}
+
+export function transferDrawingNodesToParagraph(srcEngine, targetEngine, srcDrawingNodes, targetParagraph, overrideImageBytes = null, overrideExt = null) {
+  if (!srcDrawingNodes || !targetParagraph) return false;
+  const nodes = Array.isArray(srcDrawingNodes) ? srcDrawingNodes : [srcDrawingNodes];
+  if (nodes.length === 0) return false;
+
+  const srcEng = srcEngine?.engine || srcEngine;
+  const tgtEng = targetEngine?.engine || targetEngine;
+  if (!srcEng || !tgtEng) return false;
+
+  let count = 0;
+  for (const srcDrawingNode of nodes) {
+    const blip = srcDrawingNode.getElementsByTagNameNS('*', 'blip')[0];
+    if (!blip) continue;
+    const embedId = blip.getAttribute('r:embed') || blip.getAttributeNS(R_NS, 'embed') || blip.getAttribute('ns1:embed');
+    if (!embedId) continue;
+
+    const rel = srcEng.relationshipMap?.get(embedId) || 'media/image1.png';
+    let targetPath = rel.startsWith('word/') ? rel : `word/${rel.replace(/^\//, '')}`;
+    const imgBytes = overrideImageBytes || srcEng.mediaFiles?.get(targetPath);
+    if (!imgBytes) continue;
+
+    const ext = overrideExt || targetPath.split('.').pop() || 'png';
+    const relsText = tgtEng.relsText || '';
+    const rIdNums = [...relsText.matchAll(/Id=["']rId(\d+)["']/g)].map((m) => parseInt(m[1], 10));
+    const maxRId = Math.max(0, ...rIdNums);
+    const newRId = `rId${maxRId + 10 + count}`;
+    const newMediaPath = `word/media/image_ghs_${Date.now()}_${count}.${ext}`;
+    const newRelTarget = `media/${newMediaPath.split('/').pop()}`;
+
+    if (!tgtEng.mediaFiles) tgtEng.mediaFiles = new Map();
+    tgtEng.mediaFiles.set(newMediaPath, imgBytes);
+    tgtEng.zip?.file(newMediaPath, imgBytes);
+    tgtEng.relationshipMap?.set(newRId, newRelTarget);
+
+    const newRelTag = `<Relationship Id="${newRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${newRelTarget}"/>`;
+    tgtEng.relsText = relsText.includes('</Relationships>')
+      ? relsText.replace('</Relationships>', `${newRelTag}</Relationships>`)
+      : `${relsText}\r\n${newRelTag}`;
+
+    const clonedDrawing = targetParagraph.ownerDocument.importNode(srcDrawingNode, true);
+    const clonedBlip = clonedDrawing.getElementsByTagNameNS('*', 'blip')[0];
+    if (clonedBlip) {
+      clonedBlip.setAttributeNS(R_NS, 'r:embed', newRId);
+    }
+
+    const run = targetParagraph.ownerDocument.createElementNS(W_NS, 'w:r');
+    run.appendChild(clonedDrawing);
+    targetParagraph.appendChild(run);
+    count++;
+  }
+  return count > 0;
+}
+
+
+export function applyStandardHangingIndent(cell, leftVal = '420', hangingVal = '420') {
+  if (!cell?.node) return;
+  const p = cell.node.getElementsByTagNameNS(W_NS, 'p')[0] || cell.node.querySelector('p');
+  if (!p) return;
+  let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0] || p.querySelector('pPr');
+  if (!pPr) {
+    pPr = p.ownerDocument.createElementNS(W_NS, 'w:pPr');
+    p.insertBefore(pPr, p.firstChild);
+  }
+  const existingInds = Array.from(pPr.getElementsByTagNameNS(W_NS, 'ind'));
+  existingInds.forEach(node => pPr.removeChild(node));
+  const localInds = Array.from(pPr.getElementsByTagName('ind'));
+  localInds.forEach(node => pPr.removeChild(node));
+
+  // 严格杜绝私自注入制表位（模板中没有任何 tabs）
+  const existingTabs = Array.from(pPr.getElementsByTagNameNS(W_NS, 'tabs'));
+  existingTabs.forEach(node => pPr.removeChild(node));
+  const localTabs = Array.from(pPr.getElementsByTagName('tabs'));
+  localTabs.forEach(node => pPr.removeChild(node));
+
+  // 严格对齐母版行间距 300 dxa
+  let spacing = pPr.getElementsByTagNameNS(W_NS, 'spacing')[0] || pPr.querySelector('spacing');
+  if (!spacing) {
+    spacing = p.ownerDocument.createElementNS(W_NS, 'w:spacing');
+    pPr.appendChild(spacing);
+  }
+  spacing.setAttributeNS(W_NS, 'w:line', '300');
+  spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
+
+  const ind = p.ownerDocument.createElementNS(W_NS, 'w:ind');
+  ind.setAttributeNS(W_NS, 'w:left', String(leftVal));
+  ind.setAttributeNS(W_NS, 'w:leftChars', '0');
+  ind.setAttributeNS(W_NS, 'w:hanging', String(hangingVal));
+  ind.setAttributeNS(W_NS, 'w:firstLineChars', '0');
+  pPr.appendChild(ind);
+}
+
+export function setCellAlignment(cell, align = 'center') {
+  if (!cell?.node) return;
+  const ps = cell.node.getElementsByTagNameNS(W_NS, 'p');
+  for (let i = 0; i < ps.length; i++) {
+    const p = ps[i];
+    let pPr = firstChild(p, 'pPr');
+    if (!pPr) {
+      pPr = cell.node.ownerDocument.createElementNS(W_NS, 'w:pPr');
+      p.insertBefore(pPr, p.firstChild);
+    }
+    let jc = firstChild(pPr, 'jc');
+    if (!jc) {
+      jc = cell.node.ownerDocument.createElementNS(W_NS, 'w:jc');
+      pPr.appendChild(jc);
+    }
+    jc.setAttributeNS(W_NS, 'w:val', align);
+  }
+  cell.align = align;
+  if (cell.paragraphs) {
+    for (const para of cell.paragraphs) {
+      if (!para.format) para.format = {};
+      para.format.alignment = align;
+    }
+  }
+}
+
+export function writeCellValue(cell, value, roleStyle = null) {
+  if (!cell?.editable) throw new DocxEngineError(cell?.protectedReason || '该单元格不是可编辑值区域。', 'LOCKED_FIELD');
+  const valStr = typeof value === 'object' && value !== null && 'value' in value
+    ? value.value
+    : String(value ?? '');
+  // 严格压缩连续空行，杜绝空白占位行 (OW-LineBreak-02)
+  const clean = valStr.replace(/\r\n?/g, '\n').replace(/\n\s*\n+/g, '\n').trim();
+  replaceCellValueContent(cell, clean, roleStyle);
+  refreshCellText(cell);
+}
+
+export function writeCellLabel(cell, value, allowLabelEdit = false, roleStyle = null) {
+  if (!allowLabelEdit) throw new DocxEngineError('标签默认锁定，请先开启“允许修改标签文本”。', 'LOCKED_LABEL');
+  if (cell?.record?.sectionNumber && ![2, 3, 5, 6, 9, 10, 11, 12, 14].includes(cell.record.sectionNumber)) {
+    throw new DocxEngineError('只有第2、6、9、10、11、12部分允许根据源文件微调特殊标签，其他章节标签完全锁定。', 'LABEL_MUTATION_FORBIDDEN');
+  }
+  if (!cell?.labelNodes?.length) throw new DocxEngineError('该单元格没有可编辑的标签运行区。', 'NO_LABEL');
+  let clean = String(value ?? '').trim();
+  const callerPrefixMatch = clean.match(/^(\d+\.\d+)(\s+)(.*)$/);
+  if (callerPrefixMatch) {
+    let core = callerPrefixMatch[3].trim();
+    if (!/[：:]$/.test(core) && !core.includes('其他危害')) core += '：';
+    const num = callerPrefixMatch[1];
+    const secNum = parseInt(num.split('.')[0], 10);
+    const padLen = secNum === 11 ? 6 : (secNum === 9 ? 5 : 5);
+    const spaceCount = num === '11.10' ? 2 : Math.max(1, padLen - num.length);
+    const prefix = `${num}${' '.repeat(spaceCount)}`;
+    clean = prefix + core;
+  } else if (cell.row >= 1 && /^\s*(\d+\.\d+)/.test(cell.text) && !/物质或混合物分类/.test(clean)) {
+    const existingPrefixMatch = cell.text.match(/^\s*(\d+\.\d+)/);
+    const num = existingPrefixMatch[1];
+    const secNum = parseInt(num.split('.')[0], 10);
+    const padLen = secNum === 11 ? 6 : (secNum === 9 ? 5 : 5);
+    clean = clean.replace(/^\s*\d+\.\d+\s*/, '').trim();
+    if (!/[：:]$/.test(clean) && !clean.includes('其他危害') && !clean.includes('物质或混合物分类')) clean += '：';
+    const spaceCount = num === '11.10' ? 2 : Math.max(1, padLen - num.length);
+    const prefix = `${num}${' '.repeat(spaceCount)}`;
+    clean = prefix + clean;
+  }
+  distributeText(cell.labelNodes, clean);
+  applyRoleTypography(cell.labelNodes, roleStyle, true);
+  refreshCellText(cell);
+}
+
+function sequenceMatch(text) {
+  return String(text || '').match(/^(\s*)(\d+)\.(\d+)(\s*)(.*)$/s);
+}
+
+function replaceSequence(cell, sectionNumber, itemNumber) {
+  if (!cell) return false;
+  const full = combinedNodeText(cell.paragraphs.flatMap((paragraph) => paragraph.runs.flatMap((run) => run.textNodes)));
+  const match = sequenceMatch(full);
+  if (!match || Number(match[2]) !== Number(sectionNumber)) return false;
+  const secNum = Number(sectionNumber);
+  const padLen = secNum === 11 ? 6 : (secNum === 9 ? 5 : 5);
+  const itemStr = `${sectionNumber}.${itemNumber}`;
+  const spaceCount = (secNum === 11 && itemNumber === 10) ? 2 : Math.max(1, padLen - itemStr.length);
+  const separator = ' '.repeat(spaceCount);
+  const replacement = `${match[1]}${sectionNumber}.${itemNumber}${secNum === 9 || secNum === 11 ? separator : (match[4] || '  ')}${match[5]}`;
+  distributeText(cell.paragraphs.flatMap((paragraph) => paragraph.runs.flatMap((run) => run.textNodes)), replacement);
+  refreshCellText(cell);
+  return true;
+}
+
+/**
+ * 全局表格拓扑自愈守卫 (Global Table Topology Guard)
+ * 扫描全文档所有表格，自动纠正由于删列或收敛导致的行宽度缺损、跨列遗漏与悬空 vMerge
+ */
+export function healAllTableTopologies(docXml) {
+  if (!docXml) return;
+  // 全局物理清除所有表格内的 <w:numPr> 自动编号属性 (REQ-S3-DUP-PURGE)
+  // 杜绝从原始母版残留的列表定义在 Word 中触发自动编号叠加导致序号重复 (如 3.1 3.1)
+  const numPrs = Array.from(docXml.getElementsByTagNameNS(W_NS, 'numPr'));
+  for (const np of numPrs) {
+    np.parentNode?.removeChild(np);
+  }
+  const localNumPrs = Array.from(docXml.getElementsByTagName('numPr'));
+  for (const np of localNumPrs) {
+    np.parentNode?.removeChild(np);
+  }
+  const tbls = Array.from(docXml.getElementsByTagNameNS(W_NS, 'tbl'));
+  for (const tbl of tbls) {
+    const gridCols = Array.from(tbl.getElementsByTagNameNS(W_NS, 'gridCol'));
+    if (gridCols.length === 0) continue;
+    const gridWidths = gridCols.map((c) => Number(c.getAttributeNS(W_NS, 'w') || 0));
+    const totalGridWidth = gridWidths.reduce((a, b) => a + b, 0);
+    const totalGridCols = gridCols.length;
+
+    const rows = Array.from(tbl.getElementsByTagNameNS(W_NS, 'tr'));
+    for (let rIdx = 0; rIdx < rows.length; rIdx++) {
+      const row = rows[rIdx];
+      const cells = Array.from(row.getElementsByTagNameNS(W_NS, 'tc'));
+      if (cells.length === 0) continue;
+
+      let rowWidth = 0;
+      let rowSpan = 0;
+      for (const cell of cells) {
+        const tcPr = cell.getElementsByTagNameNS(W_NS, 'tcPr')[0];
+        const tcWNode = tcPr?.getElementsByTagNameNS(W_NS, 'tcW')[0];
+        const spanNode = tcPr?.getElementsByTagNameNS(W_NS, 'gridSpan')[0];
+        const wVal = Number(tcWNode?.getAttributeNS(W_NS, 'w') || 0);
+        const sVal = Number(spanNode?.getAttributeNS(W_NS, 'val') || 1);
+        rowWidth += wVal;
+        rowSpan += sVal;
+      }
+
+      // 1. 自动自愈总宽度缺损与跨列不足
+      if (rowWidth < totalGridWidth || rowSpan < totalGridCols) {
+        const deficitWidth = totalGridWidth - rowWidth;
+        const deficitSpan = totalGridCols - rowSpan;
+        const lastCell = cells[cells.length - 1];
+        if (lastCell) {
+          let tcPr = lastCell.getElementsByTagNameNS(W_NS, 'tcPr')[0];
+          if (!tcPr) {
+            tcPr = docXml.createElementNS(W_NS, 'w:tcPr');
+            lastCell.insertBefore(tcPr, lastCell.firstChild);
+          }
+          let tcW = tcPr.getElementsByTagNameNS(W_NS, 'tcW')[0];
+          if (!tcW) {
+            tcW = docXml.createElementNS(W_NS, 'w:tcW');
+            tcPr.appendChild(tcW);
+          }
+          const curW = Number(tcW.getAttributeNS(W_NS, 'w') || 0);
+          tcW.setAttributeNS(W_NS, 'w', String(curW + Math.max(0, deficitWidth)));
+          tcW.setAttributeNS(W_NS, 'type', 'dxa');
+
+          let gridSpan = tcPr.getElementsByTagNameNS(W_NS, 'gridSpan')[0];
+          if (!gridSpan) {
+            gridSpan = docXml.createElementNS(W_NS, 'w:gridSpan');
+            tcPr.appendChild(gridSpan);
+          }
+          const curSpan = Number(gridSpan.getAttributeNS(W_NS, 'val') || 1);
+          gridSpan.setAttributeNS(W_NS, 'val', String(curSpan + Math.max(0, deficitSpan)));
+        }
+      }
+
+      // 2. 自动剥除孤立的纵向合并 (vMerge)
+      for (let cIdx = 0; cIdx < cells.length; cIdx++) {
+        const cell = cells[cIdx];
+        const tcPr = cell.getElementsByTagNameNS(W_NS, 'tcPr')[0];
+        const vMerge = tcPr?.getElementsByTagNameNS(W_NS, 'vMerge')[0];
+        if (vMerge) {
+          const val = vMerge.getAttributeNS(W_NS, 'val');
+          if (val === 'restart') {
+            const nextRow = rows[rIdx + 1];
+            const nextCells = nextRow ? Array.from(nextRow.getElementsByTagNameNS(W_NS, 'tc')) : [];
+            const nextCell = nextCells[cIdx];
+            const nextTcPr = nextCell?.getElementsByTagNameNS(W_NS, 'tcPr')[0];
+            const nextVMerge = nextTcPr?.getElementsByTagNameNS(W_NS, 'vMerge')[0];
+            if (!nextVMerge || nextVMerge.getAttributeNS(W_NS, 'val') === 'restart') {
+              tcPr.removeChild(vMerge);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * 表格行几何拓扑与跨列自愈中枢 (Table Row Geometry Normalizer)
+ * 彻底杜绝因删列或收敛导致的总宽度缺失、gridSpan 遗漏或悬空 vMerge 破坏排版
+ */
+export function normalizeRowGeometry(row, options = {}) {
+  if (!row?.node || !Array.isArray(row.cells) || row.cells.length === 0) return;
+  const secNum = row.record?.sectionNumber;
+
+  // 1. 彻底清除所有单元格上的悬空 vMerge（若无后续行进行纵向合并，剥除 vMerge="restart" / "continue"）
+  for (const cell of row.cells) {
+    if (!cell?.node) continue;
+    const vmNodes = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'vMerge'));
+    vmNodes.forEach((n) => n.parentNode?.removeChild(n));
+    const localVmNodes = Array.from(cell.node.getElementsByTagName('vMerge'));
+    localVmNodes.forEach((n) => n.parentNode?.removeChild(n));
+  }
+
+  // 2. 当行被收敛为标准双列（Label + Value）时，实施网格宽度与跨列自愈
+  if (row.cells.length === 2) {
+    const cell0 = row.cells[0];
+    const cell1 = row.cells[1];
+
+    if (secNum === 11 || options.isSection11 || /生殖毒性|Reproductive/i.test(cell0?.text || '')) {
+      // Section 11 标准双列定义：Cell 0 宽 3519 dxa，Cell 1 宽 6262 dxa 且跨 3 列 (gridSpan="3")
+      if (cell0?.node) {
+        let tcPr0 = cell0.node.getElementsByTagNameNS(W_NS, 'tcPr')[0] || cell0.node.querySelector('tcPr');
+        if (!tcPr0) {
+          tcPr0 = cell0.node.ownerDocument.createElementNS(W_NS, 'w:tcPr');
+          cell0.node.insertBefore(tcPr0, cell0.node.firstChild);
+        }
+        let tcW0 = tcPr0.getElementsByTagNameNS(W_NS, 'tcW')[0] || tcPr0.querySelector('tcW');
+        if (!tcW0) {
+          tcW0 = cell0.node.ownerDocument.createElementNS(W_NS, 'w:tcW');
+          tcPr0.appendChild(tcW0);
+        }
+        tcW0.setAttributeNS(W_NS, 'w:w', '3519');
+        tcW0.setAttributeNS(W_NS, 'w:type', 'dxa');
+      }
+
+      if (cell1?.node) {
+        let tcPr1 = cell1.node.getElementsByTagNameNS(W_NS, 'tcPr')[0] || cell1.node.querySelector('tcPr');
+        if (!tcPr1) {
+          tcPr1 = cell1.node.ownerDocument.createElementNS(W_NS, 'w:tcPr');
+          cell1.node.insertBefore(tcPr1, cell1.node.firstChild);
+        }
+
+        // 补齐宽度为 6262 dxa，与全表其他双列行 100% 齐平
+        let tcW1 = tcPr1.getElementsByTagNameNS(W_NS, 'tcW')[0] || tcPr1.querySelector('tcW');
+        if (!tcW1) {
+          tcW1 = cell1.node.ownerDocument.createElementNS(W_NS, 'w:tcW');
+          tcPr1.appendChild(tcW1);
+        }
+        tcW1.setAttributeNS(W_NS, 'w:w', '6262');
+        tcW1.setAttributeNS(W_NS, 'w:type', 'dxa');
+
+        // 补齐 gridSpan="3"
+        let gridSpan1 = tcPr1.getElementsByTagNameNS(W_NS, 'gridSpan')[0] || tcPr1.querySelector('gridSpan');
+        if (!gridSpan1) {
+          gridSpan1 = cell1.node.ownerDocument.createElementNS(W_NS, 'w:gridSpan');
+          tcPr1.appendChild(gridSpan1);
+        }
+        gridSpan1.setAttributeNS(W_NS, 'w:val', '3');
+      }
+    }
+  }
+}
+
+export function removeCellFromRow(row, cellIndex) {
+  if (!row?.node || cellIndex < 0 || cellIndex >= row.cells.length) return false;
+  const targetCell = row.cells[cellIndex];
+  if (targetCell?.node && targetCell.node.parentNode) {
+    targetCell.node.parentNode.removeChild(targetCell.node);
+  }
+  row.cells.splice(cellIndex, 1);
+  // 删列后自动执行几何拓扑与跨列自愈
+  normalizeRowGeometry(row);
+  return true;
+}
+
+
+/**
+ * 规整表格行为标准纯净的双列结构 (消除底模继承的 vMerge、多余单元格或列宽漂移)
+ */
+export function normalizeTwoColumnRow(rowNode, w0 = 2800, w1 = 6981) {
+  let cNodes = Array.from(rowNode.getElementsByTagNameNS(W_NS, 'tc'));
+  while (cNodes.length > 2) {
+    rowNode.removeChild(cNodes[cNodes.length - 1]);
+    cNodes = Array.from(rowNode.getElementsByTagNameNS(W_NS, 'tc'));
+  }
+  while (cNodes.length < 2) {
+    const newTc = rowNode.ownerDocument.createElementNS(W_NS, 'w:tc');
+    const newP = rowNode.ownerDocument.createElementNS(W_NS, 'w:p');
+    newTc.appendChild(newP);
+    rowNode.appendChild(newTc);
+    cNodes = Array.from(rowNode.getElementsByTagNameNS(W_NS, 'tc'));
+  }
+  [w0, w1].forEach((wVal, idx) => {
+    const tc = cNodes[idx];
+    let tcPr = tc.getElementsByTagNameNS(W_NS, 'tcPr')[0];
+    if (!tcPr) {
+      tcPr = rowNode.ownerDocument.createElementNS(W_NS, 'w:tcPr');
+      tc.insertBefore(tcPr, tc.firstChild);
+    }
+    const span = tcPr.getElementsByTagNameNS(W_NS, 'gridSpan')[0];
+    if (span) tcPr.removeChild(span);
+
+    const vMerge = tcPr.getElementsByTagNameNS(W_NS, 'vMerge')[0];
+    if (vMerge) tcPr.removeChild(vMerge);
+
+    let tcW = tcPr.getElementsByTagNameNS(W_NS, 'w:tcW')[0];
+    if (!tcW) {
+      tcW = rowNode.ownerDocument.createElementNS(W_NS, 'w:tcW');
+      tcPr.appendChild(tcW);
+    }
+    tcW.setAttributeNS(W_NS, 'w:w', String(wVal));
+    tcW.setAttributeNS(W_NS, 'w:type', 'dxa');
+  });
+}
+
+/**
+ * 中文毒理学标签英译映射表 (严格遵循法定 GHS 术语与主审计断言)
+ */
+export function mapToxicologyLabelToEnglish(cnLabel) {
+  const clean = cnLabel.replace(/^\s*11\.\d+\s*/, '').replace(/[:：]$/, '').trim();
+  if (/经口/i.test(clean)) return 'Acute toxicity, oral';
+  if (/经皮/i.test(clean)) return 'Acute toxicity, dermal';
+  if (/吸入/i.test(clean) && !/危害|危险/i.test(clean)) return 'Acute toxicity, inhalation';
+  if (/急性毒性/i.test(clean)) return 'Acute toxicity';
+  if (/主要皮肤刺激|原发性皮肤刺激|皮肤刺激/i.test(clean)) return 'Primary skin irritation';
+  if (/主要粘膜刺激|主要眼睛刺激|原发性粘膜刺激|眼睛刺激/i.test(clean)) return 'Primary mucosal irritation';
+  if (/致敏/i.test(clean)) return 'Respiratory or skin sensitization';
+  if (/亚急性/i.test(clean)) return 'Subacute, subchronic and prolonged toxicity';
+  if (/致癌/i.test(clean)) return 'Carcinogenicity';
+  if (/生育力/i.test(clean)) return 'Reproductive toxicity - fertility';
+  if (/致畸/i.test(clean)) return 'Reproductive toxicity - teratogenicity';
+  if (/生殖毒性/i.test(clean)) return 'Reproductive toxicity';
+  if (/体外/i.test(clean)) return 'Germ cell mutagenicity (in vitro)';
+  if (/体内/i.test(clean)) return 'Germ cell mutagenicity (in vivo)';
+  if (/致突变|遗传毒性/i.test(clean)) return 'Germ cell mutagenicity';
+  if (/一次性接触/i.test(clean)) return 'Specific target organ toxicity (single exposure)';
+  if (/重复性接触|反复接触/i.test(clean)) return 'Specific target organ toxicity (repeated exposure)';
+  if (/吸入危/i.test(clean)) return 'Aspiration hazard';
+  if (/CMR/i.test(clean)) return 'CMR assessment';
+  if (/附加信息|其它信息/i.test(clean)) return 'Additional information';
+  return clean;
+}
+
+/**
+ * 格式化 Section 11 标签单元格 (统一 9.1 外观黄金基准 420/420、激光垂直对齐、字号、加粗)
+ */
+export function formatSection11LabelCell(cell, numberStr, labelText, isEnglish = false) {
+  if (!cell?.node) return;
+  // 9.1 外观黄金几何标尺：420 dxa 悬挂缩进 + <w:tab/> 激光垂直对齐 (REQ-GOLDEN-ANCHOR)
+  applyStandardHangingIndent(cell, '420', '420');
+  const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
+  if (ps.length === 0) return;
+  const p = ps[0];
+  const pNumPrs = Array.from(p.getElementsByTagNameNS(W_NS, 'numPr'));
+  pNumPrs.forEach(n => n.parentNode?.removeChild(n));
+  for (let i = 1; i < ps.length; i++) {
+    ps[i].parentNode?.removeChild(ps[i]);
+  }
+  Array.from(p.getElementsByTagNameNS(W_NS, 'r')).forEach(r => p.removeChild(r));
+
+  let cleanLabel = labelText.trim();
+  if (isEnglish) {
+    cleanLabel = cleanLabel.replace(/：/g, ':');
+    if (!cleanLabel.endsWith(':')) cleanLabel += ':';
+  } else {
+    cleanLabel = cleanLabel.replace(/:/g, '：');
+    if (!cleanLabel.endsWith('：')) cleanLabel += '：';
+  }
+
+  // Run 1: 序号 Run + <w:tab/>
+  const r1 = p.ownerDocument.createElementNS(W_NS, 'w:r');
+  const rPr1 = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
+  const rFonts1 = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+  rFonts1.setAttributeNS(W_NS, 'w:ascii', isEnglish ? 'Arial' : 'Times New Roman');
+  rFonts1.setAttributeNS(W_NS, 'w:hAnsi', isEnglish ? 'Arial' : 'Times New Roman');
+  rFonts1.setAttributeNS(W_NS, 'w:eastAsia', isEnglish ? 'Arial' : '宋体');
+  rFonts1.setAttributeNS(W_NS, 'w:cs', isEnglish ? 'Arial' : 'Times New Roman');
+  rPr1.appendChild(rFonts1);
+  const b1 = p.ownerDocument.createElementNS(W_NS, 'w:b');
+  rPr1.appendChild(b1);
+  const seqSz = !isEnglish ? (numberStr.length >= 5 ? '19' : '21') : (numberStr.length >= 5 ? '15' : '18');
+  const sz1 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
+  sz1.setAttributeNS(W_NS, 'w:val', seqSz);
+  rPr1.appendChild(sz1);
+  const szCs1 = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
+  szCs1.setAttributeNS(W_NS, 'w:val', seqSz);
+  rPr1.appendChild(szCs1);
+  r1.appendChild(rPr1);
+
+  const t1 = p.ownerDocument.createElementNS(W_NS, 'w:t');
+  t1.textContent = numberStr;
+  r1.appendChild(t1);
+  const tab = p.ownerDocument.createElementNS(W_NS, 'w:tab');
+  r1.appendChild(tab);
+  p.appendChild(r1);
+
+  // Run 2: 标签 Run
+  const r2 = p.ownerDocument.createElementNS(W_NS, 'w:r');
+  const rPr2 = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
+  const rFonts2 = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+  rFonts2.setAttributeNS(W_NS, 'w:ascii', isEnglish ? 'Arial' : 'Times New Roman');
+  rFonts2.setAttributeNS(W_NS, 'w:hAnsi', isEnglish ? 'Arial' : 'Times New Roman');
+  rFonts2.setAttributeNS(W_NS, 'w:eastAsia', isEnglish ? 'Arial' : '宋体');
+  rFonts2.setAttributeNS(W_NS, 'w:cs', isEnglish ? 'Arial' : 'Times New Roman');
+  rPr2.appendChild(rFonts2);
+  const b2 = p.ownerDocument.createElementNS(W_NS, 'w:b');
+  rPr2.appendChild(b2);
+  const targetLblSz = isEnglish ? '19' : '24';
+  const sz2 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
+  sz2.setAttributeNS(W_NS, 'w:val', targetLblSz);
+  rPr2.appendChild(sz2);
+  const szCs2 = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
+  szCs2.setAttributeNS(W_NS, 'w:val', targetLblSz);
+  rPr2.appendChild(szCs2);
+  r2.appendChild(rPr2);
+
+  const t2 = p.ownerDocument.createElementNS(W_NS, 'w:t');
+  t2.textContent = cleanLabel;
+  r2.appendChild(t2);
+  p.appendChild(r2);
+}
+
+/**
+ * 格式化 Section 14 标签单元格 (统一 9.1 外观黄金基准 420/420、加粗、法定字号)
+ */
+export function formatSection14LabelCell(cell, numberStr, labelText, isEnglish = false) {
+  if (!cell?.node) return;
+  // 9.1 外观黄金几何标尺：420 dxa 悬挂缩进 + <w:tab/> 激光垂直对齐 (REQ-GOLDEN-ANCHOR)
+  applyStandardHangingIndent(cell, '420', '420');
+  const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
+  if (ps.length === 0) return;
+  const p = ps[0];
+  const pNumPrs = Array.from(p.getElementsByTagNameNS(W_NS, 'numPr'));
+  pNumPrs.forEach(n => n.parentNode?.removeChild(n));
+  for (let i = 1; i < ps.length; i++) {
+    ps[i].parentNode?.removeChild(ps[i]);
+  }
+  Array.from(p.getElementsByTagNameNS(W_NS, 'r')).forEach(r => p.removeChild(r));
+
+  let cleanLabel = labelText.trim();
+  if (isEnglish) {
+    cleanLabel = cleanLabel.replace(/：/g, ':');
+    if (!cleanLabel.endsWith(':')) cleanLabel += ':';
+  } else {
+    cleanLabel = cleanLabel.replace(/:/g, '：');
+    if (!cleanLabel.endsWith('：')) cleanLabel += '：';
+  }
+
+  // Run 1: 序号 Run + <w:tab/>
+  const r1 = p.ownerDocument.createElementNS(W_NS, 'w:r');
+  const rPr1 = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
+  const rFonts1 = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+  rFonts1.setAttributeNS(W_NS, 'w:ascii', isEnglish ? 'Arial' : 'Times New Roman');
+  rFonts1.setAttributeNS(W_NS, 'w:hAnsi', isEnglish ? 'Arial' : 'Times New Roman');
+  rFonts1.setAttributeNS(W_NS, 'w:eastAsia', isEnglish ? 'Arial' : '宋体');
+  rFonts1.setAttributeNS(W_NS, 'w:cs', isEnglish ? 'Arial' : 'Times New Roman');
+  rPr1.appendChild(rFonts1);
+  const b1 = p.ownerDocument.createElementNS(W_NS, 'w:b');
+  rPr1.appendChild(b1);
+  const seqSz = !isEnglish ? (numberStr.length >= 5 ? '19' : '21') : (numberStr.length >= 5 ? '15' : '18');
+  const sz1 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
+  sz1.setAttributeNS(W_NS, 'w:val', seqSz);
+  rPr1.appendChild(sz1);
+  const szCs1 = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
+  szCs1.setAttributeNS(W_NS, 'w:val', seqSz);
+  rPr1.appendChild(szCs1);
+  r1.appendChild(rPr1);
+
+  const t1 = p.ownerDocument.createElementNS(W_NS, 'w:t');
+  t1.textContent = numberStr;
+  r1.appendChild(t1);
+  const tab = p.ownerDocument.createElementNS(W_NS, 'w:tab');
+  r1.appendChild(tab);
+  p.appendChild(r1);
+
+  // Run 2: 标签 Run
+  const r2 = p.ownerDocument.createElementNS(W_NS, 'w:r');
+  const rPr2 = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
+  const rFonts2 = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+  rFonts2.setAttributeNS(W_NS, 'w:ascii', isEnglish ? 'Arial' : 'Times New Roman');
+  rFonts2.setAttributeNS(W_NS, 'w:hAnsi', isEnglish ? 'Arial' : 'Times New Roman');
+  rFonts2.setAttributeNS(W_NS, 'w:eastAsia', isEnglish ? 'Arial' : '宋体');
+  rFonts2.setAttributeNS(W_NS, 'w:cs', isEnglish ? 'Arial' : 'Times New Roman');
+  rPr2.appendChild(rFonts2);
+  const b2 = p.ownerDocument.createElementNS(W_NS, 'w:b');
+  rPr2.appendChild(b2);
+  const targetLblSz = isEnglish ? '19' : '24';
+  const sz2 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
+  sz2.setAttributeNS(W_NS, 'w:val', targetLblSz);
+  rPr2.appendChild(sz2);
+  const szCs2 = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
+  szCs2.setAttributeNS(W_NS, 'w:val', targetLblSz);
+  rPr2.appendChild(szCs2);
+  r2.appendChild(rPr2);
+
+  const t2 = p.ownerDocument.createElementNS(W_NS, 'w:t');
+  t2.textContent = cleanLabel;
+  r2.appendChild(t2);
+  p.appendChild(r2);
+}
+
+/**
+ * 从源文件中 1:1 物理提取所有毒理学终点 (自适应多行表格与叙述性通栏单单元格)
+ */
+export function extractToxicologicalEndpointsFromSource(srcEngine) {
+  const s11Src = srcEngine?.records?.find(r => r.sectionNumber === 11);
+  if (!s11Src) return [];
+
+  // 1. 若源文件为标准多行表格 (行数 >= 4 且有独立端点行)
+  if (s11Src.rows.length >= 4) {
+    const endpoints = [];
+    for (let rIdx = 3; rIdx < s11Src.rows.length; rIdx++) {
+      const row = s11Src.rows[rIdx];
+      const rawLbl = (row.cells[0]?.text || '').trim();
+      const rawVal = (row.cells[row.cells.length - 1]?.text || '').trim();
+      if (!rawLbl) continue;
+      const cleanLbl = rawLbl.replace(/^\s*11\.\d+\s*/, '').replace(/[:：]$/, '');
+      endpoints.push({
+        cnLabel: cleanLbl,
+        enLabel: mapToxicologyLabelToEnglish(cleanLbl),
+        content: rawVal
+      });
+    }
+    if (endpoints.length > 0) return endpoints;
+  }
+
+  // 2. 若源文件为叙述性单单元格大文本块
+  const rawText = s11Src.rows.map(r => r.cells.map(c => c.text).join('\n')).join('\n');
+  const endpointDefs = [
+    { key: 'acute_oral', cnLabel: '急性毒性，经口', enLabel: 'Acute toxicity, oral', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:急性毒性[，, ]*经口|经口毒性)[：:]?/i },
+    { key: 'acute_dermal', cnLabel: '急性毒性，经皮', enLabel: 'Acute toxicity, dermal', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:急性毒性[，, ]*经皮|经皮毒性)[：:]?/i },
+    { key: 'acute_inhalation', cnLabel: '急性毒性，吸入', enLabel: 'Acute toxicity, inhalation', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:急性毒性[，, ]*吸入|吸入毒性)[：:]?/i },
+    { key: 'skin_irritation', cnLabel: '主要皮肤刺激性', enLabel: 'Primary skin irritation', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:原发性皮肤刺激|主要皮肤刺激性?|皮肤刺激)[：:]?/i },
+    { key: 'eye_irritation', cnLabel: '主要粘膜刺激性', enLabel: 'Primary mucosal irritation', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:原发性粘膜刺激|主要(?:粘膜|眼睛)刺激性?|眼睛刺激)[：:]?/i },
+    { key: 'sensitization', cnLabel: '致敏性', enLabel: 'Respiratory or skin sensitization', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:致敏性|皮肤致敏性|呼吸道或皮肤致敏)[：:]?/i },
+    { key: 'subacute', cnLabel: '亚急性、亚慢性和延迟毒性', enLabel: 'Subacute, subchronic and prolonged toxicity', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:亚急性[，,、]亚慢性和延迟毒性|亚急性毒性)[：:]?/i },
+    { key: 'carcinogenicity', cnLabel: '致癌性', enLabel: 'Carcinogenicity', match: /(?:^|\n)\s*(?:11\.\d+\s*)?致癌性(?!\s*[:：]\s*无数据资料)[：:]?/i },
+    { key: 'repro_fertility', cnLabel: '生殖毒性/生育力', enLabel: 'Reproductive toxicity - fertility', match: /(?:^|\n)\s*(?:11\.\d+\s*)?生殖毒性[\/／]生育力[：:]?/i },
+    { key: 'repro_terato', cnLabel: '生殖毒性/致畸形', enLabel: 'Reproductive toxicity - teratogenicity', match: /(?:^|\n)\s*(?:11\.\d+\s*)?生殖毒性[\/／]致畸形[：:]?/i },
+    { key: 'in_vitro_mutagenicity', cnLabel: '体外遗传毒性', enLabel: 'Germ cell mutagenicity (in vitro)', match: /(?:^|\n)\s*(?:11\.\d+\s*)?体外遗传毒性[：:]?/i },
+    { key: 'in_vivo_mutagenicity', cnLabel: '体内基因毒性', enLabel: 'Germ cell mutagenicity (in vivo)', match: /(?:^|\n)\s*(?:11\.\d+\s*)?体内基因毒性[：:]?/i },
+    { key: 'stot_single', cnLabel: 'STOT评估-一次性接触', enLabel: 'Specific target organ toxicity (single exposure)', match: /(?:^|\n)\s*(?:11\.\d+\s*)?STOT评估-一次性接触[：:]?/i },
+    { key: 'stot_repeated', cnLabel: 'STOT评估-重复性接触', enLabel: 'Specific target organ toxicity (repeated exposure)', match: /(?:^|\n)\s*(?:11\.\d+\s*)?STOT评估-重复性接触[：:]?/i },
+    { key: 'aspiration', cnLabel: '吸入危害', enLabel: 'Aspiration hazard', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:吸入危害|吸入危险)[：:]?/i },
+    { key: 'cmr', cnLabel: 'CMR评估', enLabel: 'CMR assessment', match: /(?:^|\n)\s*(?:11\.\d+\s*)?CMR评估[：:]?/i }
+  ];
+
+  const occurrences = [];
+  for (const def of endpointDefs) {
+    const m = rawText.match(def.match);
+    if (m) {
+      occurrences.push({
+        ...def,
+        startIndex: m.index,
+        endIndex: m.index + m[0].length
+      });
+    }
+  }
+  occurrences.sort((a, b) => a.startIndex - b.startIndex);
+
+  const endpoints = [];
+  for (let i = 0; i < occurrences.length; i++) {
+    const cur = occurrences[i];
+    const nextStart = (i + 1 < occurrences.length) ? occurrences[i + 1].startIndex : rawText.length;
+    let body = rawText.slice(cur.endIndex, nextStart).trim();
+    endpoints.push({
+      key: cur.key,
+      cnLabel: cur.cnLabel,
+      enLabel: cur.enLabel,
+      content: body
+    });
+  }
+  return endpoints;
+}
+
+export function formatSection9LabelCell(cell, numberStr, labelText, isEnglish = false) {
+  if (!cell?.node) return;
+  // 严格继承模板事实：悬挂缩进 420 dxa，零制表位，行间距 300 dxa
+  applyStandardHangingIndent(cell, '420', '420');
+  const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
+  if (ps.length === 0) return;
+  const p = ps[0];
+  // 清除段落上残留的 numPr 自动编号定义 (REQ-S3-DUP-PURGE)
+  const pNumPrs = Array.from(p.getElementsByTagNameNS(W_NS, 'numPr'));
+  pNumPrs.forEach(n => n.parentNode?.removeChild(n));
+  // 物理清除第一段之外的所有多余段落（如模板中原有的折行段落，彻底切断残留重复词链条）
+  for (let i = 1; i < ps.length; i++) {
+    ps[i].parentNode?.removeChild(ps[i]);
+  }
+  const existingRuns = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+  existingRuns.forEach(r => p.removeChild(r));
+  const localRuns = Array.from(p.getElementsByTagName('r'));
+  localRuns.forEach(r => p.removeChild(r));
+
+  if (isEnglish) {
+    // 英文版方案 A 工业合规排版：Arial 9.5pt (sz=19) 加粗，序号与标签之间双半角空格，半角冒号结尾
+    // 标准物理特性 Canonical 规范化，直接免疫任何历史残留重复！
+    let cleanLabel = labelText.replace(/：/g, ':').trim();
+    if (/log Pow|n-octanol/i.test(cleanLabel)) {
+      cleanLabel = 'log Pow (n-octanol/water partition coefficient):';
+    } else if (/Auto-ignition/i.test(cleanLabel)) {
+      cleanLabel = 'Auto-ignition temperature:';
+    } else if (/Ignition temp/i.test(cleanLabel)) {
+      cleanLabel = 'Ignition temperature:';
+    } else if (/Hazardous decomposition/i.test(cleanLabel)) {
+      cleanLabel = 'Hazardous decomposition products:';
+    } else if (/Decomposition/i.test(cleanLabel)) {
+      cleanLabel = 'Decomposition temperature:';
+    } else if (/Saturated vapour/i.test(cleanLabel)) {
+      cleanLabel = 'Saturated vapour pressure:';
+    } else {
+      if (!cleanLabel.endsWith(':')) cleanLabel += ':';
+    }
+
+    // 英文版激光绝对垂直对齐 (G-38): Run 1 序号加粗 + <w:tab/>，Run 2 标签 Arial 9.5pt 加粗
+    const r1 = p.ownerDocument.createElementNS(W_NS, 'w:r');
+    const rPr1 = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
+    const rFonts1 = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+    rFonts1.setAttributeNS(W_NS, 'w:ascii', 'Arial');
+    rFonts1.setAttributeNS(W_NS, 'w:hAnsi', 'Arial');
+    rFonts1.setAttributeNS(W_NS, 'w:eastAsia', 'Arial');
+    rFonts1.setAttributeNS(W_NS, 'w:cs', 'Arial');
+    rPr1.appendChild(rFonts1);
+    const b1 = p.ownerDocument.createElementNS(W_NS, 'w:b');
+    rPr1.appendChild(b1);
+    const sz1 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
+    sz1.setAttributeNS(W_NS, 'w:val', '19');
+    rPr1.appendChild(sz1);
+    const szCs1 = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
+    szCs1.setAttributeNS(W_NS, 'w:val', '19');
+    rPr1.appendChild(szCs1);
+    r1.appendChild(rPr1);
+
+    const t1 = p.ownerDocument.createElementNS(W_NS, 'w:t');
+    t1.textContent = numberStr;
+    r1.appendChild(t1);
+
+    const tab = p.ownerDocument.createElementNS(W_NS, 'w:tab');
+    r1.appendChild(tab);
+    p.appendChild(r1);
+
+    const r2 = p.ownerDocument.createElementNS(W_NS, 'w:r');
+    const rPr2 = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
+    const rFonts2 = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+    rFonts2.setAttributeNS(W_NS, 'w:ascii', 'Arial');
+    rFonts2.setAttributeNS(W_NS, 'w:hAnsi', 'Arial');
+    rFonts2.setAttributeNS(W_NS, 'w:eastAsia', 'Arial');
+    rFonts2.setAttributeNS(W_NS, 'w:cs', 'Arial');
+    rPr2.appendChild(rFonts2);
+    const b2 = p.ownerDocument.createElementNS(W_NS, 'w:b');
+    rPr2.appendChild(b2);
+    const sz2 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
+    sz2.setAttributeNS(W_NS, 'w:val', '19');
+    rPr2.appendChild(sz2);
+    const szCs2 = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
+    szCs2.setAttributeNS(W_NS, 'w:val', '19');
+    rPr2.appendChild(szCs2);
+    r2.appendChild(rPr2);
+
+    const t2 = p.ownerDocument.createElementNS(W_NS, 'w:t');
+    t2.textContent = cleanLabel;
+    r2.appendChild(t2);
+    p.appendChild(r2);
+
+    refreshCellText(cell);
+    return;
+  }
+
+  // 中文母版激光绝对垂直对齐 (G-38): Run 1 序号加粗 + <w:tab/>，Run 2 标签 Arial 12pt 加粗
+  const r1 = p.ownerDocument.createElementNS(W_NS, 'w:r');
+  const rPr1 = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
+  const rFonts1 = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+  rFonts1.setAttributeNS(W_NS, 'w:hint', 'eastAsia');
+  rFonts1.setAttributeNS(W_NS, 'w:ascii', 'Times New Roman');
+  rFonts1.setAttributeNS(W_NS, 'w:hAnsi', 'Times New Roman');
+  rFonts1.setAttributeNS(W_NS, 'w:eastAsia', '宋体');
+  rFonts1.setAttributeNS(W_NS, 'w:cs', 'Times New Roman');
+  rPr1.appendChild(rFonts1);
+  const b1 = p.ownerDocument.createElementNS(W_NS, 'w:b');
+  rPr1.appendChild(b1);
+  // G-38: 中文 Section 9 序号依法锁定为 10.5pt (sz="21")，后随标签 12pt (sz="24")，确保 9.10~9.24 不超悬挂缩进 420 dxa 激光垂线
+  const sz1 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
+  sz1.setAttributeNS(W_NS, 'w:val', '21');
+  rPr1.appendChild(sz1);
+  const szCs1 = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
+  szCs1.setAttributeNS(W_NS, 'w:val', '21');
+  rPr1.appendChild(szCs1);
+  r1.appendChild(rPr1);
+
+  const t1 = p.ownerDocument.createElementNS(W_NS, 'w:t');
+  t1.textContent = numberStr;
+  r1.appendChild(t1);
+
+  // 关键：注入法定 <w:tab/>，配合 420 dxa 悬挂缩进，将后随标签首字符死死锁定在 80.28pt 同一垂直线上
+  const tab = p.ownerDocument.createElementNS(W_NS, 'w:tab');
+  r1.appendChild(tab);
+  p.appendChild(r1);
+
+  // Run 2: 标签部分 (中文标准小四号 12pt 宋体加粗，杜绝西文 Arial 污染)
+  const r2 = p.ownerDocument.createElementNS(W_NS, 'w:r');
+  const rPr2 = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
+  const rFonts2 = p.ownerDocument.createElementNS(W_NS, 'w:rFonts');
+  rFonts2.setAttributeNS(W_NS, 'w:hint', 'eastAsia');
+  rFonts2.setAttributeNS(W_NS, 'w:ascii', 'Times New Roman');
+  rFonts2.setAttributeNS(W_NS, 'w:hAnsi', 'Times New Roman');
+  rFonts2.setAttributeNS(W_NS, 'w:eastAsia', '宋体');
+  rFonts2.setAttributeNS(W_NS, 'w:cs', 'Times New Roman');
+  rPr2.appendChild(rFonts2);
+  const b2 = p.ownerDocument.createElementNS(W_NS, 'w:b');
+  rPr2.appendChild(b2);
+  const sz2 = p.ownerDocument.createElementNS(W_NS, 'w:sz');
+  sz2.setAttributeNS(W_NS, 'w:val', '24');
+  rPr2.appendChild(sz2);
+  const szCs2 = p.ownerDocument.createElementNS(W_NS, 'w:szCs');
+  szCs2.setAttributeNS(W_NS, 'w:val', '24');
+  rPr2.appendChild(szCs2);
+  r2.appendChild(rPr2);
+
+  let cleanLabel = String(labelText || '').trim();
+  if (!/[：:]$/.test(cleanLabel) && !cleanLabel.includes('其他信息')) {
+    cleanLabel += '：';
+  }
+  const t2 = p.ownerDocument.createElementNS(W_NS, 'w:t');
+  t2.textContent = cleanLabel;
+  r2.appendChild(t2);
+  p.appendChild(r2);
+
+  refreshCellText(cell);
+}
+
+/**
+ * 语义化单元格格式强约束分发器 (Semantic Class Formatter)
+ * 所有产出的文本格式除特殊操作外，强制与模板对齐，只允许进行归类：
+ * - 'label': 产出模板标签文本格式（Arial 12pt Bold，行距 300 dxa）
+ * - 'value': 产出模板值文本格式（Arial 12pt Regular，非加粗，行距 300 dxa，无悬挂）
+ * - 'section9-label': 产出 Section 9 复合标签格式（Times New Roman/Arial 10.5pt Bold + Arial 12pt Bold）
+ */
+export function applySemanticCellFormat(cell, semanticType, content, isEnglish = false) {
+  if (!cell?.node) return;
+  if (semanticType === 'section9-label') {
+    const match = String(content || '').match(/^(d+.d+)s*(.*)$/);
+    if (match) {
+      formatSection9LabelCell(cell, match[1], match[2], isEnglish);
+    } else {
+      formatSection9LabelCell(cell, '', String(content || ''), isEnglish);
+    }
+    return;
+  }
+
+  const p = cell.node.getElementsByTagNameNS(W_NS, 'p')[0] || cell.node.querySelector('p');
+  if (!p) return;
+
+  // 统一行间距为母版 300 dxa
+  let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0] || p.querySelector('pPr');
+  if (!pPr) {
+    pPr = p.ownerDocument.createElementNS(W_NS, 'w:pPr');
+    p.insertBefore(pPr, p.firstChild);
+  }
+  let spacing = pPr.getElementsByTagNameNS(W_NS, 'spacing')[0] || pPr.querySelector('spacing');
+  if (!spacing) {
+    spacing = p.ownerDocument.createElementNS(W_NS, 'w:spacing');
+    pPr.appendChild(spacing);
+  }
+  spacing.setAttributeNS(W_NS, 'w:line', '300');
+  spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
+
+  if (semanticType === 'label') {
+    // 标签：强制加粗，字号 12pt (sz=24)
+    const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+    for (const r of runs) {
+      let rPr = r.getElementsByTagNameNS(W_NS, 'w:rPr')[0] || r.querySelector('rPr');
+      if (!rPr) {
+        rPr = p.ownerDocument.createElementNS(W_NS, 'w:rPr');
+        r.insertBefore(rPr, r.firstChild);
+      }
+      let b = rPr.getElementsByTagNameNS(W_NS, 'w:b')[0] || rPr.querySelector('b');
+      if (!b) {
+        b = p.ownerDocument.createElementNS(W_NS, 'w:b');
+        rPr.appendChild(b);
+      }
+    }
+  } else if (semanticType === 'value') {
+    // 值：强制非加粗，字号 12pt (sz=24)，无悬挂缩进
+    const existingInds = Array.from(pPr.getElementsByTagNameNS(W_NS, 'ind'));
+    existingInds.forEach(node => pPr.removeChild(node));
+    const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+    for (const r of runs) {
+      let rPr = r.getElementsByTagNameNS(W_NS, 'w:rPr')[0] || r.querySelector('rPr');
+      if (rPr) {
+        const bs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'b'));
+        bs.forEach(bNode => rPr.removeChild(bNode));
+        const bcss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
+        bcss.forEach(bNode => rPr.removeChild(bNode));
+      }
+    }
+  }
+}
+
+export function renumberRecord(record) {
+  const section = record?.sectionNumber;
+  if (!section || record.kind !== 'table') return [];
+  let next = 0;
+  const seenNodes = new Set();
+  const changes = [];
+  for (const row of record.rows.slice(1)) {
+    const cell = row.cells[0];
+    if (!cell) continue;
+    if (cell.node && seenNodes.has(cell.node)) continue;
+    if (cell.node) seenNodes.add(cell.node);
+    const match = sequenceMatch(cell.text);
+    if (!match || Number(match[2]) !== section) continue;
+    const rest = match[5].trim();
+    if (!rest || /^[+\-<>=~\d]/.test(rest)) continue;
+    const oldItem = Number(match[3]);
+    const item = ++next;
+    if (section === 9) {
+      const isEnglish = /Appearance/i.test(cell.text) || /Physical/i.test(record.rows[0]?.cells?.[0]?.text || '');
+      formatSection9LabelCell(cell, `${section}.${item}`, rest, isEnglish);
+      if (oldItem !== item) {
+        changes.push({ row: row.index, from: `${section}.${oldItem}`, to: `${section}.${item}` });
+      }
+    } else {
+      if (oldItem !== item) {
+        changes.push({ row: row.index, from: `${section}.${oldItem}`, to: `${section}.${item}` });
+        replaceSequence(cell, section, item);
+      }
+    }
+  }
+  return changes;
+}
+
+function clearNonBoldText(rowNode) {
+  for (const run of descendants(rowNode, 'r')) {
+    const format = parseRunFormat(run);
+    if (format.bold) continue;
+    for (const text of descendants(run, 't')) text.textContent = '';
+  }
+}
+
+export function addRowAfter(engine, record, rowIndex) {
+  if (!record || record.kind !== 'table') throw new DocxEngineError('当前记录不是表格', 'NOT_TABLE');
+  const row = record.rows[rowIndex];
+  if (!row) throw new DocxEngineError('未找到要复制的行', 'ROW_NOT_FOUND');
+  const clone = row.node.cloneNode(true);
+  clearNonBoldText(clone);
+  row.node.parentNode.insertBefore(clone, row.node.nextSibling);
+  engine.refresh();
+  let updated = engine.records.find((item) => item.id === record.id);
+  if (updated) {
+    renumberRecord(updated);
+    engine.refresh();
+    updated = engine.records.find((item) => item.id === record.id);
+  }
+  return updated;
+}
+
+export function deleteRow(engine, record, rowIndex) {
+  if (!record || record.kind !== 'table') throw new DocxEngineError('当前记录不是表格', 'NOT_TABLE');
+  if (rowIndex === 0) throw new DocxEngineError('禁止删除章节标题行', 'PROTECTED_ROW');
+  if (record.rows.length <= 2) throw new DocxEngineError('至少保留一行数据，禁止删除唯一行', 'PROTECTED_ROW');
+  const row = record.rows[rowIndex];
+  if (!row) throw new DocxEngineError('未找到要删除的行', 'ROW_NOT_FOUND');
+  row.node.parentNode.removeChild(row.node);
+  engine.refresh();
+  let updated = engine.records.find((item) => item.id === record.id);
+  if (updated) {
+    renumberRecord(updated);
+    engine.refresh();
+    updated = engine.records.find((item) => item.id === record.id);
+  }
+  return updated;
+}
+
+/**
+ * 将表格的某一行渲染或转换为单单元格通栏行 (Full-Width Row)
+ * @param {Object} record - 表格 record
+ * @param {number} rowIndex - 行索引
+ * @param {string|Array<string>} content - 填入的文本（支持换行符或多段落数组）
+ * @param {Object} options - 配置项，如 totalWidth (默认 9781 或 9795), isEnglish, boldSubheaders, borders
+ */
+export function renderFullWidthRow(record, rowIndex, content, options = {}) {
+  if (!record || record.kind !== 'table') return;
+  const row = record.rows[rowIndex];
+  if (!row?.node) return;
+
+  const doc = row.node.ownerDocument;
+  const totalCols = (record.structure?.gridWidthsTwips?.length) || record.columns || 2;
+  const totalWidth = options.totalWidth || (record.structure?.gridWidthsTwips || []).reduce((sum, w) => sum + (Number(w) || 0), 0) || (options.isSection2 ? 9795 : 9781);
+
+  // 1. 彻底清除现有旧 tc 节点（包括继承的 vMerge 占位 tc 与多余 tc），防止纵向合并导致的数据消失
+  const existingTcs = Array.from(row.node.getElementsByTagNameNS(W_NS, 'tc'));
+  existingTcs.forEach((tc) => row.node.removeChild(tc));
+
+  // 2. 构造干净、纯粹的单单元格通栏节点
+  const tcNode = doc.createElementNS(W_NS, 'w:tc');
+  row.node.appendChild(tcNode);
+
+  const tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+  tcNode.appendChild(tcPr);
+
+  const tcW = doc.createElementNS(W_NS, 'w:tcW');
+  tcW.setAttributeNS(W_NS, 'w:w', String(totalWidth));
+  tcW.setAttributeNS(W_NS, 'w:type', 'dxa');
+  tcPr.appendChild(tcW);
+
+  if (totalCols > 1) {
+    const gridSpan = doc.createElementNS(W_NS, 'w:gridSpan');
+    gridSpan.setAttributeNS(W_NS, 'w:val', String(totalCols));
+    tcPr.appendChild(gridSpan);
+  }
+
+  const vAlign = doc.createElementNS(W_NS, 'w:vAlign');
+  vAlign.setAttributeNS(W_NS, 'w:val', 'center');
+  tcPr.appendChild(vAlign);
+
+  // Section 2 单元格上下留空呼吸规范 (w:tcMar: top/bottom 160 dxa)
+  if (options.isSection2) {
+    const tcMar = doc.createElementNS(W_NS, 'w:tcMar');
+    const topMar = doc.createElementNS(W_NS, 'w:top');
+    topMar.setAttributeNS(W_NS, 'w:w', '160');
+    topMar.setAttributeNS(W_NS, 'w:type', 'dxa');
+    tcMar.appendChild(topMar);
+
+    const bottomMar = doc.createElementNS(W_NS, 'w:bottom');
+    bottomMar.setAttributeNS(W_NS, 'w:w', '160');
+    bottomMar.setAttributeNS(W_NS, 'w:type', 'dxa');
+    tcMar.appendChild(bottomMar);
+
+    const leftMar = doc.createElementNS(W_NS, 'w:left');
+    leftMar.setAttributeNS(W_NS, 'w:w', '140');
+    leftMar.setAttributeNS(W_NS, 'w:type', 'dxa');
+    tcMar.appendChild(leftMar);
+
+    const rightMar = doc.createElementNS(W_NS, 'w:right');
+    rightMar.setAttributeNS(W_NS, 'w:w', '140');
+    rightMar.setAttributeNS(W_NS, 'w:type', 'dxa');
+    tcMar.appendChild(rightMar);
+
+    tcPr.appendChild(tcMar);
+  }
+
+  // 边框注入
+  if (options.borders !== false) {
+    const tcBorders = doc.createElementNS(W_NS, 'w:tcBorders');
+    tcPr.appendChild(tcBorders);
+    const isSec2 = (options.isSection2 === true) || (record.sectionNumber === 2) || /^(?:2\.\s*|危险性概述|Hazards? Identification)/i.test(record.rows?.[0]?.cells?.[0]?.text || '');
+    let topVal = options.topBorder || (isSec2 ? 'none' : 'dotted');
+    let bottomVal = options.bottomBorder || (isSec2 ? 'none' : 'dotted');
+    let leftVal = options.leftBorder || 'single';
+    let rightVal = options.rightBorder || 'single';
+
+    if (isSec2) {
+      const isFirstDataRow = (rowIndex === 1);
+      const isLastRow = (rowIndex === (record.rows?.length || 1) - 1);
+      if (isFirstDataRow) {
+        topVal = 'single';
+        bottomVal = isLastRow ? 'single' : 'none';
+      } else if (isLastRow) {
+        topVal = 'none';
+        bottomVal = 'single';
+      } else {
+        topVal = 'none';
+        bottomVal = 'none';
+      }
+    }
+
+    const cellBorders = [
+      { name: 'top', val: topVal },
+      { name: 'bottom', val: bottomVal },
+      { name: 'left', val: leftVal },
+      { name: 'right', val: rightVal }
+    ];
+
+    for (const cb of cellBorders) {
+      const el = doc.createElementNS(W_NS, `w:${cb.name}`);
+      el.setAttributeNS(W_NS, 'w:val', cb.val);
+      el.setAttributeNS(W_NS, 'w:color', 'auto');
+      el.setAttributeNS(W_NS, 'w:sz', cb.val === 'none' ? '0' : '4');
+      el.setAttributeNS(W_NS, 'w:space', '0');
+      tcBorders.appendChild(el);
+    }
+  }
+
+  // 3. 填充段落内容 (严格对齐全局规范与 handcraft-typography 5 级缩进及加粗状态机)
+  if (content !== undefined && content !== null) {
+    const rawParagraphs = Array.isArray(content) ? content : String(content).split(/\r?\n/);
+    let currentS2Level = 1;
+    const s2BaseIndent = options.isEnglish ? '317' : '480';
+    const s2SubValueIndent = options.isEnglish ? '677' : '840';
+    for (let pIdx = 0; pIdx < rawParagraphs.length; pIdx++) {
+      const pItem = rawParagraphs[pIdx];
+      if (pItem && typeof pItem === 'object' && pItem.isDrawing) {
+        const pNode = doc.createElementNS(W_NS, 'w:p');
+        const pPr = doc.createElementNS(W_NS, 'w:pPr');
+        const jc = doc.createElementNS(W_NS, 'w:jc');
+        jc.setAttributeNS(W_NS, 'w:val', 'left');
+        pPr.appendChild(jc);
+        if (options.isSection2) {
+          const ind = doc.createElementNS(W_NS, 'w:ind');
+          ind.setAttributeNS(W_NS, 'w:left', s2SubValueIndent);
+          pPr.appendChild(ind);
+        }
+        pNode.appendChild(pPr);
+        transferDrawingNodesToParagraph(pItem.srcEngine, options.targetEngine || record.engine, pItem.drawingNodes, pNode, pItem.overrideImageBytes, pItem.overrideExt);
+        tcNode.appendChild(pNode);
+        continue;
+      }
+      const pText = typeof pItem === 'string' ? pItem : String(pItem?.text || '');
+      const pNode = doc.createElementNS(W_NS, 'w:p');
+      const pPr = doc.createElementNS(W_NS, 'w:pPr');
+      const trimmed = pText.trim();
+
+      // 对齐手做版段落对齐：
+      // Section 2: GHS危险性类别、羟基丙烯酸酯聚合物GHS危险性分类、环境危害需显式注入 jc="left"
+      // Section 11: 全行显式注入 jc="left"
+      if (options.isSection2) {
+        if (/^(?:GHS危险性类别|GHS hazard classification|羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification|环境危害|Environmental hazards)/i.test(trimmed)) {
+          const jc = doc.createElementNS(W_NS, 'w:jc');
+          jc.setAttributeNS(W_NS, 'w:val', 'left');
+          pPr.appendChild(jc);
+        }
+      } else if (options.isSection11) {
+        const jc = doc.createElementNS(W_NS, 'w:jc');
+        jc.setAttributeNS(W_NS, 'w:val', 'left');
+        pPr.appendChild(jc);
+      }
+
+      const spacing = doc.createElementNS(W_NS, 'w:spacing');
+      spacing.setAttributeNS(W_NS, 'w:line', '300');
+      spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
+      // Section 11 组分间距公理：组件与组件之间严格且唯美地空一行 (before="240"=12pt)，杜绝软回车双重叠加空两行
+      const isSecondComponentOrLater = (rawParagraphs.length === 2 && pIdx === 1) || pIdx >= 2;
+      if (options.isSection11 && isSecondComponentOrLater) {
+        spacing.setAttributeNS(W_NS, 'w:before', '240');
+      }
+      // Section 2 模块间保留一个空行间隔公理 (before="160"=8pt)：在各主要节标题（2.2、2.3、2.4、2.5）起始段落前注入
+      if (options.isSection2) {
+        if (/^(?:2\.[2-9]|(?:2\.\d+\s*)?(?:(?:GHS\s*)?标签要素|Label elements|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危害|其他危险|Other\s*Hazards?))/i.test(trimmed)) {
+          spacing.setAttributeNS(W_NS, 'w:before', '160');
+        }
+      }
+      pPr.appendChild(spacing);
+
+      // Section 2 专属缩进几何状态机 (完全对齐父子层级统一规范：父级顶格、一级标题文本与二级子标签及直接值首字绝对垂直对齐、二级值文本向右层级缩进)
+      if (options.isSection2) {
+        // 关键防御：严格识别父级节标题行 (2.1 GHS危险性类别、2.2 GHS标签要素、2.3 危险性说明、2.4 防范说明、2.5 其他危害等)，节标题绝不应用正文缩进！
+        const isParentHeader = /^(?:2\.\d+|GHS危险性类别|物质或混合物的分类|Classification of the substance or mixture|GHS\s*标签要素|Label elements|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危险|其他危害|Other\s*Hazards?)/i.test(trimmed);
+        if (isParentHeader) {
+          currentS2Level = 1;
+        } else {
+          // 子标签统一集合：GHS象形图、信号词、必须列在标签上的有害成份、需要注意的物质、预防措施、事故响应、安全存储、安全储存、废弃处置 (中英文)
+          const isSubLabel = /^(?:(?:GHS\s*)?(?:象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components which must be listed on the label)|(?:需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal)[：:])/i.test(trimmed);
+
+          if (isSubLabel) {
+            currentS2Level = 2;
+            // 所有子标签：统一缩进 s2BaseIndent (中文 440 twips / 英文 360 twips)，首字绝对垂直对齐！
+            const ind = doc.createElementNS(W_NS, 'w:ind');
+            ind.setAttributeNS(W_NS, 'w:left', s2BaseIndent);
+            pPr.appendChild(ind);
+          } else {
+            // 正文值行：根据当前层级决定缩进
+            // 若在二级子标签下（P代码、象形图值、信号词值等），应用 s2SubValueIndent (中文 800 twips / 英文 720 twips) 靠右缩进；
+            // 若在一级直接条目下（2.1 分类描述、H代码、非危不属于危险物说明、2.5 其他危害值等），应用 s2BaseIndent，与上方一级标签文本首字绝对垂直对齐！
+            const ind = doc.createElementNS(W_NS, 'w:ind');
+            ind.setAttributeNS(W_NS, 'w:left', currentS2Level === 2 ? s2SubValueIndent : s2BaseIndent);
+            pPr.appendChild(ind);
+          }
+        }
+      } else if (options.isSection11 && options.leftIndentTwips) {
+        const ind = doc.createElementNS(W_NS, 'w:ind');
+        ind.setAttributeNS(W_NS, 'w:left', String(options.leftIndentTwips));
+        pPr.appendChild(ind);
+      }
+
+      pNode.appendChild(pPr);
+
+      // Section 2 细粒度加粗状态机 (精准分离标签加粗与常规体正文)
+      let runSpecs = [];
+      if (options.isSection2) {
+        // 关键防御：优先匹配键值对行与节标题行，确保 2.1 GHS危险性类别、2.2 GHS标签要素、2.3 危险性说明、2.4 防范说明、2.5 其他危害等加粗，值常规体
+        const kvMatch = pText.match(/^(\s*(?:(?:2\.\d+\s*)?(?:GHS危险性类别|GHS hazard classification|物质或混合物的分类|Classification of the substance or mixture)|羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification|(?:2\.\d+\s*)?(?:GHS\s*)?标签要素|Label elements|(?:2\.\d+\s*)?GHS Label Elements|象形图|GHS\s*象形图|GHS pictograms|警告词|信号词|Signal word|(?:必须列在标签上的有害成份|Hazardous components which must be listed on the label)|(?:2\.\d+\s*)?(?:危险性说明|Hazard statements?(?:\s*\([a-zA-Z0-9]+\))?)|(?:2\.\d+\s*)?(?:防范说明|Precautionary statements?(?:\s*\([a-zA-Z0-9]+\))?)|物理化学危险|Physical and chemical hazards|健康危害|Health hazards|环境危害|Environmental hazards|(?:2\.\d+\s*)?(?:其他危害|其他危险)|(?:2\.\d+\s*)?Other\s*Hazards?))([:：]?)\s*(.*)$/i);
+        if (kvMatch) {
+          const label = kvMatch[1];
+          const colon = kvMatch[2] || '';
+          const val = kvMatch[3];
+          if (!val && (/标签要素|label elements|危险性类别|classification|危险性说明|hazard statements|防范说明|precautionary statements|象形图|pictograms/i.test(label))) {
+            runSpecs = [{ text: label + colon, bold: true }];
+          } else if (label.includes('GHS危险性类别') && !options.isEnglish) {
+            runSpecs = [{ text: label + colon, bold: true }];
+            if (val.trim()) {
+              runSpecs.push({ text: ' ', bold: false }, { text: val.trim(), bold: false });
+            }
+          } else {
+            runSpecs = [{ text: label + colon, bold: true }];
+            if (val) {
+              const separator = options.isEnglish ? ' ' : '';
+              runSpecs.push({ text: separator + val.trim(), bold: false });
+            }
+          }
+        } else if (/^(?:预防措施|事故响应|安全存储|安全储存|废弃处置)[：:]/i.test(trimmed) ||
+                   /^(?:Prevention|Response|Storage|Disposal)[：:]/i.test(trimmed) ||
+                   /^(?:防范说明)[:：]?$/i.test(trimmed) || /^(?:Precautionary statements)[:：]?$/i.test(trimmed)) {
+          runSpecs = [{ text: pText, bold: true }];
+        } else if (/^(?:请注意以下物质|N,N-二甲基乙醇胺|GHS分类|易燃|急性毒性|皮肤|严重眼睛|生殖毒性|特异性靶器官|对水环境|致敏)/i.test(trimmed) ||
+                   /^(?:Please note the following substance|N,N-Dimethylethanolamine|GHS classification|Flammable|Acute toxicity|Skin|Serious eye|Eye irritation|Reproductive|Specific target|Sensitisation|Sensitization|Aquatic|Hazardous to the aquatic)/i.test(trimmed) ||
+                   /(?:类别|Category|\(H\d+[A-Za-z]?\))/i.test(trimmed) ||
+                   /^H\d{3}/i.test(trimmed) || /^P\d{3}/i.test(trimmed)) {
+          runSpecs = [{ text: pText, bold: false }];
+        } else if (/^(?:操作时穿戴|操作后彻底清洗|作业场所不得|在室外或通风良好处操作|吸入[：:]|眼睛|食入[：:]|泄露[：:]|灭火[：:]|请置于避光|装完整|使用后的空桶)/i.test(trimmed) ||
+                   /^(?:Wear protective|Wash contact|Do not eat|Use only outdoors|If inhaled|Skin and eye|Rinse mouth|In case of spillage|In case of fire|Store in a cool|Empty containers)/i.test(trimmed)) {
+          // 保留条目前单空格微偏移
+          if (pText.startsWith('        ')) {
+            runSpecs = [
+              { text: ' ', bold: false },
+              { text: '       ', bold: false },
+              { text: pText.slice(8), bold: false }
+            ];
+          } else if (pText.startsWith('    ')) {
+            runSpecs = [
+              { text: ' ', bold: false },
+              { text: '   ', bold: false },
+              { text: pText.slice(4), bold: false }
+            ];
+          } else {
+            runSpecs = [{ text: pText, bold: false }];
+          }
+        } else {
+          runSpecs = [{ text: pText, bold: false }];
+        }
+      } else if (options.isSection11) {
+        // Section 11 专属 G-11 粗细层级状态机：继承编辑器体系，组件标题与各项指标子标签强制加粗，数值常规体
+        if (/^(?:该产品无可用的毒理学研究|No toxicological studies|(?:下面是|以下是).*?(?:成分|组分|数据|毒理学数据)|The following (?:is|are) toxicological data)/i.test(trimmed)) {
+          runSpecs = [{ text: pText, bold: false }];
+        } else {
+          const lines = pText.split('\n');
+          runSpecs = [];
+          for (let li = 0; li < lines.length; li++) {
+            const line = lines[li];
+            if (li > 0) {
+              runSpecs.push({ br: true });
+            }
+            if (line === '') {
+              continue;
+            }
+            const isComponentHeader = options.isEnglish
+              ? /^(?:N,N-Dimethylacetamide|Hydroxy polyacrylate dispersion|Propylene glycol butyl ether|2-\(2-Butoxyethoxy\)ethanol)[:：]\s*$/i.test(line.trim()) || (li === 0 && /^[^:\n]+[:：]\s*$/i.test(line.trim()) && !/^(?:Toxicity|Irritation|Acute toxicity|Primary|Sensitization|Mutagenicity|Carcinogenicity|Reproductive|Specific target|Aspiration|Additional)[:：]/i.test(line.trim()))
+              : /^(?:N,N-二甲基乙酰胺|羟基聚丙烯酸酯分散体|丙二醇丁醚|二乙二醇丁醚)[：:]\s*$/.test(line.trim()) || (li === 0 && /^[^：\n]+[：:]\s*$/.test(line.trim()) && !/^(?:毒性|刺激性|急性毒性|主要|致敏性|致突变性|致癌性|生殖毒性|特异性靶器官|吸入危险|附加信息)[：:]/.test(line.trim()));
+            if (isComponentHeader) {
+              runSpecs.push({ text: line, bold: true });
+            } else {
+              // 匹配指标子标签：如 "毒性："、"刺激性："、"皮肤刺激："、"经皮（鼠）LD50："、"吸入（鼠）LD50："、"经口（鼠）LD50：" 等
+              const labelMatch = line.match(/^(\s*(?:毒性|刺激性|皮肤刺激|眼睛刺激|急性毒性|主要皮肤刺激性|主要粘膜刺激性|主要眼睛刺激性|致敏性|致突变性|致癌性|生殖毒性|特异性靶器官系统毒性(?:（一次接触\/反复接触）)?|吸入危险|附加信息|重复剂量中毒|经皮（鼠）LD50|吸入（鼠）LD50|经口（鼠）LD50|经皮|吸入|经口|物种|分类|结果|病理变化|生育力|致畸形|体外遗传毒性|Toxicity|Irritation|Skin irritation|Eye irritation|Acute toxicity|Primary skin irritation|Primary mucous membrane irritation|Sensitization|Mutagenicity|Carcinogenicity|Reproductive toxicity|Specific target organ toxicity|Aspiration hazard|Additional information|Repeated dose toxicity|Dermal|Oral|Inhalation|Species|Classification|Result|Fertility|Teratogenicity|In vitro genotoxicity)[：:])\s*(.*)$/i);
+              if (labelMatch) {
+                const subLabel = labelMatch[1];
+                const restVal = labelMatch[2];
+                const prefixSpace = options.isEnglish ? ' ' : '';
+                runSpecs.push({ text: subLabel, bold: true });
+                if (restVal) {
+                  // 嵌套子标签匹配
+                  const innerMatch = restVal.match(/^((?:经皮（鼠）LD50|吸入（鼠）LD50|经口（鼠）LD50|经皮|吸入|经口|物种|分类|结果|病理变化|Dermal|Oral|Inhalation|Species|Classification|Result)[：:])\s*(.*)$/i);
+                  if (innerMatch) {
+                    runSpecs.push({ text: prefixSpace + innerMatch[1], bold: true });
+                    if (innerMatch[2]) runSpecs.push({ text: prefixSpace + innerMatch[2], bold: false });
+                  } else {
+                    runSpecs.push({ text: prefixSpace + restVal, bold: false });
+                  }
+                }
+              } else {
+                runSpecs.push({ text: line, bold: false });
+              }
+            }
+          }
+        }
+      } else {
+        // 通用通栏行：按 boldSubheaders 整体判断
+        const isBold = options.isEnglish
+          ? /^(?:GHS hazard classification|Label elements|GHS pictograms|Signal word|Hazard statements|Precautionary statements|Prevention|Response|Storage|Disposal|Physical and chemical hazards|Health hazards|Environmental hazards)[:：]/i.test(trimmed)
+          : /^(?:GHS危险性类别|羟基丙烯酸酯聚合物GHS危险性分类|标签要素|象形图|警告词|危害性说明|防范说明|预防措施|事故响应|安全储存|安全存储|废弃处置|物理化学危险|健康危害|环境危害)[:：]?/i.test(trimmed);
+        runSpecs = [{ text: pText, bold: Boolean(options.boldSubheaders && isBold) }];
+      }
+
+      for (const rSpec of runSpecs) {
+        const rNode = doc.createElementNS(W_NS, 'w:r');
+        const rPr = doc.createElementNS(W_NS, 'w:rPr');
+        const rFonts = doc.createElementNS(W_NS, 'w:rFonts');
+        if (options.isEnglish) {
+          rFonts.setAttributeNS(W_NS, 'w:ascii', 'Arial');
+          rFonts.setAttributeNS(W_NS, 'w:hAnsi', 'Arial');
+        } else {
+          rFonts.setAttributeNS(W_NS, 'w:hint', 'eastAsia');
+          rFonts.setAttributeNS(W_NS, 'w:ascii', options.isSection11 ? '宋体' : 'Times New Roman');
+          rFonts.setAttributeNS(W_NS, 'w:hAnsi', options.isSection11 ? '宋体' : 'Times New Roman');
+          rFonts.setAttributeNS(W_NS, 'w:eastAsia', '宋体');
+        }
+        rPr.appendChild(rFonts);
+
+        const sz = doc.createElementNS(W_NS, 'w:sz');
+        const defaultTwips = options.isEnglish ? '19' : '24';
+        sz.setAttributeNS(W_NS, 'w:val', options.fontSizeTwips ? String(options.fontSizeTwips) : defaultTwips);
+        rPr.appendChild(sz);
+
+        if (rSpec.bold) {
+          const b = doc.createElementNS(W_NS, 'w:b');
+          rPr.appendChild(b);
+        }
+
+        rNode.appendChild(rPr);
+
+        if (rSpec.br) {
+          const br = doc.createElementNS(W_NS, 'w:br');
+          br.setAttributeNS(W_NS, 'w:type', 'textWrapping');
+          rNode.appendChild(br);
+        } else {
+          const t = doc.createElementNS(W_NS, 'w:t');
+          t.setAttribute('xml:space', 'preserve');
+          t.textContent = rSpec.text;
+          rNode.appendChild(t);
+        }
+        pNode.appendChild(rNode);
+      }
+
+      tcNode.appendChild(pNode);
+    }
+  }
+
+  row.cells = [{
+    node: tcNode,
+    text: Array.isArray(content) ? content.join('\n') : (content || ''),
+    editable: true,
+    kind: 'value',
+    rowIndex,
+    cellIndex: 0,
+  }];
+}
+
+export function enforceSection13DoubleCenter(cellNode) {
+  if (!cellNode) return;
+  let tcPr = cellNode.getElementsByTagNameNS(W_NS, 'tcPr')[0];
+  if (!tcPr) {
+    tcPr = cellNode.ownerDocument.createElementNS(W_NS, 'w:tcPr');
+    cellNode.insertBefore(tcPr, cellNode.firstChild);
+  }
+  let vAlign = tcPr.getElementsByTagNameNS(W_NS, 'vAlign')[0];
+  if (!vAlign) {
+    vAlign = cellNode.ownerDocument.createElementNS(W_NS, 'w:vAlign');
+    tcPr.appendChild(vAlign);
+  }
+  vAlign.setAttributeNS(W_NS, 'w:val', 'center');
+
+  const ps = cellNode.getElementsByTagNameNS(W_NS, 'p');
+  for (let i = 0; i < ps.length; i++) {
+    const p = ps[i];
+    let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+    if (!pPr) {
+      pPr = cellNode.ownerDocument.createElementNS(W_NS, 'w:pPr');
+      p.insertBefore(pPr, p.firstChild);
+    }
+    let jc = pPr.getElementsByTagNameNS(W_NS, 'jc')[0];
+    if (!jc) {
+      jc = cellNode.ownerDocument.createElementNS(W_NS, 'w:jc');
+      pPr.appendChild(jc);
+    }
+    jc.setAttributeNS(W_NS, 'w:val', 'center');
+
+    const tabs = pPr.getElementsByTagNameNS(W_NS, 'tabs')[0];
+    if (tabs) pPr.removeChild(tabs);
+    const ind = pPr.getElementsByTagNameNS(W_NS, 'ind')[0];
+    if (ind) pPr.removeChild(ind);
+  }
+}
+
+/**
+ * 对 Section 13 废弃处置原则/方法内容单元格注入两端对齐 (w:jc val="both")，对齐手做版基准
+ */
+export function enforceSection13JustifiedContent(cellNode, isEnglish = false) {
+  if (!cellNode) return;
+  const ps = cellNode.getElementsByTagNameNS(W_NS, 'p');
+  for (let i = 0; i < ps.length; i++) {
+    const p = ps[i];
+    let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+    if (!pPr) {
+      pPr = cellNode.ownerDocument.createElementNS(W_NS, 'w:pPr');
+      p.insertBefore(pPr, p.firstChild);
+    }
+    let jc = pPr.getElementsByTagNameNS(W_NS, 'jc')[0];
+    if (!jc) {
+      jc = cellNode.ownerDocument.createElementNS(W_NS, 'w:jc');
+      pPr.appendChild(jc);
+    }
+    // 英文版严格左对齐 (left)，彻底消除 both 两端分散对齐引发的假性居中失真；中文版保持两端对齐 (both)
+    // 废弃处置叙述性长文本中英文统一规范为靠左对齐 (left)，彻底消除 both 两端分散对齐引发的横向拉伸走样
+    jc.setAttributeNS(W_NS, 'w:val', 'left');
+  }
+}
+
+export function addNoteRowAfter(engine, record, rowIndex, initialText = '说明：') {
+  if (!record || record.kind !== 'table') throw new DocxEngineError('当前记录不是表格', 'NOT_TABLE');
+  const targetRow = record.rows[rowIndex];
+  if (!targetRow) throw new DocxEngineError('未找到目标行', 'ROW_NOT_FOUND');
+
+  const totalCols = (record.structure?.gridWidthsTwips?.length) || record.columns || 1;
+  const totalWidthTwips = (record.structure?.gridWidthsTwips || []).reduce((sum, w) => sum + (Number(w) || 0), 0) || 9781;
+
+  const doc = targetRow.node.ownerDocument;
+  const tr = doc.createElementNS(W_NS, 'w:tr');
+
+  const trPr = doc.createElementNS(W_NS, 'w:trPr');
+  tr.appendChild(trPr);
+
+  const tc = doc.createElementNS(W_NS, 'w:tc');
+  const tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+
+  const tcW = doc.createElementNS(W_NS, 'w:tcW');
+  tcW.setAttributeNS(W_NS, 'w:w', String(totalWidthTwips));
+  tcW.setAttributeNS(W_NS, 'w:type', 'dxa');
+  tcPr.appendChild(tcW);
+
+  if (totalCols > 1) {
+    const gridSpan = doc.createElementNS(W_NS, 'w:gridSpan');
+    gridSpan.setAttributeNS(W_NS, 'w:val', String(totalCols));
+    tcPr.appendChild(gridSpan);
+  }
+
+  const tcBorders = doc.createElementNS(W_NS, 'w:tcBorders');
+  for (const borderType of ['top', 'bottom']) {
+    const border = doc.createElementNS(W_NS, `w:${borderType}`);
+    border.setAttributeNS(W_NS, 'w:val', 'dotted');
+    border.setAttributeNS(W_NS, 'w:color', 'auto');
+    border.setAttributeNS(W_NS, 'w:sz', '4');
+    border.setAttributeNS(W_NS, 'w:space', '0');
+    tcBorders.appendChild(border);
+  }
+  tcPr.appendChild(tcBorders);
+  tc.appendChild(tcPr);
+
+  const p = doc.createElementNS(W_NS, 'w:p');
+  const pPr = doc.createElementNS(W_NS, 'w:pPr');
+  const spacing = doc.createElementNS(W_NS, 'w:spacing');
+  spacing.setAttributeNS(W_NS, 'w:line', '300');
+  spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
+  pPr.appendChild(spacing);
+  const ind = doc.createElementNS(W_NS, 'w:ind');
+  ind.setAttributeNS(W_NS, 'w:left', '34');
+  ind.setAttributeNS(W_NS, 'w:leftChars', '16');
+  ind.setAttributeNS(W_NS, 'w:right', '480');
+  pPr.appendChild(ind);
+  const jc = doc.createElementNS(W_NS, 'w:jc');
+  jc.setAttributeNS(W_NS, 'w:val', 'left');
+  pPr.appendChild(jc);
+  const pRPr = doc.createElementNS(W_NS, 'w:rPr');
+  const pSz = doc.createElementNS(W_NS, 'w:sz');
+  pSz.setAttributeNS(W_NS, 'w:val', '24');
+  pRPr.appendChild(pSz);
+  pPr.appendChild(pRPr);
+  p.appendChild(pPr);
+
+  const r = doc.createElementNS(W_NS, 'w:r');
+  const rPr = doc.createElementNS(W_NS, 'w:rPr');
+  const rFonts = doc.createElementNS(W_NS, 'w:rFonts');
+  rFonts.setAttributeNS(W_NS, 'w:ascii', '宋体');
+  rFonts.setAttributeNS(W_NS, 'w:hAnsi', '宋体');
+  rFonts.setAttributeNS(W_NS, 'w:eastAsia', '宋体');
+  rFonts.setAttributeNS(W_NS, 'w:cs', '宋体');
+  rPr.appendChild(rFonts);
+  const rSz = doc.createElementNS(W_NS, 'w:sz');
+  rSz.setAttributeNS(W_NS, 'w:val', '24');
+  rPr.appendChild(rSz);
+  const rSzCs = doc.createElementNS(W_NS, 'w:szCs');
+  rSzCs.setAttributeNS(W_NS, 'w:val', '24');
+  rPr.appendChild(rSzCs);
+  const rB = doc.createElementNS(W_NS, 'w:b');
+  rB.setAttributeNS(W_NS, 'w:val', '0');
+  rPr.appendChild(rB);
+  r.appendChild(rPr);
+
+  const t = doc.createElementNS(W_NS, 'w:t');
+  t.setAttribute('xml:space', 'preserve');
+  t.textContent = initialText;
+  r.appendChild(t);
+  p.appendChild(r);
+  tc.appendChild(p);
+
+  tr.appendChild(tc);
+  targetRow.node.parentNode.insertBefore(tr, targetRow.node.nextSibling);
+
+  engine.refresh();
+  let updated = engine.records.find((item) => item.id === record.id);
+  if (updated) {
+    renumberRecord(updated);
+    engine.refresh();
+    updated = engine.records.find((item) => item.id === record.id);
+  }
+  return updated;
+}
+
+export function moveRow(engine, record, rowIndex, direction) {
+  if (!record || record.kind !== 'table') throw new DocxEngineError('当前记录不是表格', 'NOT_TABLE');
+  if (rowIndex === 0) throw new DocxEngineError('禁止移动章节标题行', 'PROTECTED_ROW');
+  const targetRow = record.rows[rowIndex];
+  if (!targetRow) throw new DocxEngineError('未找到目标行', 'ROW_NOT_FOUND');
+
+  if (direction === 'up') {
+    if (rowIndex <= 1) throw new DocxEngineError('该行已处于第一项，无法继续上移', 'CANNOT_MOVE');
+    const prevRow = record.rows[rowIndex - 1];
+    prevRow.node.parentNode.insertBefore(targetRow.node, prevRow.node);
+  } else if (direction === 'down') {
+    if (rowIndex >= record.rows.length - 1) throw new DocxEngineError('该行已处于末尾，无法继续下移', 'CANNOT_MOVE');
+    const nextRow = record.rows[rowIndex + 1];
+    nextRow.node.parentNode.insertBefore(targetRow.node, nextRow.node.nextSibling);
+  } else {
+    throw new DocxEngineError('未知的移动方向', 'INVALID_DIRECTION');
+  }
+
+  engine.refresh();
+  let updated = engine.records.find((item) => item.id === record.id);
+  if (updated) {
+    renumberRecord(updated);
+    engine.refresh();
+    updated = engine.records.find((item) => item.id === record.id);
+  }
+  return updated;
+}
+
+export function moveRowUp(engine, record, rowIndex) {
+  return moveRow(engine, record, rowIndex, 'up');
+}
+
+export function moveRowDown(engine, record, rowIndex) {
+  return moveRow(engine, record, rowIndex, 'down');
+}
+
+export function auditRecord(record) {
+  const errors = [];
+  const section = record?.sectionNumber;
+  if (!section || record.kind !== 'table') return errors;
+  let expected = 1;
+  let lastItem = null;
+  for (const row of record.rows.slice(1)) {
+    const cell = row.cells[0];
+    if (!cell) continue;
+    const match = sequenceMatch(cell.text);
+    if (!match || Number(match[2]) !== section) continue;
+    const item = Number(match[3]);
+    if (item === lastItem) continue;
+    if ([11, 12].includes(section)) {
+      if (item < 1) errors.push(`Section ${section} 第 ${row.index} 行序号无效`);
+      lastItem = item;
+      continue;
+    }
+    if (item !== expected) errors.push(`Section ${section} 序号断号：应为 ${section}.${expected}，当前为 ${section}.${item}`);
+    expected += 1;
+    lastItem = item;
+  }
+  return errors;
+}
+
+export function auditEngine(engine) {
+  return engine.records.filter((record) => record.kind === 'table').flatMap((record) => auditRecord(record).map((message) => ({ recordId: record.id, section: record.section, message })));
+}
+
+export function recordById(engine, id) {
+  return engine.records.find((record) => record.id === id) || null;
+}
+
+export function restoreSectionToTemplate(engine, baselineEngine, sectionIdentifier) {
+  if (!engine) throw new DocxEngineError('目标引擎为空。', 'ENGINE_NULL');
+  if (!baselineEngine) throw new DocxEngineError('基准模板引擎为空。', 'BASELINE_NULL');
+
+  const currentRecord = typeof sectionIdentifier === 'object' && sectionIdentifier
+    ? sectionIdentifier
+    : engine.records.find((r) => r.id === sectionIdentifier || (r.sectionNumber != null && r.sectionNumber === Number(sectionIdentifier)));
+
+  if (!currentRecord || currentRecord.kind !== 'table') {
+    throw new DocxEngineError('未找到当前可恢复的章节表格。', 'SECTION_NOT_FOUND');
+  }
+
+  const baselineRecord = baselineEngine.records.find((r) =>
+    r.kind === 'table' &&
+    (currentRecord.sectionNumber != null
+      ? r.sectionNumber === currentRecord.sectionNumber
+      : r.tableIndex === currentRecord.tableIndex)
+  );
+
+  if (!baselineRecord) {
+    throw new DocxEngineError('未在初始模板中找到对应章节表格。', 'BASELINE_NOT_FOUND');
+  }
+
+  const currentTblNode = currentRecord.rows[0]?.node?.parentNode;
+  const baselineTblNode = baselineRecord.rows[0]?.node?.parentNode;
+
+  if (!currentTblNode || !baselineTblNode || !currentTblNode.parentNode) {
+    throw new DocxEngineError('无法定位表格底层 XML 节点。', 'XML_NODE_NOT_FOUND');
+  }
+
+  const clonedTblNode = baselineTblNode.cloneNode(true);
+  currentTblNode.parentNode.replaceChild(clonedTblNode, currentTblNode);
+
+  engine.refresh();
+
+  const updatedRecord = engine.records.find((r) =>
+    r.kind === 'table' &&
+    (currentRecord.sectionNumber != null
+      ? r.sectionNumber === currentRecord.sectionNumber
+      : r.tableIndex === currentRecord.tableIndex)
+  );
+  if (updatedRecord) {
+    renumberRecord(updatedRecord);
+  }
+  return updatedRecord;
+}
+
+export function editableFields(record) {
+  if (!record || record.kind !== 'table') return [];
+  return record.rows.flatMap((row) => row.cells.flatMap((cell) => {
+    const fields = [];
+    if (cell.valueNodes.length) fields.push({ type: 'value', row: row.index, col: cell.col, cell });
+    if (cell.labelNodes.length) fields.push({ type: 'label', row: row.index, col: cell.col, cell });
+    return fields;
+  }));
+}
+
+export function normalizedSequence(paragraph, cell) {
+  if (!paragraph || cell?.row === 0) return null;
+  const numText = paragraph.numberingText?.trim() || '';
+  const rawText = paragraph.rawText || paragraph.text || '';
+
+  const rawMatch = rawText.match(/^\s*(?:v)?(\d{1,2}(?:[\.．、]\d{1,2})+|\d{1,2}[\.．、])\s*([\.．、:：]|\s|$)?/i);
+  const numMatch = numText.match(/^\s*(?:v)?(\d{1,2}(?:[\.．、]\d{1,2})+|\d{1,2}[\.．、])\s*([\.．、:：]|\s|$)?/i);
+
+  const matchedStr = numMatch?.[1] || (numText ? numText : null) || rawMatch?.[1];
+  if (!matchedStr) return null;
+
+  const seqStr = matchedStr.replace(/[．]/g, '.');
+  const cleanedSeq = seqStr.replace(/[\.、]$/, '');
+  const displaySeq = `${cleanedSeq}  `;
+  const stripLength = rawMatch ? rawMatch[0].length : 0;
+
+  return {
+    text: displaySeq,
+    stripLength,
+    rawNumber: cleanedSeq,
+  };
+}
+
+export function classifyLabelTier(cell, row, paragraph, record) {
+  if (!row || row.index === 0 || cell?.row === 0) return 'title';
+  if (row.cells && row.cells[0] !== cell && cell?.col !== 0) return 'none';
+  const text = cell.text?.trim() || '';
+  const labelText = cell.labelText?.trim() || '';
+
+  // Section 8 Special Exception: "建议" / "Recommendation" belongs to PARENT tier!
+  if (record?.sectionNumber === 8 && /^\s*(?:建议|Recommendation)\s*[：:]?\s*$/i.test(labelText || text)) {
+    return 'parent';
+  }
+
+  // Section 15 Explanatory Labels: Bold items are notes/explanatory labels and MUST NOT have child indent, must be flush left (parent)!
+  if (record?.sectionNumber === 15) {
+    return 'parent';
+  }
+
+  const seq = normalizedSequence(paragraph, cell);
+  if (seq) return 'parent';
+
+  if (labelText || /^[^\r\n：:]{1,100}[：:]/.test(text)) {
+    return 'child';
+  }
+
+  return 'none';
+}
+
+export function extractProductModelFromEngine(engine) {
+  if (!engine) return '';
+  const sec1 = engine.records?.find((r) => r.sectionNumber === 1);
+  if (!sec1) return '';
+
+  for (const r of sec1.rows) {
+    for (const c of r.cells) {
+      const role = cellRole(c);
+      const label = (role.labelText || '').trim();
+      const val = (role.valueText || '').trim();
+      if (!val) continue;
+      if (/此处填写|待填|待确定|待完善|N\/A|---/.test(val)) continue;
+
+      if (/产品名称|Product name|Trade name|品名|型号/i.test(label)) {
+        const m = val.match(/([A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)+)/);
+        if (m) return m[1];
+        if (val.length <= 30) return val;
+      }
+
+      if (/中文名称|Name of substance/i.test(label)) {
+        const m = val.match(/([A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)+)/);
+        if (m) return m[1];
+      }
+    }
+  }
+  return '';
+}
+
+export function extractModelFromText(text) {
+  if (!text) return '';
+  const clean = text.replace(/\.(?:docx|pdf|doc|txt)$/i, '');
+  const stripped = clean
+    .replace(/(?:正式模板|模板|msds|tds|CN|EN|冠志|国彩|Guocai|Guanzhi|原件|编辑后|source|converted|test_export|current_matching|\(\d+\))/gi, ' ')
+    .replace(/^[\s_-]+|[\s_-]+$/g, '')
+    .trim();
+  const m = stripped.match(/([A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)+)/);
+  if (m) return m[1];
+  const parts = stripped.split(/\s+/).filter(Boolean);
+  if (parts.length > 0 && parts[0].length <= 25 && !/^[_-]+$/.test(parts[0])) {
+    return parts[0];
+  }
+  return '';
+}
+
+export function buildExportDocxName(engine, options = {}) {
+  // 0. 用户显式指定的自定义文件名优先
+  if (options.customFileName && typeof options.customFileName === 'string') {
+    let custom = options.customFileName.trim();
+    if (custom) {
+      if (!/\.docx$/i.test(custom)) custom += '.docx';
+      return custom;
+    }
+  }
+
+  // 1. Language: CN or EN
+  let lang = options.lang || (options.language ? (options.language.toUpperCase().startsWith('EN') ? 'EN' : 'CN') : '');
+  const tplName = options.templateName || '';
+  const srcName = engine?.sourceName || '';
+  if (!lang) {
+    if (/EN|English/i.test(tplName) || /_EN_|_EN\b/i.test(srcName) || engine?.headerFooterData?.language === 'EN') {
+      lang = 'EN';
+    } else {
+      const sec1 = engine?.records?.find((r) => r.sectionNumber === 1);
+      if (sec1 && /Identification/i.test(sec1.title || '')) {
+        lang = 'EN';
+      } else {
+        lang = 'CN';
+      }
+    }
+  }
+
+  // 2. Entity: 冠志 / 国彩 / Guanzhi / Guocai
+  let entity = options.entity || '';
+  if (!entity) {
+    if (/国彩|Guocai/i.test(tplName) || /国彩|Guocai/i.test(srcName) || engine?.headerFooterData?.entity === '国彩') {
+      entity = lang === 'EN' ? 'Guocai' : '国彩';
+    } else if (engine) {
+      const sec1 = engine.records?.find((r) => r.sectionNumber === 1);
+      if (sec1) {
+        const allText = sec1.rows.flatMap((r) => r.cells.map((c) => cellRole(c).valueText || '')).join(' ');
+        if (/国彩/i.test(allText)) {
+          entity = lang === 'EN' ? 'Guocai' : '国彩';
+        } else if (/GUOCAI/i.test(allText)) {
+          entity = 'Guocai';
+        } else if (/GUANZHI/i.test(allText) && lang === 'EN') {
+          entity = 'Guanzhi';
+        }
+      }
+    }
+    if (!entity) {
+      entity = (lang === 'EN' && /Guanzhi/i.test(tplName)) ? 'Guanzhi' : '冠志';
+    }
+  }
+
+  // 3. Product Model
+  let model = '';
+  if (options.productModel && !/^(?:MSDS|模板|正式模板|Template)$/i.test(options.productModel.trim())) {
+    model = extractModelFromText(options.productModel) || options.productModel.trim();
+  }
+  if (!model && engine?.headerFooterData?.model) {
+    model = engine.headerFooterData.model;
+  }
+  if (!model && engine) {
+    model = extractProductModelFromEngine(engine);
+  }
+  if (!model && options.sourcePreviewName) {
+    model = extractModelFromText(options.sourcePreviewName);
+  }
+  if (!model && srcName) {
+    model = extractModelFromText(srcName);
+  }
+  if (model) {
+    model = model.replace(/^[\s_-]+|[\s_-]+$/g, '');
+  }
+  if (!model || model === '_' || /^(?:MSDS|模板|正式模板)$/i.test(model)) {
+    model = 'MSDS';
+  }
+
+  // Output format reference: "OS-1030 msds_CN 冠志.docx"
+  return `${model} msds_${lang} ${entity}.docx`;
+}
+
+// =============================================================================
+// 编辑器局部同步覆写模式 (Template-Agnostic Local Preset Overlay System)
+// =============================================================================
+
+export const SEMANTIC_KEY_PATTERNS = {
+  'sec1.product_name': /^(?:1\.1\s*)?(?:产品名称|中文名称|Product\s*name|Trade\s*name|Product\s*Identifier)/i,
+  'sec1.chemical_category': /^(?:化学品分类|Chemical\s*category|Chemical\s*Family|Chemical\s*Classification)/i,
+  'sec1.recommended_use': /^(?:1\.2\s*)?(?:产品使用建议|使用建议和使用限制|Product\s*use|Recommended\s*Use)/i,
+  'sec1.supplier.name': /^(?:供应商名称|Name\s*of\s*supplier|Supplier\s*Name)/i,
+  'sec1.supplier.address': /^(?:供应商地址|Supplier\s*address)/i,
+  'sec1.supplier.tel': /^(?:电话|Tel|Telephone)/i,
+  'sec1.supplier.fax': /^(?:传真|Fax)/i,
+  'sec2.ghs_classification': /^(?:2\.1\s*)?(?:GHS\s*危险性类别|GHS\s*Hazard\s*Classification)/i,
+  'sec2.ghs_pictograms': /^(?:GHS\s*象形图|GHS\s*Hazard\s*Pictograms|GHS\s*Pictograms)/i,
+  'sec2.other_hazards': /^(?:2\.2\s*)?(?:其他危害|Other\s*Hazards)/i,
+  'sec3.product_type': /^(?:3\.1\s*)?(?:产品类型|Product\s*type)/i,
+  'sec9.appearance': /^(?:9\.1\s*)?(?:外观|Appearance)/i,
+  'sec9.ph': /^(?:9\.2\s*|9\.3\s*)?(?:pH\s*值|pH\s*value|pH)/i,
+  'sec9.ionicity': /^(?:9\.3\s*|9\.4\s*)?(?:离子性|Ionicity|Ionic\s*Character)/i,
+  'sec9.flammability': /^(?:9\.4\s*|9\.8\s*)?(?:可燃性|Flammability)/i,
+  'sec9.density': /^(?:9\.5\s*|9\.12\s*)?(?:密度|Density)/i,
+  'sec9.water_solubility': /^(?:9\.6\s*|9\.13\s*)?(?:水溶性|Solubility\s*in\s*water|Water\s*Solubility)/i,
+  'sec9.viscosity': /^(?:9\.7\s*|9\.19\s*)?(?:粘度|Viscosity|Dynamic\s*viscosity)/i,
+  'sec9.auto_ignition': /^(?:9\.8\s*|9\.16\s*)?(?:自燃温度|Auto-ignition)/i,
+  'sec9.ignition_temp': /^(?:9\.9\s*|9\.17\s*)?(?:引燃温度|Ignition\s*Temperature)/i,
+  'sec9.explosive_props': /^(?:9\.10\s*|9\.20\s*)?(?:爆炸特性|Explosive\s*properties)/i,
+  'sec9.dust_explosion': /^(?:9\.11\s*|9\.21\s*)?(?:粉尘爆炸级别|Dust\s*explosion\s*class)/i,
+  'sec9.solids': /^(?:9\.12\s*|9\.22\s*)?(?:固体含量|Solid\s*content|Solids\s*Content)/i,
+  'sec9.other_info': /^(?:9\.13\s*|9\.24\s*)?(?:其他信息|Other\s*information)/i,
+  'sec10.chemical_stability': /^(?:10\.1\s*)?(?:化学稳定性|Chemical\s*stability)/i,
+  'sec10.decomposition_products': /^(?:10\.2\s*)?(?:危险分解产物|Hazardous\s*decomposition)/i,
+  'sec10.possible_reactions': /^(?:10\.3\s*)?(?:可能的危害反应|Possible\s*hazardous\s*reactions|Possibility\s*of\s*Hazardous)/i,
+  'sec11.acute_toxicity': /^(?:11\.1\s*)?(?:急性毒性|Acute\s*toxicity)/i,
+  'sec11.skin_irritation': /^(?:11\.2\s*)?(?:主要皮肤刺激性|Primary\s*skin\s*irritation)/i,
+  'sec11.eye_irritation': /^(?:11\.3\s*)?(?:主要眼睛刺激性|主要粘膜刺激性|Primary\s*eye\s*irritation)/i,
+  'sec11.sensitization': /^(?:11\.4\s*)?(?:致敏性|Sensitization)/i,
+  'sec11.mutagenicity': /^(?:11\.5\s*)?(?:致突变性|Mutagenicity)/i,
+  'sec12.ecotoxicity': /^(?:12\.1\s*)?(?:生态毒性|Ecotoxicity)/i,
+  'sec12.persistence': /^(?:12\.2\s*)?(?:持久性和降解性|Persistence\s*and\s*degradability)/i,
+  'sec12.other_effects': /^(?:12\.3\s*)?(?:其他不利的影响|Other\s*adverse\s*effects)/i,
+  'sec13.disposal_methods': /^(?:处理方法|Disposal\s*methods)/i,
+  'sec14.road_rail': /^(?:14\.1\s*)?(?:公路和铁路运输|Road\s*and\s*rail\s*transport)/i,
+  'sec14.sea': /^(?:14\.2\s*)?(?:海上运输|Maritime\s*transport|Sea\s*Transport)/i,
+  'sec14.air': /^(?:14\.3\s*)?(?:空运|Air\s*transport)/i,
+  'sec14.special_precautions': /^(?:14\.4\s*)?(?:用户特殊注意事项|Special\s*precautions\s*for\s*user)/i,
+};
+
+export function getCellSemanticKey(cell) {
+  if (!cell) return null;
+  const sec = cell.record?.sectionNumber;
+  if (!sec) return null;
+  const row = cell.record.rows[cell.row];
+  if (!row) return null;
+
+  // 1. Identify label text for the row / cell
+  const labelCell =
+    row.cells.find((c) => c.role === 'label' || c.isLabel) ||
+    row.cells.slice(0, cell.col).reverse().find((c) => !c.editable && (c.labelText || c.text)?.trim()) ||
+    row.cells.find((c) => !c.editable && (c.labelText || c.text)?.trim()) ||
+    row.cells[0];
+  const rawLabel = (cell.labelText || (cell.editable ? (labelCell?.labelText || labelCell?.text) : cell.text) || '').trim();
+
+  // 2. Match canonical patterns
+  for (const [key, pattern] of Object.entries(SEMANTIC_KEY_PATTERNS)) {
+    if (key.startsWith(`sec${sec}.`) && pattern.test(rawLabel)) {
+      return key;
+    }
+  }
+
+  // 3. Fallback: normalized clean label key
+  if (rawLabel) {
+    const clean = rawLabel
+      .replace(/^[0-9.]+\s*/, '')
+      .replace(/[:：]/g, '')
+      .replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '_')
+      .toLowerCase()
+      .slice(0, 32);
+    if (clean) return `sec${sec}.lbl_${clean}`;
+  }
+
+  return `sec${sec}.r${cell.row}_c${cell.col}`;
+}
+
+export function findCellBySemanticKey(engine, semanticKey) {
+  if (!engine?.records || !semanticKey) return null;
+  const [secPart] = semanticKey.split('.');
+  const secNum = parseInt(secPart.replace('sec', ''), 10);
+  const matchingRecords = engine.records.filter((r) => r.sectionNumber === secNum && Array.isArray(r.rows));
+  if (matchingRecords.length === 0) return null;
+
+  // 1. Try exact match using getCellSemanticKey on editable cells across matching records
+  let fallbackCandidate = null;
+  for (const record of matchingRecords) {
+    for (const row of record.rows) {
+      for (const cell of row.cells) {
+        if (cell.editable && getCellSemanticKey(cell) === semanticKey) {
+          if (cell.text && cell.text.trim()) {
+            return cell;
+          }
+          if (!fallbackCandidate) fallbackCandidate = cell;
+        }
+      }
+    }
+  }
+  if (fallbackCandidate) return fallbackCandidate;
+
+  // 2. Pattern fallback
+  const pattern = SEMANTIC_KEY_PATTERNS[semanticKey];
+  if (pattern) {
+    for (const record of matchingRecords) {
+      for (const row of record.rows) {
+        const rowLabelCell =
+          row.cells.find((c) => c.role === 'label' || c.isLabel) ||
+          row.cells.find((c) => !c.editable && (c.labelText || c.text)?.trim()) ||
+          row.cells[0];
+        const rowLabel = (rowLabelCell?.labelText || rowLabelCell?.text || '').trim();
+        if (pattern.test(rowLabel)) {
+          const valCell = row.cells.find((c) => c.editable);
+          if (valCell) return valCell;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+export function extractSemanticSnapshot(engine) {
+  const snapshot = {};
+  if (!engine?.records) return snapshot;
+  for (const record of engine.records) {
+    if (!Array.isArray(record.rows)) continue;
+    for (const row of record.rows) {
+      for (const cell of row.cells) {
+        if (cell.editable) {
+          const key = getCellSemanticKey(cell);
+          if (key) {
+            // 优先记录具有实质有效文本的单元格，防止小节空标题行遮蔽具体数据值行
+            const val = (cell.valueText !== undefined ? cell.valueText : cell.text) || '';
+            if (!(key in snapshot) || (!snapshot[key]?.trim() && val.trim())) {
+              snapshot[key] = val;
+            }
+          }
+        }
+      }
+    }
+  }
+  return snapshot;
+}
+
+export function applySemanticOverrides(engine, fieldOverrides = {}) {
+  if (!engine?.records || !fieldOverrides) return 0;
+  let count = 0;
+  for (const [key, value] of Object.entries(fieldOverrides)) {
+    if (value === undefined || value === null) continue;
+    const cell = findCellBySemanticKey(engine, key);
+    if (cell && cell.editable) {
+      writeCellValue(cell, value);
+      count++;
+    }
+  }
+  return count;
+}
+
+export const SYSTEM_DEFAULT_PRESETS = [
+  {
+    id: 'preset_guocai_cn',
+    name: '国彩中文标准预设',
+    entity: '国彩',
+    language: 'CN',
+    baselineId: 'baseline_cn_guanzhi',
+    targetTemplate: 'CN 国彩',
+    isBuiltin: true,
+    enabledForExport: true,
+    headerFooterOverrides: {
+      company: '英德市国彩新材料有限公司',
+      title: '物料安全数据表',
+      version: 'V1.0',
+      customFileNamePattern: '{model} msds_CN 国彩.docx',
+    },
+    fieldOverrides: {
+      supplier_name: '英德市国彩精细化工有限公司',
+      supplier_address: '广东省英德市白沙镇太平村更古坑凯迪工业园区',
+      emergency_phone: '86-763-2811205',
+      phone: '86-763-2811205',
+      fax: '86-763-2811024',
+      postal_code: '513038',
+    },
+  },
+  {
+    id: 'preset_guocai_en',
+    name: '国彩英文标准预设',
+    entity: '国彩',
+    language: 'EN',
+    baselineId: 'baseline_en_guanzhi',
+    targetTemplate: 'EN 国彩',
+    isBuiltin: true,
+    enabledForExport: true,
+    headerFooterOverrides: {
+      company: 'Yingde Guocai New Material Co., Ltd.',
+      title: 'MATERIAL SAFETY DATA SHEET',
+      version: 'V1.0',
+      customFileNamePattern: '{model} msds_EN 国彩.docx',
+    },
+    fieldOverrides: {
+      supplier_name: 'Yingde Guocai Fine Chemical Co., Ltd.',
+      supplier_address: 'Kaidi Industrial Park, Genggukeng, Taiping Village, Baisha Town, Yingde, Guangdong, China',
+      emergency_phone: '86-763-2811205',
+      phone: '86-763-2811205',
+      fax: '86-763-2811024',
+      postal_code: '513038',
+    },
+  },
+  {
+    id: 'preset_guanzhi_cn',
+    name: '冠志中文基准预设',
+    entity: '冠志',
+    language: 'CN',
+    baselineId: 'baseline_cn_guanzhi',
+    targetTemplate: 'CN 冠志',
+    isBuiltin: true,
+    enabledForExport: true,
+    headerFooterOverrides: {
+      company: '广州冠志新材料科技有限公司',
+      title: '物料安全数据表',
+      version: 'V1.0',
+      customFileNamePattern: '{model} msds_CN 冠志.docx',
+    },
+    fieldOverrides: {
+      supplier_name: '广州冠志新材料科技有限公司',
+    },
+  },
+  {
+    id: 'preset_guanzhi_en',
+    name: '冠志英文基准预设',
+    entity: '冠志',
+    language: 'EN',
+    baselineId: 'baseline_en_guanzhi',
+    targetTemplate: 'EN 冠志',
+    isBuiltin: true,
+    enabledForExport: true,
+    headerFooterOverrides: {
+      company: 'Guangzhou Guanzhi New Materials Technology Co., Ltd.',
+      title: 'MATERIAL SAFETY DATA SHEET',
+      version: 'V1.0',
+      customFileNamePattern: '{model} msds_EN 冠志.docx',
+    },
+    fieldOverrides: {
+      supplier_name: 'Guangzhou Guanzhi New Materials Technology Co., Ltd.',
+    },
+  },
+];
+export const TEMPLATE_BASELINES = [
+  {
+    id: 'baseline_cn_guanzhi',
+    label: '中文基准 (CN 冠志)',
+    displayName: '正式模板 · CN 冠志 (国标 GHS)',
+    templateFile: '正式模板_MSDS_CN_冠志(1).docx',
+    language: 'CN',
+    entity: '冠志',
+    defaultFileNamePattern: '{model} msds_CN 冠志.docx',
+  },
+  {
+    id: 'baseline_en_guanzhi',
+    label: '英文基准 (EN 冠志)',
+    displayName: '正式模板 · EN 冠志 (OSHA GHS)',
+    templateFile: '正式模板_MSDS_EN_冠志(1).docx',
+    language: 'EN',
+    entity: '冠志',
+    defaultFileNamePattern: '{model} msds_EN 冠志.docx',
+  },
+];
+
+export const SYSTEM_BUILTIN_PRESETS = SYSTEM_DEFAULT_PRESETS;
+
+export class PresetStore {
+  static STORAGE_KEY = 'msds_editor_presets_v2';
+
+  static loadPresets() {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const raw = window.localStorage.getItem(this.STORAGE_KEY);
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list) && list.length > 0) {
+            return this._mergeWithBuiltins(list);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load presets from localStorage', e);
+    }
+    return JSON.parse(JSON.stringify(SYSTEM_DEFAULT_PRESETS));
+  }
+
+  static async fetchPresetsFromApi() {
+    try {
+      if (typeof fetch !== 'undefined') {
+        const resp = await fetch('/api/msds/presets');
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data && data.success && Array.isArray(data.presets) && data.presets.length > 0) {
+            const list = data.presets.map((p) => ({
+              id: p.id,
+              name: p.name,
+              entity: p.entity,
+              language: p.language,
+              targetTemplate: p.target_template || (p.language === 'en' ? `EN ${p.entity === 'guocai' ? '国彩' : '冠志'}` : `CN ${p.entity === 'guocai' ? '国彩' : '冠志'}`),
+              isBuiltin: Boolean(p.is_builtin),
+              enabledForExport: Boolean(p.enabled),
+              headerFooterOverrides: {
+                company: p.footer_company || '',
+                title: p.header_title || '',
+                customFileNamePattern: p.file_name_template || '',
+              },
+              fieldOverrides: p.company_info || {},
+            }));
+            this.savePresets(list);
+            return list;
+          }
+        }
+      }
+    } catch (e) {
+      // offline or backend API inactive, gracefully keep local presets
+    }
+    return null;
+  }
+
+  static createPreset(name = '新建自定义预设', baselineIdOrTemplate = 'baseline_cn_guanzhi') {
+    const baseline = TEMPLATE_BASELINES.find((b) => b.id === baselineIdOrTemplate)
+      || (baselineIdOrTemplate.includes('EN') ? TEMPLATE_BASELINES[1] : TEMPLATE_BASELINES[0]);
+    return {
+      id: `preset_${Date.now()}`,
+      name: (name || '新建自定义预设').trim(),
+      baselineId: baseline.id,
+      language: baseline.language,
+      entity: baseline.entity,
+      targetTemplate: `${baseline.language} ${baseline.entity}`,
+      isBuiltin: false,
+      enabledForExport: true,
+      headerFooterOverrides: {},
+      fieldOverrides: {},
+    };
+  }
+
+  static savePresets(presets) {
+    let saved = false;
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(this.STORAGE_KEY, JSON.stringify(presets));
+        saved = true;
+      }
+    } catch (e) {
+      console.warn('Failed to save presets to localStorage', e);
+    }
+    return saved;
+  }
+
+  static _mergeWithBuiltins(userList) {
+    const result = [...userList];
+    for (const b of SYSTEM_BUILTIN_PRESETS) {
+      if (!result.some((p) => p.id === b.id)) {
+        result.push(JSON.parse(JSON.stringify(b)));
+      }
+    }
+    for (const p of result) {
+      if (!p.baselineId) {
+        p.baselineId = (p.language === 'EN' || p.targetTemplate?.includes('EN')) ? 'baseline_en_guanzhi' : 'baseline_cn_guanzhi';
+      }
+    }
+    return result;
+  }
+}
+
+
+// ============================================================
+// 值清空功能 (Clear Value Functions) - 支持普通与预设编辑模式
+// ============================================================
+
+export function clearCellValue(cell, valueStyle = null) {
+  if (!cell || !cell.editable) return false;
+  writeCellValue(cell, '', valueStyle);
+  return true;
+}
+
+export function clearSectionValues(record, valueStyle = null) {
+  if (!record || !Array.isArray(record.rows)) return 0;
+  let clearedCount = 0;
+  for (const row of record.rows) {
+    for (const cell of row.cells) {
+      if (cell.editable) {
+        writeCellValue(cell, '', valueStyle);
+        clearedCount++;
+      }
+    }
+  }
+  return clearedCount;
+}
+
+// ============================================================
+// 预设优先级覆盖核心合并管线 (Preset Priority Overlay Pipeline)
+// ============================================================
+
+export function applyPresetPriorityOverlay(baseEngine, preset, targetEngine) {
+  if (!baseEngine || !preset || !targetEngine) return 0;
+
+  // 1. 提取普通基准模式全部语义快照
+  const baseSnapshot = extractSemanticSnapshot(baseEngine);
+
+  // 2. 准备最终合并键值对：优先采用预设的非空值，未填项继承普通基准
+  const mergedValues = { ...baseSnapshot };
+  const presetValues = preset.fieldOverrides || preset.values || {};
+  for (const [key, val] of Object.entries(presetValues)) {
+    if (val !== undefined && val !== null && String(val).trim() !== '') {
+      mergedValues[key] = String(val); // 优先级覆盖！
+    }
+  }
+
+  // 3. 应用到目标引擎
+  const appliedCount = applySemanticOverrides(targetEngine, mergedValues);
+
+  // 4. 合并页眉页脚
+  const baseHf = baseEngine.headerFooterData || {};
+  const presetHf = preset.headerFooterOverrides || preset.headerFooterData || {};
+  const mergedHf = {
+    ...baseHf,
+    company: presetHf.company?.trim() || baseHf.company || '',
+    title: presetHf.title?.trim() || baseHf.title || '物料安全数据表',
+    version: presetHf.version?.trim() || baseHf.version || 'V1.0',
+    revisionDate: presetHf.revisionDate?.trim() || baseHf.revisionDate || '',
+    model: baseHf.model || '', // 型号始终继承主文档
+  };
+  updateHeaderFooterData(targetEngine, mergedHf);
+
+  return appliedCount;
+}
+
+
+export class DraftStore {
+  static STORAGE_KEY = 'msds_editor_drafts_v1';
+
+  static loadAllDraftsMeta() {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const raw = window.localStorage.getItem(this.STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn('Failed to load drafts meta from localStorage', e);
+    }
+    return {};
+  }
+
+  static saveDraftMeta(baselineId, meta) {
+    if (!baselineId) return;
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const all = this.loadAllDraftsMeta();
+        all[baselineId] = {
+          ...all[baselineId],
+          ...meta,
+          baselineId,
+          updatedAt: Date.now(),
+        };
+        window.localStorage.setItem(this.STORAGE_KEY, JSON.stringify(all));
+      }
+    } catch (e) {
+      console.warn('Failed to save draft meta to localStorage', e);
+    }
+  }
+
+  static clearDraftMeta(baselineId) {
+    if (!baselineId) return;
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const all = this.loadAllDraftsMeta();
+        delete all[baselineId];
+        window.localStorage.setItem(this.STORAGE_KEY, JSON.stringify(all));
+      }
+    } catch (e) {
+      console.warn('Failed to clear draft meta', e);
+    }
+  }
+}
+
+/**
+ * 将表格的相邻两行重构为标准三列垂直合并结构 (如 11.7 生殖毒性的 生育力 与 致畸性)
+ * 底层 4 列网格拓扑：
+ * Row 1 (mainRow):
+ *   tc[0]: gridSpan=1, vMerge=restart, width=3519, 文本为 mainLabel (加粗)
+ *   tc[1]: gridSpan=1, width=1311, 文本为 sub1Label (加粗)
+ *   tc[2]: gridSpan=2, width=4951, 文本为 sub1Value (常规体)
+ * Row 2 (subRow):
+ *   tc[0]: gridSpan=1, vMerge=continue, width=3519, 内容为空 <w:p/>
+ *   tc[1]: gridSpan=1, width=1311, 文本为 sub2Label (加粗)
+ *   tc[2]: gridSpan=2, width=4951, 文本为 sub2Value (常规体)
+ */
+export function renderThreeColumnVMergeSubRows(record, mainRowIndex, subRowIndex, config = {}) {
+  if (!record || record.kind !== 'table') return;
+  const mainRow = record.rows[mainRowIndex];
+  const subRow = record.rows[subRowIndex];
+  if (!mainRow?.node || !subRow?.node) return;
+
+  const doc = mainRow.node.ownerDocument;
+  const isEn = Boolean(config.isEnglish);
+  const fontAscii = isEn ? 'Arial' : 'Times New Roman';
+  const fontEastAsia = isEn ? 'Arial' : '宋体';
+  const fontSize = isEn ? '19' : '24'; // 英文 9.5pt，中文 12pt
+
+  function createCell(width, gridSpan, vMergeVal) {
+    const tc = doc.createElementNS(W_NS, 'w:tc');
+    const tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+    const tcW = doc.createElementNS(W_NS, 'w:tcW');
+    tcW.setAttributeNS(W_NS, 'w:w', String(width));
+    tcW.setAttributeNS(W_NS, 'w:type', 'dxa');
+    tcPr.appendChild(tcW);
+
+    if (gridSpan > 1) {
+      const gs = doc.createElementNS(W_NS, 'w:gridSpan');
+      gs.setAttributeNS(W_NS, 'w:val', String(gridSpan));
+      tcPr.appendChild(gs);
+    }
+    if (vMergeVal) {
+      const vm = doc.createElementNS(W_NS, 'w:vMerge');
+      if (vMergeVal !== 'continue') {
+        vm.setAttributeNS(W_NS, 'w:val', vMergeVal);
+      }
+      tcPr.appendChild(vm);
+    }
+
+    const tcBorders = doc.createElementNS(W_NS, 'w:tcBorders');
+    ['top', 'left', 'bottom', 'right'].forEach(side => {
+      const b = doc.createElementNS(W_NS, `w:${side}`);
+      b.setAttributeNS(W_NS, 'w:val', 'dotted');
+      b.setAttributeNS(W_NS, 'w:sz', '4');
+      b.setAttributeNS(W_NS, 'w:space', '0');
+      b.setAttributeNS(W_NS, 'w:color', 'auto');
+      tcBorders.appendChild(b);
+    });
+    tcPr.appendChild(tcBorders);
+
+    const vAlign = doc.createElementNS(W_NS, 'w:vAlign');
+    vAlign.setAttributeNS(W_NS, 'w:val', 'center');
+    tcPr.appendChild(vAlign);
+
+    tc.appendChild(tcPr);
+    return tc;
+  }
+
+  function appendPara(tc, text, isBold = false, hanging = null) {
+    const p = doc.createElementNS(W_NS, 'w:p');
+    const pPr = doc.createElementNS(W_NS, 'w:pPr');
+    const spacing = doc.createElementNS(W_NS, 'w:spacing');
+    spacing.setAttributeNS(W_NS, 'w:line', '300');
+    spacing.setAttributeNS(W_NS, 'w:lineRule', 'auto');
+    pPr.appendChild(spacing);
+
+    const jc = doc.createElementNS(W_NS, 'w:jc');
+    jc.setAttributeNS(W_NS, 'w:val', 'left');
+    pPr.appendChild(jc);
+
+    if (hanging) {
+      const ind = doc.createElementNS(W_NS, 'w:ind');
+      ind.setAttributeNS(W_NS, 'w:left', hanging.left || '420');
+      ind.setAttributeNS(W_NS, 'w:hanging', hanging.hanging || '420');
+      pPr.appendChild(ind);
+    }
+
+    p.appendChild(pPr);
+
+    if (text) {
+      const r = doc.createElementNS(W_NS, 'w:r');
+      const rPr = doc.createElementNS(W_NS, 'w:rPr');
+      const rFonts = doc.createElementNS(W_NS, 'w:rFonts');
+      rFonts.setAttributeNS(W_NS, 'w:ascii', fontAscii);
+      rFonts.setAttributeNS(W_NS, 'w:hAnsi', fontAscii);
+      rFonts.setAttributeNS(W_NS, 'w:eastAsia', fontEastAsia);
+      rPr.appendChild(rFonts);
+
+      if (isBold) {
+        rPr.appendChild(doc.createElementNS(W_NS, 'w:b'));
+      } else {
+        const b0 = doc.createElementNS(W_NS, 'w:b');
+        b0.setAttributeNS(W_NS, 'w:val', '0');
+        rPr.appendChild(b0);
+      }
+
+      const sz = doc.createElementNS(W_NS, 'w:sz');
+      sz.setAttributeNS(W_NS, 'w:val', fontSize);
+      rPr.appendChild(sz);
+      const szCs = doc.createElementNS(W_NS, 'w:szCs');
+      szCs.setAttributeNS(W_NS, 'w:val', fontSize);
+      rPr.appendChild(szCs);
+
+      r.appendChild(rPr);
+      const t = doc.createElementNS(W_NS, 'w:t');
+      t.textContent = text;
+      r.appendChild(t);
+      p.appendChild(r);
+    }
+    tc.appendChild(p);
+  }
+
+  // 清空 mainRow 旧单元格
+  Array.from(mainRow.node.getElementsByTagNameNS(W_NS, 'tc')).forEach(tc => mainRow.node.removeChild(tc));
+  // 清空 subRow 旧单元格
+  Array.from(subRow.node.getElementsByTagNameNS(W_NS, 'tc')).forEach(tc => subRow.node.removeChild(tc));
+
+  // 1. 构建 mainRow (3 列)
+  const mCell0 = createCell(3519, 1, 'restart');
+  appendPara(mCell0, config.mainLabel || (isEn ? '11.7  Reproductive toxicity:' : '11.7  生殖毒性：'), true, { left: '420', hanging: '420' });
+  mainRow.node.appendChild(mCell0);
+
+  const mCell1 = createCell(1311, 1, null);
+  appendPara(mCell1, config.sub1Label || (isEn ? 'Fertility:' : '生育力：'), true);
+  mainRow.node.appendChild(mCell1);
+
+  const mCell2 = createCell(4951, 2, null);
+  appendPara(mCell2, config.sub1Value || '', false);
+  mainRow.node.appendChild(mCell2);
+
+  // 2. 构建 subRow (3 列)
+  const sCell0 = createCell(3519, 1, 'continue');
+  appendPara(sCell0, '', false); // 空段落
+  subRow.node.appendChild(sCell0);
+
+  const sCell1 = createCell(1311, 1, null);
+  appendPara(sCell1, config.sub2Label || (isEn ? 'Teratogenicity:' : '致畸性：'), true);
+  subRow.node.appendChild(sCell1);
+
+  const sCell2 = createCell(4951, 2, null);
+  appendPara(sCell2, config.sub2Value || '', false);
+  subRow.node.appendChild(sCell2);
+
+  if (record.engine?.refresh) {
+    record.engine.refresh();
+  }
+}
+
+
+/**
+ * 全局表格边框规范强化 (各 section 表格外框实线，内框统一虚线)
+ * @param {Object} record - 表格 record
+ */
+export function enforceTableStandardBorders(record) {
+  if (!record || record.kind !== 'table') return;
+  const tblNode = record.node || record.rows?.[0]?.node?.parentNode;
+  if (!tblNode) return;
+  const doc = tblNode.ownerDocument;
+  if (!doc) return;
+
+  const sectionNumber = record.sectionNumber || (() => {
+    const r0Text = (record.rows?.[0]?.cells?.[0]?.text || '').trim();
+    const m = r0Text.match(/^(\d+)\./);
+    return m ? parseInt(m[1], 10) : null;
+  })();
+
+  const isSection2 = (sectionNumber === 2) || /^(?:2\.\s*|危险性概述|Hazards? Identification)/i.test(record.rows?.[0]?.cells?.[0]?.text || '');
+
+  // 1. 设置表格级 tblBorders
+  let tblPr = firstChild(tblNode, 'tblPr');
+  if (!tblPr) {
+    tblPr = doc.createElementNS(W_NS, 'w:tblPr');
+    tblNode.insertBefore(tblPr, tblNode.firstChild);
+  }
+  let tblBorders = firstChild(tblPr, 'tblBorders');
+  if (!tblBorders) {
+    tblBorders = doc.createElementNS(W_NS, 'w:tblBorders');
+    tblPr.appendChild(tblBorders);
+  } else {
+    while (tblBorders.firstChild) tblBorders.removeChild(tblBorders.firstChild);
+  }
+  // Section 2 大通栏规范：外框实线 single 4，内部横竖完全为 none（零内框线）
+  const borderDefs = isSection2 ? [
+    { name: 'top', val: 'single', sz: '4' },
+    { name: 'left', val: 'single', sz: '4' },
+    { name: 'bottom', val: 'single', sz: '4' },
+    { name: 'right', val: 'single', sz: '4' },
+    { name: 'insideH', val: 'none', sz: '0' },
+    { name: 'insideV', val: 'none', sz: '0' }
+  ] : [
+    { name: 'top', val: 'single', sz: '4' },
+    { name: 'left', val: 'single', sz: '4' },
+    { name: 'bottom', val: 'single', sz: '4' },
+    { name: 'right', val: 'single', sz: '4' },
+    { name: 'insideH', val: 'dotted', sz: '4' },
+    { name: 'insideV', val: 'dotted', sz: '4' }
+  ];
+  for (const b of borderDefs) {
+    const el = doc.createElementNS(W_NS, `w:${b.name}`);
+    el.setAttributeNS(W_NS, 'w:val', b.val);
+    el.setAttributeNS(W_NS, 'w:sz', b.sz);
+    el.setAttributeNS(W_NS, 'w:space', '0');
+    el.setAttributeNS(W_NS, 'w:color', 'auto');
+    tblBorders.appendChild(el);
+  }
+
+  // 2. 逐行逐单元格设置 tcBorders (遍历物理 DOM 节点，彻底杜绝 vMerge 延续单元格逃逸)
+  const trNodes = Array.from(tblNode.getElementsByTagNameNS(W_NS, 'tr'));
+  const numRows = trNodes.length;
+  for (let rIdx = 0; rIdx < numRows; rIdx++) {
+    const trNode = trNodes[rIdx];
+    const isTitleRow = (rIdx === 0);
+    const isFirstDataRow = (rIdx === 1);
+    const isLastRow = (rIdx === numRows - 1);
+
+    // Section 2 通栏规范：如果行级存在 tblPrEx 覆盖边框，坚决清除其 tblBorders
+    if (isSection2) {
+      const tblPrEx = firstChild(trNode, 'tblPrEx');
+      if (tblPrEx) {
+        const b = firstChild(tblPrEx, 'tblBorders');
+        if (b) tblPrEx.removeChild(b);
+      }
+    }
+
+    const tcNodes = Array.from(trNode.getElementsByTagNameNS(W_NS, 'tc'));
+    const numCells = tcNodes.length;
+    for (let cIdx = 0; cIdx < numCells; cIdx++) {
+      const cellNode = tcNodes[cIdx];
+      if (!cellNode) continue;
+
+      let tcPr = firstChild(cellNode, 'tcPr');
+      if (!tcPr) {
+        tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+        cellNode.insertBefore(tcPr, cellNode.firstChild);
+      }
+      let tcBorders = firstChild(tcPr, 'tcBorders');
+      if (!tcBorders) {
+        tcBorders = doc.createElementNS(W_NS, 'w:tcBorders');
+        tcPr.appendChild(tcBorders);
+      } else {
+        while (tcBorders.firstChild) tcBorders.removeChild(tcBorders.firstChild);
+      }
+
+      let topVal = 'dotted';
+      let bottomVal = 'dotted';
+      if (isSection2) {
+        if (isTitleRow) {
+          topVal = 'single';
+          bottomVal = 'single';
+        } else if (isFirstDataRow) {
+          topVal = 'single';
+          bottomVal = isLastRow ? 'single' : 'none';
+        } else if (isLastRow) {
+          topVal = 'none';
+          bottomVal = 'single';
+        } else {
+          topVal = 'none';
+          bottomVal = 'none';
+        }
+      } else {
+        if (isTitleRow) {
+          topVal = 'single';
+          bottomVal = 'single';
+        } else if (isFirstDataRow) {
+          topVal = 'single';
+          bottomVal = isLastRow ? 'single' : 'dotted';
+        } else if (isLastRow) {
+          topVal = 'dotted';
+          bottomVal = 'single';
+        }
+      }
+
+      const isLeft = (cIdx === 0);
+      const isRight = (cIdx === numCells - 1);
+      const leftVal = isLeft ? 'single' : (isSection2 ? 'none' : 'dotted');
+      const rightVal = isRight ? 'single' : (isSection2 ? 'none' : 'dotted');
+
+      const cellBorders = [
+        { name: 'top', val: topVal },
+        { name: 'bottom', val: bottomVal },
+        { name: 'left', val: leftVal },
+        { name: 'right', val: rightVal }
+      ];
+
+      for (const cb of cellBorders) {
+        const el = doc.createElementNS(W_NS, `w:${cb.name}`);
+        el.setAttributeNS(W_NS, 'w:val', cb.val);
+        el.setAttributeNS(W_NS, 'w:sz', cb.val === 'none' ? '0' : '4');
+        el.setAttributeNS(W_NS, 'w:space', '0');
+        el.setAttributeNS(W_NS, 'w:color', 'auto');
+        tcBorders.appendChild(el);
+      }
+    }
+  }
+}
+
+export * from './universal-editor-primitives.js';

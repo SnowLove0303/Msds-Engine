@@ -1,0 +1,758 @@
+[
+  {
+    "i": 0,
+    "jc": "left",
+    "ind": {
+      "firstLine": null,
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": "GHS危险性类别:",
+        "bold": true
+      },
+      {
+        "t": " ",
+        "bold": false
+      },
+      {
+        "t": "无",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 1,
+    "jc": "left",
+    "ind": {
+      "firstLine": null,
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": "羟基丙烯酸酯聚合物GHS危险性分类：",
+        "bold": true
+      },
+      {
+        "t": "不适用",
+        "bold": false
+      },
+      {
+        "t": "；",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 2,
+    "jc": null,
+    "ind": {
+      "firstLine": null,
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": "标签要素",
+        "bold": true
+      },
+      {
+        "t": "：",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 3,
+    "jc": null,
+    "ind": {
+      "firstLine": "480",
+      "left": null,
+      "hanging": null,
+      "right": "480"
+    },
+    "runs": [
+      {
+        "t": "请注意以下物质：",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 4,
+    "jc": null,
+    "ind": {
+      "firstLine": "480",
+      "left": null,
+      "hanging": null,
+      "right": "480"
+    },
+    "runs": [
+      {
+        "t": "N",
+        "bold": false
+      },
+      {
+        "t": ",N-",
+        "bold": false
+      },
+      {
+        "t": "二甲基乙醇胺，中和剂，已键合为盐，质量浓度小于2.0%",
+        "bold": false
+      },
+      {
+        "t": "，",
+        "bold": false
+      },
+      {
+        "t": "特定阈值浓度≥5%",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 5,
+    "jc": null,
+    "ind": {
+      "firstLine": "480",
+      "left": null,
+      "hanging": null,
+      "right": "480"
+    },
+    "runs": [
+      {
+        "t": "GHS分类：",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 6,
+    "jc": null,
+    "ind": {
+      "firstLine": "480",
+      "left": null,
+      "hanging": null,
+      "right": "480"
+    },
+    "runs": [
+      {
+        "t": "易燃",
+        "bold": false
+      },
+      {
+        "t": "液体3",
+        "bold": false
+      },
+      {
+        "t": " ",
+        "bold": false
+      },
+      {
+        "t": "H226；",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 7,
+    "jc": null,
+    "ind": {
+      "firstLine": "480",
+      "left": null,
+      "hanging": null,
+      "right": "480"
+    },
+    "runs": [
+      {
+        "t": "急性毒性4",
+        "bold": false
+      },
+      {
+        "t": " ",
+        "bold": false
+      },
+      {
+        "t": "吸入性 H332；",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 8,
+    "jc": null,
+    "ind": {
+      "firstLine": "480",
+      "left": null,
+      "hanging": null,
+      "right": "480"
+    },
+    "runs": [
+      {
+        "t": "急性毒性4",
+        "bold": false
+      },
+      {
+        "t": " ",
+        "bold": false
+      },
+      {
+        "t": "经皮H312；",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 9,
+    "jc": null,
+    "ind": {
+      "firstLine": "480",
+      "left": null,
+      "hanging": null,
+      "right": "480"
+    },
+    "runs": [
+      {
+        "t": "皮肤腐蚀1",
+        "bold": false
+      },
+      {
+        "t": "B H314",
+        "bold": false
+      },
+      {
+        "t": "；",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 10,
+    "jc": null,
+    "ind": {
+      "firstLine": "480",
+      "left": null,
+      "hanging": null,
+      "right": "480"
+    },
+    "runs": [
+      {
+        "t": "特异性靶器官系统毒性（一次接触）3",
+        "bold": false
+      },
+      {
+        "t": " ",
+        "bold": false
+      },
+      {
+        "t": "H335",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 11,
+    "jc": null,
+    "ind": {
+      "firstLine": "480",
+      "left": null,
+      "hanging": null,
+      "right": "480"
+    },
+    "runs": [
+      {
+        "t": "特异性靶器官系统毒性（一次接触）3",
+        "bold": false
+      },
+      {
+        "t": " ",
+        "bold": false
+      },
+      {
+        "t": "H335",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 12,
+    "jc": null,
+    "ind": {
+      "firstLine": null,
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": "象形图",
+        "bold": true
+      },
+      {
+        "t": "：",
+        "bold": true
+      },
+      {
+        "t": "无",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 13,
+    "jc": null,
+    "ind": {
+      "firstLine": null,
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": "警告词：",
+        "bold": true
+      },
+      {
+        "t": "警告",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 14,
+    "jc": null,
+    "ind": {
+      "firstLine": null,
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": "危害性说明:",
+        "bold": true
+      },
+      {
+        "t": "没有明显的已知作用或严重危险。",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 15,
+    "jc": null,
+    "ind": {
+      "firstLine": null,
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": "防范说明:",
+        "bold": true
+      }
+    ]
+  },
+  {
+    "i": 16,
+    "jc": null,
+    "ind": {
+      "firstLine": "482",
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": "预防措施：",
+        "bold": true
+      }
+    ]
+  },
+  {
+    "i": 17,
+    "jc": null,
+    "ind": {
+      "firstLine": null,
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": " ",
+        "bold": false
+      },
+      {
+        "t": "       ",
+        "bold": false
+      },
+      {
+        "t": "操作时穿戴必要的防护用品（手套、防护镜、工作服等）。",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 18,
+    "jc": null,
+    "ind": {
+      "firstLine": null,
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": " ",
+        "bold": false
+      },
+      {
+        "t": "       ",
+        "bold": false
+      },
+      {
+        "t": "操作后彻底清洗身体接触部位。",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 19,
+    "jc": null,
+    "ind": {
+      "firstLine": null,
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": " ",
+        "bold": false
+      },
+      {
+        "t": "       ",
+        "bold": false
+      },
+      {
+        "t": "作业场所不得进食，饮水或吸烟。",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 20,
+    "jc": null,
+    "ind": {
+      "firstLine": "960",
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": "在室外或通风良好处操作。",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 21,
+    "jc": null,
+    "ind": {
+      "firstLine": "482",
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": "事故响应：",
+        "bold": true
+      }
+    ]
+  },
+  {
+    "i": 22,
+    "jc": null,
+    "ind": {
+      "firstLine": null,
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": " ",
+        "bold": false
+      },
+      {
+        "t": "       ",
+        "bold": false
+      },
+      {
+        "t": "吸入：一旦吸入，如有不适，就医。",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 23,
+    "jc": null,
+    "ind": {
+      "firstLine": null,
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": " ",
+        "bold": false
+      },
+      {
+        "t": "       ",
+        "bold": false
+      },
+      {
+        "t": "眼睛、皮肤接触；使用肥皂、清水等清洗即可。如有不适感，就医。",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 24,
+    "jc": null,
+    "ind": {
+      "firstLine": null,
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": " ",
+        "bold": false
+      },
+      {
+        "t": "       ",
+        "bold": false
+      },
+      {
+        "t": "食入：立即漱口，禁止催吐，立即就医诊治。",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 25,
+    "jc": null,
+    "ind": {
+      "firstLine": null,
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": " ",
+        "bold": false
+      },
+      {
+        "t": "       ",
+        "bold": false
+      },
+      {
+        "t": "泄露：收集泄漏物。",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 26,
+    "jc": null,
+    "ind": {
+      "firstLine": null,
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": " ",
+        "bold": false
+      },
+      {
+        "t": "       ",
+        "bold": false
+      },
+      {
+        "t": "灭火：火灾时，使用干粉、泡沫、二氧化碳灭火。",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 27,
+    "jc": null,
+    "ind": {
+      "firstLine": "482",
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": "安全存储：",
+        "bold": true
+      }
+    ]
+  },
+  {
+    "i": 28,
+    "jc": null,
+    "ind": {
+      "firstLine": null,
+      "left": "1199",
+      "hanging": "720",
+      "right": null
+    },
+    "runs": [
+      {
+        "t": " ",
+        "bold": false
+      },
+      {
+        "t": "   ",
+        "bold": false
+      },
+      {
+        "t": "请置于避光、阴凉干燥处存放，存储温度应保持在5-35℃，避免霜冻，保持产品",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 29,
+    "jc": null,
+    "ind": {
+      "firstLine": null,
+      "left": "1198",
+      "hanging": "240",
+      "right": null
+    },
+    "runs": [
+      {
+        "t": "装完整。每次取用之后立即密封，打开包装后尽快使用完毕。",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 30,
+    "jc": null,
+    "ind": {
+      "firstLine": "482",
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": "废弃处置：",
+        "bold": true
+      }
+    ]
+  },
+  {
+    "i": 31,
+    "jc": null,
+    "ind": {
+      "firstLine": null,
+      "left": "959",
+      "hanging": "480",
+      "right": null
+    },
+    "runs": [
+      {
+        "t": " ",
+        "bold": false
+      },
+      {
+        "t": "   ",
+        "bold": false
+      },
+      {
+        "t": "使用后的空桶未经无害化处理前，不得存储食物及其他物品，以免对人体、环境造成危害；包装物的回收、利用、处置应符合国家及当地相关法律、法规规定，因包装物处置不当造成的危害及损失，由处置方承担。",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 32,
+    "jc": null,
+    "ind": {
+      "firstLine": null,
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": "物理化学危险：",
+        "bold": true
+      },
+      {
+        "t": "对水体、土壤可造成一定的污染。",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 33,
+    "jc": null,
+    "ind": {
+      "firstLine": null,
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": "健康危害：",
+        "bold": true
+      },
+      {
+        "t": "无",
+        "bold": false
+      }
+    ]
+  },
+  {
+    "i": 34,
+    "jc": "left",
+    "ind": {
+      "firstLine": null,
+      "left": null,
+      "hanging": null,
+      "right": null
+    },
+    "runs": [
+      {
+        "t": "环境危害：",
+        "bold": true
+      },
+      {
+        "t": "无危险物质释放，防止进入下水道，以防聚合物沉积阻塞下水道。",
+        "bold": false
+      }
+    ]
+  }
+]

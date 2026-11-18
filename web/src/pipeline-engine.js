@@ -1160,14 +1160,25 @@ export function verifySourceFactGrounding(candidateText, srcEngine) {
 }
 
 export function parseSection2FromSource(srcEngine) {
-  const srcS2 = srcEngine?.records?.find(r => r.sectionNumber === 2);
-  if (!srcS2) return null;
+  const s2Records = srcEngine?.records?.filter(r => r.sectionNumber === 2) || [];
+  if (s2Records.length === 0) return null;
   const rawParas = [];
-  for (let r = 1; r < srcS2.rows.length; r++) {
-    for (const cell of srcS2.rows[r].cells) {
-      for (const p of cell.paragraphs) {
-        const txt = p.runs.map(r => r.text).join('').trim();
-        if (txt) rawParas.push(txt);
+  for (const rec of s2Records) {
+    if (rec.rows) {
+      for (let r = 1; r < rec.rows.length; r++) {
+        for (const cell of rec.rows[r].cells) {
+          for (const p of cell.paragraphs) {
+            const txt = p.runs.map(r => r.text).join('').trim();
+            if (txt) rawParas.push(txt);
+          }
+        }
+      }
+    } else if (rec.text) {
+      const lines = rec.text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      for (const line of lines) {
+        if (!/^\s*2\s*[\.,、]?\s*危险性概述/i.test(line)) {
+          rawParas.push(line);
+        }
       }
     }
   }
@@ -1399,11 +1410,19 @@ export function parseSection2FromSource(srcEngine) {
 
 
 export function extractSection9PropertiesFromSource(srcEngine) {
-  const s9 = srcEngine?.records?.find(r => r.sectionNumber === 9);
-  if (!s9) return [];
+  let s9 = srcEngine?.records?.find(r => r.sectionNumber === 9 && r.kind === 'table');
+  if (!s9) {
+    s9 = srcEngine?.records?.find(r => r.sectionNumber === 9);
+  }
+  if (!s9) {
+    s9 = srcEngine?.records?.find(r => r.kind === 'table' && r.rows?.some(row => row.cells?.some(c => /外观|pH值?|初沸点|闪点/i.test(c.text))));
+  }
+  if (!s9 || !s9.rows) return [];
 
   const items = [];
-  for (let rIdx = 1; rIdx < s9.rows.length; rIdx++) {
+  const firstRowText = (s9.rows[0]?.cells?.[0]?.text || '').trim();
+  const startIdx = /^(?:9\s*[\.,、]|理化特性|physical)/i.test(firstRowText) ? 1 : 0;
+  for (let rIdx = startIdx; rIdx < s9.rows.length; rIdx++) {
     const row = s9.rows[rIdx];
     const c0 = row.cells[0];
     const c1 = row.cells[1];
@@ -1916,8 +1935,8 @@ export function buildThreeTierSection11(engine, facts = {}, isEnglish = false) {
     s11 = addRowAfter(engine, s11, s11.rows.length - 1);
   }
 
-  const srcS11 = facts.srcEngine?.records?.find((r) => r.sectionNumber === 11);
-  const srcPreamble = (srcS11?.rows[2]?.cells[0]?.text || '').trim();
+  const srcS11 = facts.srcEngine?.records?.find((r) => r.sectionNumber === 11 && r.rows);
+  const srcPreamble = (srcS11?.rows?.[2]?.cells[0]?.text || '').trim();
 
   const disclaimerText = !isEnglish
     ? '该产品无可用的毒理学研究。'
@@ -1940,7 +1959,7 @@ export function buildThreeTierSection11(engine, facts = {}, isEnglish = false) {
   renderFullWidthRow(s11, 2, preambleText, { isEnglish, isSection11: true, leftIndentTwips: 34, boldSubheaders: false, totalWidth: 9781 });
 
   let detailParagraphs = (isEnglish && facts.detailParagraphsEn) ? facts.detailParagraphsEn : (facts.detailParagraphs || []);
-  if (!detailParagraphs.length && srcS11) {
+  if (!detailParagraphs.length && srcS11 && srcS11.rows) {
     // 从源文件 Section 11 中动态聚合端点
     const lines = [];
     for (let r = 3; r < srcS11.rows.length; r++) {
@@ -2069,8 +2088,8 @@ export function buildDynamicSection11Table(engine, srcEngine, baseCnEngine = nul
     );
   }
   if (s11.rows[2]) {
-    const srcS11Rec = (srcEngine || baseCnEngine)?.records?.find(r => r.sectionNumber === 11);
-    const srcRow2Text = (srcS11Rec?.rows[2]?.cells[0]?.text || '').trim();
+    const srcS11Rec = (srcEngine || baseCnEngine)?.records?.find(r => r.sectionNumber === 11 && r.rows);
+    const srcRow2Text = (srcS11Rec?.rows?.[2]?.cells[0]?.text || '').trim();
     let preamble = !isEnglish ? '下面是这些成分的毒理学数据。' : 'The following is toxicological data for these ingredients:';
     if (srcRow2Text) {
       if (!isEnglish) {
@@ -2197,9 +2216,17 @@ export function buildDynamicSection14Table(engine, srcEngine, baseCnEngine = nul
       const pairs = decomposeCellPairToFacts(row.cells?.[0], row.cells?.[1], row, 14);
       s14Pairs.push(...pairs);
     }
+  } else if (srcS14 && srcS14.text) {
+    const lines = srcS14.text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    for (const line of lines) {
+      const m = line.match(/^([^：:\s]+)[：:]\s*(.*)$/);
+      if (m) {
+        s14Pairs.push({ rawLabel: m[1].trim(), rawValue: m[2].trim() });
+      }
+    }
   }
 
-  const srcS14Text = srcS14 ? srcS14.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n') : '';
+  const srcS14Text = srcS14 ? (srcS14.rows ? srcS14.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n') : (srcS14.text || '')) : '';
 
   const dgFacts = facts.dangerousGoods || facts.transport || {};
   const unMatch = srcS14Text.match(/UN\s*(\d{4})/i) || srcS14Text.match(/联合国编号\s*[:：]?\s*(\d{4})/i);
@@ -3097,8 +3124,8 @@ function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
   // 10.5 规范化 Section 15：源文件仅 4 部法规时，剔除底模外生强塞的 GB 15258
   let s15Rec = engine.records.find(r => r.sectionNumber === 15);
   if (s15Rec) {
-    const srcS15 = srcEngine?.records?.find(r => r.sectionNumber === 15);
-    const srcS15Text = srcS15 ? srcS15.rows.map(r => r.cells.map(c => c.text).join(' ')).join(' ') : '';
+    const srcS15 = srcEngine?.records?.find(r => r.sectionNumber === 15 && r.rows);
+    const srcS15Text = srcS15 && srcS15.rows ? srcS15.rows.map(r => r.cells.map(c => c.text).join(' ')).join(' ') : '';
     const srcHasGb15258 = /15258|安全标签编写/i.test(srcS15Text);
     if (!srcHasGb15258) {
       const gb15258Row = s15Rec.rows.find(r => /15258|安全标签/i.test(r.cells[0]?.text || ''));
@@ -3131,9 +3158,9 @@ function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
   buildDynamicSection14Table(engine, srcEngine, null, false, facts);
 
   // 11.9 规范化 Section 12 说明行：若源文件 Section 12 首行即为端点行（无独立通栏说明行），彻底删除底模的独立说明行 (Row 1)
-  const srcS12 = srcEngine?.records?.find(r => r.sectionNumber === 12);
+  const srcS12 = srcEngine?.records?.find(r => r.sectionNumber === 12 && r.rows);
   let srcHasS12Preamble = false;
-  if (srcS12 && srcS12.rows.length > 1) {
+  if (srcS12 && srcS12.rows && srcS12.rows.length > 1) {
     const firstDataRow = srcS12.rows[1];
     const firstCellText = (firstDataRow.cells[0]?.text || '').trim();
     if (firstDataRow.cells.length === 1 || (!/生态毒性|12\.\d/i.test(firstCellText) && firstCellText.length > 15)) {

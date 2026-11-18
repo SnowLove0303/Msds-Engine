@@ -1,0 +1,6259 @@
+{
+  "summary": {
+    "totalFiles": 88,
+    "pArtifactCount": 0,
+    "thinSpaceCount": 0,
+    "companyMismatchCount": 22,
+    "missingDateCount": 0
+  },
+  "results": [
+    {
+      "file": "PU-6013BIO msds_CN 冠志.docx",
+      "relPath": "01-1 单组份水性聚氨酯树脂 PU\\PU-6013Bio\\PU-6013BIO msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PU-6013BIO-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PU-6013BIO-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PU-6013BIO msds_CN 国彩.docx",
+      "relPath": "01-1 单组份水性聚氨酯树脂 PU\\PU-6013Bio\\PU-6013BIO msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PU-6013BIO-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PU-6013BIO-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PU-6013BIO msds_EN Guanzhi.docx",
+      "relPath": "01-1 单组份水性聚氨酯树脂 PU\\PU-6013Bio\\PU-6013BIO msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PU-6013BIO-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PU-6013BIO-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PU-6013BIO msds_EN Guocai.docx",
+      "relPath": "01-1 单组份水性聚氨酯树脂 PU\\PU-6013Bio\\PU-6013BIO msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PU-6013BIO-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PU-6013BIO-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "HPU-7660 msds_CN 冠志.docx",
+      "relPath": "01-2 水性羟基聚氨酯树脂 HPU\\HPU-7660\\HPU-7660 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 HPU-7660-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 HPU-7660-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "HPU-7660 msds_CN 国彩.docx",
+      "relPath": "01-2 水性羟基聚氨酯树脂 HPU\\HPU-7660\\HPU-7660 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 HPU-7660-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 HPU-7660-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "HPU-7660 msds_EN Guanzhi.docx",
+      "relPath": "01-2 水性羟基聚氨酯树脂 HPU\\HPU-7660\\HPU-7660 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. HPU-7660-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. HPU-7660-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "HPU-7660 msds_EN Guocai.docx",
+      "relPath": "01-2 水性羟基聚氨酯树脂 HPU\\HPU-7660\\HPU-7660 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. HPU-7660-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. HPU-7660-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "HPU-7700 msds_CN 冠志.docx",
+      "relPath": "01-2 水性羟基聚氨酯树脂 HPU\\HPU-7700\\HPU-7700 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 HPU-7700-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 HPU-7700-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "HPU-7700 msds_CN 国彩.docx",
+      "relPath": "01-2 水性羟基聚氨酯树脂 HPU\\HPU-7700\\HPU-7700 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 HPU-7700-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 HPU-7700-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "HPU-7700 msds_EN Guanzhi.docx",
+      "relPath": "01-2 水性羟基聚氨酯树脂 HPU\\HPU-7700\\HPU-7700 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. HPU-7700-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. HPU-7700-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "HPU-7700 msds_EN Guocai.docx",
+      "relPath": "01-2 水性羟基聚氨酯树脂 HPU\\HPU-7700\\HPU-7700 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. HPU-7700-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. HPU-7700-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3612 msds_CN 冠志.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3612\\PA-3612 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-3612-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-3612-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3612 msds_CN 国彩.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3612\\PA-3612 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-3612-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-3612-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3612 msds_EN Guanzhi.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3612\\PA-3612 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-3612-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-3612-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3612 msds_EN Guocai.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3612\\PA-3612 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-3612-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-3612-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3615 msds_CN 冠志.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3615\\PA-3615 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-3615-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-3615-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3615 msds_CN 国彩.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3615\\PA-3615 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-3615-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-3615-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3615 msds_EN Guanzhi.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3615\\PA-3615 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-3615-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-3615-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3615 msds_EN Guocai.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3615\\PA-3615 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-3615-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-3615-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3617 msds_CN 冠志.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3617\\PA-3617 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-3617-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-3617-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3617 msds_CN 国彩.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3617\\PA-3617 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-3617-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-3617-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3617 msds_EN Guanzhi.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3617\\PA-3617 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-3617-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-3617-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3617 msds_EN Guocai.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3617\\PA-3617 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-3617-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-3617-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3655 msds_CN 冠志.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3655\\PA-3655 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-3655-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-3655-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3655 msds_CN 国彩.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3655\\PA-3655 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-3655-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-3655-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3655 msds_EN Guanzhi.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3655\\PA-3655 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-3655-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-3655-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3655 msds_EN Guocai.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3655\\PA-3655 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-3655-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-3655-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3656 msds_CN 冠志.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3656\\PA-3656 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-3656-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-3656-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3656 msds_CN 国彩.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3656\\PA-3656 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-3656-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-3656-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3656 msds_EN Guanzhi.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3656\\PA-3656 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-3656-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-3656-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3656 msds_EN Guocai.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3656\\PA-3656 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-3656-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-3656-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3663 msds_CN 冠志.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3663\\PA-3663 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-3663-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-3663-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3663 msds_CN 国彩.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3663\\PA-3663 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-3663-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-3663-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3663 msds_EN Guanzhi.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3663\\PA-3663 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-3663-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-3663-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-3663 msds_EN Guocai.docx",
+      "relPath": "02-1 单组份水性丙烯酸乳液 PA\\PA-3663\\PA-3663 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-3663-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-3663-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4000 msds_CN 冠志.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4000\\PA-4000 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-4000-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-4000-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4000 msds_CN 国彩.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4000\\PA-4000 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-4000-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-4000-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4000 msds_EN Guanzhi.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4000\\PA-4000 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4000-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4000-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4000 msds_EN Guocai.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4000\\PA-4000 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-4000-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-4000-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4006 msds_CN 冠志.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4006\\PA-4006 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-4006-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-4006-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4006 msds_CN 国彩.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4006\\PA-4006 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-4006-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-4006-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4006 msds_EN Guanzhi.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4006\\PA-4006 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4006-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4006-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4006 msds_EN Guocai.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4006\\PA-4006 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-4006-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-4006-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4771 msds_CN 冠志.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4771\\PA-4771 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-4771-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-4771-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4771 msds_CN 国彩.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4771\\PA-4771 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-4771-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-4771-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4771 msds_EN Guanzhi.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4771\\PA-4771 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4771-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4771-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4771 msds_EN Guocai.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4771\\PA-4771 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-4771-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-4771-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4778 msds_CN 冠志.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4778\\PA-4778 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-4778-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-4778-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4778 msds_CN 国彩.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4778\\PA-4778 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-4778-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-4778-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4778 msds_EN Guanzhi.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4778\\PA-4778 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4778-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4778-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4778 msds_EN Guocai.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4778\\PA-4778 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-4778-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-4778-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4800 msds_CN 冠志.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4800\\PA-4800 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-4800-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-4800-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4800 msds_CN 国彩.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4800\\PA-4800 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-4800-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-4800-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4800 msds_EN Guanzhi.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4800\\PA-4800 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4800-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4800-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4800 msds_EN Guocai.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4800\\PA-4800 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-4800-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-4800-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4804T msds_CN 冠志.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4804T\\PA-4804T msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-4804T-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-4804T-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4804T msds_CN 国彩.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4804T\\PA-4804T msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-4804T-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-4804T-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4804T msds_EN Guanzhi.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4804T\\PA-4804T msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4804T-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4804T-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4804T msds_EN Guocai.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4804T\\PA-4804T msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-4804T-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-4804T-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4807 msds_CN 冠志.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4807\\PA-4807 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-4807-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-4807-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4807 msds_CN 国彩.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4807\\PA-4807 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-4807-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-4807-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4807 msds_EN Guanzhi.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4807\\PA-4807 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4807-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4807-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4807 msds_EN Guocai.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4807\\PA-4807 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-4807-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-4807-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4808 msds_CN 冠志.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4808\\PA-4808 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-4808-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-4808-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4808 msds_CN 国彩.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4808\\PA-4808 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-4808-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-4808-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4808 msds_EN Guanzhi.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4808\\PA-4808 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4808-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4808-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4808 msds_EN Guocai.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4808\\PA-4808 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-4808-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-4808-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4812 msds_CN 冠志.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4812\\PA-4812 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-4812-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-4812-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4812 msds_CN 国彩.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4812\\PA-4812 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-4812-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-4812-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4812 msds_EN Guanzhi.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4812\\PA-4812 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4812-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4812-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4812 msds_EN Guocai.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4812\\PA-4812 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-4812-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-4812-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4816 msds_CN 冠志.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4816\\PA-4816 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-4816-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-4816-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4816 msds_CN 国彩.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4816\\PA-4816 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-4816-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-4816-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4816 msds_EN Guanzhi.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4816\\PA-4816 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4816-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4816-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4816 msds_EN Guocai.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4816\\PA-4816 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-4816-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-4816-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4817 msds_CN 冠志.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4817\\PA-4817 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-4817-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-4817-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4817 msds_CN 国彩.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4817\\PA-4817 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-4817-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-4817-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4817 msds_EN Guanzhi.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4817\\PA-4817 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4817-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4817-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4817 msds_EN Guocai.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4817\\PA-4817 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-4817-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-4817-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4819 msds_CN 冠志.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4819\\PA-4819 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-4819-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-4819-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4819 msds_CN 国彩.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4819\\PA-4819 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-4819-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-4819-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4819 msds_EN Guanzhi.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4819\\PA-4819 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4819-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4819-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4819 msds_EN Guocai.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4819\\PA-4819 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-4819-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-4819-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4835 msds_CN 冠志.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4835\\PA-4835 msds_CN 冠志.docx",
+      "isEn": false,
+      "isGuocai": false,
+      "expectedCompany": "广州冠志新材料科技有限公司",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"广州冠志新材料科技有限公司 PA-4835-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "广州冠志新材料科技有限公司 PA-4835-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4835 msds_CN 国彩.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4835\\PA-4835 msds_CN 国彩.docx",
+      "isEn": false,
+      "isGuocai": true,
+      "expectedCompany": "英德市国彩新材料有限公司",
+      "companyMatched": false,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"英德市国彩精细化工有限公司 PA-4835-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"修订日期：2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "英德市国彩精细化工有限公司 PA-4835-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "修订日期：2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "修订日期：2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4835 msds_EN Guanzhi.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4835\\PA-4835 msds_EN Guanzhi.docx",
+      "isEn": true,
+      "isGuocai": false,
+      "expectedCompany": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4835-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Guangzhou Guanzhi New Material Technology Co., Ltd. PA-4835-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    },
+    {
+      "file": "PA-4835 msds_EN Guocai.docx",
+      "relPath": "02-2 水性羟基丙烯酸乳液 PA\\PA-4835\\PA-4835 msds_EN Guocai.docx",
+      "isEn": true,
+      "isGuocai": true,
+      "expectedCompany": "Yingde Guocai New Material Co., Ltd.",
+      "companyMatched": true,
+      "footers": [
+        {
+          "partName": "word/footer1.xml",
+          "paragraphsText": [
+            "[Tbl r0 c0 p0 left]: \"Yingde Guocai New Material Co., Ltd. PA-4835-MSDS\"",
+            "[Tbl r0 c1 p0 right]: \"Revision Date: 2026/11/16\"",
+            "[Tbl r1 c0 p0 left]: \"\"",
+            "[Tbl r1 c1 p0 right]: \"PAGE 3 /  NUMPAGES  5\""
+          ],
+          "runsInfo": [
+            {
+              "text": "Yingde Guocai New Material Co., Ltd. PA-4835-MSDS",
+              "sz": 10.5,
+              "font": "/",
+              "jc": "left"
+            },
+            {
+              "text": "Revision Date: 2026/11/16   ",
+              "sz": 9,
+              "color": "7F7F7F",
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "3",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": " / ",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            },
+            {
+              "text": "5",
+              "sz": 12,
+              "font": "楷体_GB2312/Arial",
+              "jc": "right"
+            }
+          ],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": "Revision Date: 2026/11/16   "
+        },
+        {
+          "partName": "word/footer2.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        },
+        {
+          "partName": "word/footer3.xml",
+          "paragraphsText": [],
+          "runsInfo": [],
+          "hasPArtifact": false,
+          "hasThinSpace": false,
+          "rawRevisionDate": null
+        }
+      ]
+    }
+  ]
+}

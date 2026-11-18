@@ -1,0 +1,860 @@
+[
+  {
+    "name": "PU-1007",
+    "cat": "1-1 水性聚氨酯 PU",
+    "s2RowCount": 4,
+    "s2Rows": [
+      {
+        "label": "2.危险性概述",
+        "val": "2.危险性概述"
+      },
+      {
+        "label": "2.1 物质或混合物的分类：",
+        "val": "GHS 危险性类别： 根据 GHS 不属于危害化学品。"
+      },
+      {
+        "label": "2.2 标签要素：",
+        "val": "GHS-象形图 根据 GHS 不属于危害化学品。"
+      },
+      {
+        "label": "2.3 其他危害：",
+        "val": "无适用资料。"
+      }
+    ],
+    "s3CompCount": 6,
+    "s3Comps": [
+      {
+        "name": "聚氨酯聚合物",
+        "cas": "商业机密",
+        "conc": "30.0~40.0"
+      },
+      {
+        "name": "去离子水",
+        "cas": "7732-18-5",
+        "conc": ">60"
+      },
+      {
+        "name": "三乙胺",
+        "cas": "121-44-8",
+        "conc": "0.1-1"
+      },
+      {
+        "name": "4.3.接触眼睛：",
+        "cas": "立即翻起上下眼睑用大量缓和流动的水清洗眼睛至少20 分钟。且将头倾斜，避免化学品流入另一只未受污染的眼睛，并立即就医。",
+        "conc": "未标明"
+      },
+      {
+        "name": "4.4.接触皮肤：",
+        "cas": "立即用肥皂和大量的水冲洗。若发生皮肤反应，就医。",
+        "conc": "未标明"
+      },
+      {
+        "name": "4.5.吸入：",
+        "cas": "一旦吸入，如有不适，就医。",
+        "conc": "未标明"
+      }
+    ],
+    "s8Rows": 11,
+    "s8HasEmptyControlTable": false,
+    "s9Rows": 23,
+    "s11Rows": 14,
+    "s11IsPureStatement": false,
+    "s11HasDeadweight": false,
+    "s12Rows": 4,
+    "s13Rows": 3,
+    "auditIssueCount": 0,
+    "auditIssues": []
+  },
+  {
+    "name": "PU-202A",
+    "cat": "1-1 水性聚氨酯 PU",
+    "s2RowCount": 8,
+    "s2Rows": [
+      {
+        "label": "2.危险性概述",
+        "val": "2.危险性概述"
+      },
+      {
+        "label": "2.1 GHS危险性类别：",
+        "val": "急性毒性（吸入），类别4（H332） 皮肤腐蚀/刺激，类别3（H316） 严重眼睛损伤/眼睛刺激性，类别2B（H320） 生殖毒性物质，类别1B（H360） 特异性靶器官系统毒性 一次接触，类别1（H370） 特异性靶器官系统毒性 反复接触，类别2（H373）"
+      },
+      {
+        "label": "2.2 GHS标签要素：",
+        "val": ""
+      },
+      {
+        "label": "GHS象形图：",
+        "val": "[象形图]"
+      },
+      {
+        "label": "2.3 信号词：",
+        "val": "危险"
+      },
+      {
+        "label": "2.4 危险性说明：",
+        "val": "H316造成轻微皮肤刺激。 H320造成眼睛刺激。 H332吸入有害。 H360可能对生育能力或胎儿造成伤害。 H370可能对器官的伤害。 H373长期或重复暴露可能会对器官造成伤害（肝）。"
+      },
+      {
+        "label": "2.5 防范说明：",
+        "val": "预防措施： P201 在使用前获取特别指示。 P202 在阅读并了解所有安全预防措施之前，切勿操作与处置。 P260 不要吸入粉尘/烟/气体/气雾/蒸气/喷雾。 P264 操作后彻底清洗双手。 P270 使用本产品时不要进食、饮水或吸烟。 P271 只能在室外或通风良好处使用。 P280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。 事故响应： P304+P340 如误吸入：将人转移到空气新鲜处，保持呼吸舒适体位。 P305+P351+P338 如果进入眼睛：用水小心地冲洗几分钟。如简便易行，摘除隐形眼镜，继续冲洗。 P308+P313 如果接触到或有疑虑：求医/就诊。 P337+P313 如眼刺激持续不退：求医/就诊。 P370+P378 火灾时：使用泡沫，干粉灭火器或二氧化碳灭火。 安全储存： P405 储存处须加锁。 废弃处置： P501 处置内装物/容器按照当地规章。"
+      },
+      {
+        "label": "2.6 其他危害",
+        "val": "无适用资料。"
+      }
+    ],
+    "s3CompCount": 3,
+    "s3Comps": [
+      {
+        "name": "聚氨酯分散体",
+        "cas": "9009-54-5",
+        "conc": "28.0~31.0"
+      },
+      {
+        "name": "去离子水",
+        "cas": "7732-18-5",
+        "conc": "53.0~57.0"
+      },
+      {
+        "name": "N,N－二甲基乙酰胺(DMAC)",
+        "cas": "127-19-5",
+        "conc": "15.0~16.0"
+      }
+    ],
+    "s8Rows": 11,
+    "s8HasEmptyControlTable": false,
+    "s9Rows": 24,
+    "s11Rows": 14,
+    "s11IsPureStatement": false,
+    "s11HasDeadweight": false,
+    "s12Rows": 4,
+    "s13Rows": 3,
+    "auditIssueCount": 0,
+    "auditIssues": []
+  },
+  {
+    "name": "HPU-7651",
+    "cat": "1-2 羟基聚氨酯 HPU",
+    "s2RowCount": 6,
+    "s2Rows": [
+      {
+        "label": "2.危险性概述",
+        "val": "2.危险性概述"
+      },
+      {
+        "label": "物质或混合物分类",
+        "val": "物质或混合物分类"
+      },
+      {
+        "label": "2.1 物质或混合物分类：",
+        "val": "根据GHS不属于危害化学品"
+      },
+      {
+        "label": "2.2 GHS标签要素：",
+        "val": ""
+      },
+      {
+        "label": "2.3 防范说明：",
+        "val": ""
+      },
+      {
+        "label": "2.4 其他危害",
+        "val": "无适用资料。"
+      }
+    ],
+    "s3CompCount": 3,
+    "s3Comps": [
+      {
+        "name": "聚氨酯聚合物",
+        "cas": "商业机密",
+        "conc": "＞30"
+      },
+      {
+        "name": "水",
+        "cas": "7732-18-5",
+        "conc": "＞60"
+      },
+      {
+        "name": "N,N-二甲基乙醇胺",
+        "cas": "108-01-0",
+        "conc": "1-5"
+      }
+    ],
+    "s8Rows": 12,
+    "s8HasEmptyControlTable": false,
+    "s9Rows": 20,
+    "s11Rows": 9,
+    "s11IsPureStatement": false,
+    "s11HasDeadweight": false,
+    "s12Rows": 4,
+    "s13Rows": 3,
+    "auditIssueCount": 0,
+    "auditIssues": []
+  },
+  {
+    "name": "PA-3615",
+    "cat": "2-1 丙烯酸乳液 PA",
+    "s2RowCount": 4,
+    "s2Rows": [
+      {
+        "label": "2.危险性概述",
+        "val": "2.危险性概述"
+      },
+      {
+        "label": "2.1 物质或混合物的分类：",
+        "val": "GHS 危险性类别： 根据 GHS 不属于危害化学品。"
+      },
+      {
+        "label": "2.2 标签要素：",
+        "val": "GHS-象形图 根据 GHS 不属于危害化学品。"
+      },
+      {
+        "label": "2.3 其他危害：",
+        "val": "无适用资料。"
+      }
+    ],
+    "s3CompCount": 2,
+    "s3Comps": [
+      {
+        "name": "丙烯酸共聚物",
+        "cas": "商业机密",
+        "conc": "> 30"
+      },
+      {
+        "name": "去离子水",
+        "cas": "7732-18-5",
+        "conc": "> 50"
+      }
+    ],
+    "s8Rows": 12,
+    "s8HasEmptyControlTable": false,
+    "s9Rows": 20,
+    "s11Rows": 7,
+    "s11IsPureStatement": false,
+    "s11HasDeadweight": false,
+    "s12Rows": 4,
+    "s13Rows": 3,
+    "auditIssueCount": 0,
+    "auditIssues": []
+  },
+  {
+    "name": "PA-3110",
+    "cat": "2-3 羟基丙烯酸 PA",
+    "s2RowCount": 4,
+    "s2Rows": [
+      {
+        "label": "2.危险性概述",
+        "val": "2.危险性概述"
+      },
+      {
+        "label": "2.1 GHS标签要素：",
+        "val": ""
+      },
+      {
+        "label": "GHS象形图：",
+        "val": ""
+      },
+      {
+        "label": "2.2 其他危害",
+        "val": "无适用资料。"
+      }
+    ],
+    "s3CompCount": 5,
+    "s3Comps": [
+      {
+        "name": "羟基丙烯酸酯聚合物",
+        "cas": "商业机密",
+        "conc": "＞40"
+      },
+      {
+        "name": "水",
+        "cas": "7732-18-5",
+        "conc": "＞40"
+      },
+      {
+        "name": "乙二醇丁醚",
+        "cas": "111-76-2",
+        "conc": "3.5"
+      },
+      {
+        "name": "S-100",
+        "cas": "64742-95-6",
+        "conc": "3.5"
+      },
+      {
+        "name": "N,N二甲基乙醇胺",
+        "cas": "108-01-0",
+        "conc": "1-2"
+      }
+    ],
+    "s8Rows": 12,
+    "s8HasEmptyControlTable": false,
+    "s9Rows": 19,
+    "s11Rows": 4,
+    "s11IsPureStatement": false,
+    "s11HasDeadweight": false,
+    "s12Rows": 4,
+    "s13Rows": 3,
+    "auditIssueCount": 0,
+    "auditIssues": []
+  },
+  {
+    "name": "PUA-1011",
+    "cat": "3 聚氨酯改性丙烯酸 PUA",
+    "s2RowCount": 8,
+    "s2Rows": [
+      {
+        "label": "2.危险性概述",
+        "val": "2.危险性概述"
+      },
+      {
+        "label": "2.1 GHS危险性类别：",
+        "val": "生殖毒性物质，类别1B（H360）"
+      },
+      {
+        "label": "2.2 GHS标签要素：",
+        "val": ""
+      },
+      {
+        "label": "GHS象形图：",
+        "val": "[象形图]"
+      },
+      {
+        "label": "2.3 信号词：",
+        "val": "危险"
+      },
+      {
+        "label": "2.4 危险性说明：",
+        "val": "H360可能对胎儿造成伤害。"
+      },
+      {
+        "label": "2.5 防范说明：",
+        "val": "预防措施： P201 在使用前获取特别指示。 P202 在阅读并了解所有安全预防措施之前，切勿操作与处置。 P280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。 事故响应： P308+P313 如接触到或有疑虑：求医/就诊。 安全储存： P405 储存处须加锁。 废弃处置： P501 处置内装物/容器按照当地规章。"
+      },
+      {
+        "label": "2.6 其他危害",
+        "val": "可能存在透皮吸收N－甲基吡咯烷酮的危险"
+      }
+    ],
+    "s3CompCount": 4,
+    "s3Comps": [
+      {
+        "name": "丙烯酸改性聚氨酯聚合物",
+        "cas": "商业机密",
+        "conc": "30-40"
+      },
+      {
+        "name": "水",
+        "cas": "7732-18-5",
+        "conc": "50-60"
+      },
+      {
+        "name": "N-甲基吡咯烷酮",
+        "cas": "872-50-4",
+        "conc": "5-15"
+      },
+      {
+        "name": "三乙胺",
+        "cas": "121-44-8",
+        "conc": "0.5-2"
+      }
+    ],
+    "s8Rows": 12,
+    "s8HasEmptyControlTable": false,
+    "s9Rows": 20,
+    "s11Rows": 13,
+    "s11IsPureStatement": false,
+    "s11HasDeadweight": false,
+    "s12Rows": 4,
+    "s13Rows": 3,
+    "auditIssueCount": 0,
+    "auditIssues": []
+  },
+  {
+    "name": "EP-1601",
+    "cat": "4-1 水性环氧 EP",
+    "s2RowCount": 6,
+    "s2Rows": [
+      {
+        "label": "2.危险性概述",
+        "val": "2.危险性概述"
+      },
+      {
+        "label": "物质或混合物分类",
+        "val": "物质或混合物分类"
+      },
+      {
+        "label": "2.1 物质或混合物分类：",
+        "val": "GHS危险性类别: 对水环境有慢性危害, 类别 3 (H412)"
+      },
+      {
+        "label": "2.2 GHS标签要素：",
+        "val": "GHS-象形图 [象形图] 必须列在标签上的有害成份 2-丁氧基乙醇 CHS危险性类别: 危害性说明： H412 对水生生物有害并具有长期持续影响。"
+      },
+      {
+        "label": "2.3 防范说明：",
+        "val": "预防措施： P273 禁止排入环境。 废弃处置： P501 将本品或其容器送至有资质的废物处理厂处置。"
+      },
+      {
+        "label": "2.4 其他危害",
+        "val": "无适用资料。"
+      }
+    ],
+    "s3CompCount": 4,
+    "s3Comps": [
+      {
+        "name": "环氧聚合物",
+        "cas": "商业机密",
+        "conc": "＞35"
+      },
+      {
+        "name": "水",
+        "cas": "7732-18-5",
+        "conc": "＞35"
+      },
+      {
+        "name": "2-丁氧基乙醇",
+        "cas": "111-76-2",
+        "conc": "10-20"
+      },
+      {
+        "name": "N,N二甲基乙醇胺",
+        "cas": "108-01-0",
+        "conc": "0.2-2"
+      }
+    ],
+    "s8Rows": 12,
+    "s8HasEmptyControlTable": false,
+    "s9Rows": 20,
+    "s11Rows": 2,
+    "s11IsPureStatement": true,
+    "s11HasDeadweight": false,
+    "s12Rows": 4,
+    "s13Rows": 3,
+    "auditIssueCount": 0,
+    "auditIssues": []
+  },
+  {
+    "name": "EC-1800",
+    "cat": "4-2 水性环氧固化剂 EC",
+    "s2RowCount": 6,
+    "s2Rows": [
+      {
+        "label": "2.危险性概述",
+        "val": "2.危险性概述"
+      },
+      {
+        "label": "物质或混合物分类",
+        "val": "物质或混合物分类"
+      },
+      {
+        "label": "2.1 物质或混合物分类：",
+        "val": "GHS危险性类别: 对水环境有慢性危害, 类别 3 (H412)"
+      },
+      {
+        "label": "2.2 GHS标签要素：",
+        "val": "GHS-象形图 丙二醇甲醚 危害性说明： H412 对水生生物有害并具有长期持续影响。"
+      },
+      {
+        "label": "2.3 防范说明：",
+        "val": "预防措施： P273 禁止排入环境。 废弃处置： P501 将本品或其容器送至有资质的废物处理厂处置。"
+      },
+      {
+        "label": "2.4 其他危害",
+        "val": "无适用资料。"
+      }
+    ],
+    "s3CompCount": 3,
+    "s3Comps": [
+      {
+        "name": "环氧胺加成物",
+        "cas": "商业机密",
+        "conc": "＞35"
+      },
+      {
+        "name": "水",
+        "cas": "7732-18-5",
+        "conc": "＞45"
+      },
+      {
+        "name": "丙二醇甲醚",
+        "cas": "5131-66-8",
+        "conc": "5-10"
+      }
+    ],
+    "s8Rows": 12,
+    "s8HasEmptyControlTable": false,
+    "s9Rows": 20,
+    "s11Rows": 2,
+    "s11IsPureStatement": true,
+    "s11HasDeadweight": false,
+    "s12Rows": 4,
+    "s13Rows": 3,
+    "auditIssueCount": 0,
+    "auditIssues": []
+  },
+  {
+    "name": "UV-5100",
+    "cat": "5 光固化树脂 UV",
+    "s2RowCount": 6,
+    "s2Rows": [
+      {
+        "label": "2.危险性概述",
+        "val": "2.危险性概述"
+      },
+      {
+        "label": "物质或混合物分类",
+        "val": "物质或混合物分类"
+      },
+      {
+        "label": "2.1 物质或混合物分类：",
+        "val": "根据GHS不属于危害化学品"
+      },
+      {
+        "label": "2.2 GHS标签要素：",
+        "val": ""
+      },
+      {
+        "label": "2.3 防范说明：",
+        "val": ""
+      },
+      {
+        "label": "2.4 其他危害",
+        "val": "无适用资料。"
+      }
+    ],
+    "s3CompCount": 4,
+    "s3Comps": [
+      {
+        "name": "聚氨酯/脲聚合物",
+        "cas": "N/A",
+        "conc": "30-40"
+      },
+      {
+        "name": "三乙胺",
+        "cas": "121-44-8",
+        "conc": "0.5-2"
+      },
+      {
+        "name": "丙酮",
+        "cas": "67-64-1",
+        "conc": "0.1-1"
+      },
+      {
+        "name": "水",
+        "cas": "7732-18-5",
+        "conc": "＞50"
+      }
+    ],
+    "s8Rows": 11,
+    "s8HasEmptyControlTable": false,
+    "s9Rows": 24,
+    "s11Rows": 2,
+    "s11IsPureStatement": true,
+    "s11HasDeadweight": false,
+    "s12Rows": 4,
+    "s13Rows": 3,
+    "auditIssueCount": 0,
+    "auditIssues": []
+  },
+  {
+    "name": "OS-9012",
+    "cat": "6-1 异氰酸酯固化剂 OS",
+    "s2RowCount": 6,
+    "s2Rows": [
+      {
+        "label": "2.危险性概述",
+        "val": "2.危险性概述"
+      },
+      {
+        "label": "物质或混合物分类",
+        "val": "物质或混合物分类"
+      },
+      {
+        "label": "2.1 物质或混合物分类：",
+        "val": "GHS危险性类别: 急性毒性，吸入性，类别 4 (H332) 皮肤致敏，类别 1B (H317) 对水环境有慢性危害，类别 3 (H412) 特异性靶器官有毒（一次性接触），类别 3 (H335)"
+      },
+      {
+        "label": "2.2 GHS标签要素：",
+        "val": "GHS-象形图 [象形图] 必须列在标签上的有害成分 基于HDI的亲水脂肪族聚异氰酸酯 危害性说明： H332吸入有害。 H317可能造成皮肤过敏反应。 H335可能造成呼吸道刺激。 H412对水生生物有害并具有长期持续影响。"
+      },
+      {
+        "label": "2.3 防范说明：",
+        "val": "预防措施： P273 禁止排入环境。 废弃处置： P501 将本品或其容器送至有资质的废物外理厂处置。"
+      },
+      {
+        "label": "2.4 其他危害",
+        "val": "无适用资料。"
+      }
+    ],
+    "s3CompCount": 2,
+    "s3Comps": [
+      {
+        "name": "聚乙二醇单甲醚封闭的六甲撑二异氰酸酯基均聚物",
+        "cas": "143472-08-6",
+        "conc": "≥95%"
+      },
+      {
+        "name": "六甲撑二异氰酸酯",
+        "cas": "822-06-0",
+        "conc": "≤0.2%"
+      }
+    ],
+    "s8Rows": 15,
+    "s8HasEmptyControlTable": true,
+    "s9Rows": 15,
+    "s11Rows": 7,
+    "s11IsPureStatement": false,
+    "s11HasDeadweight": false,
+    "s12Rows": 4,
+    "s13Rows": 3,
+    "auditIssueCount": 0,
+    "auditIssues": []
+  },
+  {
+    "name": "BL-8085",
+    "cat": "6-2 封闭型固化剂 BL",
+    "s2RowCount": 4,
+    "s2Rows": [
+      {
+        "label": "2.危险性概述",
+        "val": "2.危险性概述"
+      },
+      {
+        "label": "2.1 物质或混合物的分类：",
+        "val": "GHS 危险性类别： 根据 GHS 不属于危害化学品。"
+      },
+      {
+        "label": "2.2 标签要素：",
+        "val": "GHS-象形图 根据 GHS 不属于危害化学品。"
+      },
+      {
+        "label": "2.3 其他危害：",
+        "val": "无适用资料。"
+      }
+    ],
+    "s3CompCount": 2,
+    "s3Comps": [
+      {
+        "name": "封闭型异氰酸酯",
+        "cas": "商业机密",
+        "conc": "＞30"
+      },
+      {
+        "name": "水",
+        "cas": "7732-18-5",
+        "conc": "＞50"
+      }
+    ],
+    "s8Rows": 12,
+    "s8HasEmptyControlTable": false,
+    "s9Rows": 19,
+    "s11Rows": 8,
+    "s11IsPureStatement": false,
+    "s11HasDeadweight": false,
+    "s12Rows": 4,
+    "s13Rows": 3,
+    "auditIssueCount": 0,
+    "auditIssues": []
+  },
+  {
+    "name": "OS-8000",
+    "cat": "6-3 碳化二亚胺 OS",
+    "s2RowCount": 4,
+    "s2Rows": [
+      {
+        "label": "2.危险性概述",
+        "val": "2.危险性概述"
+      },
+      {
+        "label": "2.1 物质或混合物的分类：",
+        "val": "GHS 危险性类别： 根据 GHS 不属于危害化学品。"
+      },
+      {
+        "label": "2.2 标签要素：",
+        "val": "GHS-象形图 根据 GHS 不属于危害化学品。"
+      },
+      {
+        "label": "2.3 其他危害：",
+        "val": "无适用资料。"
+      }
+    ],
+    "s3CompCount": 2,
+    "s3Comps": [
+      {
+        "name": "脂肪族聚碳化二亚胺",
+        "cas": "商业机密",
+        "conc": "＞35"
+      },
+      {
+        "name": "水",
+        "cas": "7732-18-5",
+        "conc": "55-65"
+      }
+    ],
+    "s8Rows": 16,
+    "s8HasEmptyControlTable": true,
+    "s9Rows": 15,
+    "s11Rows": 7,
+    "s11IsPureStatement": false,
+    "s11HasDeadweight": false,
+    "s12Rows": 4,
+    "s13Rows": 3,
+    "auditIssueCount": 0,
+    "auditIssues": []
+  },
+  {
+    "name": "2-苯氧基乙醇",
+    "cat": "7 水性助剂 OS等",
+    "s2RowCount": 4,
+    "s2Rows": [
+      {
+        "label": "2.危险性概述",
+        "val": "2.危险性概述"
+      },
+      {
+        "label": "2.1 物质或混合物的分类：",
+        "val": "GHS 危险性类别： 根据 GHS 不属于危害化学品。"
+      },
+      {
+        "label": "2.2 标签要素：",
+        "val": "GHS-象形图 根据 GHS 不属于危害化学品。"
+      },
+      {
+        "label": "2.3 其他危害：",
+        "val": "无适用资料。"
+      }
+    ],
+    "s3CompCount": 1,
+    "s3Comps": [
+      {
+        "name": "2-苯氧基乙醇",
+        "cas": "122-99-6",
+        "conc": "99"
+      }
+    ],
+    "s8Rows": 12,
+    "s8HasEmptyControlTable": false,
+    "s9Rows": 11,
+    "s11Rows": 7,
+    "s11IsPureStatement": false,
+    "s11HasDeadweight": false,
+    "s12Rows": 4,
+    "s13Rows": 3,
+    "auditIssueCount": 0,
+    "auditIssues": []
+  },
+  {
+    "name": "OS-8950",
+    "cat": "水性噁唑啉交联剂",
+    "s2RowCount": 6,
+    "s2Rows": [
+      {
+        "label": "2.危险性概述",
+        "val": "2.危险性概述"
+      },
+      {
+        "label": "物质或混合物分类",
+        "val": "物质或混合物分类"
+      },
+      {
+        "label": "2.1 物质或混合物分类：",
+        "val": "GHS危险性类别: 易燃液体，类别 3 (H226) 急性毒性，吸入性，类别 4 (H336)"
+      },
+      {
+        "label": "2.2 GHS标签要素：",
+        "val": "GHS-象形图 [象形图] 危害性说明： H226 易燃液体和蒸汽。 H336可能引起嗜睡或头晕。"
+      },
+      {
+        "label": "2.3 防范说明：",
+        "val": "预防措施： P210 远离热源/火花/明火。禁止吸烟。 P260 不要吸入粉尘/烟气/气体/烟雾/蒸汽/喷雾。 P271 仅在户外或通风良好处使用。 P280 戴防护手套/宇防护服/戴防护眼镜/戴防护面罩。"
+      },
+      {
+        "label": "2.4 其他危害",
+        "val": "无适用资料。"
+      }
+    ],
+    "s3CompCount": 3,
+    "s3Comps": [
+      {
+        "name": "噁唑啉改性丙烯酸类聚合物",
+        "cas": "商业机密",
+        "conc": "40-50"
+      },
+      {
+        "name": "丙二醇甲醚",
+        "cas": "107-98-2",
+        "conc": "30-40"
+      },
+      {
+        "name": "水",
+        "cas": "7732-18-5",
+        "conc": "15-25"
+      }
+    ],
+    "s8Rows": 16,
+    "s8HasEmptyControlTable": true,
+    "s9Rows": 15,
+    "s11Rows": 7,
+    "s11IsPureStatement": false,
+    "s11HasDeadweight": false,
+    "s12Rows": 4,
+    "s13Rows": 3,
+    "auditIssueCount": 0,
+    "auditIssues": []
+  },
+  {
+    "name": "EP-8801",
+    "cat": "非水性无溶剂",
+    "s2RowCount": 6,
+    "s2Rows": [
+      {
+        "label": "2.危险性概述",
+        "val": "2.危险性概述"
+      },
+      {
+        "label": "物质或混合物分类",
+        "val": "物质或混合物分类"
+      },
+      {
+        "label": "2.1 物质或混合物分类：",
+        "val": "GHS危险性类别: 急性毒性，吸入性，类别 4 (H332) 皮肤致敏，类别 1B (H317) 对水环境有慢性危害，类别 3 (H412)"
+      },
+      {
+        "label": "2.2 GHS标签要素：",
+        "val": "GHS-象形图 [象形图] 危害性说明： H313解除皮肤可能有害。 H320造成眼刺激。 H402对水生生物有害。"
+      },
+      {
+        "label": "2.3 防范说明：",
+        "val": "预防措施： P210 远离热源/火花/明火/热表面。-禁止吸烟 P264 操作后彻底清洁皮肤。 P273 避免释放到环境中。 P280 戴防护手套/穿防护服/戴防护眼罩/戴防护面具。 事故响应： P302+P352 如果在皮肤上：用大量肥皂和水淋洗。 P305+P351+P338 如进入眼睛：用水小心清洗几分钟。如戴隐形眼镜并可方便地取出，取出隐形眼镜。继续冲洗。 P310 立即呼救解毒中心或医生。 P321 具体治疗（见本标签上提供的急救指导）。 P362 脱掉沾染的衣服，清洗后方可重新使用。"
+      },
+      {
+        "label": "2.4 其他危害",
+        "val": "无适用资料。"
+      }
+    ],
+    "s3CompCount": 2,
+    "s3Comps": [
+      {
+        "name": "改性环氧树脂",
+        "cas": "商业机密",
+        "conc": "＞50"
+      },
+      {
+        "name": "甲醇",
+        "cas": "67-56-1",
+        "conc": "＜0.5%"
+      }
+    ],
+    "s8Rows": 11,
+    "s8HasEmptyControlTable": false,
+    "s9Rows": 14,
+    "s11Rows": 7,
+    "s11IsPureStatement": false,
+    "s11HasDeadweight": false,
+    "s12Rows": 4,
+    "s13Rows": 3,
+    "auditIssueCount": 0,
+    "auditIssues": []
+  }
+]

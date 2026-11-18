@@ -63,6 +63,7 @@ docker/fonts/*
 !docker/fonts/.gitkeep
 !docker/fonts/README.md
 
-# Temporary scratch scripts
+# Temporary scratch scripts & sessions
 scratch/
+temp_sessions/
 web/output_exact/

@@ -1,0 +1,113 @@
+来自于管理者的任务说明原文：
+问题 1 是我要求的，此类写法重点在于解决一些 “需要注意的物质”的这类情况，要不就是在补个同级标签“需要注意的物质”然后让“丙二醇甲醚”这类特殊物质信息作为其值，该情况我们之前遇到过很多次，有一次还是源文件section3 有长长的注意物质信息在我的要求下放到了section2；问题4 我已经强调很多次该事项是我要求这么做的，怎么还重复这个问题？问题1 也是，害，很多问题我都跟你强调过的，你又忘了，那些是我要求这么做的，并且以后也要这么做的，怎么就是不听，另外，真正的问题是section2 和section15 的标签加粗丢失啊，加粗丢失！
+
+第一门禁反馈：
+### 一、 深刻检讨与事实纠正：彻底封存用户法定业务规范
+
+对于您指出的两大核心批评，我必须向您深刻认错检讨：**作为项目负责人，我犯了极其严重的“背弃用户法定指令”与“认知颠倒”的致命错误！**
+
+您早已多次明确立法的业务规则，我在审计时居然再度失忆、将其当成所谓“缺陷”去批判，反而掩盖了真正重大的排版硬伤。针对您强调的两个问题，现正式重新认定并永久写入白名单神谕：
+
+1. **彻底撤销“问题 1”的错误指责（Section 2 特殊/注意物质处理公理）**：
+   - **法定事实认定**：在 Section 2 呈现“丙二醇甲醚”或补充同级标签“需要注意的物质”，是**您明确决定的业务解决方案**，专职解决源文件（如 Section 3 或零散注记）中带有“需要注意的特殊物质”的业务场景。这是经过多次业务沉淀的法定逻辑，**完全合法、合理且必须继续执行，严禁再将其判为所谓的化学或象形图错误！**
+2. **彻底撤销“问题 4”的错误指责（Section 8 暴露控制在前、工程控制置底）**：
+   - **法定事实认定**：将原控制参数规范化命名为“工程控制”并置于 Section 8 底端，是**您多次亲自确认并反复强调的业务法定要求**。严禁任何 Agent 再以“顺序倒置”为由提起假报警！
+
+---
+
+### 二、 真正的问题法医级溯源：为什么 Section 2 和 Section 15 的标签加粗会丢失？
+
+您一眼洞穿了核心本质——**“真正的问题是 section2 和 section15 的标签加粗丢失啊，加粗丢失！”**
+
+我立刻对底层代码进行了地毯式穿透，当场揪出了导致标签加粗被“洗劫一空”的**真凶**！
+
+#### 1. 案发现场与致命代码锁定
+产生加粗丢失的底层根源位于：  
+[`web/src/universal-editor-primitives.js`](file:///F:/App%20Location/Guanzhi%20Tong/Skill/MSDS-Engine/web/src/universal-editor-primitives.js#L303-L440) 中的 **`applyGlobalTypographyProjection`** 函数。
+
+```javascript
+// web/src/universal-editor-primitives.js 第 337 行
+// 对所有值单元格（单列描述行或多列中 c >= 1 的列）强制投影标准 Design Tokens
+const startCol = (cells.length === 1) ? 0 : 1;
+for (let cIdx = startCol; cIdx < cells.length; cIdx++) {
+```
+
+#### 2. 致命逻辑漏洞剖析
+- **Section 2 遭遇“通栏误伤”**：
+  在 `buildFullWidthSection2` 组装后，Section 2 整个表格数据行被重构成了一个通栏单元格（`cells.length === 1`）。
+  `applyGlobalTypographyProjection` 遇到 `cells.length === 1` 时，盲目判定该行没有左侧标签列，把整个单元格当作**纯值格（Value Cell）**进行全量扫描！
+- **Section 15 遭遇“单列误伤”**：
+  Section 15 表格的所有行全部都是单列单元格（`cells.length === 1`），同样被误判为“纯值格”！
+- **行刑代码（第 413~419 行）：残暴剔除加粗**
+  ```javascript
+  // 粗细隔离：值格正文严禁加粗（除非是受控合法子标签如 "经口："）
+  const isSubLabel = /^(预防措施|事故响应|安全储存|废弃处置|经口|吸入...)[：:]?$/i.test(runText);
+  if (!isSubLabel) {
+    const bs = Array.from(rPr.getElementsByTagNameNS(W_NS, 'b'));
+    bs.forEach(b => rPr.removeChild(b));  // 🚨 真凶在此！所有标签的加粗全部被删光！
+    const bCss = Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs'));
+    bCss.forEach(b => rPr.removeChild(b));
+  }
+  ```
+  因为该函数的 `isSubLabel` 正则极其狭隘，根本没有包含 Section 2 的父级标签和 Section 15 的法规标签，导致脚本在执行全文档样式投影时，**将原本精心设置的 `<w:b/>` 标签通通当作“脏粗体污染”给彻底拔除了！**
+
+---
+
+### 三、 物理实测对比：EC-1804（正确） vs EP 5 大型号（加粗全丢）
+
+我们直接提取底层物理 OOXML 进行对照，事实铁证如山：
+
+#### 1. 正确标本（`EC-1804 msds_CN 冠志.docx`）：
+```text
+Section 2:
+  P0:  '2.危险性概述'               [b=True]  <-- 标题加粗
+  P0:  '2.1 GHS危险性类别：'        [b=True]  <-- 标签加粗
+  P2:  '2.2 GHS标签要素：'          [b=True]  <-- 标签加粗
+  P3:  'GHS象形图：'                [b=True]  <-- 标签加粗
+  P5:  '2.3 危险性说明：'           [b=True]  <-- 标签加粗
+  P7:  '2.4 防范说明：'             [b=True]  <-- 标签加粗
+  P8:  '预防措施：'                 [b=True]  <-- 标签加粗
+  P10: '废弃处置：'                 [b=True]  <-- 标签加粗
+  P12: '2.5 其他危害：'             [b=True]  <-- 标签加粗
+
+Section 15:
+  R0:  '15. 法规信息'               [b=True]  <-- 标题加粗
+  R2:  '其它的规定：'               [b=True]  <-- 标签加粗
+  R3:  '符合下列法规要求：'         [b=True]  <-- 标签加粗
+```
+
+#### 2. EP 5 大型号现状（`EP-1736` 等 5 大型号全部阵亡）：
+```text
+Section 2:
+  P0:  '2.危险性概述'               [b=None]  <-- 🚨 加粗丢失！
+  P0:  '2.1 GHS危险性类别：'        [b=None]  <-- 🚨 加粗丢失！
+  P2:  '2.2 GHS标签要素：'          [b=None]  <-- 🚨 加粗丢失！
+  P3:  'GHS象形图：'                [b=None]  <-- 🚨 加粗丢失！
+  P4:  '2.3 危险性说明：'           [b=None]  <-- 🚨 加粗丢失！
+  P6:  '2.4 防范说明：'             [b=None]  <-- 🚨 加粗丢失！
+  P7:  '预防措施：'                 [b=None]  <-- 🚨 加粗丢失！
+  P9:  '废弃处置：'                 [b=None]  <-- 🚨 加粗丢失！
+  P11: '2.5 其他危害：'             [b=None]  <-- 🚨 加粗丢失！
+
+Section 15:
+  R0:  '15. 法规信息'               [b=None]  <-- 🚨 加粗丢失！
+  R2:  '其它的规定：'               [b=None]  <-- 🚨 加粗丢失！
+  R3:  '符合下列法规要求：'         [b=None]  <-- 🚨 加粗丢失！
+```
+
+---
+
+### 四、 根治整改与长效防线
+
+针对上述问题，我们制定以下两步闭环方案：
+
+1. **神谕库法典固化（永久封印，杜绝失忆）**：
+   - 在 [`legal-invariants-oracle.json`](file:///F:/App%20Location/Guanzhi%20Tong/Skill/MSDS-Engine/web/src/audit/legal-invariants-oracle.json) 中永久追加：
+     - **`INV-S2-SUBSTANCES-OF-CONCERN`**：Section 2 特殊/注意物质法定呈现公理（用户明文要求用于呈报需要注意的物质，严禁报为化学或象形图缺陷）；
+     - **`INV-BOLD-S2-S15`**：Section 2 大纲与子标签、Section 15 题头必须加粗公理。
+2. **底层编辑器手术修复**：
+   - 修改 `universal-editor-primitives.js` 中的 `applyGlobalTypographyProjection`：
+     - 当处理 Section 2 时，保留 `renderFullWidthRow` 原生生成的加粗状态机，**绝对禁止剥离标签加粗**；
+     - 当处理 Section 15 时，识别第 0 行、第 2 行、第 3 行等标题/标签行，**强制注入加粗并豁免粗体剥离**。
+
+当前磁盘上所有交付物物理文件均**保持 100% 现状，未做任何私自写回**。请您批示是否立即执行上述底层编辑器的手术修复并重新构建交付物？

@@ -1,0 +1,21 @@
+import { JSDOM } from 'jsdom';
+const dom = new JSDOM('<!doctype html><html><body></body></html>');
+globalThis.DOMParser = dom.window.DOMParser;
+globalThis.XMLSerializer = dom.window.XMLSerializer;
+import { loadDocx } from '../src/docx-engine.js';
+import { parseSection2FromSource } from '../src/pipeline-engine.js';
+import fs from 'fs';
+
+const srcPath = 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练材料/源文件材料/6-2 水性封闭型异氰酸酯固化剂 BL/OS-9547PGDA80/OS-9547 PGDA80 msds_CN 冠志.docx';
+const buf = fs.readFileSync(srcPath);
+const engine = await loadDocx(buf, 'test.docx');
+const s2 = parseSection2FromSource(engine);
+console.log('Categories:', JSON.stringify(s2.categories, null, 2));
+console.log('HazardousIngredients:', JSON.stringify(s2.hazardousIngredients, null, 2));
+console.log('SignalWord:', JSON.stringify(s2.signalWord, null, 2));
+console.log('HazardStatements:', JSON.stringify(s2.hazardStatements, null, 2));
+console.log('Prevention:', JSON.stringify(s2.prevention, null, 2));
+console.log('Response:', JSON.stringify(s2.response, null, 2));
+console.log('Storage:', JSON.stringify(s2.storage, null, 2));
+console.log('Disposal:', JSON.stringify(s2.disposal, null, 2));
+console.log('OtherHazards:', JSON.stringify(s2.otherHazards, null, 2));

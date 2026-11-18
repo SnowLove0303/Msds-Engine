@@ -714,13 +714,28 @@ function parsePartRecords(xml, partName, relationshipMap, prefix = '', numbering
   const root = xml.documentElement;
   const records = [];
   let tableIndex = 0;
+  let currentSectionNumber = null;
+  let currentSectionTitle = null;
   for (const child of directChildren(root, 'body').flatMap((body) => directChildren(body))) {
     if (localName(child) === 'tbl') {
-      records.push(buildTableRecord(child, tableIndex, partName, relationshipMap, prefix, numbering));
+      const rec = buildTableRecord(child, tableIndex, partName, relationshipMap, prefix, numbering);
+      if (rec.sectionNumber) {
+        currentSectionNumber = rec.sectionNumber;
+        currentSectionTitle = rec.title;
+      } else if (currentSectionNumber) {
+        rec.sectionNumber = currentSectionNumber;
+        rec.section = prefix || `第 ${currentSectionNumber} 部分`;
+      }
+      records.push(rec);
       tableIndex += 1;
     } else if (localName(child) === 'p') {
       const paragraph = parseParagraph(child, numbering);
       if (paragraph.text || paragraph.segments.length) {
+        const info = sectionInfo(paragraph.text, tableIndex);
+        if (info.sectionNumber) {
+          currentSectionNumber = info.sectionNumber;
+          currentSectionTitle = info.title;
+        }
         records.push({
           id: `${partName}-paragraph-${records.length}`,
           kind: 'text',
@@ -729,8 +744,8 @@ function parsePartRecords(xml, partName, relationshipMap, prefix = '', numbering
           text: paragraph.text,
           content: paragraph.segments,
           paragraph,
-          section: prefix || '文档正文',
-          sectionNumber: null,
+          section: info.sectionNumber ? `第 ${info.sectionNumber} 部分` : (currentSectionNumber ? `第 ${currentSectionNumber} 部分` : (prefix || '文档正文')),
+          sectionNumber: info.sectionNumber || currentSectionNumber,
           searchText: paragraph.text,
         });
       }
@@ -739,10 +754,23 @@ function parsePartRecords(xml, partName, relationshipMap, prefix = '', numbering
   // Header/footer XML has a flat part root instead of w:body.
   if (!records.length) {
     for (const child of directChildren(root)) {
-      if (localName(child) === 'tbl') records.push(buildTableRecord(child, tableIndex++, partName, relationshipMap, prefix, numbering));
+      if (localName(child) === 'tbl') {
+        const rec = buildTableRecord(child, tableIndex++, partName, relationshipMap, prefix, numbering);
+        if (rec.sectionNumber) {
+          currentSectionNumber = rec.sectionNumber;
+        } else if (currentSectionNumber) {
+          rec.sectionNumber = currentSectionNumber;
+          rec.section = prefix || `第 ${currentSectionNumber} 部分`;
+        }
+        records.push(rec);
+      }
       if (localName(child) === 'p') {
         const paragraph = parseParagraph(child, numbering);
-        if (paragraph.text) records.push({ id: `${partName}-paragraph-${records.length}`, kind: 'text', part: partName, title: paragraph.text.slice(0, 80), text: paragraph.text, content: paragraph.segments, paragraph, section: prefix || '正文', sectionNumber: null, searchText: paragraph.text });
+        if (paragraph.text) {
+          const info = sectionInfo(paragraph.text, tableIndex);
+          if (info.sectionNumber) currentSectionNumber = info.sectionNumber;
+          records.push({ id: `${partName}-paragraph-${records.length}`, kind: 'text', part: partName, title: paragraph.text.slice(0, 80), text: paragraph.text, content: paragraph.segments, paragraph, section: prefix || (currentSectionNumber ? `第 ${currentSectionNumber} 部分` : '正文'), sectionNumber: currentSectionNumber, searchText: paragraph.text });
+        }
       }
     }
   }
@@ -918,7 +946,7 @@ export function extractHeaderFooterData(engine) {
   }
 
   // 2. 辅以 Section 1 的补充推断
-  const sec1 = engine.records?.find((r) => r.sectionNumber === 1);
+  const sec1 = engine.records?.find((r) => r.sectionNumber === 1 && r.rows);
   if (sec1) {
     if (!data.model) {
       data.model = extractProductModelFromEngine(engine);
@@ -3110,8 +3138,8 @@ function applyInhalationReclassification(endpoints) {
 }
 
 export function extractToxicologicalEndpointsFromSource(srcEngine) {
-  const s11Src = srcEngine?.records?.find(r => r.sectionNumber === 11);
-  if (!s11Src) return [];
+  const s11Src = srcEngine?.records?.find(r => r.sectionNumber === 11 && r.rows);
+  if (!s11Src || !s11Src.rows) return [];
 
   // 1. 若源文件为标准多行表格 (行数 >= 4 且有独立端点行)
   if (s11Src.rows.length >= 4) {
@@ -4262,8 +4290,8 @@ export function classifyLabelTier(cell, row, paragraph, record) {
 
 export function extractProductModelFromEngine(engine) {
   if (!engine) return '';
-  const sec1 = engine.records?.find((r) => r.sectionNumber === 1);
-  if (!sec1) return '';
+  const sec1 = engine.records?.find((r) => r.sectionNumber === 1 && r.rows);
+  if (!sec1 || !sec1.rows) return '';
 
   for (const r of sec1.rows) {
     for (const c of r.cells) {
@@ -4337,8 +4365,8 @@ export function buildExportDocxName(engine, options = {}) {
     if (/国彩|Guocai/i.test(tplName) || /国彩|Guocai/i.test(srcName) || engine?.headerFooterData?.entity === '国彩') {
       entity = lang === 'EN' ? 'Guocai' : '国彩';
     } else if (engine) {
-      const sec1 = engine.records?.find((r) => r.sectionNumber === 1);
-      if (sec1) {
+      const sec1 = engine.records?.find((r) => r.sectionNumber === 1 && r.rows);
+      if (sec1 && sec1.rows) {
         const allText = sec1.rows.flatMap((r) => r.cells.map((c) => cellRole(c).valueText || '')).join(' ');
         if (/国彩/i.test(allText)) {
           entity = lang === 'EN' ? 'Guocai' : '国彩';

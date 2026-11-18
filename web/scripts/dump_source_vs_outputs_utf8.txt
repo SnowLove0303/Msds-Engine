@@ -1,0 +1,416 @@
+﻿
+=======================================================
+=== SOURCE DOCUMENT (源文件母本): F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练材料/源文件材料/4-2 水性环氧固化剂 EC/EC-1804/EC-1804 msds_CN 冠志(1).docx
+=======================================================
+Header/Footer files: [ 'word/footer1.xml', 'word/header1.xml' ]
+
+--- [SECTION 1] ---
+  Row 0 (1 cols): ["v1.物料及供应商标识"]
+  Row 1 (2 cols): ["1.1产品名称：","EC-1804"]
+  Row 2 (2 cols): ["中文名称：","水性环氧固化剂"]
+  Row 3 (2 cols): ["化学品分类：","改性脂肪胺"]
+  Row 4 (2 cols): ["1.2产品使用建议和使用限制：","涂料"]
+  Row 5 (2 cols): ["1.3供应商信息：",""]
+  Row 6 (2 cols): ["供应商名称：","广州冠志新材料科技有限公司"]
+  Row 7 (2 cols): ["供应商地址：","广州市萝岗区科学城掬泉路3号广州国际企业孵化器A区1106室"]
+  Row 8 (2 cols): ["电话：","86-20-82567990"]
+  Row 9 (2 cols): ["传真：","86-20-32214789"]
+
+--- [SECTION 2] ---
+  Row 0 (1 cols): ["2.危险性概述"]
+  Row 1 (1 cols): ["物质或混合物分类\\n2.1 物质或混合物的分类\\nGHS危险性类别:\\n对水环境有慢性危害, 类别 3 (H412)\\n2.2 标签要素\\n危害性说明:\\nH412 对水生生物有害并具有长期持续影响。\\n防范说明:\\nP273 禁止排入环境。\\nP501 将本品或其容器送至有资质的废物处理厂处置。\\n2.3 其他危险 无适用资料。"]
+
+--- [SECTION 3] ---
+  Row 0 (1 cols): ["3. 成分/组成资料"]
+  Row 1 (2 cols): ["3.1产品类型：","混合物"]
+  Row 2 (3 cols): ["3.2成分","",""]
+  Row 3 (3 cols): ["化学品名称","CAS编号","%（w/w）"]
+  Row 4 (3 cols): ["胺和环氧树脂的加合物","商业机密","38-42"]
+  Row 5 (3 cols): ["水","7732-18-5","58-62"]
+
+--- [SECTION 4] ---
+  Row 0 (1 cols): ["4.急救措施"]
+  Row 1 (2 cols): ["4.1.一般措施：","立即脱掉所有被污染的衣物。"]
+  Row 2 (2 cols): ["4.2.误服：","禁止催吐，须就医。"]
+  Row 3 (2 cols): ["4.3.接触眼睛：","撑开眼睑，用温水长时间冲洗（至少10分钟），就诊眼科医生。"]
+  Row 4 (2 cols): ["4.4.接触皮肤：","立即用肥皂和大量的水冲洗。若发生皮肤反应，就医"]
+  Row 5 (2 cols): ["4.5.吸入：","若刺激呼吸道，就医。"]
+
+--- [SECTION 5] ---
+  Row 0 (1 cols): ["5.消防措施"]
+  Row 1 (2 cols): ["5.1.合适的灭火剂：","二氧化碳（CO2），泡沫，灭火粉末，大火时应用喷洒水"]
+  Row 2 (2 cols): ["5.2.不合适的灭火剂：","高流量的水喷射"]
+  Row 3 (2 cols): ["5.3.物质或混合物的特殊危害：","燃烧时释放一氧化碳、二氧化碳、氮氧化物和少量的氰化氢"]
+  Row 4 (2 cols): ["5.4.消防预防措施和保护设备：","在着火或爆炸情况下，不要吸进烟尘。"]
+
+--- [SECTION 6] ---
+  Row 0 (1 cols): ["6.意外泄漏措施"]
+  Row 1 (2 cols): ["6.1.个人预防措施、应急程序：","戴防护设备。\\n确保充分的通风/排气。令未授权人员离开。"]
+  Row 2 (2 cols): ["6.2.环境保护措施：","禁止排入下水道，废水或土壤中。"]
+  Row 3 (2 cols): ["6.3.污染物收集和清除的方法：","用化学品吸收材料或必要时用干沙收集，并储存与密闭容器中。"]
+
+--- [SECTION 7] ---
+  Row 0 (1 cols): ["7.操作和储存"]
+  Row 1 (2 cols): ["7.1安全操作防范：","操作时遵守化学品的常见预防措施。避免与皮肤和眼睛接触。\\n远离食物、饮料和烟草。休息以前和工作结束时洗手。将工作服单独存放。\\n更换被污染或浸湿的衣物"]
+  Row 2 (2 cols): ["7.2安全储存条件：","容器保持紧闭，存储在干燥通风处。为保持产品质量，必须遵守我们产品信息表的储存条件。"]
+
+--- [SECTION 8] ---
+  Row 0 (1 cols): ["8.接触控制/个人防护"]
+  Row 1 (1 cols): ["8.1控制参数"]
+  Row 2 (1 cols): ["根据EC指令2006/121/EG,无可用的接触限值信息"]
+  Row 3 (1 cols): ["8.2暴露控制"]
+  Row 4 (2 cols): ["呼吸系统防护：","喷涂过程中要求有呼吸防护设备。"]
+  Row 5 (1 cols): ["手部防护："]
+  Row 6 (2 cols): ["防护手套的合适材料：","EN 374-3"]
+  Row 7 (1 cols): ["氟化橡胶 –FKM:厚度≧0.4mm；穿透时间≧480min."]
+  Row 8 (1 cols): ["丁基橡胶 –IIR：厚度≧0.5mm；穿透时间≧480min."]
+  Row 9 (1 cols): ["丁腈橡胶 – NBR：厚度≧0.35mm；穿透时间≧480min."]
+  Row 10 (2 cols): ["建议：","污染的手套应废弃。"]
+  Row 11 (2 cols): ["眼睛防护：","戴眼罩/面罩。"]
+  Row 12 (2 cols): ["身体防护：","穿着适当的防护服。"]
+
+--- [SECTION 9] ---
+  Row 0 (1 cols): ["9. 物理和化学特性"]
+  Row 1 (2 cols): ["9.1外 观：","黄色至浅褐色透明液体"]
+  Row 2 (2 cols): ["9.2嗅觉阀值：","胺味"]
+  Row 3 (2 cols): ["9.3pH值：","无数据"]
+  Row 4 (2 cols): ["9.4离子性：","无数据"]
+  Row 5 (2 cols): ["9.5初沸点：","＞100℃"]
+  Row 6 (2 cols): ["9.6闪点：","＞94℃"]
+  Row 7 (2 cols): ["9.7蒸发速率：","无数据"]
+  Row 8 (2 cols): ["9.8可燃性（固态、气态）：","不适用"]
+  Row 9 (2 cols): ["9.9燃烧值：","不适用"]
+  Row 10 (2 cols): ["9.10相对蒸气密度：","无数据"]
+  Row 11 (2 cols): ["9.11相对密度：","约1.06g/cm3"]
+  Row 12 (2 cols): ["9.12水溶性：","可混溶"]
+  Row 13 (2 cols): ["9.13表面张力：","无数据"]
+  Row 14 (2 cols): ["9.14辛醇/水分配系数的对数值：","无数据"]
+  Row 15 (2 cols): ["9.15自燃温度：","不适用"]
+  Row 16 (2 cols): ["9.16引燃温度：","无数据"]
+  Row 17 (2 cols): ["9.17动力粘度：","3000-30000 mPa.s"]
+  Row 18 (2 cols): ["9.18固体含量：","40±2%"]
+  Row 19 (2 cols): ["9.19其他信息：","上述数据非产品指标，产品指标请参见产品技术信息表。"]
+
+--- [SECTION 10] ---
+  Row 0 (1 cols): ["10.稳定性和反应性"]
+  Row 1 (2 cols): ["10.1化学稳定性：","根据规范使用，不会发生分解。"]
+  Row 2 (2 cols): ["10.2避免接触的条件：","避免0℃以下的低温和超过70℃的高温。"]
+  Row 3 (2 cols): ["10.3可能的危害反应：","正确储存或操作时，无危害反应。"]
+
+--- [SECTION 11] ---
+  Row 0 (1 cols): ["11.毒性资料"]
+  Row 1 (1 cols): ["该产品无可用的毒理学研究。"]
+
+--- [SECTION 12] ---
+  Row 0 (1 cols): ["12.生态信息"]
+  Row 1 (2 cols): ["12.1生态毒性：","该产品无可用的生态毒理学研究。禁止排入下水道，废水或土壤中。"]
+  Row 2 (2 cols): ["12.2持久性和降解性：","该产品不易生物降解。"]
+  Row 3 (2 cols): ["12.3其他：","根据生态毒理学资料，该产品被划分为对鱼类和水蚤无害类。"]
+
+--- [SECTION 13] ---
+  Row 0 (1 cols): ["13. 处理注意事项"]
+  Row 1 (1 cols): ["必需遵守适用的国标、国家或当地法规进行废弃。"]
+  Row 2 (1 cols): ["在欧盟领域内废弃，应根据欧洲废弃物分类（EWC）的适当法规。"]
+  Row 3 (2 cols): ["处理方法：","尽可能将容器倒空（例如经倾倒，刮擦或排干直至“滴干”）\\n可根据化学工业现存的回收方案送往适当的收集点处理。\\n容器应按照国家法令和环境相关法规进行回收。\\n不能将废弃物通过废水排放。"]
+
+--- [SECTION 14] ---
+  Row 0 (1 cols): ["14. 运输信息"]
+  Row 1 (2 cols): ["14.1公路和铁路运输：","非危险品陆运输方式，符合ADG准则。"]
+  Row 2 (2 cols): ["14.2海上运输：","非危险品海运方式，符合IMDG准则。"]
+  Row 3 (2 cols): ["14.3空运：","非危险品运输方式，符合IATA准则。"]
+  Row 4 (2 cols): ["14.4用户特殊注意事项：","非危险货物。\\n温度不可高于+40℃，温度不可低于+5℃。\\n远离食物、酸和碱。"]
+
+--- [SECTION 15] ---
+  Row 0 (1 cols): ["15. 法规信息"]
+  Row 1 (1 cols): ["物质或混合物的相关安全、健康和环保法律法规"]
+  Row 2 (1 cols): ["其它的规定："]
+  Row 3 (1 cols): ["符合下列法规要求："]
+  Row 4 (1 cols): ["危险化学品安全管理条例，国务院令344号"]
+  Row 5 (1 cols): ["GB/T 16483-2008 化学品安全技术说明书内容和项目顺序"]
+  Row 6 (1 cols): ["GB 13690-2009 化学品分类和危险性公示通则"]
+  Row 7 (1 cols): ["GB 20576- GB20598 化学品分类，警示标签和警示性说明安全规范"]
+
+--- [SECTION 16] ---
+  Row 0 (1 cols): ["16. 其他信息"]
+  Row 1 (1 cols): ["就我们所掌握的知识信息，截止本安全技术说明书发布之日，它提供的资料是正确的。所提供的信息仅仅作为安全处理，使用，生产，储存，运输，处置和排放的指导书，而不是一份担保或品质说明书。本资料只针对所指定的具体物料，而对这种物料与其它物料混合使用或在其它制程中使用的情况，则未必有效（除非在文本中有特别说明）。"]
+
+=======================================================
+=== CN DELIVERABLE (中文交付物): F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练材料/TDS MSDS 重写版/04-2 水性环氧固化剂 EC/EC-1804/EC-1804 msds_CN 冠志.docx
+=======================================================
+Header/Footer files: [
+  'word/footer1.xml',
+  'word/footer2.xml',
+  'word/footer3.xml',
+  'word/header1.xml',
+  'word/header2.xml',
+  'word/header3.xml'
+]
+
+--- [SECTION 1] ---
+  Row 0 (1 cols): ["1.物料及供应商标识"]
+  Row 1 (2 cols): ["1.1  产品名称：",""]
+  Row 2 (2 cols): ["中文名称：","水性环氧固化剂 EC-1804"]
+  Row 3 (2 cols): ["化学品分类：","改性脂肪胺"]
+  Row 4 (2 cols): ["1.2  产品使用建议和使用限制：","涂料"]
+  Row 5 (2 cols): ["1.3  供应商信息：",""]
+  Row 6 (2 cols): ["供应商名称：","广州冠志新材料科技有限公司"]
+  Row 7 (2 cols): ["供应商地址：","广州市萝岗区科学城掬泉路3号广州国际企业孵化器A区1106室"]
+  Row 8 (2 cols): ["电话：","86-20-82567990"]
+  Row 9 (2 cols): ["传真：","86-20-32214789"]
+
+--- [SECTION 2] ---
+  Row 0 (1 cols): ["2.危险性概述"]
+  Row 1 (1 cols): ["2.1 GHS危险性类别：\\n对水环境有慢性危害, 类别 3 (H412)\\n2.2 GHS标签要素：\\nGHS象形图：无\\n信号词：无\\n危险性说明：\\nH412 对水生生物有害并具有长期持续影响。\\n防范说明：\\n预防措施：\\nP273 禁止排入环境。\\n废弃处置：\\nP501 将本品或其容器送至有资质的废物处理厂处置。\\n2.3 其他危险：无适用资料。"]
+
+--- [SECTION 3] ---
+  Row 0 (1 cols): ["3. 成分/组成资料"]
+  Row 1 (2 cols): ["3.1产品类型：","混合物"]
+  Row 2 (3 cols): ["3.2成分","",""]
+  Row 3 (3 cols): ["化学品名称","CAS编号","含量%（w/w）"]
+  Row 4 (3 cols): ["胺和环氧树脂的加合物","商业机密","38-42"]
+  Row 5 (3 cols): ["水","7732-18-5","58-62"]
+
+--- [SECTION 4] ---
+  Row 0 (1 cols): ["4.急救措施"]
+  Row 1 (2 cols): ["4.1  一般措施：","立即脱掉所有被污染的衣物。"]
+  Row 2 (2 cols): ["4.2  误服：","禁止催吐，须就医。"]
+  Row 3 (2 cols): ["4.3  接触眼睛：","撑开眼睑，用温水长时间冲洗（至少10分钟），就诊眼科医生。"]
+  Row 4 (2 cols): ["4.4  接触皮肤：","立即用肥皂和大量的水冲洗。若发生皮肤反应，就医。"]
+  Row 5 (2 cols): ["4.5  吸入：","若刺激呼吸道，就医。"]
+
+--- [SECTION 5] ---
+  Row 0 (1 cols): ["5.消防措施"]
+  Row 1 (2 cols): ["5.1  合适的灭火剂：","二氧化碳（CO2），泡沫，灭火粉末，大火时应用喷洒水。"]
+  Row 2 (2 cols): ["5.2  不合适的灭火剂：","高流量的水喷射"]
+  Row 3 (2 cols): ["5.3  物质或混合物的特殊危害：","燃烧时释放一氧化碳、二氧化碳、氮氧化物和少量的氰化氢"]
+  Row 4 (2 cols): ["5.4  消防预防措施和保护设备：","在着火或爆炸情况下，不要吸进烟尘。"]
+
+--- [SECTION 6] ---
+  Row 0 (1 cols): ["6.意外泄漏措施"]
+  Row 1 (2 cols): ["6.1  个人预防措施、应急程序：","戴防护设备。\\n确保充分的通风/排气。令未授权人员离开。"]
+  Row 2 (2 cols): ["6.2  环境保护措施：","禁止排入下水道，废水或土壤中。"]
+  Row 3 (2 cols): ["6.3  污染物收集和清除的方法：","用化学品吸收材料或必要时用干沙收集，并储存与密闭容器中。"]
+
+--- [SECTION 7] ---
+  Row 0 (1 cols): ["7.操作和储存"]
+  Row 1 (2 cols): ["7.1安全操作防范：","操作时遵守化学品的常见预防措施。避免与皮肤和眼睛接触。\\n远离食物、饮料和烟草。休息以前和工作结束时洗手。将工作服单独存放。\\n更换被污染或浸湿的衣物。"]
+  Row 2 (2 cols): ["7.2安全储存条件：","容器保持紧闭，存储在干燥通风处。为保持产品质量，必须遵守我们产品信息表的储存条件。"]
+
+--- [SECTION 8] ---
+  Row 0 (1 cols): ["8.接触控制/个人防护"]
+  Row 1 (1 cols): ["8.1  暴露控制："]
+  Row 2 (2 cols): ["呼吸系统防护：","喷涂过程中要求有呼吸防护设备。"]
+  Row 3 (2 cols): ["手部防护：",""]
+  Row 4 (2 cols): ["防护手套的合适材料：","EN 374-3"]
+  Row 5 (2 cols): ["氟化橡胶 –FKM：","厚度≧0.4mm；穿透时间≧480min"]
+  Row 6 (2 cols): ["丁基橡胶 –IIR：","厚度≧0.5mm；穿透时间≧480min"]
+  Row 7 (2 cols): ["丁腈橡胶 – NBR：","厚度≧0.35mm；穿透时间≧480min"]
+  Row 8 (2 cols): ["建议：","污染的手套应废弃。"]
+  Row 9 (2 cols): ["眼睛防护：","戴眼罩/面罩。"]
+  Row 10 (2 cols): ["身体防护：","穿着适当的防护服。"]
+  Row 11 (2 cols): ["8.2  工程控制：","根据EC指令2006/121/EG,无可用的接触限值信息。"]
+
+--- [SECTION 9] ---
+  Row 0 (1 cols): ["9. 物理和化学特性"]
+  Row 1 (2 cols): ["9.1\t外 观：","黄色至浅褐色透明液体"]
+  Row 2 (2 cols): ["9.2\t嗅觉阀值：","胺味"]
+  Row 3 (2 cols): ["9.3\tpH值：","无数据"]
+  Row 4 (2 cols): ["9.4\t离子性：","无数据"]
+  Row 5 (2 cols): ["9.5\t初沸点：","＞100℃"]
+  Row 6 (2 cols): ["9.6\t闪点：","＞94℃"]
+  Row 7 (2 cols): ["9.7\t蒸发速率：","无数据"]
+  Row 8 (2 cols): ["9.8\t可燃性（固态、气态）：","不适用"]
+  Row 9 (2 cols): ["9.9\t燃烧值：","不适用"]
+  Row 10 (2 cols): ["9.10\t相对蒸气密度：","无数据"]
+  Row 11 (2 cols): ["9.11\t相对密度：","约1.06g/cm3"]
+  Row 12 (2 cols): ["9.12\t水溶性：","可混溶"]
+  Row 13 (2 cols): ["9.13\t表面张力：","无数据"]
+  Row 14 (2 cols): ["9.14\t辛醇/水分配系数的对数值：","无数据"]
+  Row 15 (2 cols): ["9.15\t自燃温度：","不适用"]
+  Row 16 (2 cols): ["9.16\t引燃温度：","无数据"]
+  Row 17 (2 cols): ["9.17\t动力粘度：","3000-30000 mPa.s"]
+  Row 18 (2 cols): ["9.18\t固体含量：","40±2%"]
+  Row 19 (2 cols): ["9.19\t其他信息：","上述数据非产品指标，产品指标请参见产品技术信息表。"]
+
+--- [SECTION 10] ---
+  Row 0 (1 cols): ["10.稳定性和反应性"]
+  Row 1 (2 cols): ["10.1  化学稳定性：","根据规范使用，不会发生分解。"]
+  Row 2 (2 cols): ["10.2  可能的危害反应：","正确储存或操作时，无危害反应。"]
+  Row 3 (2 cols): ["10.3  应避免的条件：","避免0℃以下的低温和超过70℃的高温。"]
+
+--- [SECTION 11] ---
+  Row 0 (1 cols): ["11.毒性资料"]
+  Row 1 (1 cols): ["该产品无可用的毒理学研究。"]
+
+--- [SECTION 12] ---
+  Row 0 (1 cols): ["12.生态信息"]
+  Row 1 (2 cols): ["12.1  生态毒性：","该产品无可用的生态毒理学研究。禁止排入下水道，废水或土壤中。"]
+  Row 2 (2 cols): ["12.2  持久性和降解性：","该产品不易生物降解。"]
+  Row 3 (2 cols): ["12.3  其他不利的影响：","根据生态毒理学资料，该产品被划分为对鱼类和水蚤无害类。"]
+
+--- [SECTION 13] ---
+  Row 0 (1 cols): ["13. 处理注意事项"]
+  Row 1 (1 cols): ["必须遵守适用的国标、国家或当地法规进行废弃。"]
+  Row 2 (1 cols): ["在欧盟领域内废弃，应根据欧洲废弃物分类（EWC）的适当法规。"]
+  Row 3 (2 cols): ["处理方法：","尽可能将容器倒空（例如经倾倒，刮擦或排干直至“滴干”）\\n可根据化学工业现存的回收方案送往适当的收集点处理。\\n容器应按照国家法令和环境相关法规进行回收。\\n不能将废弃物通过废水排放。"]
+
+--- [SECTION 14] ---
+  Row 0 (1 cols): ["14. 运输信息"]
+  Row 1 (2 cols): ["14.1  公路和铁路运输：","非危险品陆运输方式，符合ADG准则。"]
+  Row 2 (2 cols): ["14.2  海上运输：","非危险品海运方式，符合IMDG准则。"]
+  Row 3 (2 cols): ["14.3  空运：","非危险品运输方式，符合IATA准则。"]
+  Row 4 (2 cols): ["14.4  用户特殊注意事项：","非危险货物。\\n温度不可高于+40℃，温度不可低于+5℃。\\n远离食物、酸和碱。"]
+
+--- [SECTION 15] ---
+  Row 0 (1 cols): ["15. 法规信息"]
+  Row 1 (1 cols): ["物质或混合物的相关安全、健康和环保法律法规"]
+  Row 2 (1 cols): ["其它的规定："]
+  Row 3 (1 cols): ["符合下列法规要求："]
+  Row 4 (1 cols): ["危险化学品安全管理条例，国务院令344号"]
+  Row 5 (1 cols): ["GB/T 16483-2008 化学品安全技术说明书内容和项目顺序"]
+  Row 6 (1 cols): ["GB 13690-2009 化学品分类和危险性公示通则"]
+  Row 7 (1 cols): ["GB 20576- GB20598 化学品分类，警示标签和警示性说明安全规范"]
+
+--- [SECTION 16] ---
+  Row 0 (1 cols): ["16. 其他信息"]
+  Row 1 (1 cols): ["就我们所掌握的知识信息，截止本安全技术说明书发布之日，它提供的资料是正确的。所提供的信息仅仅作为安全处理，使用，生产，储存，运输，处置和排放的指导书，而不是一份担保或品质说明书。本资料只针对所指定的具体物料，而对这种物料与其它物料混合使用或在其它制程中使用的情况，则未必有效（除非在文本中有特别说明）。"]
+
+=======================================================
+=== EN DELIVERABLE (英文交付物): F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练材料/TDS MSDS 重写版/04-2 水性环氧固化剂 EC/EC-1804/EC-1804 msds_EN Guanzhi.docx
+=======================================================
+Header/Footer files: [
+  'word/footer1.xml',
+  'word/footer2.xml',
+  'word/footer3.xml',
+  'word/header1.xml',
+  'word/header2.xml',
+  'word/header3.xml'
+]
+
+--- [SECTION 1] ---
+  Row 0 (1 cols): ["1.1. Identification"]
+  Row 1 (2 cols): ["1.1\tProduct name:","Waterborne epoxy curing agent EC-1804"]
+  Row 2 (2 cols): ["Chemical category:","Modified aliphatic amine"]
+  Row 3 (2 cols): ["1.2\tProduct use suggestions and restrictions:","Used in coatings."]
+  Row 4 (2 cols): ["1.3\tSupplier information:",""]
+  Row 5 (2 cols): ["Name of supplier:","Guangzhou Guanzhi New Material Technology Co., Ltd."]
+  Row 6 (2 cols): ["Supplier address:","Room 1106, Area A, Guangzhou International Business Incubator, No. 3 Juquan Road, Science City, Luogang District, Guangzhou"]
+  Row 7 (2 cols): ["Tel:","86-20-82567990"]
+  Row 8 (2 cols): ["Fax:","86-20-32214789"]
+
+--- [SECTION 2] ---
+  Row 0 (1 cols): ["2.Hazards Identification"]
+  Row 1 (1 cols): ["2.1 Classification of the substance or mixture:\\nChronic aquatic toxicity (Category 3), H412\\n2.2 GHS Label Elements:\\nGHS pictograms: None\\nSignal word: None\\nHazard statements:\\nH412 Harmful to aquatic life with long lasting effects.\\nPrecautionary statements:\\nPrevention:\\nP273 Avoid release to the environment.\\nDisposal:\\nP501 Dispose of contents/container in accordance with local regulations.\\n2.3 Other hazards: No applicable information."]
+
+--- [SECTION 3] ---
+  Row 0 (1 cols): ["3.Composition/Information on Ingredients"]
+  Row 1 (2 cols): ["3.1\tProduct type:","Mixture"]
+  Row 2 (1 cols): ["3.2\tIngredients:"]
+  Row 3 (3 cols): ["Chemical name","CAS NO.","Concentration % (w/w)"]
+  Row 4 (3 cols): ["Amine and epoxy resin adduct","Trade secret","38-42"]
+  Row 5 (3 cols): ["Water","7732-18-5","58-62"]
+
+--- [SECTION 4] ---
+  Row 0 (1 cols): ["4.First aid measures"]
+  Row 1 (2 cols): ["4.1\tGeneral measures:","Remove all contaminated clothing immediately."]
+  Row 2 (2 cols): ["4.2\tIngestion:","Do NOT induce vomiting. Seek medical attention immediately."]
+  Row 3 (2 cols): ["4.3\tEye contact:","Hold eyelids open and flush with plenty of warm water for at least 10 minutes. Consult an ophthalmologist."]
+  Row 4 (2 cols): ["4.4\tSkin contact:","Wash immediately with plenty of soap and water. If skin reaction occurs, seek medical advice."]
+  Row 5 (2 cols): ["4.5\tInhalation:","If respiratory irritation occurs, seek medical advice."]
+
+--- [SECTION 5] ---
+  Row 0 (1 cols): ["5.Fire fighting measures"]
+  Row 1 (2 cols): ["5.1\tSuitable extinguishing agents:","Carbon dioxide (CO2), foam, extinguishing powder. For large fires, use water spray."]
+  Row 2 (2 cols): ["5.2\tUnsuitable extinguishing agents:","High-volume water jet."]
+  Row 3 (2 cols): ["5.3\tSpecial hazards of substances or mixtures:","Combustion may release carbon monoxide, carbon dioxide, nitrogen oxides and trace amounts of hydrogen cyanide."]
+  Row 4 (2 cols): ["5.4\tFirefighting precautions protective equipment:","In case of fire or explosion, do not breathe fumes/smoke."]
+
+--- [SECTION 6] ---
+  Row 0 (1 cols): ["6.Measures for accidental leakage"]
+  Row 1 (2 cols): ["6.1\tPersonal precautions, protective equipment and emergency procedures:","Wear protective equipment.\\nEnsure adequate ventilation. Keep unauthorized persons away."]
+  Row 2 (2 cols): ["6.2\tEnvironmental precautions:","Do not discharge into drains, wastewater, or soil."]
+  Row 3 (2 cols): ["6.3\tMethods and material for containment and cleaning up:","Absorb with chemical absorbent material or dry sand if necessary, and store in tightly closed containers."]
+
+--- [SECTION 7] ---
+  Row 0 (1 cols): ["7.Operation and storage"]
+  Row 1 (2 cols): ["7.1\tPrecautions for safe handling:","Observe common chemical precautions during handling. Avoid contact with skin and eyes.\\nKeep away from food, drink and tobacco. Wash hands before breaks and at the end of workday. Store work clothing separately.\\nChange contaminated or soaked clothing."]
+  Row 2 (2 cols): ["7.2\tConditions for safe storage:","Keep containers tightly closed in a dry, well-ventilated place. To maintain product quality, strictly follow the storage conditions in our technical data sheet."]
+
+--- [SECTION 8] ---
+  Row 0 (1 cols): ["8.Exposure control / personal protection"]
+  Row 1 (1 cols): ["8.1\tExposure controls:"]
+  Row 2 (2 cols): ["Respiratory protection:","Respiratory protection equipment is required during spraying."]
+  Row 3 (2 cols): ["Hand protection:",""]
+  Row 4 (2 cols): ["Suitable material for protective gloves:","EN 374-3"]
+  Row 5 (2 cols): ["Fluororubber – FKM:","Thickness ≥ 0.4 mm; Breakthrough time ≥ 480 min."]
+  Row 6 (2 cols): ["Butyl rubber – IIR:","Thickness ≥ 0.5 mm; Breakthrough time ≥ 480 min."]
+  Row 7 (2 cols): ["Nitrile rubber – NBR:","Thickness ≥ 0.35 mm; Breakthrough time ≥ 480 min."]
+  Row 8 (2 cols): ["Recommendation:","Discard contaminated gloves."]
+  Row 9 (2 cols): ["Eye protection:","Wear safety glasses/face shield."]
+  Row 10 (2 cols): ["Body protection:","Wear appropriate protective clothing."]
+  Row 11 (2 cols): ["8.2\tEngineering controls:","No exposure limit information is available under EC Directive 2006/121/EC."]
+
+--- [SECTION 9] ---
+  Row 0 (1 cols): ["9.Physical and chemical properties"]
+  Row 1 (2 cols): ["9.1\tAppearance:","Yellow to light brown transparent liquid"]
+  Row 2 (2 cols): ["9.2\tOdour threshold:","Amine-like"]
+  Row 3 (2 cols): ["9.3\tpH value:","No data available."]
+  Row 4 (2 cols): ["9.4\tIonicity:","No data available."]
+  Row 5 (2 cols): ["9.5\tInitial boiling point:","> 100 °C"]
+  Row 6 (2 cols): ["9.6\tFlash point:","> 94 °C"]
+  Row 7 (2 cols): ["9.7\tEvaporation rate:","No data available."]
+  Row 8 (2 cols): ["9.8\tFlammability (solids, gases):","Not applicable"]
+  Row 9 (2 cols): ["9.9\tCombustion value:","Not applicable"]
+  Row 10 (2 cols): ["9.10\tRelative vapour density:","No data available."]
+  Row 11 (2 cols): ["9.11\tDensity:","Approx. 1.06 g/cm³"]
+  Row 12 (2 cols): ["9.12\tSolubility in water:","Miscible with water"]
+  Row 13 (2 cols): ["9.13\tSurface tension:","No data available."]
+  Row 14 (2 cols): ["9.14\tlog Pow (n-octanol/water partition coefficient):","No data available."]
+  Row 15 (2 cols): ["9.15\tAuto-ignition temperature:","Not applicable"]
+  Row 16 (2 cols): ["9.16\tIgnition temperature:","No data available."]
+  Row 17 (2 cols): ["9.17\tDynamic viscosity:","3000-30000 mPa·s"]
+  Row 18 (2 cols): ["9.18\tSolid content:","40±2%"]
+  Row 19 (2 cols): ["9.19\tOther information:","The above data are not product specifications. Please refer to the product technical information sheet for specifications."]
+
+--- [SECTION 10] ---
+  Row 0 (1 cols): ["10.Stability and reactivity"]
+  Row 1 (2 cols): ["10.1\tChemical stability:","No decomposition if used according to specifications."]
+  Row 2 (2 cols): ["10.2\tPossibility of hazardous reactions:","No hazardous reactions when stored and handled correctly."]
+  Row 3 (2 cols): ["10.3\tConditions to avoid:","Avoid low temperatures below 0°C and high temperatures above 70°C."]
+
+--- [SECTION 11] ---
+  Row 0 (1 cols): ["11.Toxicity information"]
+  Row 1 (1 cols): ["No toxicological studies were available for this product."]
+
+--- [SECTION 12] ---
+  Row 0 (1 cols): ["12.Ecological information"]
+  Row 1 (2 cols): ["12.1\tEcotoxicity:","No ecotoxicological studies are available for this product. Do not discharge into drains, wastewater, or soil."]
+  Row 2 (2 cols): ["12.2\tPersistence and degradability:","The product is not readily biodegradable."]
+  Row 3 (2 cols): ["12.3\tOther adverse effects:","Based on ecotoxicological data, the product is classified as non-hazardous to fish and daphnia."]
+
+--- [SECTION 13] ---
+  Row 0 (1 cols): ["13.Handling precautions"]
+  Row 1 (1 cols): ["Dispose of in accordance with applicable national standards and national or local regulations."]
+  Row 2 (1 cols): ["Within the European Union, dispose of in accordance with the applicable provisions of the European Waste Catalogue (EWC)."]
+  Row 3 (2 cols): ["Disposal methods:","Empty containers as completely as possible (e.g., by pouring, scraping, or draining until \"drip-dry\").\\nThey may be sent to an appropriate collection point under existing chemical industry recycling schemes.\\nRecycle containers in accordance with national regulations and applicable environmental requirements.\\nDo not discharge waste via wastewater."]
+
+--- [SECTION 14] ---
+  Row 0 (1 cols): ["14.Transportation information"]
+  Row 1 (2 cols): ["14.1\tRoad and rail transport:","Not classified as dangerous goods for land transport, in accordance with ADG regulations."]
+  Row 2 (2 cols): ["14.2\tMaritime transport:","Not classified as dangerous goods for sea transport, in accordance with IMDG regulations."]
+  Row 3 (2 cols): ["14.3\tAir transport:","Not classified as dangerous goods for air transport, in accordance with IATA regulations."]
+  Row 4 (2 cols): ["14.4\tSpecial precautions for user:","Not regulated as dangerous goods.\\nTemperature must not exceed +40°C and must not fall below +5°C.\\nKeep away from food, acids and bases."]
+
+--- [SECTION 15] ---
+  Row 0 (1 cols): ["15.Regulatory information"]
+  Row 1 (1 cols): ["Relevant safety, health and environmental regulations for the substance or mixture"]
+  Row 2 (1 cols): ["Other provisions:"]
+  Row 3 (1 cols): ["Complies with the following regulations:"]
+  Row 4 (1 cols): ["Regulations on the Safety Management of Hazardous Chemicals, State Council Decree No. 591"]
+  Row 5 (1 cols): ["GB/T 16483 Safety data sheet for chemical products - Content and order of sections"]
+  Row 6 (1 cols): ["GB 13690 General rules for classification and hazard communication of chemicals"]
+  Row 7 (1 cols): ["GB 30000.2-29 Rules for classification and labelling of chemicals"]
+
+--- [SECTION 16] ---
+  Row 0 (1 cols): ["16.Other information"]
+  Row 1 (1 cols): ["To the best of our knowledge, the information provided in this Safety Data Sheet is accurate as of the date of publication. The information given is designed only as guidance for safe handling, use, processing, storage, transportation, disposal, and release and is not to be considered a warranty or quality specification. The information relates only to the specific material designated and may not be valid for such material used in combination with any other materials or in any process, unless specified in the text."]

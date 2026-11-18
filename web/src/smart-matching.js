@@ -1226,10 +1226,10 @@ export function detectNonHazardousComposite(sourceEngineOrRecords, facts = {}) {
   const records = Array.isArray(sourceEngineOrRecords)
     ? sourceEngineOrRecords
     : (sourceEngineOrRecords?.records || []);
-  const s2 = records.find((r) => r.sectionNumber === 2);
-  const s3 = records.find((r) => r.sectionNumber === 3);
+  const s2Records = records.filter((r) => r.sectionNumber === 2);
+  const s3 = records.find((r) => r.sectionNumber === 3 && r.rows);
 
-  const s2Text = s2 ? s2.rows.map((r) => (r.cells || []).map((c) => c.text || '').join(' ')).join(' ') : '';
+  const s2Text = s2Records.map(r => r.rows ? r.rows.map(row => (row.cells || []).map(c => c.text || '').join(' ')).join(' ') : (r.text || '')).join(' ');
   const s3Notes = facts.section3ExemptionNotes || extractSection3ExemptionNotes(s3);
 
   const isNonHaz = /根据GHS不属于危害化学品|不属于危害化学品|不属于危险|GHS危险性类别[:：]?\s*无|not classified/i.test(s2Text);
@@ -4360,6 +4360,8 @@ origRefresh.call(editorEngine);
                 injectedCount++;
               } catch (e) {}
             }
+            const prevSuspended12 = batchSuspended;
+            batchSuspended = false;
             while (tRecord.rows.length > 2) {
               try {
                 const updated = deleteRow(editorEngine, tRecord, tRecord.rows.length - 1);
@@ -4369,6 +4371,7 @@ origRefresh.call(editorEngine);
                 break;
               }
             }
+            batchSuspended = prevSuspended12;
           }
         } else {
           // 【架构级优化】自适应提取源文件 Section 12 中的全部前置说明行 (0行、1行或2行)，绝不主观误删
