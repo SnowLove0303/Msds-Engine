@@ -253,7 +253,7 @@ export function translateChemicalCategoryToEnglish(cnCategory, cnName = '') {
   if (/无水.*环氧|非水.*环氧|无溶剂.*环氧|环氧.*无水/i.test(combined)) {
     return 'Anhydrous epoxy resin';
   }
-  if (/环氧.*固化剂|固化剂.*环氧/i.test(combined)) {
+  if (/环氧.*固化剂|固化剂.*环氧|环氧胺加成物/i.test(combined)) {
     return 'Waterborne epoxy curing agent';
   }
   if (/水性.*环氧|环氧.*乳液|环氧.*水分散/i.test(combined)) {
@@ -396,6 +396,9 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
 
   // 1. Section 1 动态派生 (严格对齐算法训练材料 PU-1003 等规范)
   let prodName = facts.productNameEn;
+  if (prodName && /[\u4e00-\u9fa5]/.test(prodName)) {
+    prodName = null;
+  }
   let categoryEn = facts.chemicalCategoryEn || facts.categoryEn;
   let useEn = facts.recommendedUseEn || facts.useEn || 'Raw material for industrial coatings';
 

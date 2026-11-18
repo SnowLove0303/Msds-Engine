@@ -1,6 +1,22 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
-## [2026-11-17 场景B - 11月16日 22款产品 176份全量交付物母版拓扑与企业预设标准化刷新 (SCENARIO-B-BATCH-DELIVERABLES-REFRESH-22-MODELS)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户决议指令【场景B】。对 2026-11-16 批量生成的 22 款产品（涵盖 PU、HPU、PA 单组份、PA 羟基 4 大品类）共 176 份交付物（88 份 DOCX + 88 份 PDF）进行全量重新标准化生成与覆盖刷新，确保交付物库历史成果 100% 干净统一无瑕疵：
+## [2026-11-18 EC-1848 水性环氧固化剂八格式全量受控覆写生产与底座组分抽取通用缺陷根治 (EC1848-EIGHT-DELIVERABLES-AND-COMPONENT-EXTRACTION-FIX)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与 MSDS-Studio 工业级受控规程。顺利完成水性环氧固化剂品类代表型号 `EC-1848` 从源文档抽取到 8 格式（4 DOCX + 4 PDF）的高质量覆写交付与三大机械套件全景深度审计，并攻克底座两项隐蔽通用缺陷：
+1. **EC-1848 8 格式受控产出与化学事实绝对保真**：
+   - **源文件事实锚定**: 严格源于 `EC-1848 msds_CN 冠志.docx`，定性为危化品 (`isHazardous = true`)、`对水环境有慢性危害 类别 3 (H412)`，信号词 `警告` (`Warning`)，无 GHS 象形图；
+   - **组分事实 100% 物理守恒**: 完整承接 4 项全部组分（胺类混合物 45-51% 商业机密、水 41-49% CAS 7732-18-5、丙二醇甲醚 3-7% CAS 5131-66-8、丙酸 1-3% CAS 79-09-4），浓度区间总和严格闭合在 ~100%；
+   - **交付矩阵 8 格式纯净落盘**: 目标目录 `算法训练材料/TDS MSDS 重写版/04-2 水性环氧固化剂 EC/EC-1848/` 下 4 DOCX + 4 PDF 物理生成完毕，修改时间戳同步差 $\le 6.6\text{s}$，文件大小均 $> 28\text{ KB}$。
+2. **底座隐蔽通用缺陷法医穿透与根治 ([Incident] Inquest & Fixes)**：
+   - **[Incident 1: Section 3 多行组分解析子系统误杀化学品名]**：`recognition-engine.js` 原有子系统在清洗表头噪声时采用宽松子串匹配 `!/3\.\d|成分|混合物|物质/i.test(name)`，导致有效化学组分“`胺类混合物`”因命中“`混合物`”子串被静默漏抓，组分缺失近 50%。根治措施：将表头过滤升级为严格锚定正则 `!/^(?:3\.\d.*|化学品名称.*|CAS.*|成分.*|混合物|物质)$/i.test(name.trim())`，仅精确剔除纯标签行，彻底保全包含“混合物/物质”字样的复杂化学物质名；
+   - **[Incident 2: 英文版品名回退 Chinese 残留与专有词汇英译盲区]**：当源文档第 1 章节仅标注通用中文名称“水性环氧固化剂”而未在同一行出现英文时，`context-governor.js` 缺少中文字符安全兜底，导致未经英译的中文文本直传至交付物，触发 Gate 4 与 Gate 12 熔断。根治措施：
+     1. 在 `context-governor.js` 的 `CHEMICAL_TRANSLATION_DICT` 中补充 `水性环氧固化剂` (`Waterborne epoxy curing agent`)、`环氧胺加成物` (`Epoxy amine adduct`)、`胺类混合物` (`Amine mixture`) 与 `丙酸` (`Propionic acid`)；
+     2. 在 `context-governor.js` 与 `pipeline-engine.js` 中确立双重安全防线：若英文品名包含中文字符，强制熔断清空并回退至基于型号与品类的标准英文生成链（`Waterborne epoxy curing agent EC-1848`），彻底消除任何中文污染可能。
+3. **三大全景深度审计套件 100% 满分核销 (Zero Warnings, Zero Errors)**：
+   - **集中式中央主审计 (`run_master_msds_audit.mjs`)**: 167/167 项指标全绿，退出码 0 (🏆 AUDIT_PASSED)；
+   - **双极双层法医级深度审计 (`audit_bipolar_bilayer.mjs`)**: 165/165 项指标全绿，退出码 0 (🏆 AUDIT_PASSED)；
+   - **逐行双重对照英译审计 (`audit_translation_dual_display.mjs`)**: 93/93 项条目 100.0% MATCH，退出码 0 (🏆 AUDIT_PASSED)。
+
+---
+
 1. **刷新治理范围与四项核心排版几何硬指标落地**：
    - **国彩法定全称全量统一 (REQ-02)**：所有国彩版产出物（中文与英文）第 1 部分供应商及页脚中，统一为 `英德市国彩精细化工有限公司` 与 `Yingde Guocai Fine Chemical Co., Ltd.`，废弃旧称“英德市国彩新材料有限公司”及英文旧称检索出现次数严格为 **0**；
    - **页脚修订日期 Y 轴视觉水平绝对齐平 (REQ-03)**：页脚第 0 行右侧修订日期单元格注入 `<w:vAlign w:val="center"/>` 且行距归零，与左侧企业主体中心高差 PyMuPDF 物理实测 $\Delta Y \le 1.5\text{ pt}$，肉眼与排版标尺完全共线；

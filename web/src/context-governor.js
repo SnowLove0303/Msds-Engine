@@ -21,6 +21,10 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '环氧聚合物': 'Epoxy polymer',
   '环氧树脂': 'Epoxy resin',
   '无水环氧树脂': 'Anhydrous epoxy resin',
+  '水性环氧固化剂': 'Waterborne epoxy curing agent',
+  '环氧固化剂': 'Waterborne epoxy curing agent',
+  '环氧胺加成物': 'Epoxy amine adduct',
+  '胺类混合物': 'Amine mixture',
   '聚氨酯分散体': 'Polyurethane dispersion',
   '水性聚氨酯': 'Waterborne polyurethane',
   '聚氨酯聚合物': 'Polyurethane polymer',
@@ -63,6 +67,7 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '乙醇': 'Ethanol',
   '丙酮': 'Acetone',
   '乙酸': 'Acetic acid',
+  '丙酸': 'Propionic acid',
   '二甲基乙酰胺': 'N,N-Dimethylacetamide (DMAC)',
   'N,N-二甲基乙酰胺': 'N,N-Dimethylacetamide (DMAC)',
   'N,N－二甲基乙酰胺': 'N,N-Dimethylacetamide (DMAC)',
@@ -320,7 +325,13 @@ export function governContext(context1, overrides = {}) {
     }
   })
 
-  const enProductName = raw.productNameEn || (raw.productName ? translateChemicalTerm(raw.productName) : null) || modelCode
+  let enProductName = raw.productNameEn || (raw.productName ? translateChemicalTerm(raw.productName) : null) || modelCode;
+  if (!enProductName || /[\u4e00-\u9fa5]/.test(enProductName)) {
+    enProductName = modelCode;
+  }
+  if (enProductName && modelCode && !new RegExp(`\\b${modelCode.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b`, 'i').test(enProductName)) {
+    enProductName = `${enProductName} ${modelCode}`;
+  }
 
   const en = {
     modelCode,

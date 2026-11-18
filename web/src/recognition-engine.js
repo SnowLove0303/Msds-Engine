@@ -731,7 +731,7 @@ function parseSection3(record, facts) {
         const name = names[i] || names[0] || '';
         const cas = casList[i] || casList[0] || '';
         const conc = concList[i] || concList[0] || '';
-        if (name && !/3\.\d|成分|混合物|物质/i.test(name)) {
+        if (name && !/^(?:3\.\d.*|化学品名称.*|CAS.*|成分.*|混合物|物质)$/i.test(name.trim())) {
           facts.components.push({
             name,
             casNumber: cas,
@@ -753,7 +753,7 @@ function parseSection3(record, facts) {
         const pctMatch = full.match(/(\d+(?:\.\d+)?(?:\s*-\s*\d+(?:\.\d+)?)?%)/);
         if (pctMatch) concentration = pctMatch[1];
 
-        if (name && !/3\.\d|成分|混合物|物质/i.test(name)) {
+        if (name && !/^(?:3\.\d.*|化学品名称.*|CAS.*|成分.*|混合物|物质)$/i.test(name.trim())) {
           facts.components.push({
             name,
             casNumber: cas,
