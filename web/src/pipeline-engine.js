@@ -1093,6 +1093,48 @@ export function translateGhsPrecautionary(p) {
  */
 const KNOWN_GHS_PICTOGRAM_REGEX = /^(?:火焰|易燃|腐蚀|感叹号|骷髅|健康危害|环境|圆圈[上方]*火焰|氧化|爆炸|气瓶|无|None|Not applicable|GHS0[1-9])$/i;
 
+/**
+ * 验证候选标签有害成分是否具有纯粹的源文件内部物理事实扎根 (Source Fact Grounding)
+ * 恪守【通用型原则】与【内容来源于源文件原则】：
+ * 1. 绝对不硬编码特定型号或特定化学名称；
+ * 2. 100% 仅以当前源文件自身 Section 3 (成分表) 声明的化学品名称为内部事实对账依据；
+ * 3. 杜绝任何外部词典猜测或外生幻觉，过滤排版噪音。
+ */
+export function verifySourceFactGrounding(candidateText, srcEngine) {
+  if (!candidateText || typeof candidateText !== 'string') return false;
+  const clean = candidateText.trim();
+  if (!clean || clean.length < 2) return false;
+
+  // 若源文件带有明确的化学成分前缀（如“必须列在标签上的有害成分：”），享有源文件明文声明准入
+  if (/^(?:必须列在标签上的有害成[份分]|列在标签上的有害成[份分]|有害成[份分]|危险组分)[：:]/i.test(candidateText)) {
+    return true;
+  }
+
+  const srcS3 = srcEngine?.records?.find(r => r.sectionNumber === 3);
+  if (!srcS3 || !srcS3.rows) return true;
+
+  const declaredComponents = [];
+  for (let r = 1; r < srcS3.rows.length; r++) {
+    const row = srcS3.rows[r];
+    for (const cell of row.cells || []) {
+      const cellText = (cell.text || '').trim();
+      if (!cellText) continue;
+      const lines = cellText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      for (const line of lines) {
+        if (!/^(?:3\.|化学品名称|组分|成分|Component|Chemical|CAS|%|w\/w|含量)/i.test(line)) {
+          declaredComponents.push(line);
+        }
+      }
+    }
+  }
+
+  const isGroundedInS3 = declaredComponents.some(comp => {
+    return comp === clean || comp.includes(clean) || clean.includes(comp);
+  });
+
+  return isGroundedInS3;
+}
+
 export function parseSection2FromSource(srcEngine) {
   const srcS2 = srcEngine?.records?.find(r => r.sectionNumber === 2);
   if (!srcS2) return null;
@@ -1224,6 +1266,27 @@ export function parseSection2FromSource(srcEngine) {
         if (!/2\.1\s*物质或混合物的分类|GHS危险性类别[：:]?$/i.test(p)) {
           if (!/(?:[信警]号词|警示词|危险性说明|防范说明|其他危险)/i.test(p)) {
             categories.push(p);
+          }
+        }
+      }
+    } else if (mode === 'label') {
+      // 恪守【通用型原则】与【内容来源于源文件原则】：通用标签要素作用域装载
+      const isExcluded = 
+        /^(?:(?:2\.\d+\s*)?(?:危险性说明|危害性说明|防范说明|其他危险|Other\s*hazards?))/i.test(p) ||
+        /^(?:GHS[- ]?象形图|象形图|pictograms?)/i.test(p) ||
+        /(?:[信警]号词|警示词|Signal\s*word)[：:\s]*(?:危险|警告|Danger|Warning)/i.test(p) ||
+        /^(?:H\d{3}|P\d{3})/i.test(p) ||
+        /\[象形图\]/i.test(p);
+
+      if (!isExcluded) {
+        const cleanVal = p.replace(/^(?:必须列在标签上的有害成[份分]|列在标签上的有害成[份分]|有害成[份分]|危险组分)[：:]?\s*/i, '').trim();
+        if (cleanVal && verifySourceFactGrounding(cleanVal, srcEngine)) {
+          if (hazardousIngredients) {
+            if (!hazardousIngredients.includes(cleanVal)) {
+              hazardousIngredients += '、' + cleanVal;
+            }
+          } else {
+            hazardousIngredients = cleanVal;
           }
         }
       }
@@ -1645,23 +1708,34 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         row2Paras.push('GHS pictograms: None');
       }
       if (parsed.hazardousIngredients) {
-        let ingEn = parsed.hazardousIngredients;
-        if (/HDI.*亲水|亲水.*HDI|基于HDI/i.test(ingEn)) {
-          ingEn = 'Hydrophilic aliphatic polyisocyanate based on HDI';
-        } else if (ingEn.includes('丁氧基乙醇')) {
-          ingEn = '2-Butoxyethanol';
-        } else if (/1-丁氧基-2-丙醇/i.test(ingEn)) {
-          ingEn = '1-Butoxy-2-propanol';
-        } else if (/丙二醇甲醚|1-甲氧基-2-丙醇/i.test(ingEn)) {
-          ingEn = 'Propylene glycol monomethyl ether';
-        } else if (/轻质芳香烃石脑油/i.test(ingEn)) {
-          ingEn = 'Solvent naphtha (petroleum), light arom. (benzene < 0.1%)';
-        } else if (/二丙二醇甲醚/i.test(ingEn)) {
-          ingEn = 'Dipropylene glycol monomethyl ether';
-        } else if (/N[－-]甲基吡咯烷酮/i.test(ingEn)) {
-          ingEn = 'N-Methyl-2-pyrrolidone';
-        } else if (/三乙胺/i.test(ingEn)) {
-          ingEn = 'Triethylamine';
+        let ingEn = null;
+        // 1. 优先从 Section 3 双语事实池中按中文名动态检索英译
+        if (Array.isArray(facts.components) && Array.isArray(facts.enComponents)) {
+          const matchedIdx = facts.components.findIndex(c => c.name && (c.name === parsed.hazardousIngredients || parsed.hazardousIngredients.includes(c.name) || c.name.includes(parsed.hazardousIngredients)));
+          if (matchedIdx !== -1 && facts.enComponents[matchedIdx]?.name) {
+            ingEn = facts.enComponents[matchedIdx].name;
+          }
+        }
+        // 2. 通用标准化学词典映射兜底
+        if (!ingEn) {
+          ingEn = parsed.hazardousIngredients;
+          if (/HDI.*亲水|亲水.*HDI|基于HDI/i.test(ingEn)) {
+            ingEn = 'Hydrophilic aliphatic polyisocyanate based on HDI';
+          } else if (ingEn.includes('丁氧基乙醇')) {
+            ingEn = '2-Butoxyethanol';
+          } else if (/1-丁氧基-2-丙醇/i.test(ingEn)) {
+            ingEn = '1-Butoxy-2-propanol';
+          } else if (/丙二醇甲醚|1-甲氧基-2-丙醇/i.test(ingEn)) {
+            ingEn = 'Propylene glycol monomethyl ether';
+          } else if (/轻质芳香烃石脑油/i.test(ingEn)) {
+            ingEn = 'Solvent naphtha (petroleum), light arom. (benzene < 0.1%)';
+          } else if (/二丙二醇甲醚/i.test(ingEn)) {
+            ingEn = 'Dipropylene glycol monomethyl ether';
+          } else if (/N[－-]甲基吡咯烷酮/i.test(ingEn)) {
+            ingEn = 'N-Methyl-2-pyrrolidone';
+          } else if (/三乙胺/i.test(ingEn)) {
+            ingEn = 'Triethylamine';
+          }
         }
         row2Paras.push(`Hazardous components which must be listed on the label: ${ingEn}`);
       }
