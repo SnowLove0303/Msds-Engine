@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import JSZip from 'jszip';
 import { DOMParser } from '@xmldom/xmldom';
+import { validateCasChecksum } from '../src/cas-validator.js';
 
 /**
  * 双极双层全景机械深度审计套件 (Bipolar Bilayer Deep Audit Suite)
@@ -824,6 +825,22 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
     }
   }
   assert(nonCenterIngredientCellsEn === 0, `Section 3 英文版成分表格内容居中对齐 (jc=center) (违规格数: ${nonCenterIngredientCellsEn})`);
+
+  // L-S3: CAS 格式与加权模 10 校验和断言 (INV-CAS-CHECKSUM)
+  let casErrorCount = 0;
+  for (let r = 3; r < s3Trs.length; r++) {
+    const tcs = s3Trs[r].getElementsByTagName('w:tc');
+    const casCn = (tcs[1]?.textContent || '').trim();
+    const res = validateCasChecksum(casCn);
+    if (!res.valid) casErrorCount++;
+  }
+  for (let r = 3; r < s3TrsEn.length; r++) {
+    const tcs = s3TrsEn[r].getElementsByTagName('w:tc');
+    const casEn = (tcs[1]?.textContent || '').trim();
+    const res = validateCasChecksum(casEn);
+    if (!res.valid) casErrorCount++;
+  }
+  assert(casErrorCount === 0, `Section 3 (L-S3): 组分 CAS 格式与国际加权模 10 校验和合规 (违规项数: ${casErrorCount})`);
 
   // L-S4: 急救措施 (四维分流)
   assert(/吸入|皮肤接触|眼睛接触|食入/.test(s4TextCn), 'Section 4 (L-S4): 吸入/皮肤/眼睛/食入四维接触途径清晰分流');

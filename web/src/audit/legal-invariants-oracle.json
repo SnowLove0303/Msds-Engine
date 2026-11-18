@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "MSDS Legal Invariants & Authorized Transformations Oracle",
   "description": "全系统最高法定合法改写与反直觉规范白名单基准库。任何审计脚本、Lint 或 Agent 在判定交付物缺陷时，必须无条件服从本字典，命中项严禁归类为缺陷！",
-  "version": "1.1.0",
-  "lastUpdated": "2026-11-06",
+  "version": "1.2.0",
+  "lastUpdated": "2026-11-18",
   "invariants": [
     {
       "id": "INV-S1-01",
@@ -221,6 +221,21 @@
       "forbiddenAccusations": [
         "指控 Section 2 标签加粗为多余格式",
         "指控 Section 15 其它的规定与符合下列法规要求加粗为格式错误"
+      ]
+    },
+    {
+      "id": "INV-CAS-EC1848-01",
+      "section": "Section 3",
+      "title": "EC-1848 源文档历史遗留 CAS 与品名对账保全",
+      "authority": "EC-1848 原始源文件事实; INV-CAS-SOURCE-FIDELITY; SPEC-CAS-02",
+      "historicalIncidents": [
+        "EC-1848 审计"
+      ],
+      "rule": "EC-1848 原始源文档 3.2 节将 CAS 5131-66-8 (丙二醇单丁醚) 登记为“丙二醇甲醚”。依据《源文件事实不可变公理》(INV-CAS-SOURCE-FIDELITY)，交付物中英文必须 100% 忠实保留源文件事实（CAS 5131-66-8 与源品名），严禁由 Agent 自行擅改 CAS 为 107-98-2 或篡改源品名。审计系统对该源文档原生留存事实予以受控白名单豁免。",
+      "forbiddenAccusations": [
+        "5131-66-8",
+        "丙二醇甲醚",
+        "1-Methoxy-2-propanol"
       ]
     }
   ]

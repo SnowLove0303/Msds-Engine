@@ -16,6 +16,12 @@ if (!globalThis.DOMParser || !globalThis.XMLSerializer) {
 import { loadDocx } from '../src/docx-engine.js';
 import { verifySentenceCountFidelity } from '../src/sentence-translator.js';
 import { auditTranslationDualDisplay } from './audit_translation_dual_display.mjs';
+import {
+  validateCasChecksum,
+  verifyChemicalCasCoherence,
+  auditSection3CasList,
+  auditSection2HazardousCasCoherence
+} from '../src/cas-validator.js';
 
 /**
  * MSDS Studio 工业级集中式中央主审计套件 (Universal Master MSDS Audit Suite)
@@ -477,7 +483,15 @@ export async function runMasterMsdsAudit(options = {}) {
   let srcCnName = '';
   let srcCnCategory = '';
   let srcS11Rows = 0;
-  const effectiveSourcePath = sourceDocx || (fs.readdirSync(targetDir).find(f => /源文件留存|源文件|raw|source/i.test(f) && f.endsWith('.docx')) ? path.join(targetDir, fs.readdirSync(targetDir).find(f => /源文件留存|源文件|raw|source/i.test(f) && f.endsWith('.docx'))) : null);
+  let effectiveSourcePath = sourceDocx;
+  if (effectiveSourcePath && !fs.existsSync(effectiveSourcePath)) {
+    const altPath = path.resolve(__dirname, '../..', effectiveSourcePath);
+    if (fs.existsSync(altPath)) effectiveSourcePath = altPath;
+  }
+  if (!effectiveSourcePath) {
+    const found = fs.readdirSync(targetDir).find(f => /源文件留存|源文件|raw|source/i.test(f) && f.endsWith('.docx'));
+    if (found) effectiveSourcePath = path.join(targetDir, found);
+  }
   if (effectiveSourcePath && fs.existsSync(effectiveSourcePath)) {
     try {
       const srcDocx = await loadDocx(fs.readFileSync(effectiveSourcePath));
@@ -767,6 +781,110 @@ export async function runMasterMsdsAudit(options = {}) {
       `成分表格组分行数中英文必须 1:1 绝对相等 (CN: ${cnBodyRows.length} vs EN: ${enBodyRows.length})`,
       `CN=${cnBodyRows.length}, EN=${enBodyRows.length}`,
       'Section 3'
+    );
+
+    // 1. CAS 格式与加权模 10 校验和合规硬门禁 (INV-CAS-CHECKSUM)
+    const isHeaderRow = (r) => {
+      const c0 = (r.cells[0]?.text || '').trim();
+      const c1 = (r.cells[1]?.text || '').trim();
+      return /^(?:化学品名称|成分|物质名称|组分|Chemical name|Components|Substance)$/i.test(c0) ||
+             /^(?:CAS编号|CAS NO\.?|CAS号|CAS)$/i.test(c1);
+    };
+    const cnComponents = cnBodyRows
+      .filter(r => !isHeaderRow(r))
+      .map(r => ({
+        name: (r.cells[0]?.text || '').trim(),
+        cas: (r.cells[1]?.text || '').trim(),
+        conc: (r.cells[2]?.text || '').trim()
+      }));
+    const enComponents = enBodyRows
+      .filter(r => !isHeaderRow(r))
+      .map(r => ({
+        name: (r.cells[0]?.text || '').trim(),
+        cas: (r.cells[1]?.text || '').trim(),
+        conc: (r.cells[2]?.text || '').trim()
+      }));
+
+    const cnCasAudit = auditSection3CasList(cnComponents);
+    const enCasAudit = auditSection3CasList(enComponents);
+    const allCasChecksumValid = cnCasAudit.details.every(d => d.valid) && enCasAudit.details.every(d => d.valid);
+
+    assert(
+      allCasChecksumValid,
+      '环3',
+      'Section 3 CAS 格式与加权模 10 校验和合规硬门禁 (INV-CAS-CHECKSUM)',
+      'Section 3 全量组分 CAS 编号必须符合国际标准且加权模 10 校验和完全匹配（或合法商业机密豁免）',
+      allCasChecksumValid
+        ? `全量 ${cnComponents.length} 项组分 CAS 校验 100% 合规`
+        : `发现 ${cnCasAudit.details.filter(d => !d.valid).length + enCasAudit.details.filter(d => !d.valid).length} 项 CAS 错误: ${[...cnCasAudit.details, ...enCasAudit.details].filter(d => !d.valid).map(d => `${d.cas}(${d.message})`).join(', ')}`,
+      'Section 3 CAS Checksum'
+    );
+
+    // 2. Section 3 CAS 编号与化学品名称实体一致性硬门禁 (INV-CAS-NAME-COHERENCE)
+    const allCoherent = cnCasAudit.details.every(d => d.coherent) && enCasAudit.details.every(d => d.coherent);
+    const incoherentKeywords = [...cnCasAudit.details, ...enCasAudit.details].filter(d => !d.coherent).map(d => `${d.name} ${d.cas}`);
+    assert(
+      allCoherent,
+      '环3',
+      'Section 3 CAS 编号与化学品名称实体一致性硬门禁 (INV-CAS-NAME-COHERENCE)',
+      'Section 3 所列化学品中英文名称与对应 CAS 编号必须指向同一实体，严禁张冠李戴错配',
+      allCoherent
+        ? '化学品中英文名称与 CAS 编号实体一致性验证全部通过'
+        : `发现名称与 CAS 错配: ${[...cnCasAudit.details, ...enCasAudit.details].filter(d => !d.coherent).map(d => d.message).join('; ')}`,
+      'Section 3 Chemical Entity Coherence',
+      incoherentKeywords
+    );
+
+    // 3. Section 3 组分 CAS 编号源文件 1:1 物理对账硬门禁 (INV-CAS-SOURCE-FIDELITY)
+    if (effectiveSourcePath && fs.existsSync(effectiveSourcePath)) {
+      try {
+        const srcBuf = fs.readFileSync(effectiveSourcePath);
+        const srcDoc = await loadDocx(srcBuf, path.basename(effectiveSourcePath));
+        const srcS3 = srcDoc.records.find(r => r.sectionNumber === 3);
+        if (srcS3 && srcS3.rows.length >= 3) {
+          const rawSrcCasText = srcS3.rows.slice(2).map(r => (r.cells[1]?.text || '')).join('\n');
+          const srcCasList = rawSrcCasText
+            .split(/\r?\n/)
+            .map(s => s.trim())
+            .filter(s => s && !/^(?:CAS编号|CAS NO\.?|CAS号|CAS)$/i.test(s));
+          const delivCasList = cnComponents.map(c => c.cas).filter(Boolean);
+          const isSourceCasFidelity = srcCasList.length === delivCasList.length &&
+            srcCasList.every((cas, idx) => cas === delivCasList[idx]);
+          assert(
+            isSourceCasFidelity,
+            '环3',
+            'Section 3 组分 CAS 编号源文件 1:1 物理对账硬门禁 (INV-CAS-SOURCE-FIDELITY)',
+            '交付物 Section 3 的 CAS 编号集合必须与物理源文档载明的 CAS 事实 100% 忠实对齐，严禁外生篡改',
+            isSourceCasFidelity
+              ? `源文档与交付物 ${srcCasList.length} 项 CAS 编号 1:1 物理对齐`
+              : `源文件 CAS (${srcCasList.join(', ')}) 与交付物 CAS (${delivCasList.join(', ')}) 存在差异`,
+            'Source Ground-Truth CAS Fidelity'
+          );
+        }
+      } catch (err) {
+        console.warn(`[WARN] 无法对账源文件 CAS: ${err.message}`);
+      }
+    }
+
+    // 4. Section 2 标签有害成分与 Section 3 组分 CAS 穿透核销硬门禁 (INV-CAS-S2-CROSS-CHECK)
+    const cnS2 = cnDocx.records.find(r => r.sectionNumber === 2);
+    const enS2 = enDocx.records.find(r => r.sectionNumber === 2);
+    const cnS2Text = cnS2 ? cnS2.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n') : '';
+    const enS2Text = enS2 ? enS2.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n') : '';
+
+    const cnS2Cross = auditSection2HazardousCasCoherence(cnS2Text, cnComponents);
+    const enS2Cross = auditSection2HazardousCasCoherence(enS2Text, enComponents);
+    const isS2CrossCoherent = cnS2Cross.coherent && enS2Cross.coherent;
+
+    assert(
+      isS2CrossCoherent,
+      '环3',
+      'Section 2 标签有害成分与 Section 3 组分 CAS 穿透核销硬门禁 (INV-CAS-S2-CROSS-CHECK)',
+      'Section 2 标签声明的必须列出的有害成分必须在 Section 3 组分表中具有合法的 CAS 事实支撑与对应行',
+      isS2CrossCoherent
+        ? (cnS2Cross.matchedSubstance ? `Section 2 标签有害成分 "${cnS2Cross.matchedSubstance}" 成功穿透对齐至 Section 3 (CAS: ${cnS2Cross.matchedCas})` : 'Section 2 未载明特定标签有害成分，豁免通过')
+        : `Section 2 与 Section 3 CAS 事实穿透断裂: ${cnS2Cross.reason || enS2Cross.reason}`,
+      'Section 2 to Section 3 CAS Cross-Check'
     );
   }
 
