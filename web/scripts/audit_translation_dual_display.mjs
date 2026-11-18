@@ -109,8 +109,9 @@ export async function auditTranslationDualDisplay(cnDocxPath, enDocxPath, option
       const alarms = [];
       const warnings = [];
 
-      // 1. 中文字符残留核查 (英文版绝不能含中文字符)
-      const chineseChars = enText.match(/[\u4e00-\u9fa5]/g);
+      // 1. 中文字符残留核查 (英文版绝不能含中文字符，排除 docx-engine 内部图片占位标记 [象形图])
+      const textForChineseCheck = enText.replace(/\[象形图\]/g, '');
+      const chineseChars = textForChineseCheck.match(/[\u4e00-\u9fa5]/g);
       if (chineseChars && chineseChars.length > 0) {
         alarms.push(`英文版包含中文字符残留: "${chineseChars.slice(0, 5).join('')}"`);
       }

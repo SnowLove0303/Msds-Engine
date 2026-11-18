@@ -757,7 +757,7 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
 
           if (kvMatch || s15Match) {
             const match = kvMatch || s15Match;
-            const labelText = match[1] + (isEnglish ? ': ' : '：');
+            const labelText = (match[1].replace(/[:：\s.]+$/, '') + (isEnglish ? ': ' : '：')).trim();
             const valText = match[2]?.trim() || '';
 
             const oldRuns = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));

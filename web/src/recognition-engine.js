@@ -255,17 +255,16 @@ const SECTION_KEYWORDS = {
 };
 
 /**
- * 判定某一行是否为内嵌在表格中的新章节标题行
+ * 判定一段文本是否为一级章节大标题 (如 "1. 化学品及企业标识" 或 "1. Identification")
  */
-function detectSectionHeaderInRow(row) {
-  if (!row.cells || row.cells.length === 0) return null;
-  const firstCellText = (row.cells[0]?.text || '').trim();
-
+export function detectSectionHeaderInText(text) {
+  if (!text || typeof text !== 'string') return null;
+  const clean = text.trim();
   // 若包含点分二级及以上小节序号 (如 4.1, 5.1., 8.2)，绝非一级章节大标题！
-  if (/^\s*(?:[vV])?\s*\d{1,2}\.\d+/i.test(firstCellText)) return null;
+  if (/^\s*(?:[vV])?\s*\d{1,2}\.\d+/i.test(clean)) return null;
 
   // 兼容历史杂质前缀 (如 'v1.', 'V1.', '  1.')
-  const match = firstCellText.match(/^\s*(?:[vV])?\s*(\d{1,2})[\.、\s]+(.*)$/);
+  const match = clean.match(/^\s*(?:[vV])?\s*(\d{1,2})[\.、\s]+(.*)$/);
   if (!match) return null;
 
   const secNum = Number(match[1]);
@@ -278,6 +277,15 @@ function detectSectionHeaderInRow(row) {
     return { sectionNumber: secNum, title: cleanTitle };
   }
   return null;
+}
+
+/**
+ * 判定某一行是否为内嵌在表格中的新章节标题行
+ */
+function detectSectionHeaderInRow(row) {
+  if (!row.cells || row.cells.length === 0) return null;
+  const firstCellText = (row.cells[0]?.text || '').trim();
+  return detectSectionHeaderInText(firstCellText);
 }
 
 /**
@@ -469,10 +477,87 @@ export async function recognizeSourceDocx(docxPathOrBuffer, sourceName = 'source
   const secRawRowsMap = new Map();
   for (let s = 1; s <= 16; s++) secRawRowsMap.set(s, []);
 
-  // 1. 遍历并切分记录行，支持单表格中多章节共存时的智能分离
+  // 1. 遍历并切分记录行，支持单表格中多章节共存及“段落标题+表格/文本”混合拓扑分离
+  let currentSecNum = null;
+  let currentSecTitle = '';
+
   for (const record of records) {
-    let currentSecNum = record.sectionNumber;
-    let currentSecTitle = record.title || '';
+    // A. 段落记录处理 (kind === 'text')
+    if (record.kind === 'text') {
+      const pText = (record.text || record.title || '').trim();
+      if (!pText) continue;
+
+      const inlineHeader = detectSectionHeaderInText(pText);
+      if (inlineHeader) {
+        currentSecNum = inlineHeader.sectionNumber;
+        currentSecTitle = inlineHeader.title;
+        const targetSec = facts.sections[currentSecNum];
+        if (!targetSec.title) {
+          targetSec.title = currentSecTitle;
+        }
+        continue;
+      }
+
+      // 非标题段落，若处于已激活的章节，将其转化为规范结构行注入事实
+      if (currentSecNum && currentSecNum >= 1 && currentSecNum <= 16) {
+        const targetSec = facts.sections[currentSecNum];
+        const lines = pText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        for (const line of lines) {
+          const colonMatch = line.match(/^([^：:]{2,25})[：:](.*)$/);
+          if (colonMatch && colonMatch[2].trim()) {
+            const k = colonMatch[1].trim();
+            const v = colonMatch[2].trim();
+            const virtualRow = {
+              cells: [
+                { text: k, paragraphs: [{ text: k, runs: [{ bold: true, format: { font: 'SimSun', sizeHalfPoints: 21 } }] }] },
+                { text: v, paragraphs: [{ text: v, runs: [{ bold: false, format: { font: 'SimSun', sizeHalfPoints: 21 } }] }] }
+              ]
+            };
+            targetSec.rows.push({
+              rowIndex: targetSec.rows.length,
+              structureType: STRUCTURE_TYPES.TWO_COLUMN,
+              semanticType: SEMANTIC_TYPES.CHILD_LABEL,
+              label: k,
+              value: v,
+              columnCount: 2,
+              cells: [
+                { colIndex: 0, text: k, typography: { fontFamily: 'SimSun', fontSizePt: 10.5, isBold: true, isItalic: false, alignment: 'left', gridSpan: 1, widthDxa: null } },
+                { colIndex: 1, text: v, typography: { fontFamily: 'SimSun', fontSizePt: 10.5, isBold: false, isItalic: false, alignment: 'left', gridSpan: 1, widthDxa: null } }
+              ]
+            });
+            secRawRowsMap.get(currentSecNum).push(virtualRow);
+            targetSec.structureSummary.twoColumnCount++;
+          } else {
+            const virtualRow = {
+              cells: [
+                { text: line, paragraphs: [{ text: line, runs: [{ bold: false, format: { font: 'SimSun', sizeHalfPoints: 21 } }] }] }
+              ]
+            };
+            targetSec.rows.push({
+              rowIndex: targetSec.rows.length,
+              structureType: STRUCTURE_TYPES.FULL_WIDTH,
+              semanticType: SEMANTIC_TYPES.EXPLANATION,
+              label: '—',
+              value: line,
+              columnCount: 1,
+              cells: [
+                { colIndex: 0, text: line, typography: { fontFamily: 'SimSun', fontSizePt: 10.5, isBold: false, isItalic: false, alignment: 'left', gridSpan: 1, widthDxa: null } }
+              ]
+            });
+            secRawRowsMap.get(currentSecNum).push(virtualRow);
+            targetSec.structureSummary.fullWidthCount++;
+          }
+          targetSec.rowsCount = targetSec.rows.length;
+        }
+      }
+      continue;
+    }
+
+    // B. 表格记录处理 (kind === 'table')
+    if (record.sectionNumber && record.sectionNumber >= 1 && record.sectionNumber <= 16) {
+      currentSecNum = record.sectionNumber;
+      currentSecTitle = record.title || '';
+    }
 
     const rawRows = record.rows || [];
     for (let rIdx = 0; rIdx < rawRows.length; rIdx++) {
@@ -615,7 +700,13 @@ function parseSection1(record, facts) {
     if (nameMatch && !facts.productName) {
       facts.productName = nameMatch[1].trim();
     }
-    const modelMatch = fullRowText.match(/(?:产品型号|型号|Model|Product model)[：:\s]+([A-Za-z0-9_.\-]+)/i);
+    const modelMatch = fullRowText.match(/(?:产品型号|型号|Model|Product model|产品名称)[：:\s]+([A-Za-z0-9_.\-]+)/i);
+    if (!facts.modelCode) {
+      const directCodeMatch = fullRowText.match(/\b([A-Z]{2,4}[-_]?\d{3,5}[A-Z0-9-]*)\b/i);
+      if (directCodeMatch) {
+        facts.modelCode = directCodeMatch[1].toUpperCase();
+      }
+    }
     if (modelMatch && !facts.modelCode) {
       facts.modelCode = modelMatch[1].trim();
     }

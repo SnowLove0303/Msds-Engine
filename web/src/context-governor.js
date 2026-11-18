@@ -94,6 +94,8 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '微黄半透明液体': 'Light yellow, semi-transparent liquid',
   '微黄半透明': 'Light yellow, semi-transparent',
   '半透明液体': 'Semi-transparent liquid',
+  '半透明粘稠液体': 'Translucent viscous liquid',
+  '粘稠液体': 'Viscous liquid',
   '微黄透明': 'Slightly yellow transparent',
   '微黄色透明液体': 'Slightly yellow transparent liquid',
   '微黄液体': 'Light yellow liquid',
@@ -153,6 +155,9 @@ export function translateChemicalTerm(term) {
   }
 
   // 模式模糊匹配
+  if (/半透明.*(?:粘稠|粘性)|(?:粘稠|粘性).*半透明/i.test(trimmed)) return 'Translucent viscous liquid'
+  if (/透明.*(?:粘稠|粘性)|(?:粘稠|粘性).*透明/i.test(trimmed)) return 'Transparent viscous liquid'
+  if (/粘稠.*液体|粘性.*液体/i.test(trimmed)) return 'Viscous liquid'
   if (/透明.*半透明/i.test(trimmed)) return 'Transparent to translucent liquid'
   if (/初沸点以下无闪点/i.test(trimmed)) return 'No flash point below initial boiling point'
   if (/可混溶/i.test(trimmed)) return 'Miscible'

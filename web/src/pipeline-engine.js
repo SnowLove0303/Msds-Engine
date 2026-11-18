@@ -253,7 +253,10 @@ export function translateChemicalCategoryToEnglish(cnCategory, cnName = '') {
   if (/无水.*环氧|非水.*环氧|无溶剂.*环氧|环氧.*无水/i.test(combined)) {
     return 'Anhydrous epoxy resin';
   }
-  if (/环氧.*固化剂|固化剂.*环氧|环氧胺加成物/i.test(combined)) {
+  if (/环氧胺加成物/i.test(combined)) {
+    return 'Epoxy-amine adduct';
+  }
+  if (/环氧.*固化剂|固化剂.*环氧/i.test(combined)) {
     return 'Waterborne epoxy curing agent';
   }
   if (/水性.*环氧|环氧.*乳液|环氧.*水分散/i.test(combined)) {
@@ -389,6 +392,45 @@ export function deriveSignalWord(cnText) {
   if (/危险/i.test(text)) return 'Danger';
   if (/警告/i.test(text)) return 'Warning';
   return 'Not applicable';
+}
+
+/**
+ * 依据中文理化特性描述动态推导标准化英文外观 (通用性原则)
+ */
+export function translateAppearance(val) {
+  if (!val) return 'Liquid';
+  const trimmed = String(val).trim();
+  if (/^[A-Za-z\s,.-]+$/.test(trimmed)) return trimmed; // already English
+
+  let app = 'Liquid';
+  if (/淡黄.*至.*黄.*透明|淡黄.*黄.*透明/i.test(trimmed)) app = 'Transparent liquid, light yellow to yellow';
+  else if (/透明.*至.*半透明|透明.*半透明/i.test(trimmed)) app = 'Transparent to translucent liquid';
+  else if (/黄色.*透明.*半透明|黄.*半透明/i.test(trimmed)) app = 'Yellow transparent to translucent liquid';
+  else if (/微黄.*半透明|淡黄.*半透明/i.test(trimmed)) app = 'Slightly yellowish translucent liquid';
+  else if (/黄色至浅褐色透明液体|黄.*浅褐.*透明/i.test(trimmed)) app = 'Yellow to light brown transparent liquid';
+  else if (/无色.*微黄|无色.*淡黄/i.test(trimmed)) app = 'Colorless to slightly yellow transparent liquid';
+  else if (/无色透明/i.test(trimmed)) app = 'Colourless transparent liquid';
+  else if (/乳白.*蓝光|蓝光.*乳液/i.test(trimmed)) app = 'Milky white emulsion with bluish tint';
+  else if (/半透明.*乳液|乳液.*半透明/i.test(trimmed)) app = 'Translucent emulsion';
+  else if (/半透明/i.test(trimmed)) app = 'Translucent liquid';
+  else if (/乳白.*乳液/i.test(trimmed)) app = 'Milky white emulsion';
+  else if (/乳白/i.test(trimmed)) app = 'Milky white liquid';
+  else if (/均质/i.test(trimmed) && /微黄|淡黄/i.test(trimmed)) app = 'Light yellow homogeneous liquid';
+  else if (/微黄.*透明|淡黄.*透明|透明.*微黄|透明.*淡黄/i.test(trimmed)) app = 'Light yellow transparent liquid';
+  else if (/透明/i.test(trimmed)) app = 'Transparent liquid';
+  else if (/微黄|淡黄/i.test(trimmed)) app = 'Slightly yellowish liquid';
+  else if (/均质/i.test(trimmed)) app = 'Homogeneous liquid';
+
+  if (/粘稠|粘性/i.test(trimmed)) {
+    if (app.includes('liquid')) {
+      app = app.replace(/\bliquid\b/i, 'viscous liquid');
+    } else if (app.includes('emulsion')) {
+      app = app.replace(/\bemulsion\b/i, 'viscous emulsion');
+    } else {
+      app = 'Viscous ' + app.toLowerCase();
+    }
+  }
+  return app;
 }
 
 export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
@@ -545,18 +587,7 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
         if (!val) continue;
 
         if (/外观/i.test(lbl)) {
-          if (/淡黄.*至.*黄.*透明|淡黄.*黄.*透明/i.test(val)) sec9Facts.appearance = 'Transparent liquid, light yellow to yellow';
-          else if (/黄色.*透明.*半透明|黄.*半透明/i.test(val)) sec9Facts.appearance = 'Yellow transparent to translucent liquid';
-          else if (/乳白.*蓝光|蓝光.*乳液/i.test(val)) sec9Facts.appearance = 'Milky white emulsion with bluish tint';
-          else if (/半透明.*乳液|乳液.*半透明/i.test(val)) sec9Facts.appearance = 'Translucent emulsion';
-          else if (/半透明/i.test(val)) sec9Facts.appearance = 'Translucent liquid';
-          else if (/乳白/i.test(val)) sec9Facts.appearance = 'Milky white liquid';
-          else if (/均质/i.test(val) && /微黄|淡黄/i.test(val)) sec9Facts.appearance = 'Light yellow homogeneous liquid';
-          else if (/透明/i.test(val) && /微黄|淡黄/i.test(val)) sec9Facts.appearance = 'Light yellow transparent liquid';
-          else if (/透明/i.test(val)) sec9Facts.appearance = 'Transparent liquid';
-          else if (/微黄|淡黄/i.test(val)) sec9Facts.appearance = 'Slightly yellowish liquid';
-          else if (/均质/i.test(val)) sec9Facts.appearance = 'Homogeneous liquid';
-          else sec9Facts.appearance = 'Liquid';
+          sec9Facts.appearance = translateAppearance(val);
         } else if (/饱和蒸气压/i.test(lbl)) {
           if (/无数据/i.test(val)) {
             sec9Facts.saturated_vapour = 'No data available.';
@@ -640,14 +671,7 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
         else if (/密度/i.test(pattern)) sec9Facts.density = val.replace(/约\s*/g, 'Approx. ');
         else if (/pH|PH/i.test(pattern)) sec9Facts.ph = val;
         else if (/外\s*观/i.test(pattern)) {
-          if (/淡黄.*至.*黄.*透明|淡黄.*黄.*透明/i.test(val)) sec9Facts.appearance = 'Transparent liquid, light yellow to yellow';
-          else if (/无色.*微黄|无色.*淡黄/i.test(val)) sec9Facts.appearance = 'Colorless to slightly yellow transparent liquid';
-          else if (/微黄.*透明|淡黄.*透明|透明.*微黄|透明.*淡黄/i.test(val)) sec9Facts.appearance = 'Light yellow transparent liquid';
-          else if (/无色.*淡黄|淡黄.*粘稠/i.test(val)) sec9Facts.appearance = 'Colorless to light yellow transparent viscous liquid';
-          else if (/乳白.*蓝光|蓝光.*乳液/i.test(val)) sec9Facts.appearance = 'Milky white emulsion with bluish tint';
-          else if (/乳白.*乳液/i.test(val)) sec9Facts.appearance = 'Milky white emulsion';
-          else if (/乳白/i.test(val)) sec9Facts.appearance = 'Milky white liquid';
-          else sec9Facts.appearance = val;
+          sec9Facts.appearance = translateAppearance(val);
         }
       }
     }
@@ -1422,23 +1446,7 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
 
   if (/外\s*观/i.test(cnLabel)) {
     enLabel = 'Appearance:';
-    if (/淡黄.*至.*黄.*透明|淡黄.*黄.*透明/i.test(cnVal)) enVal = 'Transparent liquid, light yellow to yellow';
-    else if (/透明.*至.*半透明|透明.*半透明/i.test(cnVal)) enVal = 'Transparent to translucent liquid';
-    else if (/黄色.*透明.*半透明|黄.*半透明/i.test(cnVal)) enVal = 'Yellow transparent to translucent liquid';
-    else if (/微黄.*半透明|淡黄.*半透明/i.test(cnVal)) enVal = 'Slightly yellowish translucent liquid';
-    else if (/黄色至浅褐色透明液体|黄.*浅褐.*透明/i.test(cnVal)) enVal = 'Yellow to light brown transparent liquid';
-    else if (/乳白.*蓝光|蓝光.*乳液/i.test(cnVal)) enVal = 'Milky white emulsion with bluish tint';
-    else if (/乳白.*乳液/i.test(cnVal)) enVal = 'Milky white emulsion';
-    else if (/半透明.*乳液|乳液.*半透明/i.test(cnVal)) enVal = 'Translucent emulsion';
-    else if (/半透明/i.test(cnVal)) enVal = 'Translucent liquid';
-    else if (/乳白/i.test(cnVal)) enVal = 'Milky white liquid';
-    else if (/无色.*淡黄|淡黄.*粘稠/i.test(cnVal)) enVal = 'Colourless to light yellow transparent viscous liquid';
-    else if (/无色.*微黄|无色.*淡黄/i.test(cnVal)) enVal = 'Colorless to slightly yellow transparent liquid';
-    else if (/微黄.*透明|淡黄.*透明|透明.*微黄|透明.*淡黄/i.test(cnVal)) enVal = 'Light yellow transparent liquid';
-    else if (/无色透明/i.test(cnVal)) enVal = 'Colourless transparent liquid';
-    else if (/微黄|淡黄/i.test(cnVal)) enVal = 'Slightly yellowish liquid';
-    else if (/均质/i.test(cnVal)) enVal = 'Homogeneous liquid';
-    else enVal = 'Liquid';
+    enVal = translateAppearance(cnVal);
   } else if (/嗅觉/i.test(cnLabel)) {
     enLabel = 'Odour threshold:';
     if (/酒精|乙醇/.test(cnVal)) enVal = 'Alcohol-like';
@@ -1683,17 +1691,7 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       const row2Paras = ['2.2 GHS Label Elements:'];
       if (facts.drawingNodes && facts.drawingNodes.length > 0) {
         row2Paras.push('GHS pictograms:');
-        let cleanGhsBytes = null;
-        const isFlammable = parsed?.hazardStatements?.some(h => /H225|H226/i.test(h)) || parsed?.categories?.some(c => /易燃|Flammable/i.test(c));
-        if (!isFlammable) {
-          try {
-            const cleanGhsPath = fileURLToPath(new URL('../public/assets/ghs/ghs07.png', import.meta.url));
-            if (fsSync.existsSync(cleanGhsPath)) {
-              cleanGhsBytes = fsSync.readFileSync(cleanGhsPath);
-            }
-          } catch (e) {}
-        }
-        row2Paras.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine, overrideImageBytes: cleanGhsBytes, overrideExt: cleanGhsBytes ? 'png' : null });
+        row2Paras.push({ isDrawing: true, drawingNodes: facts.drawingNodes, srcEngine: facts.srcEngine });
       } else if (parsed.pictogramText && parsed.pictogramText !== '无') {
         let enPic = parsed.pictogramText;
         if (/火焰|Flammable|Flame/i.test(enPic)) enPic = 'Flame';
@@ -2139,7 +2137,7 @@ export function translateTransportValueToEnglish(cnText, mode = 'road') {
 
   let text = cnText.trim();
   if (/^非危险品陆运输方式[，,]?\s*符合ADG准则[。.]?$/i.test(text)) {
-    return 'Not classified as dangerous goods for land transport.';
+    return 'Not classified as dangerous goods for land transport, in accordance with ADG regulations.';
   }
   if (/^非危险品海运方式[，,]?\s*符合IMDG准则[。.]?$/i.test(text)) {
     return 'Not classified as dangerous goods for sea transport, in accordance with IMDG regulations.';
@@ -3516,12 +3514,30 @@ export async function buildBaseEnglishEngine({
   if (s2) {
     // isPu202a 已被通用数据驱动机制彻底替代
     const isNonHazComposite = Boolean(facts.isNonHazardousComposite || (baseCnEngine && detectNonHazardousComposite(baseCnEngine.records, facts)));
-    const cnPicCell = baseCnEngine?.records?.find(r => r.sectionNumber === 2)?.rows[1]?.cells[0];
-    const drawingNodes = facts.drawingNodes || Array.from(cnPicCell?.node?.getElementsByTagNameNS('*', 'drawing') || []);
+    // 全行动态遍历扫描 Section 2 所有单元格中的 w:drawing 节点，彻底杜绝 rows[1] 写死导致象形图丢失
+    let extractedDrawings = [];
+    const cnS2 = baseCnEngine?.records?.find(r => r.sectionNumber === 2);
+    if (cnS2) {
+      if (cnS2.node) {
+        extractedDrawings = Array.from(cnS2.node.getElementsByTagNameNS('*', 'drawing') || []);
+      }
+      if (extractedDrawings.length === 0 && cnS2.rows) {
+        for (const r of cnS2.rows) {
+          for (const c of r.cells || []) {
+            if (c.node) {
+              const d = Array.from(c.node.getElementsByTagNameNS('*', 'drawing') || []);
+              if (d.length > 0) extractedDrawings.push(...d);
+            }
+          }
+        }
+      }
+    }
+    const drawingNodes = (facts.drawingNodes && facts.drawingNodes.length > 0) ? facts.drawingNodes : extractedDrawings;
+
     buildFullWidthSection2(engine, {
       ...facts,
       modelCode: modelCode || '',
-      drawingNodes: drawingNodes.length > 0 ? drawingNodes : facts.drawingNodes,
+      drawingNodes: drawingNodes.length > 0 ? drawingNodes : null,
       srcEngine: baseCnEngine || facts.srcEngine,
       section3ExemptionNotes: enValues['sec3.exemption_notes'] || extractSection3ExemptionNotes(baseCnEngine?.records?.find(r => r.sectionNumber === 3))
     }, true);
@@ -5365,6 +5381,7 @@ export function standardizeEnglishTypographyAndLabels(engine) {
         .replace(/）/g, ')')
         .replace(/，/g, ', ')
         .replace(/；/g, '; ')
+        .replace(/[:：]\s*\./g, ':')
         .replace(/(Fluororubber|Butyl rubber|Nitrile rubber)\s*[–—C]\s*([A-Z]{3})/g, '$1 - $2')
         .replace(/\b([A-Za-z]+)\s+[–—]\s+([A-Za-z]+)\b/g, '$1 - $2');
     }
