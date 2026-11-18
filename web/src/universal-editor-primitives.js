@@ -754,10 +754,11 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
           // 匹配复合键值对 (如 "2.1 GHS危险性类别：非危险化学品" 或 "Signal word: None")
           const kvMatch = pText.match(/^(\s*(?:(?:2\.\d+\s*)?(?:GHS\s*危险性类别|GHS\s*分类|Classification of the substance or mixture|GHS\s*Classification|GHS\s*标签要素|Label elements|GHS\s*Label\s*Elements|危险性说明|危害性说明|Hazard\s*statements?(?:\s*\([a-zA-Z0-9]+\))?|防范说明|Precautionary\s*statements?(?:\s*\([a-zA-Z0-9]+\))?|其他危害|其他危险|Other\s*hazards?)|(?:GHS\s*)?(?:象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components which must be listed on the label)|(?:需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal)))[:：]\s*(.*)$/i);
           const s15Match = sectionNumber === 15 && pText.match(/^(\s*(?:其它的规定|其它规定|其他规定|Other provisions|Other regulations|符合下列法规要求|Complies with the following regulations))[:：]\s*(.*)$/i);
+          const s11Match = sectionNumber === 11 && rIdx >= 3 && pText.match(/^(\s*[^：:\n]+[：:])\s*(.*)$/);
 
-          if (kvMatch || s15Match) {
-            const match = kvMatch || s15Match;
-            const labelText = (match[1].replace(/[:：\s.]+$/, '') + (isEnglish ? ': ' : '：')).trim();
+          if (kvMatch || s15Match || s11Match) {
+            const match = kvMatch || s15Match || s11Match;
+            const labelText = (match[1].replace(/[:：\s.]+$/, '') + (isEnglish ? ': ' : '：')).trim() + (isEnglish ? ' ' : '');
             const valText = match[2]?.trim() || '';
 
             const oldRuns = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));

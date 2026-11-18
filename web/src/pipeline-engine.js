@@ -802,7 +802,7 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
       if (/自供气式呼吸器|正压式空气呼吸器|自给式呼吸器|SCBA/i.test(allS5Text)) {
         parts.push('Firefighters must wear self-contained breathing apparatus (SCBA).');
       }
-      if (/禁止污染的灭火用水|污染.*灭火.*用水.*(?:土壤|地下水|地表水)/i.test(allS5Text)) {
+      if (/禁止(?:污染的)?灭火用水|灭火用水.*(?:土壤|地下水|地表水)/i.test(allS5Text)) {
         parts.push('Do not allow contaminated firefighting water to enter soil, groundwater or surface water.');
       }
       return parts.join('\n');
@@ -1971,25 +1971,40 @@ export function buildThreeTierSection11(engine, facts = {}, isEnglish = false) {
   renderFullWidthRow(s11, 2, preambleText, { isEnglish, isSection11: true, leftIndentTwips: 34, boldSubheaders: false, totalWidth: 9781 });
 
   let detailParagraphs = (isEnglish && facts.detailParagraphsEn) ? facts.detailParagraphsEn : (facts.detailParagraphs || []);
-  if (!detailParagraphs.length && srcS11 && srcS11.rows) {
-    // 从源文件 Section 11 中动态聚合端点
-    const lines = [];
-    for (let r = 3; r < srcS11.rows.length; r++) {
-      const row = srcS11.rows[r];
-      const lbl = (row.cells[0]?.text || '').trim();
-      const val = (row.cells[row.cells.length - 1]?.text || '').trim();
-      if (lbl && val) {
-        if (!isEnglish) {
-          lines.push(`${lbl} ${val}`);
-        } else {
-          lines.push(`${lbl} ${translateToxicologyValueToEnglish(val)}`);
+  if (!detailParagraphs.length) {
+    const rawSource = facts.rawSourceEngine || facts.srcEngine;
+    const endpoints = extractToxicologicalEndpointsFromSource(rawSource);
+    if (endpoints && endpoints.length > 0) {
+      detailParagraphs = endpoints.map((ep) => {
+        const lbl = isEnglish ? (ep.enLabel || mapToxicologyLabelToEnglish(ep.cnLabel)) : ep.cnLabel;
+        const val = isEnglish ? translateToxicologyValueToEnglish(ep.content, ep.key) : ep.content;
+        const colon = isEnglish ? ': ' : '：';
+        const line = `${lbl}${colon}${val}`;
+        return isEnglish ? line.replace(/[^\S\r\n]+/g, ' ').trim() : line.trim();
+      });
+    } else if (srcS11 && srcS11.rows && srcS11.rows.length >= 4) {
+      const isMultiRow = srcS11.rows.slice(3).some(r => r.cells && r.cells.length >= 2 && (r.cells[0]?.text || '').trim() !== (r.cells[r.cells.length - 1]?.text || '').trim());
+      if (isMultiRow) {
+        const lines = [];
+        for (let r = 3; r < srcS11.rows.length; r++) {
+          const row = srcS11.rows[r];
+          if (!row.cells || row.cells.length < 2) continue;
+          const lbl = (row.cells[0]?.text || '').trim();
+          const val = (row.cells[row.cells.length - 1]?.text || '').trim();
+          if (lbl && val) {
+            const cleanLbl = lbl.replace(/^\s*11\.\d+\s*/, '').replace(/[:：]$/, '');
+            const finalLbl = isEnglish ? mapToxicologyLabelToEnglish(cleanLbl) : cleanLbl;
+            const finalVal = isEnglish ? translateToxicologyValueToEnglish(val) : val;
+            const colon = isEnglish ? ': ' : '：';
+            lines.push(`${finalLbl}${colon}${finalVal}`);
+          }
         }
+        if (lines.length) detailParagraphs = lines;
       }
     }
-    if (lines.length) detailParagraphs = [lines.join('\n')];
   }
 
-  renderFullWidthRow(s11, 3, detailParagraphs, { isEnglish, isSection11: true, leftIndentTwips: 34, boldSubheaders: false, totalWidth: 9781 });
+  renderFullWidthRow(s11, 3, detailParagraphs, { isEnglish, isSection11: true, leftIndentTwips: 34, boldSubheaders: true, totalWidth: 9781 });
   engine.refresh();
 }
 
@@ -3215,6 +3230,7 @@ function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
 
   // 严格保留模板原装序号与格式，严禁全局重排序号
   engine._adaptiveRevisionDate = finalRevisionDate;
+  engine._rawSourceEngine = srcEngine;
   return engine;
 }
 
@@ -3224,7 +3240,7 @@ function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
 /**
  * 毒理学描述与实测数据动态英译引擎 (彻底废除硬编码假数据)
  */
-function translateToxicologyValueToEnglish(cnText, endpoint = '') {
+export function translateToxicologyValueToEnglish(cnText, endpoint = '') {
   if (!cnText || typeof cnText !== 'string') return '';
   let t = cnText.trim();
   if (!t) return '';
@@ -3264,7 +3280,10 @@ function translateToxicologyValueToEnglish(cnText, endpoint = '') {
   t = t.replace(/OECD化学品测试指南\s*(\d+)/gi, 'OECD Test Guideline $1');
   t = t.replace(/此物质或混合物无急性呼吸毒性/g, 'The substance or mixture has no acute inhalation toxicity');
   t = t.replace(/此物质或混合物无急性皮肤毒性/g, 'The substance or mixture has no acute dermal toxicity');
-  t = t.replace(/无皮肤刺激/g, 'No skin irritation');
+  t = t.replace(/无皮肤刺激(?:性)?[.。]?/g, 'No skin irritation.');
+  t = t.replace(/轻微一过性刺激[，, ]*短期内可恢复[，, ]*不属于严重眼刺激物[.。]?/g, 'Slight transient irritation, reversible within a short period, not classified as serious eye irritant.');
+  t = t.replace(/AMES试验呈阴性[，, ]*无致突变性[.。]?/gi, 'Negative in AMES test, non-mutagenic.');
+  t = t.replace(/无致癌性或生殖毒性依据[.。]?/g, 'No evidence of carcinogenicity or reproductive toxicity.');
   t = t.replace(/无眼睛刺激/g, 'No eye irritation');
   t = t.replace(/不引起皮肤过敏/g, 'Did not cause skin sensitization');
   t = t.replace(/轻微刺激/g, 'Slight irritation');
@@ -3337,8 +3356,8 @@ function translateToxicologyValueToEnglish(cnText, endpoint = '') {
   t = t.replace(/[（(]?此值仅用于有可吸入的颗粒形成的情况[.。]?[）)]?/g, '(applicable only where respirable aerosols are formed)');
   t = t.replace(/N,N[－-]二甲基乙酰胺(?:\s*[（(]DMAC[）)])?/g, 'N,N-Dimethylacetamide (DMAC)');
   t = t.replace(/[（(]\s*鼠\s*[）)]\s*LD50\s*[:：]\s*/g, '(Rat) LD50: ');
-  t = t.replace(/＞/g, '> ');
-  t = t.replace(/＜/g, '< ');
+  t = t.replace(/＞\s*/g, '> ');
+  t = t.replace(/＜\s*/g, '< ');
 
   // 皮肤与眼睛刺激
   t = t.replace(/(?:物种|Species)\s*[:：]\s*(?:兔子?|家兔)/gi, 'Species: Rabbit');
@@ -3386,6 +3405,9 @@ function translateToxicologyValueToEnglish(cnText, endpoint = '') {
 
   t = t.replace(/；/g, '; ');
   t = t.replace(/[－—]/g, '-');
+  t = t.replace(/\.\s*\./g, '.');
+  t = t.replace(/[^\S\r\n]+/g, ' ');
+  t = t.replace(/\s+([,.:;!?])/g, '$1');
   return t.trim();
 }
 
@@ -3585,7 +3607,7 @@ export async function buildBaseEnglishEngine({
     const isCnS11FullWidth = cnS11ForCheck && cnS11ForCheck.rows.length === 4 && cnS11ForCheck.rows[3]?.cells?.length === 1;
     const enS11Paradigm = (isMultiComponent || isCnS11FullWidth) ? 'PARADIGM_1_FULL_WIDTH_MERGED' : 'PARADIGM_2_STANDARD_SLOTS';
     if (enS11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
-      buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || '', srcEngine: baseCnEngine || facts.srcEngine }, true);
+      buildThreeTierSection11(engine, { ...facts, rawSourceEngine: facts.rawSourceEngine || baseCnEngine?._rawSourceEngine || facts.srcEngine, modelCode: modelCode || '', srcEngine: baseCnEngine || facts.srcEngine }, true);
     }
     cleanSection12Preambles(engine, true);
   }
@@ -4503,6 +4525,7 @@ export async function executeAdaptiveDeliverablesPipeline({
     viscosityOverride: facts.viscosityOverride || facts.viscosity,
     facts
   });
+  facts.rawSourceEngine = baseCnEngine._rawSourceEngine || facts.srcEngine;
 
   const todayDateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '/');
   const isOutdated = !baseCnEngine._adaptiveRevisionDate || 
@@ -4994,6 +5017,29 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
         }
       }
     }
+
+    // 英文 Section 8 全量标签五号字号加固 (REQ-02 / DEF-12):
+    // 从 row 2 开始，严禁包含工作场所组分控制参数在内的任何单元格残留 sz="24"
+    if (isEn) {
+      for (let rIdx = 2; rIdx < s8Rec.rows.length; rIdx++) {
+        const row = s8Rec.rows[rIdx];
+        for (const cell of (row.cells || [])) {
+          if (!cell?.node) continue;
+          const allSzs = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'sz'));
+          allSzs.forEach(sz => {
+            if (sz.getAttribute('w:val') === '24') {
+              sz.setAttribute('w:val', '19');
+            }
+          });
+          const allSzCss = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'szCs'));
+          allSzCss.forEach(szCs => {
+            if (szCs.getAttribute('w:val') === '24') {
+              szCs.setAttribute('w:val', '19');
+            }
+          });
+        }
+      }
+    }
   }
 
   // 3. Section 15: 法定结构性子题头加粗保护
@@ -5076,12 +5122,12 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
         // 豁免 Section 8 顶级题头
         if (/^8\.\s*EXPOSURE|^8\.1\s*Exposure controls/i.test(c0Text)) continue;
 
+        const targetSz = '19';
         const runs = Array.from(c0.getElementsByTagNameNS(W_NS, 'r'));
         for (const run of runs) {
           const runText = (run.textContent || '').trim();
           const hasTab = run.getElementsByTagNameNS(W_NS, 'tab').length > 0 || run.getElementsByTagName('tab').length > 0;
           const isSeqRun = hasTab || /^(\d+\.\d+(?:\.\d+)?)\s*$/.test(runText);
-          const targetSz = '19';
 
           let rPr = run.getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');
           if (!run.getElementsByTagNameNS(W_NS, 'rPr')[0]) run.insertBefore(rPr, run.firstChild);
@@ -5098,6 +5144,17 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
           rFonts.setAttribute('w:eastAsia', 'Arial');
           rFonts.setAttribute('w:cs', 'Arial');
           if (!rPr.getElementsByTagNameNS(W_NS, 'rFonts')[0]) rPr.appendChild(rFonts);
+        }
+        // 清理 pPr 中的 sz/szCs 污染
+        const pPrs = Array.from(c0.getElementsByTagNameNS(W_NS, 'pPr'));
+        for (const pPr of pPrs) {
+          const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
+          if (pRPr) {
+            const pSzs = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'sz'));
+            pSzs.forEach(sz => sz.setAttribute('w:val', targetSz));
+            const pSzCss = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'szCs'));
+            pSzCss.forEach(szCs => szCs.setAttribute('w:val', targetSz));
+          }
         }
         // 清理 leftChars 污染
         const inds = Array.from(c0.getElementsByTagNameNS(W_NS, 'ind'));
@@ -5831,6 +5888,17 @@ function rebuildRunsWithTypography(p, text, { font, asciiFont, sizeVal, bold }, 
   if (text === undefined || text === null) return;
 
   const doc = p.ownerDocument;
+  const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+  if (pPr && sizeVal) {
+    const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
+    if (pRPr) {
+      const pSzs = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'sz'));
+      pSzs.forEach(sz => sz.setAttribute('w:val', sizeVal));
+      const pSzCss = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'szCs'));
+      pSzCss.forEach(szCs => szCs.setAttribute('w:val', sizeVal));
+    }
+  }
+
   const r = doc.createElementNS(W_NS, 'w:r');
   const rPr = doc.createElementNS(W_NS, 'w:rPr');
   applyRunProps(rPr, { font, asciiFont, sizeVal, bold }, W_NS);
@@ -5892,6 +5960,31 @@ export function rebuildUnifiedLabelRun(p, seqStr, labelText, { font, asciiFont, 
   const numPrs = Array.from(p.getElementsByTagNameNS(W_NS, 'numPr'));
   numPrs.forEach(n => n.parentNode?.removeChild(n));
   const doc = p.ownerDocument;
+
+  const isS81Header = /^8\.1\b/.test(seqStr || '') && /Exposure controls/i.test(labelText || '');
+  const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+  if (isS81Header) {
+    if (pPr) {
+      let pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
+      if (!pRPr) {
+        pRPr = doc.createElementNS(W_NS, 'w:rPr');
+        pPr.appendChild(pRPr);
+      }
+      let sz = pRPr.getElementsByTagNameNS(W_NS, 'sz')[0] || doc.createElementNS(W_NS, 'w:sz');
+      sz.setAttribute('w:val', '24');
+      if (!pRPr.getElementsByTagNameNS(W_NS, 'sz')[0]) pRPr.appendChild(sz);
+      let b = pRPr.getElementsByTagNameNS(W_NS, 'b')[0] || doc.createElementNS(W_NS, 'w:b');
+      if (!pRPr.getElementsByTagNameNS(W_NS, 'b')[0]) pRPr.appendChild(b);
+    }
+  } else if (pPr && sizeVal) {
+    const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')[0];
+    if (pRPr) {
+      const pSzs = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'sz'));
+      pSzs.forEach(sz => sz.setAttribute('w:val', sizeVal));
+      const pSzCss = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'szCs'));
+      pSzCss.forEach(szCs => szCs.setAttribute('w:val', sizeVal));
+    }
+  }
 
   if (seqStr) {
     const rSeq = doc.createElementNS(W_NS, 'w:r');

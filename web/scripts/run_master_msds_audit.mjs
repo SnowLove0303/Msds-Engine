@@ -1871,7 +1871,8 @@ export async function runMasterMsdsAudit(options = {}) {
   const s11RecCn = cnDocx.records.find(r => r.sectionNumber === 11);
   const s11RecEn = enDocx.records.find(r => r.sectionNumber === 11);
   const s11RowsEqual = s11RecCn && s11RecEn && s11RecCn.rows.length === s11RecEn.rows.length;
-  const s11HasEnoughEndpoints = s11RecCn && (s11RecCn.rows.length === 2 || s11RecCn.rows.length >= 15 || (srcS11Rows > 0 ? s11RecCn.rows.length === srcS11Rows : s11RecCn.rows.length === 8));
+  const isS11FullWidth = s11RecCn && (s11RecCn.rows.length === 4 && (s11RecCn.rows[3]?.cells?.length || 0) === 1);
+  const s11HasEnoughEndpoints = s11RecCn && (s11RecCn.rows.length === 2 || isS11FullWidth || s11RecCn.rows.length >= 15 || (srcS11Rows > 0 ? s11RecCn.rows.length === srcS11Rows : s11RecCn.rows.length === 8));
   assert(
     s11RowsEqual && s11HasEnoughEndpoints,
     '环3',

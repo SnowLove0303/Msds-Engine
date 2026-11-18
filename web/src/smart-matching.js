@@ -135,8 +135,8 @@ export const SECTION_SLOT_REGISTRY = {
     slots: [
       { key: 'extinguishing_media', standardLabel: '5.1 适用灭火介质：', aliases: ['适用灭火介质', '灭火介质', '灭火剂', '适用灭火剂', '合适的灭火剂', '合适灭火剂', '合适灭火介质', '5.1合适的灭火剂', '5.1.合适的灭火剂', '灭火方法及灭火剂', 'Suitable extinguishing media', 'Extinguishing media', 'Suitable extinguishing agent'] },
       { key: 'unsuitable_extinguishing_media', standardLabel: '5.2 不合适的灭火剂：', aliases: ['不合适的灭火剂', '不合适灭火剂', '不适用灭火剂', 'Unsuitable extinguishing media', 'Inappropriate extinguishing media', 'Unsuitable extinguishing agent'] },
-      { key: 'special_hazards', standardLabel: '5.3 物质或混合物的特殊危害：', aliases: ['物质或混合物的特殊危害', '特别危险性', '特殊危险性', '特别危害', 'Special hazards arising from the substance or mixture', 'Special hazards', 'Specific hazards', 'Special hazards of substances or mixtures', 'Special hazards of substance or mixture'] },
-      { key: 'protective_actions', standardLabel: '5.4 消防预防措施和保护设备：', aliases: ['消防预防措施和保护设备', '灭火注意事项及防护措施', '灭火注意事项', '灭火人员防护', '消防人员防护措施', 'Protective actions for firefighters', 'Advice for firefighters', 'Protective equipment for firefighters'] },
+      { key: 'special_hazards', standardLabel: '5.3 物质或混合物的特殊危害：', aliases: ['特殊危害', '物质或混合物的特殊危害', '特别危险性', '特殊危险性', '特别危害', 'Special hazards arising from the substance or mixture', 'Special hazards', 'Specific hazards', 'Special hazards of substances or mixtures', 'Special hazards of substance or mixture'] },
+      { key: 'protective_actions', standardLabel: '5.4 消防预防措施和保护设备：', aliases: ['消防防护', '消防预防措施和保护设备', '灭火注意事项及防护措施', '灭火注意事项', '灭火人员防护', '消防人员防护措施', 'Protective actions for firefighters', 'Advice for firefighters', 'Protective equipment for firefighters'] },
     ],
   },
   6: {
@@ -144,13 +144,13 @@ export const SECTION_SLOT_REGISTRY = {
     slots: [
       { key: 'personal_precautions', standardLabel: '6.1 作业人员防护措施、防护装备和应急处置程序：', aliases: ['作业人员防护措施', '作业人员防护', '应急人员防护', '人身安全防护', '个人预防措施', '个人预防措施、应急程序', '应急程序', 'Personal precautions, protective equipment and emergency procedures', 'Personal precautions'] },
       { key: 'environmental_precautions', standardLabel: '6.2 环境保护措施：', aliases: ['环境保护措施', '环保措施', '防止环境污染措施', 'Environmental precautions'] },
-      { key: 'cleanup_methods', standardLabel: '6.3 泄漏化学品的收容、清除方法及所使用的处置材料：', aliases: ['泄漏化学品的收容、清除方法', '清除方法', '泄漏清除方法', '收容方法', '污染物收集和清除的方法', '收集和清除的方法', 'Methods and material for containment and cleaning up', 'Clean-up methods', 'Methods for cleaning up', 'Spill and Leak Procedures', 'Spill and leak'] },
+      { key: 'cleanup_methods', standardLabel: '6.3 泄漏化学品的收容、清除方法及所使用的处置材料：', aliases: ['清理方法', '泄漏化学品的收容、清除方法', '清除方法', '泄漏清除方法', '收容方法', '污染物收集和清除的方法', '收集和清除的方法', 'Methods and material for containment and cleaning up', 'Clean-up methods', 'Methods for cleaning up', 'Spill and Leak Procedures', 'Spill and leak'] },
     ],
   },
   7: {
     title: '操作处置与储存',
     slots: [
-      { key: 'handling', standardLabel: '7.1 安全操作注意事项：', aliases: ['安全操作注意事项', '操作处置', '操作注意事项', '安全操作防范', 'Precautions for safe handling', 'Handling', 'Handling/Storage Precautions', 'Handling precautions'] },
+      { key: 'handling', standardLabel: '7.1 安全操作注意事项：', aliases: ['安全操作', '安全操作注意事项', '操作处置', '操作注意事项', '安全操作防范', 'Precautions for safe handling', 'Handling', 'Handling/Storage Precautions', 'Handling precautions'] },
       { key: 'storage', standardLabel: '7.2 安全储存条件：', aliases: ['安全储存条件', '储存注意事项', '储存条件', '安全储存', 'Conditions for safe storage, including any incompatibilities', 'Storage', 'Storage Period and Temperature', 'Storage period'] },
     ],
   },
@@ -210,7 +210,7 @@ export const SECTION_SLOT_REGISTRY = {
       { key: 'reactivity', standardLabel: '10.1 反应性：', aliases: ['反应性', '反应危险性', 'Reactivity'] },
       { key: 'stability', standardLabel: '10.2 化学稳定性：', aliases: ['化学稳定性', '稳定性', 'Chemical stability', 'Stability'] },
       { key: 'hazardous_reactions', standardLabel: '10.3 危险反应的可能性：', aliases: ['危险反应的可能性', '危险反应', '可能产生的危险反应', '可能的危害反应', '危害反应', 'Possibility of hazardous reactions', 'Hazardous reactions', 'Possible hazardous reactions'] },
-      { key: 'conditions_to_avoid', standardLabel: '10.4 应避免的条件：', aliases: ['应避免的条件', '应避免的条件（如静电、撞击或振动）', '避免接触的条件', 'Conditions to avoid'] },
+      { key: 'conditions_to_avoid', standardLabel: '10.4 应避免的条件：', aliases: ['避免接触条件', '应避免的条件', '应避免的条件（如静电、撞击或振动）', '避免接触的条件', 'Conditions to avoid'] },
       { key: 'incompatible_materials', standardLabel: '10.5 不相容的物质：', aliases: ['不相容的物质', '禁配物', '应避免的物质', 'Incompatible materials'] },
       { key: 'hazardous_decomposition', standardLabel: '10.6 危险的分解产物：', aliases: ['危险的分解产物', '分解产物', '有害燃烧产物', '危险分解产物', 'Hazardous decomposition products'] },
     ],
@@ -243,7 +243,7 @@ export const SECTION_SLOT_REGISTRY = {
     title: '生态学信息',
     slots: [
       { key: 'ecotoxicity', standardLabel: '12.1 生态毒性：', aliases: ['生态毒性', '急性水生毒性', '水生生物毒性', '生态毒理学研究', '无可用的生态毒理学研究', '半数致死有效浓度', '半数致死浓度', 'EC50', 'LC50', '藻类', '大型溞', '水蚤', '虹鳟', '对鱼类的毒性', '鱼类毒性', 'Ecotoxicity', 'Aquatic toxicity'] },
-      { key: 'persistence', standardLabel: '12.2 持久性和降解性：', aliases: ['持久性和降解性', '降解性', '生物降解性', 'Persistence and degradability', 'Durability and degradability'] },
+      { key: 'persistence', standardLabel: '12.2 持久性和降解性：', aliases: ['持久与降解性', '持久性和降解性', '降解性', '生物降解性', 'Persistence and degradability', 'Durability and degradability'] },
       { key: 'bioaccumulation', standardLabel: '12.3 潜在的生物累积性：', aliases: ['潜在的生物累积性', '生物蓄积性', '生物累积性', 'Bioaccumulative potential'] },
       { key: 'soil_mobility', standardLabel: '12.4 土壤中的迁移性：', aliases: ['土壤中的迁移性', '土壤迁移性', 'Mobility in soil'] },
       { key: 'other_adverse_effects', standardLabel: '12.5 其他不良影响：', aliases: ['其他不良影响', '其他有害效应', '环境危害总结', '其他不利的影响', '其他不利影响', '12.3其他', '12.3 其他', '其他', 'Other adverse effects'] },
@@ -252,7 +252,7 @@ export const SECTION_SLOT_REGISTRY = {
   13: {
     title: '废弃处置',
     slots: [
-      { key: 'waste_treatment_methods', standardLabel: '13.1 废弃处置方法：', aliases: ['废弃处置方法', '废弃化学品处置', '废弃物处置方法', '残余废弃物处置', '欧洲废弃物分类', '欧洲废弃物分类（EWC）', 'EWC', 'Waste treatment methods', 'Waste Disposal Method'] },
+      { key: 'waste_treatment_methods', standardLabel: '13.1 废弃处置方法：', aliases: ['处置方法', '废弃处置方法', '废弃化学品处置', '废弃物处置方法', '残余废弃物处置', '欧洲废弃物分类', '欧洲废弃物分类（EWC）', 'EWC', 'Waste treatment methods', 'Waste Disposal Method'] },
       { key: 'contaminated_packaging', standardLabel: '13.2 受污染的包装物：', aliases: ['受污染的包装物', '污染包装物处置', '受污染包装处置', '包装处置', '处理方法', 'Contaminated packaging', 'Empty Container Precautions'] },
     ],
   },
@@ -273,7 +273,7 @@ export const SECTION_SLOT_REGISTRY = {
   15: {
     title: '法规信息',
     slots: [
-      { key: 'safety_regulations', standardLabel: '15.1 物质或混合物的相关安全、健康和环保法律法规：', aliases: ['物质或混合物的相关安全、健康和环保法律法规', '化学品安全标签编写规定', '法规信息', '安全、健康和环境法规', '国内化学品安全管理法规', 'Safety, health and environmental regulations', 'Safety regulations', 'Safety, health and environmental laws and regulations related to substances or mixtures', 'Safety, health and environmental laws and regulations'] },
+      { key: 'safety_regulations', standardLabel: '15.1 物质或混合物的相关安全、健康和环保法律法规：', aliases: ['遵循法规', '物质或混合物的相关安全、健康和环保法律法规', '化学品安全标签编写规定', '法规信息', '安全、健康和环境法规', '国内化学品安全管理法规', 'Safety, health and environmental regulations', 'Safety regulations', 'Safety, health and environmental laws and regulations related to substances or mixtures', 'Safety, health and environmental laws and regulations'] },
       { key: 'other_regulations', standardLabel: '其它的规定：', aliases: ['其它的规定', '其它规定', '其他规定', 'Other regulations'] },
       { key: 'regulatory_requirements', standardLabel: '符合下列法规要求：', aliases: ['符合下列法规要求', '法规要求', 'Meet the following regulatory requirements'] },
       { key: 'reg_591', standardLabel: '危险化学品安全管理条例，国务院令591号', aliases: ['危险化学品安全管理条例', '国务院令591号', '591号', '国务院令344号', '344号', 'Regulations on the safety management of dangerous chemicals', 'Regulations on the safety management of hazardous chemicals', 'Decree No. 591 of the State Council'] },
@@ -1840,7 +1840,7 @@ export function decomposeCellPairToFacts(cell0, cell1, row = null, sectionNumber
  * 融合 16 章节局部约束插件、限定词前置解耦、非危运输级联、手套聚类与语义散文路由
  */
 export function runSmartMatching(inspectorRecords) {
-  const records = (inspectorRecords || []).filter((r) => r.kind === 'table' && r.sectionNumber);
+  const records = (inspectorRecords || []).filter((r) => r.sectionNumber);
   const matchedSections = [];
   let totalMatched = 0;
   let totalPruned = 0;
@@ -1853,7 +1853,9 @@ export function runSmartMatching(inspectorRecords) {
 
   for (let s = 1; s <= 16; s++) {
     const registry = SECTION_SLOT_REGISTRY[s];
-    const sourceRecord = records.find((r) => r.sectionNumber === s);
+    const sRecords = records.filter((r) => r.sectionNumber === s);
+    const sourceRecord = sRecords.find((r) => r.kind === 'table');
+    const textRecords = sRecords.filter((r) => r.kind === 'text');
 
     if (!registry) continue;
 
@@ -1862,7 +1864,14 @@ export function runSmartMatching(inspectorRecords) {
     let isCompoundS2 = false;
     if (sourceRecord && sourceRecord.rows) {
       for (const row of sourceRecord.rows) {
-        if (row.index === 0) continue; // 排除表头
+        if (row.index === 0) {
+          const c0Text = (row.cells?.[0]?.text || '').trim();
+          const c1Text = (row.cells?.[1]?.text || '').trim();
+          const isRealHeader = /^(?:项目|内容|指标|参数|特性|结果|名称|描述|Item|Content|Property|Value|Parameter)$/i.test(c0Text) ||
+                               /^(?:内容|数值|指标|描述|说明|Value|Description|Specification)$/i.test(c1Text) ||
+                               (row.cells?.length >= 3 && /CAS|含量|成分|组成|Chemical/i.test(c0Text));
+          if (isRealHeader) continue;
+        }
         const cell0 = row.cells?.[0];
         const cell1 = row.cells?.[1];
         if (!cell0) continue;
@@ -1969,6 +1978,49 @@ export function runSmartMatching(inspectorRecords) {
             rawValue: sanitizeTypographyAndSymbols(pairValue.trim()),
             rowObj: row,
           });
+        }
+      }
+    }
+
+    // 补充解析纯段落记录 (kind === 'text')
+    if (textRecords.length > 0) {
+      for (const tr of textRecords) {
+        const text = (tr.text || '').trim();
+        if (!text) continue;
+        if (new RegExp(`^${s}\\s*[\\.、\\s]`).test(text) && text.length < 35 && !text.includes('\n') && !/[:：]/.test(text)) {
+          continue;
+        }
+        if (s === 16 && !/[:：]/.test(text)) {
+          rawPairs.push({
+            rawLabel: '免责声明：',
+            rawValue: sanitizeTypographyAndSymbols(text),
+            rowObj: null,
+          });
+          continue;
+        }
+        const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+        for (const line of lines) {
+          if (new RegExp(`^${s}\\s*[\\.、\\s]`).test(line) && line.length < 35 && !/[:：]/.test(line)) {
+            continue;
+          }
+          const cs = safeColonSplit(line);
+          if (cs.hasColon && cs.label) {
+            rawPairs.push({
+              rawLabel: sanitizeTypographyAndSymbols(cs.label),
+              rawValue: sanitizeTypographyAndSymbols(cs.value),
+              rowObj: null,
+            });
+          } else if (line) {
+            if (rawPairs.length > 0) {
+              rawPairs[rawPairs.length - 1].rawValue += '\n' + sanitizeTypographyAndSymbols(line);
+            } else {
+              rawPairs.push({
+                rawLabel: '',
+                rawValue: sanitizeTypographyAndSymbols(line),
+                rowObj: null,
+              });
+            }
+          }
         }
       }
     }
@@ -3541,7 +3593,8 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
             // 全局大类结构题头免写守卫：严防结构大类题头被误当作值格注入
             if (s === 1) {
               const hasSeparateChineseName = tRecord.rows.some((r) => /中文名称|化学品中文名/i.test(r.cells?.[0]?.text || r.cells?.[0]?.labelText || ''));
-              if (hasSeparateChineseName && /1\.1\s*(?:产品名称|产品标识|Product\s*name)/i.test(cell0.text || cell0.labelText || '')) {
+              const hasSeparateModelRow = tRecord.rows.some((r) => /(?:产品)?型号/i.test(r.cells?.[0]?.text || r.cells?.[0]?.labelText || ''));
+              if (hasSeparateChineseName && hasSeparateModelRow && /1\.1\s*(?:产品名称|产品标识|Product\s*name)/i.test(cell0.text || cell0.labelText || '')) {
                 continue;
               }
               if (/1\.3\s*(?:供应商信息|Supplier\s*information)/i.test(cell0.text || cell0.labelText || '')) {
@@ -3611,7 +3664,7 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
                     injectVal = `${injectVal} ${modelVal}`;
                   }
                   // 规范化：确保中文产品名与型号之间有且仅有一个半角空格（避免切断 HPU 前缀）
-                  injectVal = injectVal.replace(/(?<![A-Za-z0-9\s])(PU[-\s]?\d+[A-Za-z]?)/i, ' $1').trim();
+                  injectVal = injectVal.replace(/(?<![A-Za-z0-9\s])((?:PU|PA|OS|HPU)[-\s]?\d+[A-Za-z]?)/i, ' $1').trim();
                 }
                 if (s === 5) {
                   if (matchedItem.key === 'special_hazards' && injectVal) {

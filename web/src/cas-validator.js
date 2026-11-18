@@ -98,6 +98,12 @@ export const COMMON_CHEMICAL_CAS_MAP = Object.freeze({
     aliasesCn: ['乙二醇单丁醚', '丁基溶纤剂', '防白水', 'BCS'],
     aliasesEn: ['2-butoxyethanol', 'ethylene glycol monobutyl ether', 'butyl cellosolve']
   },
+  '1336-21-6': {
+    standardNameCn: '氨水',
+    standardNameEn: 'Ammonia water',
+    aliasesCn: ['氨水', '氢氧化铵', '氨水溶液'],
+    aliasesEn: ['ammonia water', 'ammonium hydroxide', 'ammonia solution', 'ammonia aqueous solution']
+  },
   '112-34-5': {
     standardNameCn: '二乙二醇单丁醚',
     standardNameEn: '2-(2-Butoxyethoxy)ethanol',

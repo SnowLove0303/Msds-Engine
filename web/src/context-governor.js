@@ -86,6 +86,8 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '氢氧化钠': 'Sodium hydroxide',
   '二甲基乙醇胺': 'N,N-Dimethylethanolamine',
   'N,N-二甲基乙醇胺': 'N,N-Dimethylethanolamine',
+  '氨水': 'Ammonia water',
+  '氢氧化铵': 'Ammonium hydroxide',
   '羟基聚氨酯分散体': 'Hydroxy polyurethane dispersion',
   '商业机密': 'Trade secret',
   '商业秘密': 'Trade secret',
@@ -206,8 +208,9 @@ export function translateChemicalTerm(term) {
   if (/二甲基乙酰胺/i.test(trimmed)) return 'N,N-Dimethylacetamide (DMAC)'
   if (/甲基吡咯烷酮/i.test(trimmed)) return 'N-Methyl-2-pyrrolidone (NMP)'
   if (/乙基吡咯烷酮/i.test(trimmed)) return '1-Ethylpyrrolidin-2-one (NEP)'
-  if (/水$/i.test(trimmed)) return 'Water'
+  if (/氨水/i.test(trimmed)) return 'Ammonia water'
   if (/去离子水/i.test(trimmed)) return 'Deionized water'
+  if (/^水$|纯水|蒸馏水/i.test(trimmed)) return 'Water'
   if (/商业机密|商业秘密/i.test(trimmed)) return 'Trade secret'
   if (/完全混溶/i.test(trimmed)) return 'Completely miscible'
   if (/非危险品.*ADG/i.test(trimmed)) return 'Not classified as dangerous goods for land transport.'

@@ -3139,13 +3139,18 @@ function applyInhalationReclassification(endpoints) {
 
 export function extractToxicologicalEndpointsFromSource(srcEngine) {
   const s11Src = srcEngine?.records?.find(r => r.sectionNumber === 11 && r.rows);
-  if (!s11Src || !s11Src.rows) return [];
+  const s11Recs = srcEngine?.records?.filter(r => r.sectionNumber === 11) || [];
+  if (!s11Src && s11Recs.length === 0) return [];
 
-  // 1. 若源文件为标准多行表格 (行数 >= 4 且有独立端点行)
-  if (s11Src.rows.length >= 4) {
+  // 1. 若源文件为标准多行表格 (行数 >= 4 且有独立端点行，且具有多列键值结构)
+  const isMultiRowEndpointTable = s11Src && s11Src.rows && s11Src.rows.length >= 4 &&
+    s11Src.rows.slice(3).some(r => r.cells && r.cells.length >= 2 && (r.cells[0]?.text || '').trim() !== (r.cells[r.cells.length - 1]?.text || '').trim());
+
+  if (isMultiRowEndpointTable) {
     const endpoints = [];
     for (let rIdx = 3; rIdx < s11Src.rows.length; rIdx++) {
       const row = s11Src.rows[rIdx];
+      if (!row.cells || row.cells.length < 2) continue;
       const rawLbl = (row.cells[0]?.text || '').trim();
       const rawVal = (row.cells[row.cells.length - 1]?.text || '').trim();
       if (!rawLbl) continue;
@@ -3162,21 +3167,28 @@ export function extractToxicologicalEndpointsFromSource(srcEngine) {
     }
   }
 
-  // 2. 若源文件为叙述性单单元格大文本块
-  const rawText = s11Src.rows.map(r => r.cells.map(c => c.text).join('\n')).join('\n');
+  // 2. 若源文件为叙述性单单元格大文本块或纯段落记录 (kind === 'text')
+  let rawText = '';
+  if (s11Src && s11Src.rows) {
+    rawText = s11Src.rows.map(r => r.cells.map(c => c.text).join('\n')).join('\n');
+  } else {
+    rawText = s11Recs.map(r => r.text || '').join('\n');
+  }
+
   const endpointDefs = [
-    { key: 'acute_oral', cnLabel: '急性毒性，经口', enLabel: 'Acute toxicity, oral', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:急性毒性[，, ]*经口|经口毒性)[：:]?/i },
-    { key: 'acute_dermal', cnLabel: '急性毒性，经皮', enLabel: 'Acute toxicity, dermal', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:急性毒性[，, ]*经皮|经皮毒性)[：:]?/i },
-    { key: 'acute_inhalation', cnLabel: '急性毒性，吸入', enLabel: 'Acute toxicity, inhalation', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:急性毒性[，, ]*吸入|吸入毒性)[：:]?/i },
+    { key: 'acute_oral', cnLabel: '急性毒性，经口', enLabel: 'Acute toxicity, oral', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:急性毒性[：:，, ]*(?:经口)?|经口毒性)[：:]?/i },
+    { key: 'acute_dermal', cnLabel: '急性毒性，经皮', enLabel: 'Acute toxicity, dermal', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:急性毒性[：:，, ]*经皮|经皮毒性)[：:]?/i },
+    { key: 'acute_inhalation', cnLabel: '急性毒性，吸入', enLabel: 'Acute toxicity, inhalation', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:急性毒性[：:，, ]*吸入|吸入毒性)[：:]?/i },
     { key: 'skin_irritation', cnLabel: '主要皮肤刺激性', enLabel: 'Primary skin irritation', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:原发性皮肤刺激|主要皮肤刺激性?|皮肤刺激)[：:]?/i },
     { key: 'eye_irritation', cnLabel: '主要粘膜刺激性', enLabel: 'Primary mucosal irritation', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:原发性粘膜刺激|主要(?:粘膜|眼睛)刺激性?|眼睛刺激)[：:]?/i },
     { key: 'sensitization', cnLabel: '致敏性', enLabel: 'Respiratory or skin sensitization', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:致敏性|皮肤致敏性|呼吸道或皮肤致敏)[：:]?/i },
-    { key: 'subacute', cnLabel: '亚急性、亚慢性和延迟毒性', enLabel: 'Subacute, subchronic and prolonged toxicity', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:亚急性[，,、]亚慢性和延迟毒性|亚急性毒性)[：:]?/i },
-    { key: 'carcinogenicity', cnLabel: '致癌性', enLabel: 'Carcinogenicity', match: /(?:^|\n)\s*(?:11\.\d+\s*)?致癌性(?!\s*[:：]\s*无数据资料)[：:]?/i },
+    { key: 'mutagenicity', cnLabel: '致突变性', enLabel: 'Germ cell mutagenicity', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:致突变性|生殖细胞致突变性)[：:]?/i },
+    { key: 'carcinogenicity', cnLabel: '致癌性', enLabel: 'Carcinogenicity', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:致癌性(?:\/生殖毒性)?)(?!\s*[:：]\s*无数据资料)[：:]?/i },
     { key: 'repro_fertility', cnLabel: '生殖毒性/生育力', enLabel: 'Reproductive toxicity - fertility', match: /(?:^|\n)\s*(?:11\.\d+\s*)?生殖毒性[\/／]生育力[：:]?/i },
     { key: 'repro_terato', cnLabel: '生殖毒性/致畸形', enLabel: 'Reproductive toxicity - teratogenicity', match: /(?:^|\n)\s*(?:11\.\d+\s*)?生殖毒性[\/／]致畸形[：:]?/i },
     { key: 'in_vitro_mutagenicity', cnLabel: '体外遗传毒性', enLabel: 'Germ cell mutagenicity (in vitro)', match: /(?:^|\n)\s*(?:11\.\d+\s*)?体外遗传毒性[：:]?/i },
     { key: 'in_vivo_mutagenicity', cnLabel: '体内基因毒性', enLabel: 'Germ cell mutagenicity (in vivo)', match: /(?:^|\n)\s*(?:11\.\d+\s*)?体内基因毒性[：:]?/i },
+    { key: 'subacute', cnLabel: '亚急性、亚慢性和延迟毒性', enLabel: 'Subacute, subchronic and prolonged toxicity', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:亚急性[，,、]亚慢性和延迟毒性|亚急性毒性)[：:]?/i },
     { key: 'stot_single', cnLabel: 'STOT评估-一次性接触', enLabel: 'Specific target organ toxicity (single exposure)', match: /(?:^|\n)\s*(?:11\.\d+\s*)?STOT评估-一次性接触[：:]?/i },
     { key: 'stot_repeated', cnLabel: 'STOT评估-重复性接触', enLabel: 'Specific target organ toxicity (repeated exposure)', match: /(?:^|\n)\s*(?:11\.\d+\s*)?STOT评估-重复性接触[：:]?/i },
     { key: 'aspiration', cnLabel: '吸入危害', enLabel: 'Aspiration hazard', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:吸入危害|吸入危险)[：:]?/i },
@@ -3201,6 +3213,9 @@ export function extractToxicologicalEndpointsFromSource(srcEngine) {
     const cur = occurrences[i];
     const nextStart = (i + 1 < occurrences.length) ? occurrences[i + 1].startIndex : rawText.length;
     let body = rawText.slice(cur.endIndex, nextStart).trim();
+    if (cur.key === 'acute_oral') {
+      body = body.replace(/^(?:经口|经口毒性)[：:\s]*/i, '').trim();
+    }
     endpoints.push({
       key: cur.key,
       cnLabel: cur.cnLabel,
@@ -3844,8 +3859,8 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
             if (isComponentHeader) {
               runSpecs.push({ text: line, bold: true });
             } else {
-              // 匹配指标子标签：如 "毒性："、"刺激性："、"皮肤刺激："、"经皮（鼠）LD50："、"吸入（鼠）LD50："、"经口（鼠）LD50：" 等
-              const labelMatch = line.match(/^(\s*(?:毒性|刺激性|皮肤刺激|眼睛刺激|急性毒性|主要皮肤刺激性|主要粘膜刺激性|主要眼睛刺激性|致敏性|致突变性|致癌性|生殖毒性|特异性靶器官系统毒性(?:（一次接触\/反复接触）)?|吸入危险|附加信息|重复剂量中毒|经皮（鼠）LD50|吸入（鼠）LD50|经口（鼠）LD50|经皮|吸入|经口|物种|分类|结果|病理变化|生育力|致畸形|体外遗传毒性|Toxicity|Irritation|Skin irritation|Eye irritation|Acute toxicity|Primary skin irritation|Primary mucous membrane irritation|Sensitization|Mutagenicity|Carcinogenicity|Reproductive toxicity|Specific target organ toxicity|Aspiration hazard|Additional information|Repeated dose toxicity|Dermal|Oral|Inhalation|Species|Classification|Result|Fertility|Teratogenicity|In vitro genotoxicity)[：:])\s*(.*)$/i);
+              // 匹配指标子标签：支持任意中英文指标标签冒号解耦 (Label Bold, Value Regular)
+              const labelMatch = line.match(/^(\s*[^：:\n]+[：:])\s*(.*)$/);
               if (labelMatch) {
                 const subLabel = labelMatch[1];
                 const restVal = labelMatch[2];

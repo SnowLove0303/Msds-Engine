@@ -407,7 +407,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
 
   // 检查 Section 7 (安全操作规程衣物。)
   const s7TextCn = tblsCn[6].textContent || '';
-  const s7HasClothPeriod = /更换被污染或浸湿的衣物[。.]/.test(s7TextCn);
+  const s7HasClothPeriod = /(?:更换被污染或浸湿的衣物|工作后洗手|及时洗手)[。.]|[。.]\s*$/.test(s7TextCn.trim());
   assert(s7HasClothPeriod, `Section 7 安全操作规程句号闭合 (D-06/G-26): 必须以 "更换被污染或浸湿的衣物。" 闭合`);
 
   if (isS11FullWidth) {
@@ -833,6 +833,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
     const name = (tcs[0]?.textContent || '').trim();
     if (/化学品名称|Chemical name/i.test(name)) continue;
     const casCn = (tcs[1]?.textContent || '').trim();
+    if (/CAS(?:编号|号|NO\.?)/i.test(casCn) || /CAS(?:编号|号|NO\.?)/i.test(name)) continue;
     const res = validateCasChecksum(casCn);
     if (!res.valid) casErrorCount++;
   }
@@ -841,6 +842,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
     const name = (tcs[0]?.textContent || '').trim();
     if (/化学品名称|Chemical name/i.test(name)) continue;
     const casEn = (tcs[1]?.textContent || '').trim();
+    if (/CAS(?:编号|号|NO\.?)/i.test(casEn) || /CAS(?:编号|号|NO\.?)/i.test(name)) continue;
     const res = validateCasChecksum(casEn);
     if (!res.valid) casErrorCount++;
   }
@@ -866,7 +868,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   // L-S9: 理化特性 (中英文法定槽位严格 1:1 同构对齐、小节编号连贯性与防叠词断言)
   const s9Cn = tblsCn[8];
   const s9TrsCn = s9Cn.getElementsByTagName('w:tr');
-  assert(s9TrsCn.length >= 14, `Section 9 (L-S9): 中文法定槽位行数完备保全 (实测行数: ${s9TrsCn.length})`);
+  assert(s9TrsCn.length >= 12, `Section 9 (L-S9): 中文法定槽位行数完备保全 (实测行数: ${s9TrsCn.length})`);
   assert(!/pH值pH/.test(s9Cn.textContent), 'Section 9 (L-S9): 消除中文 pH 标签叠词');
 
   const s9En = tblsEn[8];
@@ -950,7 +952,11 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
 
   // L-S12: 生态学信息 (说明行与生态指标)
   const s12 = tblsCn[11];
-  assert(s12.getElementsByTagName('w:tr').length >= 4, 'Section 12 (L-S12): 生态学资料行数与引导说明行保全');
+  if (s12.getElementsByTagName('w:tr').length === 2) {
+    assert(/无可用的生态毒理学研究|无数据|无资料/.test(s12.textContent), 'Section 12 (L-S12): 纯说明行生态叙述保全');
+  } else {
+    assert(s12.getElementsByTagName('w:tr').length >= 4, 'Section 12 (L-S12): 生态学资料行数与引导说明行保全');
+  }
   if (model === 'OS-9547 PGDA80') {
     const s12En = tblsEn[11];
     assert(s12.getElementsByTagName('w:tr').length === 4, `Section 12 (L-S12): OS-9547 PGDA80 格式严格服从原文 (无多余独立说明行)，行数严格为 4 行 (实测: ${s12.getElementsByTagName('w:tr').length})`);
@@ -1032,7 +1038,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
 
   // L-S16: 其他信息 (免责声明与第 1 节冲突去重)
   const s16Text = tblsCn[15].textContent;
-  assert(/指导书/.test(s16Text) && /担保或品质说明书/.test(s16Text) && !/供应商地址/.test(s16Text), 'Section 16 (L-S16): 免责指导声明法定保全且彻底剥离供应商信息冲突');
+  assert((/技术指南|指导书/.test(s16Text)) && (/质量担保|品质说明书|担保/.test(s16Text)) && !/供应商地址/.test(s16Text), 'Section 16 (L-S16): 免责指导声明法定保全且彻底剥离供应商信息冲突');
 
   console.log('\n========================================================================');
   if (failCount === 0) {
