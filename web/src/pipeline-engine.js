@@ -1746,7 +1746,9 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         // 2. 通用标准化学词典映射兜底
         if (!ingEn) {
           ingEn = parsed.hazardousIngredients;
-          if (/HDI.*亲水|亲水.*HDI|基于HDI/i.test(ingEn)) {
+          if (/^(?:无|none)$/i.test(ingEn.trim())) {
+            ingEn = 'None';
+          } else if (/HDI.*亲水|亲水.*HDI|基于HDI/i.test(ingEn)) {
             ingEn = 'Hydrophilic aliphatic polyisocyanate based on HDI';
           } else if (ingEn.includes('丁氧基乙醇')) {
             ingEn = '2-Butoxyethanol';
