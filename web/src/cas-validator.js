@@ -10,7 +10,7 @@
  */
 
 // 商业机密与法定豁免合法模式
-const EXEMPT_CAS_PATTERN = /^(?:商业秘密|商业机密|保密|Trade\s*secret|Proprietary|无|None|Not\s*applicable|[—\-\/])$/i;
+const EXEMPT_CAS_PATTERN = /^(?:商业秘密|商业机密|保密|Trade\s*secret|Proprietary|无|None|Not\s*applicable|[—\-\/]|CAS编号|CAS\s*NO\.?|CAS)$/i;
 
 // 标准 CAS 格式：2 至 7 位数字 + 短横杠 + 2 位数字 + 短横杠 + 1 位校验码
 const CAS_FORMAT_REGEX = /^(\d{2,7})-(\d{2})-(\d)$/;
