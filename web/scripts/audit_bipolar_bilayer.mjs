@@ -830,12 +830,16 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   let casErrorCount = 0;
   for (let r = 3; r < s3Trs.length; r++) {
     const tcs = s3Trs[r].getElementsByTagName('w:tc');
+    const name = (tcs[0]?.textContent || '').trim();
+    if (/化学品名称|Chemical name/i.test(name)) continue;
     const casCn = (tcs[1]?.textContent || '').trim();
     const res = validateCasChecksum(casCn);
     if (!res.valid) casErrorCount++;
   }
   for (let r = 3; r < s3TrsEn.length; r++) {
     const tcs = s3TrsEn[r].getElementsByTagName('w:tc');
+    const name = (tcs[0]?.textContent || '').trim();
+    if (/化学品名称|Chemical name/i.test(name)) continue;
     const casEn = (tcs[1]?.textContent || '').trim();
     const res = validateCasChecksum(casEn);
     if (!res.valid) casErrorCount++;

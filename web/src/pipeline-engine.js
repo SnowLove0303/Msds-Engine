@@ -971,7 +971,8 @@ export const GHS_H_TO_CATEGORY_EN = {
   'H360': 'Reproductive toxicity (Category 1B), H360',
   'H370': 'Specific target organ toxicity - single exposure (Category 1), H370',
   'H373': 'Specific target organ toxicity - repeated exposure (Category 2), H373',
-  'H226': 'Flammable liquid (Category 3), H226'
+  'H226': 'Flammable liquid (Category 3), H226',
+  'H227': 'Flammable liquids (Category 4), H227'
 };
 
 export function translateGhsCategory(cat) {
@@ -985,6 +986,7 @@ export function translateGhsCategory(cat) {
   }
   if (/易燃液体.*(?:类别\s*2|2)/i.test(trimmed)) return 'Flammable liquids (Category 2), H225';
   if (/易燃液体.*(?:类别\s*3|3)/i.test(trimmed)) return 'Flammable liquids (Category 3), H226';
+  if (/易燃液体.*(?:类别\s*4|4)/i.test(trimmed)) return 'Flammable liquids (Category 4), H227';
   if (/急性毒性.*吸入/i.test(trimmed)) return 'Acute toxicity, Inhalation (Category 4), H332';
   if (/皮肤致敏/i.test(trimmed)) return 'Skin sensitization (Category 1B), H317';
   if (/靶器官.*一次/i.test(trimmed)) return 'Specific target organ toxicity - single exposure (Category 3), H335';
@@ -1036,6 +1038,12 @@ const GHS_CATEGORY_TRANS_MAP = {
   '急性毒性(经皮), 类别 4(H312)': 'Acute toxicity, Dermal (Category 4), H312',
   '皮肤腐蚀/刺激, 类别 2(H315)': 'Skin corrosion/irritation (Category 2), H315',
   '严重眼睛损伤/眼睛刺激性, 类别 2A(H319)': 'Serious eye damage/eye irritation (Category 2A), H319',
+  '易燃液体，类别 4 (H227)': 'Flammable liquids (Category 4), H227',
+  '易燃液体，类别4 (H227)': 'Flammable liquids (Category 4), H227',
+  '易燃液体，类别 4（H227）': 'Flammable liquids (Category 4), H227',
+  '易燃液体，类别4（H227）': 'Flammable liquids (Category 4), H227',
+  '易燃液体，类别 4': 'Flammable liquids (Category 4), H227',
+  '易燃液体，类别4': 'Flammable liquids (Category 4), H227',
 };
 
 const GHS_H_TRANS_MAP = {
@@ -1056,6 +1064,7 @@ const GHS_H_TRANS_MAP = {
   'H312': 'H312 Harmful in contact with skin.',
   'H315': 'H315 Causes skin irritation.',
   'H319': 'H319 Causes serious eye irritation.',
+  'H227': 'H227 Combustible liquid.',
 };
 
 const GHS_P_TRANS_MAP = {
@@ -1466,14 +1475,15 @@ export function translateSection9Item(cnNum, cnLabel, cnVal) {
   if (/外\s*观/i.test(cnLabel)) {
     enLabel = 'Appearance:';
     enVal = translateAppearance(cnVal);
-  } else if (/嗅觉/i.test(cnLabel)) {
+  } else if (/嗅觉|气味/i.test(cnLabel)) {
     enLabel = 'Odour threshold:';
-    if (/酒精|乙醇/.test(cnVal)) enVal = 'Alcohol-like';
+    if (/溶剂/.test(cnVal)) enVal = 'Solvent odour';
+    else if (/酒精|乙醇/.test(cnVal)) enVal = 'Alcohol-like';
     else if (/胺味/.test(cnVal)) enVal = 'Amine-like';
     else if (/特征/.test(cnVal)) enVal = 'Characteristic odour';
     else if (/无味/.test(cnVal)) enVal = 'Odourless';
     else if (/无数据|无资料/.test(cnVal)) enVal = 'No data available.';
-    else enVal = cnVal;
+    else enVal = translateChemicalTerm(cnVal) || cnVal;
   } else if (/pH/i.test(cnLabel)) {
     enLabel = 'pH value:';
     const combined = `${cnLabel} ${cnVal}`;
