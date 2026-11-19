@@ -1,5 +1,24 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-19 Section 15 法规信息全面规范化与双语排版净化 (SECTION15-REGULATORY-STANDARDIZATION)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户核心指令（section15 要改进一下）：
+1. **法医级缺陷根因穿透 (5-Whys Root Cause & Forensics)**：
+   - **中文 Row 1 被源散文冲刷覆盖**：源文档散文条目 `遵循法规：- 《危险化学品安全管理条例》...` 被 `smart-matching.js` 提取为 `safety_regulations` 并直接覆写了底模第 1 行（Row 1），导致官方底模原有法定子标题 `"物质或混合物的相关安全、健康和环保法律法规"` 被彻底冲刷丢失；且在第 3 行 `"符合下列法规要求："` 之后，第 4~7 行又重复罗列了相同的 4 部法规，造成同一表格内法规信息出现 2 次严重重复；
+   - **英文标签 `: .` 冒号句号重叠瑕疵**：在 `universal-editor-primitives.js` 的 `applyGlobalTypographyProjection` 中，处理单列标签行时无值状态下拼接了尾部西文空格（`'Other provisions: '`），导致后续西文句末补点判定 `!/[.!?:]$/.test(tc)` 发生误判（末尾字符为空格而非冒号），从而在冒号后强行追加了半角句点 `.`，形成丑陋的 `Other provisions: .` 与 `Complies with the following regulations: .`；
+   - **结构性标签行值区域重复覆写**：底模 Row 2 (`其它的规定：` / `Other provisions：`) 与 Row 3 (`符合下列法规要求：` / `Complies with the following regulations：`) 本身已具备法定标签属性，再次调用 `safeWriteCellValue` 往其值区域写入相同文本会导致标签与值叠词。
+2. **三位一体架构立法与代码级闭环治理**：
+   - **`web/src/smart-matching.js` [Root Source]**：在 `s === 15` 分支中，阻断 `safetyItem.value` 对 Row 1 的覆写，将 Row 1 永久锚定为官方底模法定子标题 `"物质或混合物的相关安全、健康和环保法律法规"`；法规清单严格仅在 Row 4~7 结构化呈现；
+   - **`web/src/universal-editor-primitives.js` [Root Source]**：在 `applyGlobalTypographyProjection` 中，当匹配到单列标签且无后置值时消除多余尾部空格；标点检测基于 `tc.trim()` 进行判定，并对以 `:` 结尾的标签行实行绝对豁免，严禁补 `.`，从源头杜绝 `: .`；
+   - **`web/src/pipeline-engine.js` [State Transition]**：加固中英双语基准拓扑构建；在 `enforceStructuralTypographyInvariants` 终审阶段增加西文标点 `.replace(/[:：]\s*\./g, ':')` 兜底守卫；废除对 Row 2 与 Row 3 结构性标签的值区域覆写，消除叠词。
+3. **交付物重新生成与双极双层法医终审核销**：
+   - 重新执行流水线生成 PA-3654 全套 8 项标准交付物（4 DOCX + 4 PDF），实测 Section 15 结构指标：
+     - 中文版 Row 1 严格等于 `"物质或混合物的相关安全、健康和环保法律法规"`，0 处散文覆盖；
+     - 中文版 Row 4~7 各占 1 行呈现 4 部规范法规，全文法规名称频次恰好为 1；
+     - 英文版 Row 2 严格为 `"Other provisions:"`，Row 3 严格为 `"Complies with the following regulations:"`，全文 0 处 `: .` 瑕疵；
+     - 中英文双语行数严格等于 8 行，非危产品 GB 15258 裁剪 1:1 对称同构；
+   - 运行双极双层全要素机械深度审计套件 (`audit_bipolar_bilayer.mjs`)：0 Failures，100% 满分通过（退出码 0）。
+
+---
+
 ## [2026-11-19 EP-1501 Section 2 排版间距紧实化与全景机械双重审计合流 (SECTION2-SPACING-COMPACTION)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户核心指令（将 Section 2 模块间空两行紧凑调整为一行空行，禁止修改系统底层代码 web/src/*）：
 1. **排版间距根因穿透与几何精算 (Geometric Root Cause & Calculations)**：
    - **历史过宽间距根因**：Section 2 数据行（Row 1~5）原本单元格内边距 `tcMar` 设定为 `top="160"` dxa (8pt) 与 `bottom="160"` dxa (8pt)，且 2.2~2.5 节标题段前设定 `w:spacing before="160"` dxa (8pt)，导致行间总垂直间距高达 `160 + 160 + 160 = 480 dxa` (24pt)，视觉表现为约 2 行空行，整体排版松散；

@@ -758,8 +758,11 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
 
           if (kvMatch || s15Match || s11Match) {
             const match = kvMatch || s15Match || s11Match;
-            const labelText = (match[1].replace(/[:：\s.]+$/, '') + (isEnglish ? ': ' : '：')).trim() + (isEnglish ? ' ' : '');
             const valText = match[2]?.trim() || '';
+            let labelText = (match[1].replace(/[:：\s.]+$/, '') + (isEnglish ? ':' : '：')).trim();
+            if (isEnglish && valText) {
+              labelText += ' ';
+            }
 
             const oldRuns = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
             oldRuns.forEach(r => p.removeChild(r));
@@ -871,10 +874,13 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
             if (isEnglish) {
               tc = tc.replace(/；/g, '; ');
               tc = tc.replace(/([.!?\)])([A-Za-z])/g, '$1 $2');
-              const isColHeader = (rIdx <= 4) && /^(?:Chemical\s*name|Components?|CAS\s*NO\.?|Concentration\s*%\s*\(w\/w\)|Basis|Type|Value)$/i.test(tc.trim());
-              if (rIdx > 0 && !isColHeader && tc.length > 15 && !/[.!?:]$/.test(tc) && !/\b(?:min|mm|CAS|EC|No|N\/A|None|Concentration|w\/w)\.?$/i.test(tc)) {
-                tc = tc + '.';
+              const trimmed = tc.trim();
+              const isColHeader = (rIdx <= 4) && /^(?:Chemical\s*name|Components?|CAS\s*NO\.?|Concentration\s*%\s*\(w\/w\)|Basis|Type|Value)$/i.test(trimmed);
+              const isLabelHeader = /[:：]$/.test(trimmed) || (sectionNumber === 15 && /^(?:Other provisions|Complies with the following regulations)/i.test(trimmed));
+              if (rIdx > 0 && !isColHeader && !isLabelHeader && trimmed.length > 15 && !/[.!?:]$/.test(trimmed) && !/\b(?:min|mm|CAS|EC|No|N\/A|None|Concentration|w\/w)\.?$/i.test(trimmed)) {
+                tc = trimmed + '.';
               }
+              tc = tc.replace(/[:：]\s*\./g, ':');
             } else {
               tc = tc.replace(/\.$/, '');
             }

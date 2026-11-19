@@ -4691,15 +4691,14 @@ origRefresh.call(editorEngine);
 
       // Section 15 法规信息顺序保全与容量自适应克隆
       if (s === 15) {
-        // 1. 物质或混合物的相关安全、健康和环保法律法规 写入 Row 1
-        const safetyItem = matchedSec.matchedRows.find((r) => r.key === 'safety_regulations' && r.value);
-        if (safetyItem && tRecord.rows.length >= 2) {
+        // 1. 物质或混合物的相关安全、健康和环保法律法规 保持法定子标题 (REQ-S15-01)
+        // 铁律防线：Row 1 恒久锁定为官方底模法定二级标题，绝对严禁被源文档散文覆盖
+        if (tRecord.rows.length >= 2) {
           const r1 = tRecord.rows[1];
           if (r1 && r1.cells?.[0]) {
             r1.cells[0].editable = true;
             try {
-              writeCellValue(r1.cells[0], safetyItem.value, editorEngine.roleStyles?.value);
-              injectedCount++;
+              writeCellValue(r1.cells[0], '物质或混合物的相关安全、健康和环保法律法规', editorEngine.roleStyles?.value);
             } catch (e) {}
           }
         }
