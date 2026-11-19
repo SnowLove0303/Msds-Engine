@@ -11,7 +11,7 @@
  *   node web/scripts/lint_source_grounding.mjs --source <源DOCX> --cn <产出中文DOCX> --en <产出英文DOCX>
  */
 
-import { JSDOM } from '../node_modules/jsdom/lib/api.js';
+import { JSDOM } from 'jsdom';
 if (!globalThis.DOMParser || !globalThis.XMLSerializer) {
   const dom = new JSDOM('<!doctype html><html><body></body></html>');
   globalThis.DOMParser = dom.window.DOMParser;
@@ -21,6 +21,7 @@ if (!globalThis.DOMParser || !globalThis.XMLSerializer) {
 import fs from 'fs';
 import path from 'path';
 import { loadDocx } from '../src/docx-engine.js';
+import { recognizeSourceDocx } from '../src/recognition-engine.js';
 
 export async function lintSourceGrounding(sourceDocxPath, cnDocxPath, enDocxPath) {
   console.log('========================================================================');
@@ -37,6 +38,7 @@ export async function lintSourceGrounding(sourceDocxPath, cnDocxPath, enDocxPath
   const srcDoc = await loadDocx(fs.readFileSync(sourceDocxPath));
   const cnDoc = await loadDocx(fs.readFileSync(cnDocxPath));
   const enDoc = await loadDocx(fs.readFileSync(enDocxPath));
+  const srcFacts = await recognizeSourceDocx(sourceDocxPath);
 
   const violations = [];
 
@@ -51,18 +53,11 @@ export async function lintSourceGrounding(sourceDocxPath, cnDocxPath, enDocxPath
   }
 
   // --- 1. 提取源文档事实指纹 (Extract Source Ground Truth) ---
-  const srcS1 = srcDoc.records.find(r => r.sectionNumber === 1);
-  const srcS2 = srcDoc.records.find(r => r.sectionNumber === 2);
-  const srcS3 = srcDoc.records.find(r => r.sectionNumber === 3);
   const srcS8 = srcDoc.records.find(r => r.sectionNumber === 8);
   const srcS9 = srcDoc.records.find(r => r.sectionNumber === 9);
-  const srcS11 = srcDoc.records.find(r => r.sectionNumber === 11);
-  const srcS13 = srcDoc.records.find(r => r.sectionNumber === 13);
-  const srcS14 = srcDoc.records.find(r => r.sectionNumber === 14);
   const srcS15 = srcDoc.records.find(r => r.sectionNumber === 15);
 
   const srcS8Text = srcS8 ? srcS8.rows.map(r => r.cells.map(c => c.text || '').join(' ')).join('\n') : '';
-  const srcS2Text = srcS2 ? srcS2.rows.map(r => r.cells.map(c => c.text || '').join(' ')).join('\n') : '';
 
   // 判定源文件 S8 事实：
   const srcExplicitNoOel = /无可用的接触限值|不含有职业接触限值|未制定|无已知|无数据|2006\/121/i.test(srcS8Text);
@@ -74,7 +69,7 @@ export async function lintSourceGrounding(sourceDocxPath, cnDocxPath, enDocxPath
   const srcHasGogglesOnly = /建议使用护目镜|护目镜/i.test(srcEyeText) && !srcHasMask;
 
   // 判定源文件 S2 事实：
-  const srcIsNonHaz = /不属于危险|非危险|不属于危害|无适用资料/i.test(srcS2Text);
+  const srcIsNonHaz = !srcFacts.ghs.isHazardous;
 
   // --- 2. 对账产出物 Section 8 (接触控制/个体防护) ---
   const cnS8 = cnDoc.records.find(r => r.sectionNumber === 8);
@@ -84,7 +79,6 @@ export async function lintSourceGrounding(sourceDocxPath, cnDocxPath, enDocxPath
 
   // LINT-S8-01: OEL 组分控制参数与 4 列表格真实性
   if (srcHasNoOel) {
-    // 源文件无接触限值：产出物绝对严禁出现 4 列表格、组分题头及未授权的六亚甲基限值
     if (/工作场所组分控制参数|物质.*依据.*类型.*数值/i.test(cnS8Text)) {
       recordViolation('LINT-S8-01', 8, '源文档无职业接触限值，产出中文严禁强塞“工作场所组分控制参数”题头或 4 列表格！', '不包含 4 列表格', '检出 4 列表头残留');
     }
@@ -131,20 +125,45 @@ export async function lintSourceGrounding(sourceDocxPath, cnDocxPath, enDocxPath
     recordViolation('LINT-S8-04', 8, '源文档未授权“建议戴上防护手套”，产出中文严禁底模外生编造！', '值格为空 ""', '检出“建议戴上防护手套”');
   }
 
-  // --- 3. 对账产出物 Section 2 (危险性概述) ---
+  // --- 3. 对账产出物 Section 2 (危险性概述与 GHS 否定词二分) ---
   const cnS2 = cnDoc.records.find(r => r.sectionNumber === 2);
   const enS2 = enDoc.records.find(r => r.sectionNumber === 2);
+  const cnS2Text = cnS2 ? cnS2.rows.map(r => r.cells.map(c => c.text || '').join(' ')).join('\n') : '';
   const enS2Text = enS2 ? enS2.rows.map(r => r.cells.map(c => c.text || '').join(' ')).join('\n') : '';
 
   if (srcIsNonHaz) {
-    if (/H412|H315|H332|H317|Category/i.test(enS2Text)) {
+    if (/H412|H315|H332|H317|Category\s*\d/i.test(enS2Text)) {
       recordViolation('LINT-S2-01', 2, '源文档为非危品，产出英文严禁残留危化品分类或 H 声明！', '无 H 声明与分类', '检出 H 声明或 Category 残留');
+    }
+    if (/(?:危险性类别|GHS分类)[：:\s]*(?!无|不适用|不属于危险)/i.test(cnS2Text) && /类别\s*[1-4]/i.test(cnS2Text)) {
+      recordViolation('LINT-S2-02', 2, '源文档明确为非危险品，产出中文严禁捏造危险性类别！', '非危险品分类', '检出具体危险性类别');
     }
   }
 
-  // --- 4. 对账产出物 Section 9 (理化特性行序与数量) ---
+  // --- 4. 对账产出物 Section 3 (组分 CAS 与浓度 1:1 保真) ---
+  const cnS3 = cnDoc.records.find(r => r.sectionNumber === 3);
+  const enS3 = enDoc.records.find(r => r.sectionNumber === 3);
+  const cnS3Text = cnS3 ? cnS3.rows.map(r => r.cells.map(c => c.text || '').join(' ')).join('\n') : '';
+  const enS3Text = enS3 ? enS3.rows.map(r => r.cells.map(c => c.text || '').join(' ')).join('\n') : '';
+
+  if (srcFacts.components && srcFacts.components.length > 0) {
+    for (const comp of srcFacts.components) {
+      if (comp.cas && /\b\d{2,7}-\d{2}-\d\b/.test(comp.cas)) {
+        if (!cnS3Text.includes(comp.cas)) {
+          recordViolation('LINT-S3-01', 3, `源文档包含组分 CAS ${comp.cas} (${comp.name})，产出中文必须完整继承！`, comp.cas, '产出中文缺失该 CAS');
+        }
+        if (!enS3Text.includes(comp.cas)) {
+          recordViolation('LINT-S3-01', 3, `源文档包含组分 CAS ${comp.cas} (${comp.name})，产出英文必须完整继承！`, comp.cas, '产出英文缺失该 CAS');
+        }
+      }
+    }
+  }
+
+  // --- 5. 对账产出物 Section 9 (理化特性行序、数量与数值对账) ---
   const cnS9 = cnDoc.records.find(r => r.sectionNumber === 9);
   const enS9 = enDoc.records.find(r => r.sectionNumber === 9);
+  const cnS9Text = cnS9 ? cnS9.rows.map(r => r.cells.map(c => c.text || '').join(' ')).join('\n') : '';
+  const enS9Text = enS9 ? enS9.rows.map(r => r.cells.map(c => c.text || '').join(' ')).join('\n') : '';
 
   if (srcS9 && cnS9 && enS9) {
     const srcItemsCount = srcS9.rows.length - 1; // 扣除标题行
@@ -154,9 +173,22 @@ export async function lintSourceGrounding(sourceDocxPath, cnDocxPath, enDocxPath
     if (cnItemsCount !== enItemsCount) {
       recordViolation('LINT-S9-01', 9, `Section 9 中英文指标项数不守恒 (CN: ${cnItemsCount} vs EN: ${enItemsCount})`, '中英文项数绝对相等', `CN ${cnItemsCount} != EN ${enItemsCount}`);
     }
+
+    // 关键物理数值对账 (闪点、密度、粘度、固含量等)
+    for (const prop of srcFacts.physicalProperties || []) {
+      const val = prop.value || '';
+      // 提取核心数字模式（如 63℃, 1.06g/cm3, 50±2%, 5000-20000）
+      const numMatch = val.match(/(\d+(?:\.\d+)?(?:\s*[±\-~]\s*\d+(?:\.\d+)?)?(?:℃|%|g\/cm3|mPa\.s)?)/);
+      if (numMatch && numMatch[1] && numMatch[1].length > 1 && !/^[0-9]$/.test(numMatch[1])) {
+        const targetToken = numMatch[1].replace(/\s+/g, '');
+        if (!cnS9Text.replace(/\s+/g, '').includes(targetToken)) {
+          recordViolation('LINT-S9-02', 9, `Section 9 关键理化指标数值 "${prop.label}: ${val}" 在产出中文中未检测到对账数值！`, targetToken, '产出中文数值不一致');
+        }
+      }
+    }
   }
 
-  // --- 5. 对账产出物 Section 11 (毒理学标准同构) ---
+  // --- 6. 对账产出物 Section 11 (毒理学标准同构) ---
   const cnS11 = cnDoc.records.find(r => r.sectionNumber === 11);
   const enS11 = enDoc.records.find(r => r.sectionNumber === 11);
 
@@ -166,7 +198,7 @@ export async function lintSourceGrounding(sourceDocxPath, cnDocxPath, enDocxPath
     }
   }
 
-  // --- 6. 对账产出物 Section 13 (4 行标准同构与纯左对齐) ---
+  // --- 7. 对账产出物 Section 13 (4 行标准同构与纯左对齐) ---
   const cnS13 = cnDoc.records.find(r => r.sectionNumber === 13);
   const enS13 = enDoc.records.find(r => r.sectionNumber === 13);
 
@@ -176,7 +208,36 @@ export async function lintSourceGrounding(sourceDocxPath, cnDocxPath, enDocxPath
     }
   }
 
-  // --- 7. 对账产出物 Section 15 (法规时效性与外生强塞) ---
+  // --- 8. 对账产出物 Section 14 (运输非危与温度区间事实对账) ---
+  const cnS14 = cnDoc.records.find(r => r.sectionNumber === 14);
+  const enS14 = enDoc.records.find(r => r.sectionNumber === 14);
+  const cnS14Text = cnS14 ? cnS14.rows.map(r => r.cells.map(c => c.text || '').join(' ')).join('\n') : '';
+  const enS14Text = enS14 ? enS14.rows.map(r => r.cells.map(c => c.text || '').join(' ')).join('\n') : '';
+
+  if (srcFacts.transport?.isNonDangerousGoods) {
+    if (!/非危险货物|非危险品/i.test(cnS14Text)) {
+      recordViolation('LINT-S14-01', 14, '源文档判定为非危险货物，产出中文必须明示非危险品！', '包含“非危险货物”或“非危险品”', '未明示非危险货物');
+    }
+    if (!/Not dangerous goods|Non-dangerous/i.test(enS14Text)) {
+      recordViolation('LINT-S14-01', 14, '源文档判定为非危险货物，产出英文必须明示 Not dangerous goods！', 'Not dangerous goods', '未明示 Not dangerous goods');
+    }
+  }
+
+  // 运输温控对账
+  const srcTempMatch = srcFacts.transport?.specialPrecautions?.primaryCn?.match(/([+\-－]?\d+)℃/g);
+  if (srcTempMatch && srcTempMatch.length > 0) {
+    for (const t of srcTempMatch) {
+      const numOnly = t.replace(/[℃+－\-]/g, '');
+      if (!cnS14Text.includes(numOnly)) {
+        recordViolation('LINT-S14-02', 14, `源文档包含运输温度限制 ${t}，产出中文缺失该温控数值！`, t, '产出中文未找到该温度');
+      }
+      if (!enS14Text.includes(numOnly)) {
+        recordViolation('LINT-S14-02', 14, `源文档包含运输温度限制 ${t}，产出英文缺失该温控数值！`, t, '产出英文未找到该温度');
+      }
+    }
+  }
+
+  // --- 9. 对账产出物 Section 15 (法规时效性与外生强塞) ---
   const cnS15 = cnDoc.records.find(r => r.sectionNumber === 15);
   const enS15 = enDoc.records.find(r => r.sectionNumber === 15);
   const srcS15Text = srcS15 ? srcS15.rows.map(r => r.cells.map(c => c.text || '').join(' ')).join('\n') : '';

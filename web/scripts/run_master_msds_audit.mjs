@@ -16,6 +16,8 @@ if (!globalThis.DOMParser || !globalThis.XMLSerializer) {
 import { loadDocx } from '../src/docx-engine.js';
 import { verifySentenceCountFidelity } from '../src/sentence-translator.js';
 import { auditTranslationDualDisplay } from './audit_translation_dual_display.mjs';
+import { lintSourceGrounding } from './lint_source_grounding.mjs';
+import { recognizeSourceDocx } from '../src/recognition-engine.js';
 import {
   validateCasChecksum,
   verifyChemicalCasCoherence,
@@ -500,20 +502,15 @@ export async function runMasterMsdsAudit(options = {}) {
         srcCnName = srcS1.rows.find(r => /中文名称|品名|产品名称/i.test(r.cells[0]?.text || ''))?.cells[1]?.text?.trim() || '';
         srcCnCategory = srcS1.rows.find(r => /化学品分类|类别|分类/i.test(r.cells[0]?.text || ''))?.cells[1]?.text?.trim() || '';
       }
-      const srcS2 = srcDocx.records.find(r => r.sectionNumber === 2);
-      if (srcS2) {
-        const srcS2Text = srcS2.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n');
-        srcHasPictogram = /象形图|pictogram/i.test(srcS2Text);
-        srcHasSignal = /信号词|警示词|signal word/i.test(srcS2Text);
-      }
-      const srcS9 = srcDocx.records.find(r => r.sectionNumber === 9);
-      if (srcS9) {
-        srcAppearance = srcS9.rows.find(r => /外\s*观/i.test(r.cells[0]?.text || ''))?.cells[1]?.text?.trim() || '';
-      }
-      const srcS11 = srcDocx.records.find(r => r.sectionNumber === 11);
-      if (srcS11) {
-        srcS11Rows = srcS11.rows.length;
-      }
+      const srcFacts = await recognizeSourceDocx(effectiveSourcePath);
+      srcHasPictogram = srcFacts.ghs.hasPictograms;
+      srcHasSignal = Boolean(srcFacts.ghs.signalWord);
+      srcIsNonHaz = !srcFacts.ghs.isHazardous;
+      if (srcFacts.productName) srcCnName = srcFacts.productName;
+      if (srcFacts.chemicalClassification) srcCnCategory = srcFacts.chemicalClassification;
+      const srcS9Item = srcFacts.physicalProperties?.find(p => /外\s*观/i.test(p.label));
+      if (srcS9Item?.value) srcAppearance = srcS9Item.value;
+      srcS11Rows = srcFacts.sections?.[11]?.rows?.length || 0;
     } catch (e) {}
   }
 
@@ -2103,6 +2100,30 @@ export async function runMasterMsdsAudit(options = {}) {
     dualAuditSummary.alarms === 0 ? `逐行双重对照核验 ${dualAuditSummary.totalRowsAudited} 条全部满分匹配` : `存在 ${dualAuditSummary.alarms} 项致命告警`,
     'Dual-Display Line Audit',
     ['翻译过程丢失条件或英文版中文字符残留']
+  );
+
+  // 环 6: 源文档事实指纹强制 1:1 物理对账硬门禁 (INV-SOURCE-GROUNDING-FIDELITY)
+  let groundingPassed = true;
+  let groundingMessage = '未指定物理源文档，跳过源事实对账';
+  if (effectiveSourcePath && fs.existsSync(effectiveSourcePath) && fs.existsSync(cnGzDocx) && fs.existsSync(enGzDocx)) {
+    console.log('>>> [Ring 6] 启动交付物与源文档 1:1 物理对账审计 (Source Grounding Fidelity)...');
+    try {
+      groundingPassed = await lintSourceGrounding(effectiveSourcePath, cnGzDocx, enGzDocx);
+      groundingMessage = groundingPassed ? '源文档事实 1:1 物理对账 100% 吻合' : '存在与源文档事实违背的缺陷';
+    } catch (err) {
+      groundingPassed = false;
+      groundingMessage = `源事实对账执行异常: ${err.message}`;
+    }
+  }
+
+  assert(
+    groundingPassed,
+    '环6',
+    '源文档事实指纹强制 1:1 物理对账硬门禁 (INV-SOURCE-GROUNDING-FIDELITY)',
+    '产出物 GHS 分类、OEL 限值、组分 CAS、理化参数及运输温控必须与物理源文档 100% 保持事实吻合，严禁捏造与篡改',
+    groundingMessage,
+    'Source Grounding Fidelity',
+    ['产出物违背源文件事实', '无中生有硬塞虚假数据']
   );
 
   // ======================================================================

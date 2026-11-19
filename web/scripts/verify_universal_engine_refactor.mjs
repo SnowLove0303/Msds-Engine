@@ -15,7 +15,8 @@ async function runVerification() {
   const files = {
     'PA-3654': 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练材料/源文件材料/2-1 单组份水性丙烯酸乳液 PA/PA-3654/PA-3654 MSDS（冠志）_源文件留存.docx',
     'PA-4914': 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练材料/源文件材料/2-4 水溶性丙烯酸树脂 PA/PA-4914/PA-4914 msds_CN 冠志_源文件留存.docx',
-    'EP-1501': 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练材料/源文件材料/4-1 水性环氧树脂 EP/EP-1501/EP-1501 msds_CN 冠志_源文件留存.docx'
+    'EP-1501': 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练材料/源文件材料/4-1 水性环氧树脂 EP/EP-1501/EP-1501 msds_CN 冠志_源文件留存.docx',
+    'PA-4902': 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练材料/源文件材料/2-1 单组份水性丙烯酸乳液 PA/PA-4902/PA-4902msds_CN 冠志___源文件留存.docx'
   };
 
   const results = {};
@@ -111,8 +112,37 @@ async function runVerification() {
   assert(Array.isArray(pa4914Facts.regulations.catalogs) && pa4914Facts.regulations.catalogs.length > 0, `[缺陷 19 失败] Section 15 catalogs 数组为空`);
   console.log(`✅ REQ-07 (缺陷 19): Section 15 法规条目化切分核销通过 (${pa4914Facts.regulations.catalogs.length}部法规) [Measured]`);
 
+  // --- PA-4902 专属 7 项通用底层根治与源事实审计核销断言 ---
+  const pa4902Facts = results['PA-4902'].facts;
+  assert(pa4902Facts.ghs.isHazardous === false, `[PA-4902 失败] 非危二分判定失败: isHazardous 应为 false，实测 ${pa4902Facts.ghs.isHazardous}`);
+  assert(pa4902Facts.ghs.categories.length === 0, `[PA-4902 失败] 否定词未过滤: categories 应为空，实测 ${JSON.stringify(pa4902Facts.ghs.categories)}`);
+  console.log('✅ REQ-08 (PA-4902 根治 01): Section 2 GHS 否定词过滤与非危险品二分判定核销通过 [Measured]');
+
+  assert(pa4902Facts.ghs.signalWord === '警告', `[PA-4902 失败] 警告词识别失败: signalWord 期望 '警告'，实测 '${pa4902Facts.ghs.signalWord}'`);
+  console.log('✅ REQ-08 (PA-4902 根治 02): Section 2 “警告词”国标同义词提取核销通过 [Measured]');
+
+  assert(pa4902Facts.ghs.hazardStatements.length > 0 && pa4902Facts.ghs.hazardStatements[0].text.includes('没有明显的已知作用'), `[PA-4902 失败] 危害性说明提取失败`);
+  assert(pa4902Facts.ghs.precautionaryStatements.prevention.length === 4, `[PA-4902 失败] 预防措施散文分句数量不符: ${pa4902Facts.ghs.precautionaryStatements.prevention.length}`);
+  assert(pa4902Facts.ghs.precautionaryStatements.response.length === 7, `[PA-4902 失败] 事故响应散文分句数量不符: ${pa4902Facts.ghs.precautionaryStatements.response.length}`);
+  assert(pa4902Facts.ghs.precautionaryStatements.storage.length === 2, `[PA-4902 失败] 安全存储散文分句数量不符: ${pa4902Facts.ghs.precautionaryStatements.storage.length}`);
+  assert(pa4902Facts.ghs.precautionaryStatements.disposal.length === 2, `[PA-4902 失败] 废弃处置散文分句数量不符: ${pa4902Facts.ghs.precautionaryStatements.disposal.length}`);
+  console.log('✅ REQ-08 (PA-4902 根治 03): Section 2 散文防范说明纯文本后备分句解析核销通过 [Measured]');
+
+  assert(pa4902Facts.componentsNotes.length >= 1 && pa4902Facts.componentsNotes[0].includes('已键合为盐'), `[PA-4902 失败] Section 3 成盐中和剂说明抽取失败`);
+  console.log('✅ REQ-08 (PA-4902 根治 04): Section 3 成盐中和剂附注结构化抽取核销通过 [Measured]');
+
+  assert(pa4902Facts.firstAid.general && pa4902Facts.firstAid.skin && pa4902Facts.firstAid.eyes, `[PA-4902 失败] Section 4 顶层字段不全: ${JSON.stringify(pa4902Facts.firstAid)}`);
+  console.log('✅ REQ-08 (PA-4902 根治 05): Section 4 一般措施、皮肤与眼睛接触顶层字段补全核销通过 [Measured]');
+
+  assert(pa4902Facts.fireFighting.suitableExtinguishMedia && pa4902Facts.fireFighting.unsuitableExtinguishMedia && pa4902Facts.fireFighting.specialHazards && pa4902Facts.fireFighting.protectiveEquipment, `[PA-4902 失败] Section 5 消防顶层字段不全: ${JSON.stringify(pa4902Facts.fireFighting)}`);
+  console.log('✅ REQ-08 (PA-4902 根治 06): Section 5 合适/不合适灭火剂、特殊危害与自供气呼吸器装备抽取核销通过 [Measured]');
+
+  assert(pa4902Facts.handlingStorage.handling && pa4902Facts.handlingStorage.storage, `[PA-4902 失败] Section 7 缺少 handling: ${JSON.stringify(pa4902Facts.handlingStorage)}`);
+  assert(pa4902Facts.stabilityReactivity.decompositionProducts && pa4902Facts.stabilityReactivity.hazardousReactions, `[PA-4902 失败] Section 10 缺少分解产物或危害反应`);
+  console.log('✅ REQ-08 (PA-4902 根治 07): Section 7 操作防范与 Section 10 危险分解产物/危害反应顶层字段补全核销通过 [Measured]');
+
   console.log('\n========================================================================');
-  console.log('  🎉 19 项全量缺陷逐条核销 100% 验证通过！全部退出码 0，无任何违规！');
+  console.log('  🎉 19+7 项全品类缺陷全量逐条核销 100% 验证通过！全部退出码 0，无任何违规！');
   console.log('========================================================================');
 }
 

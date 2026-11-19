@@ -410,6 +410,7 @@ export async function recognizeSourceDocx(docxPathOrBuffer, sourceName = 'source
       pictogramCount: 0
     },
     components: [], // Section 3 组分列表
+    componentsNotes: [], // Section 3 组分附注（如成盐中和剂说明）
     firstAid: {}, // Section 4
     fireFighting: {}, // Section 5
     accidentalRelease: {}, // Section 6
@@ -755,8 +756,34 @@ function parseSection2(record, facts, engine) {
     }
   }
 
+  // 0. 检查是否包含 Drawing 象形图节点
+  let drawingCount = 0;
+  for (const row of record.rows || []) {
+    for (const cell of row.cells || []) {
+      for (const p of cell.paragraphs || []) {
+        for (const r of p.runs || []) {
+          if (r.images && r.images.length > 0) {
+            drawingCount += r.images.length;
+          }
+        }
+      }
+    }
+  }
+  if (drawingCount > 0) {
+    facts.ghs.hasPictograms = true;
+    facts.ghs.pictogramCount = drawingCount;
+  }
+
   let inGhsCategories = false;
   let currentPGroup = null;
+  const prosePrecautionary = {
+    prevention: [],
+    response: [],
+    storage: [],
+    disposal: []
+  };
+
+  const isNegationCategory = (cat) => /^(?:无|无危害|不适用|不属于危险(?:化学)?品|未分类|非危险(?:品|化学品)?|not\s*classified|none|n\/?a)$/i.test((cat || '').trim());
 
   for (const line of rawLines) {
     if (/(?:2\.1\s*)?(?:GHS危险性类别|GHS分类|物质或混合物的?分类|危险性类别|Classification of the substance)/i.test(line)) {
@@ -765,20 +792,22 @@ function parseSection2(record, facts, engine) {
       if (afterColon && !/^(?:分类|详见下文|如下)/i.test(afterColon)) {
         const cats = afterColon.split(/[；;、\n]+/).map(s => s.trim()).filter(Boolean);
         for (const c of cats) {
-          if (c && !facts.ghs.categories.includes(c)) facts.ghs.categories.push(c);
+          if (c && !isNegationCategory(c) && !facts.ghs.categories.includes(c)) {
+            facts.ghs.categories.push(c);
+          }
         }
       }
       continue;
     }
 
     if (inGhsCategories) {
-      if (/2\.2|GHS标签要素|标签要素|信号词|警示词|危险性说明|象形图/i.test(line)) {
+      if (/2\.2|GHS标签要素|标签要素|信号词|警示词|警告词|危险性说明|象形图/i.test(line)) {
         inGhsCategories = false;
       } else {
         if (!/^(?:物质或混合物分类|GHS分类|危险性类别)[：:]?$/i.test(line)) {
           const cats = line.split(/[；;、\n]+/).map(s => s.trim()).filter(Boolean);
           for (const c of cats) {
-            if (c && !facts.ghs.categories.includes(c)) {
+            if (c && !isNegationCategory(c) && !facts.ghs.categories.includes(c)) {
               facts.ghs.categories.push(c);
             }
           }
@@ -786,48 +815,134 @@ function parseSection2(record, facts, engine) {
       }
     }
 
-    if (/(?:信号词|警示词)[：:\s]*(危险|警告|Danger|Warning)/i.test(line)) {
-      const match = line.match(/(?:信号词|警示词)[：:\s]*(危险|警告|Danger|Warning)/i);
-      if (match) facts.ghs.signalWord = match[1];
-    }
-
-    const hMatches = line.matchAll(/(H\d{3}[a-zA-Z]?)[：:\s]*([^\r\n;；]+)/g);
-    for (const m of hMatches) {
-      facts.ghs.hazardStatements.push({ code: m[1], text: m[2].trim() });
-    }
-
-    if (/(?:【?预防措施】?|防范说明\s*[:：]?\s*预防)/i.test(line)) currentPGroup = 'prevention';
-    else if (/(?:【?事故响应】?|防范说明\s*[:：]?\s*事故响应)/i.test(line)) currentPGroup = 'response';
-    else if (/(?:【?安全储存】?|防范说明\s*[:：]?\s*安全储存)/i.test(line)) currentPGroup = 'storage';
-    else if (/(?:【?废弃处置】?|【?废弃处理】?|防范说明\s*[:：]?\s*废弃)/i.test(line)) currentPGroup = 'disposal';
-
-    const pMatches = line.matchAll(/(P\d{3}(?:\s*\+\s*P\d{3})*)[：:\s]*([^\r\n;；]+)/g);
-    for (const pm of pMatches) {
-      const codeClean = pm[1].replace(/\s+/g, '');
-      const item = { code: codeClean, text: pm[2].trim() };
-      if (currentPGroup) {
-        facts.ghs.precautionaryStatements[currentPGroup].push(item);
-      } else {
-        facts.ghs.precautionaryStatements.prevention.push(item);
+    if (/(?:象形图|危险象形标记|Pictograms?)[：:\s]*(.+)/i.test(line)) {
+      const picText = line.replace(/.*(?:象形图|危险象形标记|Pictograms?)[：:\s]*/i, '').trim();
+      if (/^(?:无|None|不适用)$/i.test(picText)) {
+        facts.ghs.hasPictograms = false;
+        facts.ghs.pictogramCount = 0;
+      } else if (picText && !/^(?:详见|参见|如下)/i.test(picText)) {
+        facts.ghs.hasPictograms = true;
+        if (facts.ghs.pictogramCount === 0) facts.ghs.pictogramCount = 1;
       }
     }
 
-    if (/2\.3\s*(?:其他危害|Other hazards)[：:\s]*([^\r\n]+)/i.test(line)) {
-      const oth = line.match(/2\.3\s*(?:其他危害|Other hazards)[：:\s]*([^\r\n]+)/i);
-      if (oth) facts.ghs.otherHazards = oth[1].trim();
+    if (/(?:信号词|警示词|警告词|Signal\s*word)[：:\s]*(危险|警告|无|Danger|Warning|None)/i.test(line)) {
+      const match = line.match(/(?:信号词|警示词|警告词|Signal\s*word)[：:\s]*(危险|警告|无|Danger|Warning|None)/i);
+      if (match) {
+        const sw = match[1].trim();
+        facts.ghs.signalWord = /^(?:无|none)$/i.test(sw) ? null : sw;
+      }
+    }
+
+    // 危险性说明提取 (支持有 H 码及无 H 码非危/描述性陈述)
+    if (/(?:危[险害]性说明|危险陈述|Hazard\s*statements?)[：:\s]*/i.test(line)) {
+      const hContent = line.replace(/.*(?:危[险害]性说明|危险陈述|Hazard\s*statements?)[：:\s]*/i, '').trim();
+      const hMatches = Array.from(hContent.matchAll(/(H\d{3}[a-zA-Z]?)[：:\s]*([^\r\n;；]+)/g));
+      if (hMatches.length > 0) {
+        for (const m of hMatches) {
+          facts.ghs.hazardStatements.push({ code: m[1], text: m[2].trim() });
+        }
+      } else if (hContent && !/^(?:无|None|详见下文|如下)$/i.test(hContent)) {
+        facts.ghs.hazardStatements.push({ code: null, text: hContent });
+      }
+    } else {
+      const hMatches = line.matchAll(/(H\d{3}[a-zA-Z]?)[：:\s]*([^\r\n;；]+)/g);
+      for (const m of hMatches) {
+        facts.ghs.hazardStatements.push({ code: m[1], text: m[2].trim() });
+      }
+    }
+
+    // 防范说明分组指示
+    if (/(?:【?预防措施】?|防范说明\s*[:：]?\s*预防)/i.test(line)) {
+      currentPGroup = 'prevention';
+      const afterHdr = line.replace(/.*(?:【?预防措施】?|防范说明\s*[:：]?\s*预防)[：:\s]*/i, '').trim();
+      if (afterHdr) prosePrecautionary.prevention.push(afterHdr);
+      continue;
+    } else if (/(?:【?事故响应】?|防范说明\s*[:：]?\s*事故响应|响应措施)/i.test(line)) {
+      currentPGroup = 'response';
+      const afterHdr = line.replace(/.*(?:【?事故响应】?|防范说明\s*[:：]?\s*事故响应|响应措施)[：:\s]*/i, '').trim();
+      if (afterHdr) prosePrecautionary.response.push(afterHdr);
+      continue;
+    } else if (/(?:【?安全(?:储存|存储)】?|防范说明\s*[:：]?\s*安全(?:储存|存储)|(?:安全)?(?:储存|存储))[：:]/i.test(line)) {
+      currentPGroup = 'storage';
+      const afterHdr = line.replace(/.*(?:【?安全(?:储存|存储)】?|防范说明\s*[:：]?\s*安全(?:储存|存储)|(?:安全)?(?:储存|存储))[：:\s]*/i, '').trim();
+      if (afterHdr) prosePrecautionary.storage.push(afterHdr);
+      continue;
+    } else if (/(?:【?废弃处[置理]】?|防范说明\s*[:：]?\s*废弃)/i.test(line)) {
+      currentPGroup = 'disposal';
+      const afterHdr = line.replace(/.*(?:【?废弃处[置理]】?|防范说明\s*[:：]?\s*废弃)[：:\s]*/i, '').trim();
+      if (afterHdr) prosePrecautionary.disposal.push(afterHdr);
+      continue;
+    }
+
+    if (/(?:2\.3\s*)?(?:其他危害|物理化学危[险害]|健康危[险害]|环境危[险害]|Other hazards)/i.test(line)) {
+      currentPGroup = null;
+      if (!facts.ghs.otherHazards) facts.ghs.otherHazards = [];
+      if (Array.isArray(facts.ghs.otherHazards)) {
+        facts.ghs.otherHazards.push(line);
+      } else {
+        facts.ghs.otherHazards = [facts.ghs.otherHazards, line].filter(Boolean);
+      }
+      continue;
+    }
+
+    const pMatches = Array.from(line.matchAll(/(P\d{3}(?:\s*\+\s*P\d{3})*)[：:\s]*([^\r\n;；]+)/g));
+    if (pMatches.length > 0) {
+      for (const pm of pMatches) {
+        const codeClean = pm[1].replace(/\s+/g, '');
+        const item = { code: codeClean, text: pm[2].trim() };
+        if (currentPGroup) {
+          facts.ghs.precautionaryStatements[currentPGroup].push(item);
+        } else {
+          facts.ghs.precautionaryStatements.prevention.push(item);
+        }
+      }
+    } else if (currentPGroup && line && !/^(?:防范说明|GHS标签要素|2\.\d)/i.test(line)) {
+      prosePrecautionary[currentPGroup].push(line);
     }
   }
 
-  facts.ghs.isHazardous = facts.ghs.categories.length > 0 || facts.ghs.hazardStatements.length > 0;
+  // 若未检测到任何 P 编码，则激活散文后备解析器将收集到的中文句子分流填入四大组
+  const totalPCoded = Object.values(facts.ghs.precautionaryStatements).reduce((sum, arr) => sum + arr.length, 0);
+  if (totalPCoded === 0) {
+    for (const group of ['prevention', 'response', 'storage', 'disposal']) {
+      const groupLines = prosePrecautionary[group];
+      for (const rawL of groupLines) {
+        const sentences = rawL.split(/(?<=[。；;])\s*/).map(s => s.trim()).filter(Boolean);
+        for (const sent of sentences) {
+          if (sent && !facts.ghs.precautionaryStatements[group].some(it => it.text === sent)) {
+            facts.ghs.precautionaryStatements[group].push({ code: null, text: sent });
+          }
+        }
+      }
+    }
+  }
+
+  // 严格依据 GHS 标准二分判定是否为危险品
+  const hasValidCategories = facts.ghs.categories.length > 0;
+  const hasValidHCodes = facts.ghs.hazardStatements.some(h => h.code && /^H\d{3}/i.test(h.code));
+  const hasDangerSignal = facts.ghs.signalWord === '危险' || facts.ghs.signalWord === 'Danger';
+  const hasPictograms = facts.ghs.hasPictograms;
+
+  facts.ghs.isHazardous = Boolean(hasValidCategories || hasValidHCodes || hasDangerSignal || hasPictograms);
 }
 
 function parseSection3(record, facts) {
   const rows = record.rows || [];
   for (const row of rows) {
     const cells = row.cells.map(c => (c.text || '').trim());
-    if (cells.length < 2) continue;
-
     const full = cells.join(' ');
+
+    // 检查成分表下方的特殊附注（如成盐中和剂说明），即使为单列或合并单元格也必须抽取
+    if (/(?:请注意以下物质|中和剂|已键合为盐|键合为盐)/i.test(full)) {
+      if (!facts.componentsNotes) facts.componentsNotes = [];
+      if (!facts.componentsNotes.includes(full)) {
+        facts.componentsNotes.push(full);
+      }
+      continue;
+    }
+
+    if (cells.length < 2) continue;
     if (/化学品名称|CAS|质量分数|浓度|Component|Concentration/i.test(full) && cells.length >= 3) {
       continue;
     }
@@ -888,19 +1003,49 @@ function parseSection3(record, facts) {
 
 function parseSection4(record, facts) {
   for (const row of record.rows || []) {
-    const full = row.cells.map(c => c.text).join(' ');
-    if (/皮肤接触[：:]/i.test(full)) facts.firstAid.skin = full.replace(/.*皮肤接触[：:]/i, '').trim();
-    if (/眼睛接触[：:]/i.test(full)) facts.firstAid.eyes = full.replace(/.*眼睛接触[：:]/i, '').trim();
-    if (/吸入[：:]/i.test(full)) facts.firstAid.inhalation = full.replace(/.*吸入[：:]/i, '').trim();
-    if (/食入|误服[：:]/i.test(full)) facts.firstAid.ingestion = full.replace(/.*(?:食入|误服)[：:]/i, '').trim();
+    const c0 = (row.cells[0]?.text || '').trim();
+    const c1 = (row.cells[1]?.text || '').trim();
+    const full = row.cells.map(c => (c.text || '').trim()).join(' ');
+    const val = c1 || full.replace(/^[^：:]{2,20}[：:]/, '').trim();
+
+    if (/^(?:4\.\s*)?急救措施$/i.test(c0)) continue;
+
+    if (/(?:一般措施|一般的建议|常规建议|4\.1)/i.test(c0) && !facts.firstAid.general) facts.firstAid.general = val;
+    if (/(?:接触皮肤|皮肤接触|皮肤|4\.4)/i.test(c0) && !facts.firstAid.skin) facts.firstAid.skin = val;
+    if (/(?:接触眼睛|眼睛接触|眼睛|4\.3)/i.test(c0) && !facts.firstAid.eyes) facts.firstAid.eyes = val;
+    if (/(?:吸入|4\.5)/i.test(c0) && !facts.firstAid.inhalation) facts.firstAid.inhalation = val;
+    if (/(?:食入|误服|4\.2)/i.test(c0) && !facts.firstAid.ingestion) facts.firstAid.ingestion = val;
   }
 }
 
 function parseSection5(record, facts) {
   for (const row of record.rows || []) {
-    const full = row.cells.map(c => c.text).join(' ');
-    if (/灭火介质[：:]/i.test(full)) facts.fireFighting.media = full.replace(/.*灭火介质[：:]/i, '').trim();
-    if (/特别危险性[：:]/i.test(full)) facts.fireFighting.hazards = full.replace(/.*特别危险性[：:]/i, '').trim();
+    const c0 = (row.cells[0]?.text || '').trim();
+    const c1 = (row.cells[1]?.text || '').trim();
+    const full = row.cells.map(c => (c.text || '').trim()).join(' ');
+    const val = c1 || full.replace(/^[^：:]{2,20}[：:]/, '').trim();
+
+    if (/^(?:5\.\s*)?消防措施$/i.test(c0)) continue;
+
+    if (/(?:不合适的灭火[介剂]|不适用的灭火[介剂]|不适合的灭火剂|5\.2)/i.test(c0)) {
+      facts.fireFighting.unsuitableExtinguishMedia = val;
+    } else if (/(?:合适的灭火[介剂]|合适灭火剂|5\.1)/i.test(c0)) {
+      facts.fireFighting.suitableExtinguishMedia = val;
+      if (!facts.fireFighting.media) facts.fireFighting.media = val;
+    } else if (/(?:灭火介质|灭火剂)/i.test(c0) && !facts.fireFighting.media) {
+      facts.fireFighting.media = val;
+    }
+
+    if (/(?:特殊危害|特别危险性|5\.3)/i.test(c0)) {
+      facts.fireFighting.specialHazards = val;
+      facts.fireFighting.hazards = val;
+    } else if (!c0 && c1 && facts.fireFighting.specialHazards) {
+      facts.fireFighting.specialHazards += ' ' + c1;
+      facts.fireFighting.hazards = facts.fireFighting.specialHazards;
+    }
+    if (/(?:消防人员防护装备|防护装备|消防员特殊防护装备|5\.4)/i.test(c0)) {
+      facts.fireFighting.protectiveEquipment = val;
+    }
   }
 }
 
@@ -911,12 +1056,18 @@ function parseSection6(record, facts) {
 
 function parseSection7(record, facts) {
   for (const row of record.rows || []) {
-    const full = row.cells.map(c => c.text).join(' ');
-    if (/操作处置注意事项|操作注意事项[：:]/i.test(full)) {
-      facts.handlingStorage.handling = full.replace(/.*(?:操作处置注意事项|操作注意事项)[：:]/i, '').trim();
+    const c0 = (row.cells[0]?.text || '').trim();
+    const c1 = (row.cells[1]?.text || '').trim();
+    const full = row.cells.map(c => (c.text || '').trim()).join(' ');
+    const val = c1 || full.replace(/^[^：:]{2,20}[：:]/, '').trim();
+
+    if (/^(?:7\.\s*)?操作和储存$/i.test(c0)) continue;
+
+    if (/(?:安全操作(?:的)?(?:防范|注意事项)|操作处置注意事项|操作注意事项|7\.1\s*安全操作)/i.test(c0)) {
+      facts.handlingStorage.handling = val;
     }
-    if (/安全储存条件|储存注意事项[：:]/i.test(full)) {
-      facts.handlingStorage.storage = full.replace(/.*(?:安全储存条件|储存注意事项)[：:]/i, '').trim();
+    if (/(?:安全储存(?:的)?条件|储存注意事项|安全储存条件|7\.2\s*安全储存)/i.test(c0)) {
+      facts.handlingStorage.storage = val;
     }
   }
 }
@@ -1049,16 +1200,21 @@ function parseSection9(record, facts) {
 
 function parseSection10(record, facts) {
   for (const row of record.rows || []) {
-    const pairs = decomposeCellPairToFacts(row.cells?.[0], row.cells?.[1], row, 10);
-    for (const pair of pairs) {
-      const label = pair.rawLabel || '';
-      const val = pair.rawValue || '';
-      if (/反应性/i.test(label)) facts.stabilityReactivity.reactivity = val;
-      if (/稳定性/i.test(label)) facts.stabilityReactivity.stability = val;
-      if (/危险反应/i.test(label)) facts.stabilityReactivity.hazardousReactions = val;
-      if (/应避免的条件/i.test(label)) facts.stabilityReactivity.conditionsToAvoid = val;
-      if (/不相容的材料|禁配物/i.test(label)) facts.stabilityReactivity.incompatibleMaterials = val;
-      if (/危险的分解产物/i.test(label)) facts.stabilityReactivity.decompositionProducts = val;
+    const c0 = (row.cells[0]?.text || '').trim();
+    const c1 = (row.cells[1]?.text || '').trim();
+    const full = row.cells.map(c => (c.text || '').trim()).join(' ');
+    const val = c1 || full.replace(/^[^：:]{2,20}[：:]/, '').trim();
+
+    if (/^(?:10\.\s*)?稳定性和反应性$/i.test(c0)) continue;
+
+    if (/(?:10\.1\s*)?反应性/i.test(c0) && !/稳定性和反应性/i.test(c0)) facts.stabilityReactivity.reactivity = val;
+    if (/(?:10\.1\s*)?(?:化学)?稳定性|稳定性/i.test(c0) && !/稳定性和反应性/i.test(c0)) facts.stabilityReactivity.stability = val;
+    if (/(?:10\.[23]\s*)?(?:危险|危害)反应/i.test(c0)) facts.stabilityReactivity.hazardousReactions = val;
+    if (/(?:10\.[34]\s*)?应避免的条件/i.test(c0)) facts.stabilityReactivity.conditionsToAvoid = val;
+    if (/(?:10\.[45]\s*)?(?:不相容的材料|禁配物)/i.test(c0)) facts.stabilityReactivity.incompatibleMaterials = val;
+    if (/(?:10\.[26]\s*)?(?:危险|危害)?(?:的)?分解产物/i.test(c0)) {
+      facts.stabilityReactivity.decompositionProducts = val;
+      facts.stabilityReactivity.decomposition = val;
     }
   }
 }

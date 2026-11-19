@@ -1,5 +1,61 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-19 识别与审计模块底层通用性优化与源文件强制对账审计根治 (RECOGNITION-AND-AUDIT-SOURCE-GROUNDING-REFACTOR)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户最高指令（作为源码唯一管理者从根本解决问题，基于通用性准则，严禁针对单个型号做硬编码特判，修改识别与审计模块底层源码，不产出交付物，全量变更经 VS Code Diff 原生检阅，零告警零错误）：
+1. **识别模块底层通用性根治 (Recognition Engine Universal Root-Cause Refactor - `web/src/recognition-engine.js`)**：
+   - **Section 2 GHS 否定语义过滤与非危险品精准二分**：
+     - 构建通用否定词过滤正则（`/^(?:无|无危害|不适用|不属于危险(?:化学)?品|未分类|非危险(?:品|化学品)?|not\s*classified|none|n\/?a)$/i`），对分类文本实施否定语义清洗；
+     - 建立严格的 GHS 危险品二分判定逻辑：仅当存在有效分类、有效 H 编码、危险信号词或象形图时才判定 `isHazardous = true`，当源文件载明“GHS危险性类别: 无”且“象形图: 无”时，准确判定 `isHazardous = false`，彻底消除非危险品被颠倒为危化品的系统性缺陷；
+     - 扩充信号词国标同义词识别（支持“警告词：警告/危险”与“Signal word”）；
+     - 建立非编码型危害性说明提取通道，准确抽取“没有明显的已知作用或严重危险”等描述性说明；
+     - 建立散文防范说明纯文本后备分句解析器：当源文档未标注 `P\d{3}` 编码时，自动按照预防措施、事故响应、安全存储、废弃处置引导词切分段落，并将中文句子分流填入 `prevention`、`response`、`storage`、`disposal` 四大组，实现零信息损耗；
+     - 通用提取 `2.3 其他危害`（包括物理化学危害、健康危害、环境危害警示）至 `facts.ghs.otherHazards`。
+   - **Section 3 成盐中和剂附注结构化抽取**：
+     - 在成分表解析前置扫描合并行与说明行，将“请注意以下物质：N,N-二甲基乙醇胺，中和剂，已键合为盐...”等特殊说明结构化抽取并挂载至 `facts.componentsNotes`。
+   - **Section 4/5/7/10 顶层业务事实槽位补全**：
+     - **Section 4**：补全 `general`（一般措施/4.1）、`skin`（接触皮肤/4.4）、`eyes`（接触眼睛/4.3）、`inhalation`（吸入/4.5）、`ingestion`（误服/4.2）顶层属性；
+     - **Section 5**：提取 `suitableExtinguishMedia`（合适的灭火剂/5.1）、`unsuitableExtinguishMedia`（不合适的灭火剂/5.2）、`specialHazards`（特殊危害/烟尘警示/5.3）、`protectiveEquipment`（自供气式呼吸器/5.4），彻底消除 `{}` 空对象；
+     - **Section 7**：解耦提取 `handling`（安全操作防范/7.1）与 `storage`（安全储存条件/7.2）；
+     - **Section 10**：全面覆盖 `reactivity`、`stability`、`hazardousReactions`（危害反应/10.3）、`conditionsToAvoid`、`incompatibleMaterials`、`decompositionProducts` / `decomposition`（危险分解产物/10.2）。
+2. **审计模块强化源文档 1:1 强制物理对账机制 (Audit Module Source-Grounding Hard Gate)**：
+   - **`web/scripts/lint_source_grounding.mjs` 维度扩展**：
+     - 新增 `LINT-S2-02`：GHS 否定语义二分对账，非危险品产出物严禁出现危化品类别或象形图；
+     - 新增 `LINT-S3-01`：CAS 组分与浓度 1:1 物理对账，源文档载明的 CAS 组分必须在产出中英文中 100% 继承；
+     - 新增 `LINT-S9-02`：理化特性 19 项关键数值对账（闪点、密度、粘度、固含量等），严禁篡改或丢失原厂实测数字；
+     - 新增 `LINT-S14-01` & `LINT-S14-02`：运输非危险品事实对账与运输温度区间（如 -5℃~+50℃）全量物理对账。
+   - **`web/scripts/run_master_msds_audit.mjs` 强制接入 Ring 6**：
+     - 淘汰原浅层正则匹配（如 `/象形图/i.test` 把“象形图：无”误判为有图），全面接入 `recognizeSourceDocx` 提取权威事实；
+     - 将源文档 1:1 物理对账作为中央主审计套件的 Ring 6 强制门禁，产出物与源事实不符时坚决阻断发布并以非 0 退出码退出。
+3. **VS Code 原生两栏 Diff 协同检阅合流 (VS Code Review)**：
+   - 核心变更文件全部通过 `vscode-review` MCP 的 `review_diff_in_vscode` 呈报检阅并应用：
+     - `web/src/recognition-engine.js` (状态: approved_and_applied)
+     - `web/scripts/lint_source_grounding.mjs` (状态: approved_and_applied)
+     - `web/scripts/run_master_msds_audit.mjs` (状态: approved_and_applied)
+     - `web/scripts/verify_universal_engine_refactor.mjs` (状态: approved_and_applied)
+4. **回归与核销清算 (Regression & Verification)**：
+   - `npm run lint`（`lint:code` & `lint:audit`）：0 违规，退出码 0；
+   - `node web/scripts/verify_universal_engine_refactor.mjs`：PA-3654、PA-4914、EP-1501、PA-4902 跨品类 19+7 项缺陷 100% 满分通过，退出码 0。
+
+
+## [2026-11-19 PA-4902 与 PA-4840 源文件底层 XML DOM 直读法医审计与缺陷台账 (PA4902-PA4840-SOURCE-XML-AUDIT)] - 严格遵循用户指令脱离识别模块直接比对源文件 XML DOM：
+1. **源文件底层 XML 直读穿透比对核心缺陷沉淀 (Root Cause & Omission Ledger)**：
+   - **PA-4902 Section 2（危险性概述）重大全损**：
+     - **源文件事实**：载明“GHS危险性类别: 无”、“警告词：警告”、“危害性说明: 没有明显的已知作用或严重危险”、完整四大防范说明（预防措施、事故响应、安全存储 5-35℃、废弃处置空桶法规责任）及物理化学/环境危害警示（水体土壤污染、防聚合物沉积阻塞下水道）。
+     - **当前交付物缺陷**：流水线 `web/src/pipeline-engine.js` 第 1627 与 1696 行硬编码将非危产品“极简收敛为单数据行”，导致源文件中 90% 的安全操作警示被全盘抹杀，中文版仅剩 `2.1 GHS危险性类别：根据GHS不属于危险物`，英文版仅剩单句。
+   - **PA-4902 Section 11（毒理学信息）动物实测毒理数据丢失**：
+     - **源文件事实**：明确包含成分级毒理实验数据“水溶性羟基聚丙烯酸酯 毒性：无资料；刺激性：无资料”及“乙二醇丁醚：毒性：经皮（鼠）LD50：＞2000 mg/kg 吸入（鼠）LD50：＞1997.718 mg/l/8hE 经口（鼠）LD50：＞2000 mg/kg 刺激性：无资料”。
+     - **当前交付物缺陷**：因未命中标准 17 项 OECD 导则结构，被流水线降级为单行 `该产品无可用的毒理学研究。`，导致成分级 LD50 关键事实严重损耗。
+   - **PA-4902 Section 1（物料标识）中文版分类单元格空白**：
+     - **源文件事实**：`化学品分类：水溶性丙烯酸聚合物树脂`。
+     - **当前交付物缺陷**：英文版生成了对应译文，但中文版对应单元格完全空白未填充。
+   - **PA-4902 & PA-4840 Section 9（理化特性）pH 工艺稀释比例被过度清洗**：
+     - **源文件事实**：PA-4902 为 `pH 值： 7-9 （按1: 10 的比例用水稀释）`；PA-4840 为 `pH 值： 7-9 （按1: 1 的比例用水稀释）`。
+     - **当前交付物缺陷**：被清洗模块过度简化为 `7 - 9`，原厂关键稀释倍数被抹除。
+   - **PA-4902 Section 3（成分组成）中和剂成盐豁免附注丢失**：
+     - **源文件事实**：包含“N,N-二甲基乙醇胺，中和剂，已键合为盐，质量浓度小于 1.0% GHS分类及特定阈值浓度”重要附注。
+     - **当前交付物缺陷**：仅保留 4 行表格，附注说明丢失。
+2. **审计机制盲区复盘 (Audit Tooling Blind Spot)**：
+   - 现行自动化套件（`audit_bipolar_bilayer.mjs` 与 `run_master_msds_audit.mjs`）主要把关产出物本身的排版合法性、字体字号加粗及新鲜度，未做源文件 XML 事实的反向 1:1 闭环对账，导致严重的内容丢失未能被机器阻断。后续必须将源文件 XML 反向逐条比对固化为门禁规则。
+
 ## [2026-11-19 PA-4902 与 PA-4840 标准化覆写生产与全景逐句翻译法医审计 (PA4902-PA4840-CANONICAL-PRODUCTION-AUDIT)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户最高指令（使用标准化七步骤工作流，脱离识别模块，直接解读源文件底层 XML 事实，做好源文件内容审计与中英文逐句对照翻译审计，严禁修改底层引擎源码，坚守 INV-CORE-READONLY）：
 1. **法医级源文件底层事实穿透与无损继承 (Forensic XML DOM Grounding & Zero-Loss Ingestion)**：
    - **PA-4902 事实锁定与归正**：
