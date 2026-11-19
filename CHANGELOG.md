@@ -1,5 +1,21 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-19 EP-1501 水性环氧乳液标准七流程八格式生产与无毒理终点单说明行同构交付 (EP1501-SEVEN-STEP-PRODUCTION-AND-AUDIT)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系、MSDS-Studio 工业级标准作业 SOP 与用户最高指令（禁止改动系统底层代码 web/src/*）：
+1. **问题根因穿透与局部规范对齐 (5-Whys Root Cause & Local Specification Invariants)**：
+   - **底层封印恪守**：严格遵循用户关于“禁止改动系统底层代码”的刚性指令，底层 `web/src/*` 代码零篡改，全部工程控制通过受控流水线脚本与前置事实约束闭环；
+   - **Section 1 题头留空与名称移位对齐**：针对中文模板 `1.1  产品名称：` 作为大类题头属性，其值单元格严格清空，消除父级题头污染；品名与型号（`水性环氧乳液 EP-1501`）严格装配入 Row 2 `中文名称：` 值格，Row 3 补全 `环氧水分散体`；英文版保持 1:1 双语同构对齐；
+   - **Section 8 职业接触限值无损保全**：源文件载明之接触限值事实 `根据EC指令2006/121/EG,无可用的接触限值信息` 在中文版与英文版（`No exposure limit information is available under EC Directive 2006/121/EC.`）中 100% 物理保全，手套三项实测参数（FKM/IIR/NBR）与建议完整存活；
+   - **Section 11 毒理学无终点单说明行双语严格对称**：EP-1501 仅含单行免责事实（`该产品无可用的毒理学研究。`），在基准引擎中前置剔除模板残留的 11.1~11.3 幽灵行，阻断英文引擎将说明行误增为 2 行的连锁问题，中英文最终均严格收敛为 2 行（表头 + 1 行免责），双语结构绝对同构；
+2. **标准七流程交付物纯净落地与原生 COM PDF 转译**：
+   - 生产流水线 `web/scripts/generate_ep1501_standard_deliverables.mjs` 顺序执行标准 Step 1 至 Step 7；
+   - 目标目录 `算法训练材料/TDS MSDS 重写版/04-1 水性环氧树脂 EP/EP-1501/测试产出/` 成功生成全套 8 格式标准文件（4 DOCX + 4 PDF）；
+   - PDF 转译 100% 采用系统级 Windows COM（WPS / Word 自动化），排版、标签对齐度 (80.28pt) 与说明行字号 (9.5pt) 完全合规；
+3. **两阶双轨法医级机械终审验证**：
+   - 运行双极双层法医审计套件 (`audit_bipolar_bilayer.mjs`)：0 Failures，100% 满分通过；
+   - 运行集中式中央主审计套件 (`run_master_msds_audit.mjs`)：167 项断言 100% 全绿通过（0 Failures，退出码 0）。
+
+---
+
 ## [2026-11-19 全局通用 MSDS 标准化重构与同品类基准数据库补充体系 (UNIVERSAL-MSDS-STANDARDIZATION-AND-DB-HARMONIZATION)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与通用性原则 (Universality Principle)，全面治理过度非标源文档导致的空值行、短命剪枝与槽位漂移顽疾，重构通用匹配与基准数据库协作架构：
 1. **问题根因穿透与通用性重构 (5-Whys Root Cause Inquest)**：
    - 此前流水线过度依赖源文件格式规范度，面对非结构化源文档（如 PA-3654 等）时，因字段未命中触发激进剪枝，导致产出物连续空值行或内容过少；
