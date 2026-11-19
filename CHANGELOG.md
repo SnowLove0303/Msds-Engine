@@ -1,5 +1,22 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-19 EP-1501 六大双语细节瑕疵治理与全景对齐 (EP1501-SIX-BILINGUAL-FLAWS-RESOLUTION)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户核心指令（统一 S2 P273 措辞、S4 误服补全“立即”、S8 法规号统一为 2006/121/EC、S13 补全英文危废法规句、S14 英文温度去重、S15 中英文法规标签去重，禁止修改系统底层代码 web/src/*）：
+1. **法医级缺陷根因穿透与治理方案 (Forensic Root Cause & Actions)**：
+   - **Section 2.4 P273 措辞统一**：中文版“禁止排入环境”与英文版“Avoid release to the environment”存在用词偏差；统一按 GHS 标准修正为 `P273 避免释放到环境中。`，实现双语语义精确等价；
+   - **Section 4.2 误服时效性补齐**：英文版载明 `Seek medical attention immediately.`，中文原为 `禁止催吐，须就医。`，遗漏“立即”限定词；补充为 `禁止催吐，须立即就医。`，保持对等急救紧迫性；
+   - **Section 8.2 欧洲指令编号统一**：中文原版残留德文缩写 `2006/121/EG`，与英文版 `2006/121/EC` 不一致；中文统一修正为国际标准英文编号 `2006/121/EC`；
+   - **Section 13 废弃处置英文补全**：中文额外载明“严格按照国家和地方危废与环保管理法规执行”，英文版原无对应条文；在英文 Row 1 补全对应法定义务译文：`Strictly comply with national and local hazardous waste and environmental protection regulations.`；
+   - **Section 14.4 运输注意事项英文去重**：英文版温度要求因历史拼接出现两次重复；使用严格正则去重，收敛为单句规范表述：`Temperature must not exceed +40°C and must not fall below +5°C.`；
+   - **Section 15 法规信息中英文双重去重**：消除底模残留与字段覆写导致的叠词重复；中文 Row 2/3 去重为单次 `其它的规定：`、`符合下列法规要求：`；英文 Row 2/3 去重为单次 `Other provisions:`、`Complies with the following regulations:`。
+2. **底层封印恪守与受控流水线自愈**：
+   - `web/src/*` 底层引擎源码保持 100% 只读，零篡改；在生产流水线 `generate_ep1501_standard_deliverables.mjs` 中构建 `refineEp1501BilingualTexts` 函数链式注入中英基准与衍生变体。
+3. **交付物生成与两阶双轨机械终审验证**：
+   - 重新覆写生成全套 8 格式标准交付物（4 DOCX + 4 PDF）至目标目录；
+   - **双极双层法医审计 (`audit_bipolar_bilayer.mjs`)**：0 Failures，100% 满分通过；
+   - **Master MSDS 全要素双轨主审计 (`run_master_msds_audit.mjs`)**：167 项断言 100% 全绿通过（0 Failures，退出码 0）。
+
+---
+
 ## [2026-11-19 Section 15 法规信息全面规范化与双语排版净化 (SECTION15-REGULATORY-STANDARDIZATION)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户核心指令（section15 要改进一下）：
 1. **法医级缺陷根因穿透 (5-Whys Root Cause & Forensics)**：
    - **中文 Row 1 被源散文冲刷覆盖**：源文档散文条目 `遵循法规：- 《危险化学品安全管理条例》...` 被 `smart-matching.js` 提取为 `safety_regulations` 并直接覆写了底模第 1 行（Row 1），导致官方底模原有法定子标题 `"物质或混合物的相关安全、健康和环保法律法规"` 被彻底冲刷丢失；且在第 3 行 `"符合下列法规要求："` 之后，第 4~7 行又重复罗列了相同的 4 部法规，造成同一表格内法规信息出现 2 次严重重复；

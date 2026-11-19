@@ -109,6 +109,80 @@ function compactSection2Spacing(eng) {
   }
 }
 
+/**
+ * 治理 EP-1501 六大双语细节瑕疵与格式对齐
+ * 1. S2 P273: 中文“禁止排入环境”与英文对齐统一为“避免释放到环境中”
+ * 2. S4 误服: 中文补充“立即”为“须立即就医”
+ * 3. S8 工程控制: 中文法规编号 2006/121/EG 统一为国际通用 2006/121/EC
+ * 4. S13 废弃处置: 英文版补充危废与环保管理法规对应英译
+ * 5. S14 运输注意事项: 英文版删除重复出现的温度说明
+ * 6. S15 法规信息: 中英文均去重“其它的规定：”与“符合下列法规要求：”
+ */
+function refineEp1501BilingualTexts(eng, isEnglish) {
+  if (!eng?.documentXml) return;
+  const doc = eng.documentXml;
+  const tbls = Array.from(doc.getElementsByTagNameNS(W_NS, 'tbl'));
+
+  const replaceTextInTbl = (tbl, target, replacement) => {
+    if (!tbl) return;
+    const ts = Array.from(tbl.getElementsByTagNameNS(W_NS, 't'));
+    const fullText = ts.map(t => t.textContent).join('');
+    if (!fullText.includes(target)) return;
+
+    for (const t of ts) {
+      if (t.textContent.includes(target)) {
+        t.textContent = t.textContent.replaceAll(target, replacement);
+        return;
+      }
+    }
+
+    let newText = fullText.replace(target, replacement);
+    ts[0].textContent = newText;
+    for (let i = 1; i < ts.length; i++) {
+      ts[i].textContent = '';
+    }
+  };
+
+  if (!isEnglish) {
+    // 1. S2 P273: "禁止排入环境" -> "避免释放到环境中"
+    replaceTextInTbl(tbls[1], '禁止排入环境', '避免释放到环境中');
+
+    // 2. S4 误服: "须就医" -> "须立即就医"
+    replaceTextInTbl(tbls[3], '禁止催吐，须就医。', '禁止催吐，须立即就医。');
+
+    // 3. S8 工程控制: 2006/121/EG -> 2006/121/EC
+    replaceTextInTbl(tbls[7], '2006/121/EG', '2006/121/EC');
+
+    // 6. S15 重复去重
+    replaceTextInTbl(tbls[14], '其它的规定：其它的规定：', '其它的规定：');
+    replaceTextInTbl(tbls[14], '符合下列法规要求：符合下列法规要求：', '符合下列法规要求：');
+  } else {
+    // 4. S13 废弃处置英文补全
+    if (tbls[12]) {
+      const target13 = 'Dispose of in accordance with applicable national standards and national or local regulations.';
+      const replace13 = 'Dispose of in accordance with applicable national standards and national or local regulations. Strictly comply with national and local hazardous waste and environmental protection regulations.';
+      replaceTextInTbl(tbls[12], target13, replace13);
+    }
+
+    // 5. S14 运输注意事项去重
+    if (tbls[13]) {
+      const ts = Array.from(tbls[13].getElementsByTagNameNS(W_NS, 't'));
+      const tempReg = /Temperature must not exceed \+40[°℃]C and must not fall below \+?5[°℃]C\.\s*Temperature must not exceed \+40[°℃]C and must not fall below \+?5[°℃]C\./;
+      for (const t of ts) {
+        if (tempReg.test(t.textContent)) {
+          t.textContent = t.textContent.replace(tempReg, 'Temperature must not exceed +40°C and must not fall below +5°C.');
+        }
+      }
+    }
+
+    // 6. S15 重复去重
+    replaceTextInTbl(tbls[14], 'Other provisions: Other provisions:', 'Other provisions:');
+    replaceTextInTbl(tbls[14], 'Complies with the following regulations: Complies with the following regulations:', 'Complies with the following regulations:');
+  }
+
+  eng.refresh();
+}
+
 async function main() {
   console.log('========================================================================');
   console.log(`  EP-1501 全套 8 格式标准受控交付物生产流水线 (Seven-Step SOP)`);
@@ -169,6 +243,9 @@ async function main() {
   // Section 2 间距紧凑化治理
   compactSection2Spacing(baseCnEngine);
 
+  // 双语细节文本治理（中文）
+  refineEp1501BilingualTexts(baseCnEngine, false);
+
   // Section 11 规范治理：
   // EP-1501 无毒理学终点，仅有单行免责说明行，剪除模板残留的 11.1 / 11.2 / 11.3 幽灵行
   let s11Cn = baseCnEngine.records.find(r => r.sectionNumber === 11);
@@ -188,6 +265,7 @@ async function main() {
     revisionDate: effectiveDate
   });
   compactSection2Spacing(baseEnEngine);
+  refineEp1501BilingualTexts(baseEnEngine, true);
 
   // 4. 动态探知说明行数量并准备硬性质量门禁事实
   const s12RecordForAudit = baseCnEngine.records.find(r => r.sectionNumber === 12);
@@ -257,6 +335,7 @@ async function main() {
       applyGlobalTypographyProjection(eng, false);
       enforceStructuralTypographyInvariants(eng, false);
       compactSection2Spacing(eng);
+      refineEp1501BilingualTexts(eng, false);
 
       const s8Rec = eng.records.find(r => r.sectionNumber === 8);
       if (s8Rec) {
@@ -326,6 +405,7 @@ async function main() {
       applyGlobalTypographyProjection(eng, true);
       enforceStructuralTypographyInvariants(eng, true);
       compactSection2Spacing(eng);
+      refineEp1501BilingualTexts(eng, true);
 
       const s13Rec = eng.records.find(r => r.sectionNumber === 13);
       if (s13Rec) {
