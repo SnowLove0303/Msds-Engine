@@ -2088,7 +2088,9 @@ export function buildDynamicSection11Table(engine, srcEngine, baseCnEngine = nul
   }
 
   if (endpoints.length === 0) {
-    if (cnS11 && cnS11.rows.length === 2) {
+    const srcS11Rec = (srcEngine || baseCnEngine)?.records?.find(r => r.sectionNumber === 11);
+    const isSourceTwoRows = srcS11Rec ? srcS11Rec.rows?.length === 2 : false;
+    if (isSourceTwoRows || (cnS11 && cnS11.rows.length === 2) || !isEnglish) {
       while (s11.rows.length > 2) {
         s11 = deleteRow(engine, s11, s11.rows.length - 1);
       }

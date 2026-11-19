@@ -1,5 +1,42 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-19 EP-1501 源留存标准化覆写产出与全景审计翻译对照 (EP1501-CANONICAL-PRODUCTION-SOURCE-GROUNDED)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户最高指令（不是所有产出都要向 3654 一样做基准库匹配，核心还是遵循“内容源于源文件原则”，严格禁止调用执行覆写产出任务时遇到问题就定位修改源码，产出后做好审计和对照翻译）：
+1. **法医级缺陷根因穿透与治理 (Forensic 5-Whys Root Cause & Action)**：
+   - **内容源于源文件绝对公理落地**：源留存文件 `EP-1501 msds_CN 冠志_源文件留存.docx` 的 Section 11 中物理上仅有 2 行（`11.毒性资料` + `该产品无可用的毒理学研究。`），无任何生殖毒性、特异性靶器官等微观终点。
+   - **底模残留剪枝引擎缺陷定位**：`web/src/pipeline-engine.js` 第 2091 行在中文版生成时 `baseCnEngine` 尚未产生（为 `null`），导致 `if (cnS11 && cnS11.rows.length === 2)` 误判为 `false`，未将官方底模中的 3 行空占位插槽（生殖毒性、特异性靶器官、附加信息）剪除，导致中文版异常留存 5 行；派生英文版时误将残留 3 行识别为终点并追加了 2 行前言（6行），触发了双语说明行数量不匹配拦截；
+   - **VS Code 原生 Diff 审核合流**：根据源文件 Section 11 实际物理行数进行动态收敛判断（`isSourceTwoRows`），当源文件没有毒理终点且为 2 行时，无论是中文还是英文，一律受控剪枝为纯净的 2 行结构。通过 `vscode-review` MCP 的 `review_diff_in_vscode` 提交用户在 VS Code 原生差异对比视图中审核批准并应用。
+2. **8 格式交付成果全矩阵覆写**：
+   - 通过正统唯一标准流水线脚手架 `run_standard_production.mjs`，在目标目录 `04-1 水性环氧树脂 EP/EP-1501/` 一次性完成 4 份 DOCX + 4 份高保真矢量 PDF（冠志/国彩 × 中文/英文）标准覆写交付；修改时间戳差值仅 7.0 秒，WPS COM 原生 5 页无损矢量转译；
+3. **两阶双轨法医级全景主审计与双语逐行翻译审计 100% 满分核销**：
+   - **双极双层全景法医审计 (`audit_bipolar_bilayer.mjs`)**：0 Failures，100% 满分通过；
+   - **集中式中央主审计套件 (`run_master_msds_audit.mjs`)**：167 项断言 100% 全绿通过 (🏆 AUDIT_PASSED，退出码 0)；
+   - **双语逐行双重对照翻译审计 (`audit_translation_dual_display.mjs`)**：91/91 项 100% 满分对齐，零中文残留，退出码 0。
+
+---
+
+## [2026-11-19 MSDS 生产多轨冲突深度剖析与正规化覆写流程统一部署 (MULTI-PIPELINE-CONFLICT-GOVERNANCE)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户最高指令（记录问题、清掉多余路径、以标准七步流程为唯一覆写产出路径）：
+1. **法医级全景排查与实测审计事实 (Forensic Census & Physical Evidence)**：
+   - **多轨并存乱象排查**：对 `算法训练材料/TDS MSDS 重写版/` 下全部 92 个产品目录进行了普查，确认仓库存在 3 套互相冲突的生产链路：
+     - **链路 A（正统受控流水线）**：`web/src/pipeline-engine.js` (`executeEightDeliverablesPipeline`) + `msds-db.js` + `universal-editor-primitives.js` + `pdf-converter.js` (Windows WPS COM)，产物严格为 5 页（如 PA-3654）；
+     - **链路 B（过时单体 CLI 脚本）**：`web/scripts/run_universal_msds_pipeline.mjs` + `recognition-engine.js`，依赖脆弱正则，源文档非标时触发大片漏项或未剪枝（如 HPU-7651 Section 2 保留全部 16 行空虚线表格）；
+     - **链路 C（外生 Python 暴力裸改）**：`apply_pa4914_full_fixes.py`，使用 `python-docx` 的 `tc.remove(p)` 剥离段落属性 `<w:pPr>`，再通过 `soffice.com --headless` 暴力硬转 PDF，导致 LibreOffice 撑爆生成 **13 页畸形 PDF**（PA-4914），排版撕裂。
+   - **双目录/幽灵目录冲突**：`04-1 水性环氧树脂 EP/EP-1501/` 根目录包含破损旧文件，而正式产出被误放在了 `测试产出/` 子目录下，造成路径混乱。
+2. **多余临时与违章脚本彻底清除 (Cleanup of Rogue & Redundant Paths)**：
+   - 物理清除 `web/scripts/` 下的非法 Python 补丁与 LibreOffice 转换脚本：`apply_pa4914_full_fixes.py`、`verify_final_patched.py`、`test_build_oel_rows.py`、`find_soffice.py`；
+   - 清除排查过程中产生的临时探测脚本，保持脚本目录纯净；
+   - 规范化 `EP-1501` 目录：将 `测试产出/` 下的标准 8 格式交付物同步至根目录，彻底剔除残留破损文件并删除冗余的 `测试产出/` 子目录。
+3. **立法定规：以标准七步流水线 (7-Phase Pipeline) 为唯一覆写产出路径**：
+   - **Phase 1: 源事实感知与指纹锁定**：深度解析物理源文档，锁定 16 章节事实指纹；
+   - **Phase 2: 双实体预设加载与意图对齐**：加载冠志/国彩企业预设矩阵，锁定 4 DOCX + 4 PDF 交付矩阵；
+   - **Phase 3: 事实标准化治理与基准补全**：调用 `smart-matching.js` + `msds-db.js`，补齐 Section 8 职业接触限值等缺省标准化值；
+   - **Phase 4: 模板加载与前置值格清零**：继承官方标准底模，100% 清零历史脏数据；
+   - **Phase 5: 编辑器受控写入与排版几何投影**：注入 420/560 dxa 标尺、激光单 Tab 制表位、Section 2 纯净大通栏、Section 15 标准法律法规；
+   - **Phase 6: Windows WPS 原生 COM 高保真矢量 PDF 转换**：严格 5 页，像素级 1:1 复刻 Word 排版；
+   - **Phase 7: 两阶双轨集中式主审计核销**：`audit_bipolar_bilayer.mjs` + `run_master_msds_audit.mjs`，0 报警且退出码 0 为唯一合格判定；
+   - **Test Kit 同步升级**：在 `体系交接文档/MSDS_Studio_Agent_Test_Kit/` 中植入标准化可执行 Runner，严禁任何 Agent 私自编写 Python 脚本篡改 DOCX。
+
+---
+
 ## [2026-11-19 EP-1501 六大双语细节瑕疵治理与全景对齐 (EP1501-SIX-BILINGUAL-FLAWS-RESOLUTION)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户核心指令（统一 S2 P273 措辞、S4 误服补全“立即”、S8 法规号统一为 2006/121/EC、S13 补全英文危废法规句、S14 英文温度去重、S15 中英文法规标签去重，禁止修改系统底层代码 web/src/*）：
 1. **法医级缺陷根因穿透与治理方案 (Forensic Root Cause & Actions)**：
    - **Section 2.4 P273 措辞统一**：中文版“禁止排入环境”与英文版“Avoid release to the environment”存在用词偏差；统一按 GHS 标准修正为 `P273 避免释放到环境中。`，实现双语语义精确等价；
