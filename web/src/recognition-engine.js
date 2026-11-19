@@ -406,6 +406,7 @@ export async function recognizeSourceDocx(docxPathOrBuffer, sourceName = 'source
         disposal: []
       },
       otherHazards: null,
+      hazardousComponentsOnLabel: null,
       hasPictograms: false,
       pictogramCount: 0
     },
@@ -801,14 +802,16 @@ function parseSection2(record, facts, engine) {
     }
 
     if (inGhsCategories) {
-      if (/2\.2|GHS标签要素|标签要素|信号词|警示词|警告词|危险性说明|象形图/i.test(line)) {
+      if (/2\.2|2\.3|GHS标签要素|标签要素|信号词|警示词|警告词|危险性说明|危害性说明|象形图|防范说明|Precautionary|P\d{3}|其他危[害险]|Other\s*hazards/i.test(line)) {
         inGhsCategories = false;
       } else {
-        if (!/^(?:物质或混合物分类|GHS分类|危险性类别)[：:]?$/i.test(line)) {
-          const cats = line.split(/[；;、\n]+/).map(s => s.trim()).filter(Boolean);
-          for (const c of cats) {
-            if (c && !isNegationCategory(c) && !facts.ghs.categories.includes(c)) {
-              facts.ghs.categories.push(c);
+        if (!/^(?:物质或混合物分类|GHS分类|危险性类别|CHS危险性类别)[：:]?$/i.test(line)) {
+          if (!/^(?:防范说明|P\d{3}|2\.\d|其他危[害险])/i.test(line)) {
+            const cats = line.split(/[；;、\n]+/).map(s => s.trim()).filter(Boolean);
+            for (const c of cats) {
+              if (c && !isNegationCategory(c) && !facts.ghs.categories.includes(c)) {
+                facts.ghs.categories.push(c);
+              }
             }
           }
         }
@@ -834,13 +837,50 @@ function parseSection2(record, facts, engine) {
       }
     }
 
+    // 标签有害成分识别 (如: 必须列在标签上的有害成份：2-丁氧基乙醇)
+    if (/(?:必须列在标签上的有害成[份分]|列在标签上的有害成[份分])[：:\s]*(.*)/i.test(line)) {
+      const match = line.match(/(?:必须列在标签上的有害成[份分]|列在标签上的有害成[份分])[：:\s]*(.*)/i);
+      if (match && match[1].trim()) {
+        facts.ghs.hazardousComponentsOnLabel = match[1].trim();
+      }
+    }
+
     // 危险性说明提取 (支持有 H 码及无 H 码非危/描述性陈述)
+    const cleanHText = (code, rawTxt, fullLine) => {
+      let t = (rawTxt || '').replace(/^[)）\]】\s]+|[)）\]】\s]+$/g, '').trim();
+      if (!t && fullLine) {
+        const stripped = fullLine.replace(/\(H\d{3}[a-zA-Z]?\)/g, '').replace(/H\d{3}[a-zA-Z]?/g, '').replace(/^[)）\]】\s]+|[)）\]】\s]+$/g, '').trim();
+        if (stripped && !/^(?:GHS|CHS|危险性类别|分类)[：:\s]*$/i.test(stripped) && !/(?:类别\s*\d|分类)/i.test(stripped)) {
+          t = stripped;
+        }
+      }
+      if (!t) {
+        const DEFAULT_H_TEXTS = {
+          H412: '对水生生物有害并具有长期持续影响。',
+          H226: '易燃液体和蒸气。',
+          H302: '吞咽有害。',
+          H312: '皮肤接触有害。',
+          H314: '造成严重皮肤灼伤和眼损伤。',
+          H315: '造成皮肤刺激。',
+          H319: '造成严重眼刺激。',
+          H332: '吸入有害。',
+          H335: '可能引起呼吸道刺激。'
+        };
+        t = DEFAULT_H_TEXTS[code] || '';
+      }
+      return t;
+    };
+
     if (/(?:危[险害]性说明|危险陈述|Hazard\s*statements?)[：:\s]*/i.test(line)) {
       const hContent = line.replace(/.*(?:危[险害]性说明|危险陈述|Hazard\s*statements?)[：:\s]*/i, '').trim();
       const hMatches = Array.from(hContent.matchAll(/(H\d{3}[a-zA-Z]?)[：:\s]*([^\r\n;；]+)/g));
       if (hMatches.length > 0) {
         for (const m of hMatches) {
-          facts.ghs.hazardStatements.push({ code: m[1], text: m[2].trim() });
+          const code = m[1];
+          const text = cleanHText(code, m[2], line);
+          if (!facts.ghs.hazardStatements.some(h => h.code === code)) {
+            facts.ghs.hazardStatements.push({ code, text });
+          }
         }
       } else if (hContent && !/^(?:无|None|详见下文|如下)$/i.test(hContent)) {
         facts.ghs.hazardStatements.push({ code: null, text: hContent });
@@ -848,7 +888,11 @@ function parseSection2(record, facts, engine) {
     } else {
       const hMatches = line.matchAll(/(H\d{3}[a-zA-Z]?)[：:\s]*([^\r\n;；]+)/g);
       for (const m of hMatches) {
-        facts.ghs.hazardStatements.push({ code: m[1], text: m[2].trim() });
+        const code = m[1];
+        const text = cleanHText(code, m[2], line);
+        if (!facts.ghs.hazardStatements.some(h => h.code === code)) {
+          facts.ghs.hazardStatements.push({ code, text });
+        }
       }
     }
 
@@ -891,11 +935,16 @@ function parseSection2(record, facts, engine) {
       for (const pm of pMatches) {
         const codeClean = pm[1].replace(/\s+/g, '');
         const item = { code: codeClean, text: pm[2].trim() };
-        if (currentPGroup) {
-          facts.ghs.precautionaryStatements[currentPGroup].push(item);
-        } else {
-          facts.ghs.precautionaryStatements.prevention.push(item);
+        const prefix = codeClean.slice(0, 2);
+        let targetGroup = currentPGroup;
+        if (!targetGroup || (prefix === 'P5' && targetGroup !== 'disposal') || (prefix === 'P4' && targetGroup !== 'storage') || (prefix === 'P3' && targetGroup !== 'response') || (prefix === 'P2' && targetGroup !== 'prevention')) {
+          if (prefix === 'P2') targetGroup = 'prevention';
+          else if (prefix === 'P3') targetGroup = 'response';
+          else if (prefix === 'P4') targetGroup = 'storage';
+          else if (prefix === 'P5') targetGroup = 'disposal';
+          else targetGroup = 'prevention';
         }
+        facts.ghs.precautionaryStatements[targetGroup].push(item);
       }
     } else if (currentPGroup && line && !/^(?:防范说明|GHS标签要素|2\.\d)/i.test(line)) {
       prosePrecautionary[currentPGroup].push(line);

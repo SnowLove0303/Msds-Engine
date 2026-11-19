@@ -1,5 +1,5 @@
 import { getBenchmarkSpecsByCategory } from './msds-db.js';
-import { translateChemicalTerm } from './context-governor.js';
+import { translateChemicalTerm, CHEMICAL_TRANSLATION_DICT, translateSection3Notes } from './context-governor.js';
 import fsSync from 'node:fs';
 
 /**
@@ -839,7 +839,7 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     'sec8.eye_protection': (() => {
       const cnS8Rec = baseCnEngine?.records?.find(r => r.sectionNumber === 8);
       const cnEye = cnS8Rec?.rows?.find(r => /眼睛防护/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
-      if (/眼罩|面罩/i.test(cnEye)) return 'Wear protective goggles/face shield.';
+      if (/眼罩|面罩/i.test(cnEye)) return 'Wear safety glasses/face shield.';
       if (/建议使用护目镜|护目镜/i.test(cnEye)) return 'Protective goggles are recommended.';
       return cnEye || '';
     })(),
@@ -993,6 +993,10 @@ export function translateGhsCategory(cat) {
   if (!cat) return '';
   const trimmed = cat.trim();
   if (GHS_CATEGORY_TRANS_MAP[trimmed]) return GHS_CATEGORY_TRANS_MAP[trimmed];
+  if (CHEMICAL_TRANSLATION_DICT[trimmed]) return CHEMICAL_TRANSLATION_DICT[trimmed];
+  if (/根据GHS不属于危险|不属于危险|非危险品|非危险物/i.test(trimmed)) {
+    return 'Not classified as a hazardous chemical according to GHS.';
+  }
   const hMatch = trimmed.match(/H\d{3}[A-Za-z]?/i);
   if (hMatch) {
     const code = hMatch[0].toUpperCase();
@@ -1132,7 +1136,12 @@ export function translateGhsPrecautionary(p) {
       return GHS_P_TRANS_MAP[code];
     }
   }
-  return GHS_P_TRANS_MAP[trimmed] || trimmed;
+  if (GHS_P_TRANS_MAP[trimmed]) return GHS_P_TRANS_MAP[trimmed];
+  if (CHEMICAL_TRANSLATION_DICT[trimmed]) return CHEMICAL_TRANSLATION_DICT[trimmed];
+  const noEnd = trimmed.replace(/[。.]\s*$/, '');
+  if (CHEMICAL_TRANSLATION_DICT[noEnd]) return CHEMICAL_TRANSLATION_DICT[noEnd];
+  if (CHEMICAL_TRANSLATION_DICT[noEnd + '。']) return CHEMICAL_TRANSLATION_DICT[noEnd + '。'];
+  return translateChemicalTerm(trimmed) || trimmed;
 }
 
 /**
@@ -1176,7 +1185,8 @@ export function verifySourceFactGrounding(candidateText, srcEngine) {
   }
 
   const isGroundedInS3 = declaredComponents.some(comp => {
-    return comp === clean || comp.includes(clean) || clean.includes(comp);
+    if (!comp || comp === '水' || /^(?:不适用|无|None)$/i.test(comp)) return false;
+    return comp === clean || (comp.length >= 3 && clean.includes(comp)) || (clean.length >= 3 && comp.includes(clean));
   });
 
   return isGroundedInS3;
@@ -1226,16 +1236,19 @@ export function parseSection2FromSource(srcEngine) {
     const p = rawParas[i];
 
     // 1. 信号词优先捕获
-    const sm = p.match(/(?:[信警]号词|警示词|警示语|Signal\s*word)[：:\s]*(危险|警告|Danger|Warning)/i);
+    const sm = p.match(/(?:[信警]号词|警示词|警示语|警告词|Signal\s*word)[：:\s]*(危险|警告|Danger|Warning)/i);
     if (sm) {
       signalWord = sm[1];
-      const rest = p.replace(/(?:[信警]号词|警示词|警示语|Signal\s*word)[：:\s]*(危险|警告|Danger|Warning)/i, '').trim();
+      const rest = p.replace(/(?:[信警]号词|警示词|警示语|警告词|Signal\s*word)[：:\s]*(危险|警告|Danger|Warning)/i, '').trim();
       if (!rest) continue;
     }
 
     // 2. 其它危害 / 其它危险
-    if (/(?:2\.\d+\s*)?(?:其他危[害险]|Other\s*hazards?)/i.test(p)) {
-      otherHazards = p.replace(/^2\.\d+\s*(?:其他危[害险]|Other\s*hazards?)[：:]?\s*/i, '').trim();
+    if (/(?:2\.\d+\s*)?(?:其他危[害险]|物理化学危险|环境危害|健康危害|Other\s*hazards?)/i.test(p)) {
+      const cleanH = p.replace(/^2\.\d+\s*(?:其他危[害险]|Other\s*hazards?)[：:]?\s*/i, '').trim();
+      if (cleanH) {
+        otherHazards = otherHazards ? (otherHazards + '\n' + cleanH) : cleanH;
+      }
       mode = 'other';
       continue;
     }
@@ -1253,36 +1266,52 @@ export function parseSection2FromSource(srcEngine) {
     }
 
     // 4. 节题头切换
-    if (/^(?:2\.1\s*)?(?:物质或混合物的分类|物质或混合物分类|GHS危险性类别|GHS危险性分类)[：:]?$/i.test(p)) {
+    if (/^(?:2\.1\s*)?(?:物质或混合物的分类|物质或混合物分类|GHS危险性类别|GHS危险性分类)[：:]?(.*)$/i.test(p)) {
       mode = 'cat';
+      const m = p.match(/^(?:2\.1\s*)?(?:物质或混合物的分类|物质或混合物分类|GHS危险性类别|GHS危险性分类)[：:]?(.*)$/i);
+      if (m && m[1] && m[1].trim() && !/^(?:无|None|不适用)$/i.test(m[1].trim())) {
+        categories.push(m[1].trim());
+      }
       continue;
     }
-    if (/^(?:2\.2\s*)?(?:GHS\s*)?标签要素[：:]?$/i.test(p)) {
+    if (/^(?:2\.2\s*)?(?:GHS\s*)?标签要素[：:]?(.*)$/i.test(p)) {
       mode = 'label';
       continue;
     }
-    if (/^(?:(?:2\.\d+\s*)?(?:危险性说明|危害性说明|危害说明|危险说明|Hazard statements?))[：:]?$/i.test(p)) {
+    if (/^(?:(?:2\.\d+\s*)?(?:危险性说明|危害性说明|危害说明|危险说明|Hazard statements?))[：:]?(.*)$/i.test(p)) {
       mode = 'h';
+      const m = p.match(/^(?:(?:2\.\d+\s*)?(?:危险性说明|危害性说明|危害说明|危险说明|Hazard statements?))[：:]?(.*)$/i);
+      if (m && m[1] && m[1].trim()) {
+        hazardStatements.push(m[1].trim());
+      }
       continue;
     }
     if (/^(?:(?:2\.\d+\s*)?(?:防范说明|Precautionary statements?))[：:]?$/i.test(p)) {
       mode = 'p';
       continue;
     }
-    if (/^(?:(?:2\.\d+\s*)?(?:预防措施|Prevention))[：:]?$/i.test(p)) {
+    if (/^(?:(?:2\.\d+\s*)?(?:预防措施|Prevention))[：:]?(.*)$/i.test(p)) {
       mode = 'p_prev';
+      const m = p.match(/^(?:(?:2\.\d+\s*)?(?:预防措施|Prevention))[：:]?(.*)$/i);
+      if (m && m[1] && m[1].trim()) prevention.push(m[1].trim());
       continue;
     }
-    if (/^(?:(?:2\.\d+\s*)?(?:事故响应|Response))[：:]?$/i.test(p)) {
+    if (/^(?:(?:2\.\d+\s*)?(?:事故响应|Response))[：:]?(.*)$/i.test(p)) {
       mode = 'p_resp';
+      const m = p.match(/^(?:(?:2\.\d+\s*)?(?:事故响应|Response))[：:]?(.*)$/i);
+      if (m && m[1] && m[1].trim()) response.push(m[1].trim());
       continue;
     }
-    if (/^(?:(?:2\.\d+\s*)?(?:安全储存|安全存储|Storage))[：:]?$/i.test(p)) {
+    if (/^(?:(?:2\.\d+\s*)?(?:安全储存|安全存储|Storage))[：:]?(.*)$/i.test(p)) {
       mode = 'p_store';
+      const m = p.match(/^(?:(?:2\.\d+\s*)?(?:安全储存|安全存储|Storage))[：:]?(.*)$/i);
+      if (m && m[1] && m[1].trim()) storage.push(m[1].trim());
       continue;
     }
-    if (/^(?:(?:2\.\d+\s*)?(?:废弃处置|Disposal))[：:]?$/i.test(p)) {
+    if (/^(?:(?:2\.\d+\s*)?(?:废弃处置|Disposal))[：:]?(.*)$/i.test(p)) {
       mode = 'p_disp';
+      const m = p.match(/^(?:(?:2\.\d+\s*)?(?:废弃处置|Disposal))[：:]?(.*)$/i);
+      if (m && m[1] && m[1].trim()) disposal.push(m[1].trim());
       continue;
     }
 
@@ -1334,7 +1363,9 @@ export function parseSection2FromSource(srcEngine) {
         /^(?:GHS[- ]?象形图|象形图|pictograms?)/i.test(p) ||
         /(?:[信警]号词|警示词|Signal\s*word)[：:\s]*(?:危险|警告|Danger|Warning)/i.test(p) ||
         /^(?:H\d{3}|P\d{3})/i.test(p) ||
-        /\[象形图\]/i.test(p);
+        /\[象形图\]/i.test(p) ||
+        /^(?:对水生生物|造成|吞咽|皮肤|眼睛|吸入|引起|水环境)/.test(p) ||
+        /^(?:急性毒性|严重|刺激|危害)/.test(p);
 
       if (!isExcluded) {
         const cleanVal = p.replace(/^(?:必须列在标签上的有害成[份分]|列在标签上的有害成[份分]|有害成[份分]|危险组分)[：:]?\s*/i, '').trim();
@@ -1349,9 +1380,12 @@ export function parseSection2FromSource(srcEngine) {
         }
       }
     } else if (mode === 'h') {
-      if (/^H\d+/i.test(p)) hazardStatements.push(p);
-      else if (hazardStatements.length > 0 && !/防范说明/.test(p)) {
-        hazardStatements[hazardStatements.length - 1] += p;
+      if (!/^(?:(?:2\.\d+\s*)?(?:防范说明|Precautionary|其他危|Other|象形图|信号词|有害成[份分]))[：:]?/i.test(p)) {
+        if (/^H\d+/i.test(p) || hazardStatements.length === 0) {
+          hazardStatements.push(p);
+        } else if (!/防范说明/.test(p)) {
+          hazardStatements[hazardStatements.length - 1] += ' ' + p;
+        }
       }
     } else if (mode === 'p') {
       const cleanP = p.replace(/宇防护服/g, '穿防护服').replace(/P403\+\.?P233/g, 'P403+P233').replace(/废物外理厂/g, '废物处理厂');
@@ -1382,20 +1416,25 @@ export function parseSection2FromSource(srcEngine) {
         }
       }
     } else if (mode === 'p_prev') {
-      if (/^P\d+/i.test(p)) prevention.push(p);
-      else if (prevention.length > 0) prevention[prevention.length - 1] += p;
+      if (!/^(?:事故响应|安全储存|安全存储|废弃处置|其他危[害险]|物理化学危险|环境危害|健康危害)/.test(p)) {
+        prevention.push(p);
+      }
     } else if (mode === 'p_resp') {
-      if (/^P\d+/i.test(p)) response.push(p);
-      else if (response.length > 0) response[response.length - 1] += p;
+      if (!/^(?:安全储存|安全存储|废弃处置|其他危[害险]|物理化学危险|环境危害|健康危害)/.test(p)) {
+        response.push(p);
+      }
     } else if (mode === 'p_store') {
-      if (/^P\d+/i.test(p)) storage.push(p);
-      else if (storage.length > 0) storage[storage.length - 1] += p;
+      if (!/^(?:废弃处置|其他危[害险]|物理化学危险|环境危害|健康危害)/.test(p)) {
+        storage.push(p);
+      }
     } else if (mode === 'p_disp') {
-      if (/^P\d+/i.test(p)) disposal.push(p);
-      else if (disposal.length > 0) disposal[disposal.length - 1] += p;
+      if (!/^(?:其他危[害险]|物理化学危险|环境危害|健康危害)/.test(p)) {
+        disposal.push(p);
+      }
     } else if (mode === 'other') {
-      if (otherHazards) otherHazards += ' ' + p;
-      else otherHazards = p;
+      if (!/^(?:[13]\.|\d+\.\d+)/.test(p)) {
+        otherHazards = otherHazards ? (otherHazards + '\n' + p) : p;
+      }
     }
   }
 
@@ -1411,6 +1450,32 @@ export function parseSection2FromSource(srcEngine) {
         else if (/H302/i.test(h)) categories.push('急性毒性（经口），类别 4（H302）');
         else if (/H312/i.test(h)) categories.push('急性毒性（经皮），类别 4（H312）');
         else if (/H412/i.test(h)) categories.push('对水环境有慢性危害，类别 3（H412）');
+      }
+    }
+    // 补充：当 categories 包含明确 H 码但 hazardStatements 缺失时，无损回补标准危害说明
+    if (categories.length > 0) {
+      for (const cat of categories) {
+        const m = cat.match(/\((H\d{3}[a-zA-Z]?)\)/);
+        if (m) {
+          const code = m[1];
+          if (!hazardStatements.some(h => h.includes(code))) {
+            const DEFAULT_H_TEXTS = {
+              H412: '对水生生物有害并具有长期持续影响。',
+              H226: '易燃液体和蒸气。',
+              H302: '吞咽有害。',
+              H312: '皮肤接触有害。',
+              H314: '造成严重皮肤灼伤和眼损伤。',
+              H315: '造成皮肤刺激。',
+              H319: '造成严重眼刺激。',
+              H332: '吸入有害。',
+              H335: '可能引起呼吸道刺激。'
+            };
+            const defaultText = DEFAULT_H_TEXTS[code];
+            if (defaultText) {
+              hazardStatements.push(`${code} ${defaultText}`);
+            }
+          }
+        }
       }
     }
   }
@@ -1624,18 +1689,26 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
   if (facts.signalWord !== undefined && parsed) {
     parsed.signalWord = facts.signalWord;
   }
-  const isNonHazardous = !parsed || parsed.isNonHazardous || (!parsed.categories.length && !parsed.hazardStatements.length);
+  const hasDetailedSafetyInfo = Boolean(
+    (parsed?.categories && parsed.categories.length > 0) ||
+    parsed?.signalWord ||
+    (parsed?.hazardStatements && parsed.hazardStatements.length > 0) ||
+    (parsed?.prevention && parsed.prevention.length > 0) ||
+    (parsed?.response && parsed.response.length > 0) ||
+    (parsed?.storage && parsed.storage.length > 0) ||
+    (parsed?.disposal && parsed.disposal.length > 0)
+  );
 
   const rowGroups = [];
 
   if (!isEnglish) {
     // 中文通栏多行结构组装 (REQ-01: 解耦单行巨石为独立自然表格行)
-    if (!isNonHazardous && parsed) {
+    if (hasDetailedSafetyInfo && parsed) {
       // Row 1: 2.1 危险性类别
-      const cleanCats = parsed.categories.map(c => c.replace(/,\s*/g, '，').replace(/\((H\d+)\)/g, '（$1）'));
+      const cleanCats = (parsed.categories || []).map(c => c.replace(/,\s*/g, '，').replace(/\((H\d+)\)/g, '（$1）'));
       rowGroups.push([
         '2.1 GHS危险性类别：',
-        ...cleanCats
+        ...(cleanCats.length > 0 ? cleanCats : ['根据GHS不属于危险物'])
       ]);
 
       // Row 2: 2.2 标签要素 (象形图、有害成分、信号词)
@@ -1688,29 +1761,18 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
       // Row 5: 2.5 其他危害
       if (parsed.otherHazards) {
         let cleanOtherVal = parsed.otherHazards.trim().replace(/^(?:2\.\d+\s*)?(?:其他危[害险][:：]?\s*)?/i, '');
+        const otherLines = cleanOtherVal.split(/\r?\n/).filter(Boolean);
         rowGroups.push([
           `2.${secIdx++} 其他危害：`,
-          cleanOtherVal || '无适用资料。'
+          ...(otherLines.length > 0 ? otherLines : ['无适用资料。'])
         ]);
       }
     } else {
-      // 真实非危通栏组装 (遵循 INV-ZERO-EXOGENOUS 与源事实忠实公理)
-      // 非危场景下严格收敛为单数据行极简通栏 (Row 0: 标题, Row 1: 单单元格通栏，总行数严格等于 2)
+      // 真实纯非危无标签通栏组装 (遵循 INV-ZERO-EXOGENOUS 与源事实忠实公理)
       const row1Paras = [
         '2.1 GHS危险性类别：',
         '根据GHS不属于危险物'
       ];
-      if (facts.section3ExemptionNotes) {
-        row1Paras.push(...facts.section3ExemptionNotes.split(/\r?\n/).filter(Boolean));
-      }
-
-      if (parsed?.rawParas && parsed.rawParas.some(p => /象形图/.test(p))) {
-        row1Paras.push(
-          '2.2 GHS标签要素：',
-          'GHS象形图：',
-          '根据GHS不属于危险物'
-        );
-      }
       if (parsed?.otherHazards) {
         let cleanOtherVal = parsed.otherHazards.trim().replace(/^(?:2\.\d+\s*)?(?:其他危[害险][:：]?\s*)?/i, '');
         row1Paras.push(
@@ -1722,11 +1784,15 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
     }
   } else {
     // 英文通栏多行结构组装 (100% 数据驱动动态英译，REQ-01)
-    if (!isNonHazardous && parsed) {
+    if (hasDetailedSafetyInfo && parsed) {
       // Row 1: 2.1 Classification
       const row1Paras = ['2.1 Classification of the substance or mixture:'];
-      for (const cat of parsed.categories) {
-        row1Paras.push(translateGhsCategory(cat));
+      if (parsed.categories && parsed.categories.length > 0) {
+        for (const cat of parsed.categories) {
+          row1Paras.push(translateGhsCategory(cat));
+        }
+      } else {
+        row1Paras.push('Not classified as a hazardous chemical according to GHS.');
       }
       rowGroups.push(row1Paras);
 
@@ -1759,26 +1825,7 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         }
         // 2. 通用标准化学词典映射兜底
         if (!ingEn) {
-          ingEn = parsed.hazardousIngredients;
-          if (/^(?:无|none)$/i.test(ingEn.trim())) {
-            ingEn = 'None';
-          } else if (/HDI.*亲水|亲水.*HDI|基于HDI/i.test(ingEn)) {
-            ingEn = 'Hydrophilic aliphatic polyisocyanate based on HDI';
-          } else if (ingEn.includes('丁氧基乙醇')) {
-            ingEn = '2-Butoxyethanol';
-          } else if (/1-丁氧基-2-丙醇/i.test(ingEn)) {
-            ingEn = '1-Butoxy-2-propanol';
-          } else if (/丙二醇甲醚|1-甲氧基-2-丙醇/i.test(ingEn)) {
-            ingEn = 'Propylene glycol monomethyl ether';
-          } else if (/轻质芳香烃石脑油/i.test(ingEn)) {
-            ingEn = 'Solvent naphtha (petroleum), light arom. (benzene < 0.1%)';
-          } else if (/二丙二醇甲醚/i.test(ingEn)) {
-            ingEn = 'Dipropylene glycol monomethyl ether';
-          } else if (/N[－-]甲基吡咯烷酮/i.test(ingEn)) {
-            ingEn = 'N-Methyl-2-pyrrolidone';
-          } else if (/三乙胺/i.test(ingEn)) {
-            ingEn = 'Triethylamine';
-          }
+          ingEn = translateChemicalTerm(parsed.hazardousIngredients) || parsed.hazardousIngredients;
         }
         row2Paras.push(`Hazardous components which must be listed on the label: ${ingEn}`);
       }
@@ -1796,7 +1843,8 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         for (const h of parsed.hazardStatements) {
           const codeMatch = h.match(/^(H\d+)/);
           const code = codeMatch ? codeMatch[1] : '';
-          row3Paras.push(GHS_H_TRANS_MAP[code] || h);
+          const trans = GHS_H_TRANS_MAP[code] || CHEMICAL_TRANSLATION_DICT[h] || translateChemicalTerm(h) || h;
+          row3Paras.push(trans);
         }
         rowGroups.push(row3Paras);
       }
@@ -1841,14 +1889,16 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
           enOther = 'Risk of cutaneous absorption of N-Methyl-2-pyrrolidone (NMP).';
         } else if (/N,N[－-]二甲基乙酰胺/i.test(cleanEnVal)) {
           enOther = 'Risk of cutaneous absorption of N,N-Dimethylacetamide (DMAC).';
-        } else if (!cleanEnVal || /无适用资料|无已知|无数据|无/i.test(cleanEnVal)) {
+        } else if (!cleanEnVal || /^(?:无适用资料|无已知危险|无已知数据|无数据|无)[。.]?$/i.test(cleanEnVal.trim())) {
           enOther = 'No applicable information.';
         } else {
-          enOther = translateGhsPrecautionary(cleanEnVal) || 'No applicable information.';
+          const otherLines = cleanEnVal.split(/\r?\n/).filter(Boolean);
+          const transLines = otherLines.map(l => CHEMICAL_TRANSLATION_DICT[l] || CHEMICAL_TRANSLATION_DICT[l.trim()] || translateChemicalTerm(l) || translateGhsPrecautionary(l));
+          enOther = transLines.join('\n');
         }
         rowGroups.push([
           `2.${curIdx} Other hazards:`,
-          enOther
+          ...enOther.split('\n')
         ]);
       }
     } else {
@@ -1857,17 +1907,6 @@ export function buildFullWidthSection2(engine, facts = {}, isEnglish = false) {
         '2.1 Classification of the substance or mixture:',
         'Not classified as a hazardous chemical according to GHS.'
       ];
-      if (facts.section3ExemptionNotes) {
-        row1Paras.push(...facts.section3ExemptionNotes.split(/\r?\n/).filter(Boolean));
-      }
-
-      if (parsed?.rawParas && parsed.rawParas.some(p => /象形图|pictogram/i.test(p))) {
-        row1Paras.push(
-          '2.2 GHS Label Elements:',
-          'GHS pictograms:',
-          'Not applicable.'
-        );
-      }
       if (parsed?.otherHazards) {
         row1Paras.push(
           '2.3 Other hazards:',
@@ -1950,6 +1989,37 @@ export function detectSection11Paradigm(section11FactsOrRecords) {
   return 'PARADIGM_2_STANDARD_SLOTS';
 }
 
+function translateToxicologyDetailLine(line) {
+  if (!line) return '';
+  if (CHEMICAL_TRANSLATION_DICT[line]) return CHEMICAL_TRANSLATION_DICT[line];
+  if (CHEMICAL_TRANSLATION_DICT[line.trim()]) return CHEMICAL_TRANSLATION_DICT[line.trim()];
+  let res = line;
+  if (/^水溶性羟基聚丙烯酸酯/i.test(res)) {
+    return res.replace(/水溶性羟基聚丙烯酸酯[：:]?/g, 'Water-soluble hydroxy polyacrylate:');
+  }
+  if (/^乙二醇丁醚/i.test(res)) {
+    return res.replace(/乙二醇丁醚[：:]?/g, 'Ethylene glycol monobutyl ether:');
+  }
+  if (/^毒性[：:]/i.test(res)) {
+    res = res.replace(/^毒性[：:]\s*/i, 'Toxicity: ');
+  }
+  if (/^刺激性[：:]/i.test(res)) {
+    res = res.replace(/^刺激性[：:]\s*/i, 'Irritation: ');
+  }
+  res = res.replace(/刺激性[：:]\s*无资料/g, 'Irritation: No data available');
+  res = res.replace(/无资料/g, 'No data available');
+  res = res.replace(/经皮（鼠）/g, 'Dermal (rat) ');
+  res = res.replace(/经皮\(鼠\)/g, 'Dermal (rat) ');
+  res = res.replace(/吸入（鼠）/g, 'Inhalation (rat) ');
+  res = res.replace(/吸入\(鼠\)/g, 'Inhalation (rat) ');
+  res = res.replace(/经口（鼠）/g, 'Oral (rat) ');
+  res = res.replace(/经口\(鼠\)/g, 'Oral (rat) ');
+  res = res.replace(/＞/g, '>');
+  res = res.replace(/＜/g, '<');
+  res = res.replace(/；/g, '; ');
+  return translateToxicologyValueToEnglish(res);
+}
+
 export function buildThreeTierSection11(engine, facts = {}, isEnglish = false) {
   let s11 = engine.records.find((r) => r.sectionNumber === 11);
   if (!s11) return;
@@ -2014,6 +2084,31 @@ export function buildThreeTierSection11(engine, facts = {}, isEnglish = false) {
           }
         }
         if (lines.length) detailParagraphs = lines;
+      } else if (srcS11.rows[3]?.cells?.[0]?.text) {
+        // baseCnEngine 已经构建的单格多行通栏文本
+        const rawCellText = srcS11.rows[3].cells[0].text;
+        const lines = rawCellText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        if (isEnglish) {
+          detailParagraphs = lines.map(line => translateToxicologyDetailLine(line));
+        } else {
+          detailParagraphs = lines;
+        }
+      }
+    } else if (srcS11 && srcS11.rows && srcS11.rows.length >= 2) {
+      // 兼容单格多行紧凑型源文件结构 (如 PA-4902)
+      const rawCellText = srcS11.rows.slice(1).map(r => (r.cells || []).map(c => c.text || '').join('\n')).join('\n');
+      const lines = rawCellText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const detailLinesCn = [];
+      for (const line of lines) {
+        if (/无可用的毒理学研究|下面是这些成分|毒理学研究数据如下/i.test(line)) continue;
+        detailLinesCn.push(line);
+      }
+      if (detailLinesCn.length > 0) {
+        if (isEnglish) {
+          detailParagraphs = detailLinesCn.map(line => translateToxicologyDetailLine(line));
+        } else {
+          detailParagraphs = detailLinesCn;
+        }
       }
     }
   }
@@ -3362,13 +3457,80 @@ export function translateToxicologyValueToEnglish(cnText, endpoint = '') {
   } else {
     t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*[/／]?\s*大鼠\s*[:：]\s*/g, 'LD50 / Oral / Rat: ');
   }
+  // 1. 聚合物与特定化合物专业英译 (必须先于通用词替换，防止 '乙醇' 等截断 '2-丁氧基乙醇')
   t = t.replace(/^聚氨酯聚合物\s*(?:聚氨酯分散体)?/g, 'Polyurethane dispersion\n');
   t = t.replace(/聚氨酯聚合物/g, 'Polyurethane polymer');
   t = t.replace(/聚氨酯分散体/g, 'Polyurethane dispersion');
+  t = t.replace(/聚氨酯/g, 'Polyurethane');
+  t = t.replace(/聚丙烯酸酯分散体/g, 'Polyacrylate dispersion');
+  t = t.replace(/聚丙烯酸酯/g, 'Polyacrylate');
+  t = t.replace(/2-丁氧基乙醇/g, '2-Butoxyethanol');
+  t = t.replace(/丁氧基乙醇/g, '2-Butoxyethanol');
+  t = t.replace(/乙二醇丁醚/g, '2-Butoxyethanol');
+  t = t.replace(/N,N[－-]二甲基乙醇胺/g, 'N,N-Dimethylethanolamine');
+  t = t.replace(/N,N二甲基乙醇胺/g, 'N,N-Dimethylethanolamine');
+  t = t.replace(/二甲基乙醇胺/g, 'N,N-Dimethylethanolamine');
+  t = t.replace(/N,N[－-]二甲基乙酰胺(?:\s*[（(]DMAC[）)])?/g, 'N,N-Dimethylacetamide (DMAC)');
   t = t.replace(/乙醇/g, 'Ethanol');
+
+  // 2. 试验类型与方法
+  t = t.replace(/皮肤致敏性\s*[（(]\s*局部淋巴结试验\s*[（(]\s*LI?NA\s*[）)]\s*[）)]/gi, 'Skin sensitization (Local lymph node assay (LLNA)):');
+  t = t.replace(/沙门氏菌[\/／]微粒体试验\s*[（(]\s*Ames\s*试验\s*[）)]/gi, 'Salmonella/microsome test (Ames test)');
+  t = t.replace(/沙门氏菌[\/／]微粒体试验/gi, 'Salmonella/microsome test');
+  t = t.replace(/测试种类\s*[:：]\s*微核试验/g, 'Test type: Micronucleus test');
+  t = t.replace(/微核试验/g, 'Micronucleus test');
+  t = t.replace(/体外染色体畸变试验/g, 'In vitro mammalian chromosome aberration test');
+  t = t.replace(/根据Buehler\s*[（(]经皮试验[）)]\s*皮肤致敏性\s*[:：]/g, 'Buehler Test (dermal):');
+  t = t.replace(/OECD测试导则\s*(\d+)/g, 'OECD Test Guideline $1');
+  t = t.replace(/OECD化学品测试指南\s*(\d+)/gi, 'OECD Test Guideline $1');
+  t = t.replace(/试验周期\s*(\d+)\s*年/g, 'Test duration: $1 years');
+  t = t.replace(/剂量水平\s*[（(]\s*等级\s*[）)]\s*[:：]\s*/g, 'Dose levels: ');
+
+  // 3. 染毒途径、频次与物种
+  t = t.replace(/染毒途径\s*[:：]\s*经口/g, 'Route of exposure: Oral');
+  t = t.replace(/染毒途径\s*[:：]\s*吸入\s*[（(]\s*蒸[汽气]\s*[）)]/g, 'Route of exposure: Inhalation (vapour)');
+  t = t.replace(/染毒途径\s*[:：]\s*吸入性?/g, 'Route of exposure: Inhalation');
+  t = t.replace(/染毒途径\s*[:：]\s*腹膜内的?/g, 'Route of exposure: Intraperitoneal');
+  t = t.replace(/染毒途径\s*[:：]\s*/g, 'Route of exposure: ');
+  t = t.replace(/[（(]?接触持续时间\s*[:：]\s*(\d+)\s*天\s*[（(]包装后的第\s*([\d-]+)\s*天[）)][）)]?/g, '(duration of exposure: $1 days (days $2 post-coitum))');
+  t = t.replace(/染毒频次\s*[:：]\s*[（(]?一天\s*(\d+)\s*小时\s*[,，]\s*一周\s*(\d+)\s*天[）)]?/g, 'Exposure frequency: ($1 hours/day, $2 days/week)');
+  t = t.replace(/染毒频次\s*[:：]\s*[（(]?(\d+)\s*小时[\/／]天\s*[,，]\s*(\d+)\s*天[\/／]周[）)]?/g, 'Exposure frequency: $1 hours/day, $2 days/week');
+  t = t.replace(/(\d+)\s*小时[\/／]天/g, '$1 hours/day');
+  t = t.replace(/(\d+)\s*天[\/／]周/g, '$1 days/week');
+  t = t.replace(/染毒频次\s*[:：]\s*/g, 'Exposure frequency: ');
   t = t.replace(/经口\s*-\s*大鼠\s*-\s*雄性和雌性\s*-\s*/g, 'Oral - Rat - male and female - ');
   t = t.replace(/吸入\s*-\s*大鼠\s*-\s*雄性和雌性\s*-\s*/g, 'Inhalation - Rat - male and female - ');
-  t = t.replace(/OECD测试导则\s*(\d+)/g, 'OECD Test Guideline $1');
+  t = t.replace(/物种\s*[:：]\s*(?:大鼠|Rat)\s*[,，]\s*雄性[\/／]雌性/g, 'Species: Rat, male/female');
+  t = t.replace(/物种\s*[:：]\s*(?:小鼠|Mouse)\s*[,，]\s*雄性[\/／]雌性/g, 'Species: Mouse, male/female');
+  t = t.replace(/物种\s*[:：]\s*(?:大鼠|Rat)\s*[,，]\s*雌性/g, 'Species: Rat, female');
+  t = t.replace(/物种\s*[:：]\s*(?:大鼠|Rat)\s*[,，]\s*雄性/g, 'Species: Rat, male');
+  t = t.replace(/物种\s*[:：]\s*(?:小鼠|Mouse)\s*[,，]\s*雌性/g, 'Species: Mouse, female');
+  t = t.replace(/物种\s*[:：]\s*(?:小鼠|Mouse)\s*[,，]\s*雄性/g, 'Species: Mouse, male');
+  t = t.replace(/雄性[\/／]雌性/g, 'male/female');
+  t = t.replace(/雄性和雌性/g, 'male and female');
+  t = t.replace(/雌性/g, 'female');
+  t = t.replace(/雄性/g, 'male');
+
+  // 4. 指标与毒性限值
+  t = t.replace(/NOAEL\s*[（(]\s*毒性\s*[）)]\s*[:：]\s*/g, 'NOAEL (toxicity): ');
+  t = t.replace(/NOAEL\s*[（(]\s*致畸\s*[）)]\s*[:：]\s*/g, 'NOAEL (teratogenicity): ');
+  t = t.replace(/NOAEL\s*[（(]\s*母体\s*[）)]\s*[:：]\s*/g, 'NOAEL (maternal): ');
+  t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*[/／]?\s*大鼠\s*[:：]\s*/gi, isDermal ? 'LD50 / Dermal / Rat: ' : 'LD50 / Oral / Rat: ');
+  t = t.replace(/急性毒性\s*[,，、]\s*经皮/g, 'Acute toxicity, dermal:');
+  t = t.replace(/约\s*([\d,]+(?:\.\d+)?)\s*mg\/kg/gi, 'Approx. $1 mg/kg');
+  t = t.replace(/约\s*/g, 'Approx. ');
+
+  // 5. 结论与陈述
+  t = t.replace(/从目前掌握的数据来看\s*[,，]\s*没有迹象表明会产生可再生的毒性[.。]?/g, 'Based on available data, there is no indication of reproductive toxicity.');
+  t = t.replace(/结果\s*[:：]\s*无致突变性迹象[.。]?/g, 'Result: No mutagenic potential.');
+  t = t.replace(/无致突变性迹象[.。]?/g, 'No mutagenic potential.');
+  t = t.replace(/分类\s*[:：]\s*接触皮肤可引起过敏[.。]?/g, 'Classification: May cause sensitization by skin contact.');
+  t = t.replace(/接触皮肤可引起过敏[.。]?/g, 'May cause sensitization by skin contact.');
+  t = t.replace(/对产品的研究[.。]?/g, 'Studies on the product.');
+  t = t.replace(/对类似产品(?:的)?(?:毒理学)?研究[.。]?/g, 'Studies on a similar product.');
+  t = t.replace(/有经皮吸收的危险[.。]?/g, 'Risk of cutaneous absorption.');
+  t = t.replace(/附加信息/g, 'Additional information:');
+
   t = t.replace(/评估\s*[:：]\s*此物质或混合物无急性呼吸毒性/g, 'Assessment: The substance or mixture has no acute respiratory toxicity');
   t = t.replace(/聚氨酯/g, 'Polyurethane');
   t = t.replace(/OECD化学品测试指南\s*(\d+)/gi, 'OECD Test Guideline $1');
@@ -3727,6 +3889,9 @@ export async function buildBaseEnglishEngine({
           for (let i = 4; i < cnS3.rows.length; i++) {
             const r = cnS3.rows[i];
             const rawC0 = (r.cells[0]?.text || '').trim();
+            if (r.cells.length < 3 || /请注意|中和剂|已键合为盐|键合为盐|成盐|豁免|GHS危险性分类/i.test(rawC0)) {
+              continue; // 附注行绝不能作为常规成分数据提取
+            }
             const rawC1 = (r.cells[1]?.text || '').trim();
             const rawC2 = (r.cells[2]?.text || '').trim();
 
@@ -3758,7 +3923,11 @@ export async function buildBaseEnglishEngine({
       ].filter(Boolean);
     }
 
-    const targetRowCount = 4 + comps.length;
+    const s3NotesRaw = (facts.componentsNotes && facts.componentsNotes.length > 0)
+      ? facts.componentsNotes.join('\n')
+      : (facts.section3ExemptionNotes || enValues['sec3.exemption_notes'] || extractSection3ExemptionNotes(baseCnEngine?.records?.find(r => r.sectionNumber === 3)) || '');
+    const hasS3Notes = Boolean(s3NotesRaw && s3NotesRaw.trim());
+    const targetRowCount = 4 + comps.length + (hasS3Notes ? 1 : 0);
     while (s3.rows.length < targetRowCount) {
       s3 = addRowAfter(engine, s3, s3.rows.length - 1);
     }
@@ -3773,6 +3942,15 @@ export async function buildBaseEnglishEngine({
         safeWrite(row.cells[2], comp.conc);
       }
     });
+    if (hasS3Notes) {
+      const enNoteText = translateSection3Notes(s3NotesRaw);
+      renderFullWidthRow(s3, 4 + comps.length, enNoteText.split('\n'), {
+        isEnglish: true,
+        borders: true,
+        totalWidth: 9781,
+        gridSpan: 3
+      });
+    }
   }
 
   // Section 4
@@ -4174,18 +4352,14 @@ function translateConditionsToAvoid(cnText = '') {
     const has16483Year = /16483-2008/i.test(cnS15Text);
     const has13690Year = /13690-2009/i.test(cnS15Text);
     const stdRegulations = [
-      has344
-        ? 'Regulations on the Safety Management of Hazardous Chemicals, State Council Decree No. 344'
-        : 'Regulations on the Safety Management of Hazardous Chemicals, State Council Decree No. 591',
+      'Regulations on the Safety Management of Hazardous Chemicals, State Council Decree No. 591',
       has16483Year
         ? 'GB/T 16483-2008 Safety data sheet for chemical products - Content and order of sections'
         : 'GB/T 16483 Safety data sheet for chemical products - Content and order of sections',
       has13690Year
         ? 'GB 13690-2009 General rules for classification and hazard communication of chemicals'
         : 'GB 13690 General rules for classification and hazard communication of chemicals',
-      has20576
-        ? 'GB 20576~20598-2006 Safety rules for classification, precautionary labelling and precautionary statements of chemicals'
-        : 'GB 30000.2-29 Rules for classification and labelling of chemicals'
+      'GB 30000.2-29 Rules for classification and labelling of chemicals'
     ];
     if (cnHasGb15258) {
       stdRegulations.push('GB 15258 General rules for preparation of precautionary label for chemicals');

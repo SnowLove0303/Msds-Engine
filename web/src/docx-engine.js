@@ -3626,9 +3626,10 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
   tcW.setAttributeNS(W_NS, 'w:type', 'dxa');
   tcPr.appendChild(tcW);
 
-  if (totalCols > 1) {
+  const spanVal = options.gridSpan || totalCols;
+  if (spanVal > 1) {
     const gridSpan = doc.createElementNS(W_NS, 'w:gridSpan');
-    gridSpan.setAttributeNS(W_NS, 'w:val', String(totalCols));
+    gridSpan.setAttributeNS(W_NS, 'w:val', String(spanVal));
     tcPr.appendChild(gridSpan);
   }
 
@@ -4062,9 +4063,10 @@ export function addNoteRowAfter(engine, record, rowIndex, initialText = '说明�
   tcW.setAttributeNS(W_NS, 'w:type', 'dxa');
   tcPr.appendChild(tcW);
 
-  if (totalCols > 1) {
+  const spanVal = options.gridSpan || totalCols;
+  if (spanVal > 1) {
     const gridSpan = doc.createElementNS(W_NS, 'w:gridSpan');
-    gridSpan.setAttributeNS(W_NS, 'w:val', String(totalCols));
+    gridSpan.setAttributeNS(W_NS, 'w:val', String(spanVal));
     tcPr.appendChild(gridSpan);
   }
 

@@ -26,7 +26,7 @@ import {
 } from './docx-engine.js';
 import { applyGlobalTypographyProjection } from './universal-editor-primitives.js';
 import { enforceStructuralTypographyInvariants } from './pipeline-engine.js';
-import { translateChemicalTerm } from './context-governor.js';
+import { translateChemicalTerm, translateSection3Notes } from './context-governor.js';
 
 /**
  * 模板资产自省探测 (Discover Available Templates - REQ-TPL-DISCOVERY-01)
@@ -211,7 +211,13 @@ export async function writeDeliverableViaEditor({
     if (s3Rec) {
       // 保持表头行（0:标题, 1:3.1, 2:3.2, 3:列名），成分数据行从索引 4 开始
       const headerRowsCount = 4;
-      while (s3Rec.rows.length > headerRowsCount + comps.length) {
+      const s3NotesRaw = (contextData.componentsNotes && contextData.componentsNotes.length > 0)
+        ? (Array.isArray(contextData.componentsNotes) ? contextData.componentsNotes.join('\n') : String(contextData.componentsNotes))
+        : '';
+      const hasNotes = Boolean(s3NotesRaw && s3NotesRaw.trim());
+      const targetRowCount = headerRowsCount + comps.length + (hasNotes ? 1 : 0);
+
+      while (s3Rec.rows.length > targetRowCount) {
         deleteRowFromSession(session, { sectionNumber: 3, rowIndex: s3Rec.rows.length - 1 });
         s3Rec = engine.records.find(r => r.sectionNumber === 3);
       }
@@ -233,6 +239,24 @@ export async function writeDeliverableViaEditor({
           writeCellValue(curRow.cells[1], comp.cas || 'N/A');
           writeCellValue(curRow.cells[2], comp.concentration || comp.percentage || '100%');
         }
+      }
+      if (hasNotes) {
+        const noteRowIdx = headerRowsCount + comps.length;
+        if (s3Rec.rows.length <= noteRowIdx) {
+          insertRowIntoSession(session, {
+            sectionNumber: 3,
+            targetRowIndex: noteRowIdx,
+            cloneFromRowIndex: Math.min(4, s3Rec.rows.length - 1)
+          });
+          s3Rec = engine.records.find(r => r.sectionNumber === 3);
+        }
+        const noteText = isEnglish ? translateSection3Notes(s3NotesRaw) : s3NotesRaw;
+        renderFullWidthRow(s3Rec, noteRowIdx, noteText.split('\n'), {
+          isEnglish,
+          borders: true,
+          totalWidth: 9781,
+          gridSpan: 3
+        });
       }
     }
   }

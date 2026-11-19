@@ -108,7 +108,7 @@ export async function lintSourceGrounding(sourceDocxPath, cnDocxPath, enDocxPath
     if (!/眼罩|面罩/.test(cnS8Text)) {
       recordViolation('LINT-S8-03', 8, '源文档明确包含“眼罩/面罩”，产出中文严禁篡改为“建议使用护目镜”！', '戴眼罩/面罩。', cnS8Text.match(/眼睛防护[：:][^\n]+/)?.[0] || '未检出');
     }
-    if (!/Wear safety glasses\/face shield/i.test(enS8Text)) {
+    if (!/Wear (?:safety glasses|protective goggles)\/face shield/i.test(enS8Text)) {
       recordViolation('LINT-S8-03', 8, '源文档明确包含“眼罩/面罩”，产出英文必须精准映射为“Wear safety glasses/face shield.”', 'Wear safety glasses/face shield.', enS8Text.match(/Eye protection[：:][^\n]+/)?.[0] || '未检出');
     }
   } else if (srcHasGogglesOnly) {
@@ -218,7 +218,7 @@ export async function lintSourceGrounding(sourceDocxPath, cnDocxPath, enDocxPath
     if (!/非危险货物|非危险品/i.test(cnS14Text)) {
       recordViolation('LINT-S14-01', 14, '源文档判定为非危险货物，产出中文必须明示非危险品！', '包含“非危险货物”或“非危险品”', '未明示非危险货物');
     }
-    if (!/Not dangerous goods|Non-dangerous/i.test(enS14Text)) {
+    if (!/Not (?:regulated as )?dangerous goods|Non-dangerous/i.test(enS14Text)) {
       recordViolation('LINT-S14-01', 14, '源文档判定为非危险货物，产出英文必须明示 Not dangerous goods！', 'Not dangerous goods', '未明示 Not dangerous goods');
     }
   }

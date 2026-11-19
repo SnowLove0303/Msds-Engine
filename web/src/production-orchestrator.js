@@ -43,17 +43,20 @@ export function normalizeContext(context1, overrides = {}) {
   }
   
   if (!context2.ghs.isHazardous) {
-    context2.ghs.categories = [];
-    context2.ghs.signalWord = null;
+    context2.ghs.categories = context2.ghs.categories || [];
     context2.ghs.hasPictograms = false;
     context2.ghs.pictogramCount = 0;
-    context2.ghs.hazardStatements = [];
-    context2.ghs.precautionaryStatements = {
-      prevention: [],
-      response: [],
-      storage: [],
-      disposal: []
-    };
+    if (!context2.ghs.hazardStatements) {
+      context2.ghs.hazardStatements = [];
+    }
+    if (!context2.ghs.precautionaryStatements) {
+      context2.ghs.precautionaryStatements = {
+        prevention: [],
+        response: [],
+        storage: [],
+        disposal: []
+      };
+    }
     context2.isNonHazardousComposite = true;
   }
 
@@ -246,7 +249,10 @@ export async function produceStandardDeliverables({
     enTransport: governed.en.transport,
     enValues: governed.en.fieldOverrides || {},
     ghs: governed.cn.ghs,
-    physicalProperties: governed.cn.physicalProperties
+    physicalProperties: governed.cn.physicalProperties,
+    componentsNotes: governed.cn.componentsNotes || context1.componentsNotes || [],
+    otherHazards: governed.cn.otherHazards || context1.ghs?.otherHazards || null,
+    hazardousComponentsOnLabel: governed.cn.hazardousComponentsOnLabel || context1.ghs?.hazardousComponentsOnLabel || null
   };
 
   stages.stage3 = {
@@ -296,7 +302,11 @@ export async function produceStandardDeliverables({
     disposal: governed.en.disposal,
     productName: governed.en.productName,
     productNameEn: governed.en.productNameEn,
-    physicalProperties: governed.en.physicalProperties
+    physicalProperties: governed.en.physicalProperties,
+    ghs: governed.en.ghs || context2.ghs,
+    componentsNotes: governed.en.componentsNotes || context2.componentsNotes || [],
+    otherHazards: governed.en.otherHazards || context2.otherHazards || null,
+    hazardousComponentsOnLabel: governed.en.hazardousComponentsOnLabel || context2.hazardousComponentsOnLabel || null
   };
   const enGzDocxPath = path.join(effectiveTargetDir, `${effectiveModel} msds_EN Guanzhi.docx`);
   await writeDeliverableViaEditor({

@@ -481,6 +481,7 @@ export async function runMasterMsdsAudit(options = {}) {
   // 预读源文档关键事实，驱动全篇事实保真微观对账 (INV-FACT-GROUNDED-AUDIT)
   let srcHasPictogram = false;
   let srcHasSignal = false;
+  let srcHasPrecaution = false;
   let srcAppearance = '';
   let srcCnName = '';
   let srcCnCategory = '';
@@ -505,6 +506,12 @@ export async function runMasterMsdsAudit(options = {}) {
       const srcFacts = await recognizeSourceDocx(effectiveSourcePath);
       srcHasPictogram = srcFacts.ghs.hasPictograms;
       srcHasSignal = Boolean(srcFacts.ghs.signalWord);
+      const pStmts = srcFacts.ghs.precautionaryStatements;
+      srcHasPrecaution = Boolean(
+        (Array.isArray(pStmts) && pStmts.length > 0) ||
+        (pStmts && (pStmts.prevention?.length > 0 || pStmts.response?.length > 0 || pStmts.storage?.length > 0 || pStmts.disposal?.length > 0)) ||
+        (srcFacts.ghs.prevention && srcFacts.ghs.prevention.length > 0)
+      );
       srcIsNonHaz = !srcFacts.ghs.isHazardous;
       if (srcFacts.productName) srcCnName = srcFacts.productName;
       if (srcFacts.chemicalClassification) srcCnCategory = srcFacts.chemicalClassification;
@@ -741,8 +748,8 @@ export async function runMasterMsdsAudit(options = {}) {
         'Section 2 EN'
       );
       // 严禁非危品外生冒出“警告词：警告”或“Signal word: Warning”
-      const hasFakeWarningCn = /警告词[：:]\s*警告/.test(cnS2Text);
-      const hasFakeWarningEn = /Signal word:\s*Warning/i.test(enS2Text);
+      const hasFakeWarningCn = !srcHasSignal && /警告词[：:]\s*警告/.test(cnS2Text);
+      const hasFakeWarningEn = !srcHasSignal && /Signal word:\s*Warning/i.test(enS2Text);
       assert(
         !hasFakeWarningCn && !hasFakeWarningEn,
         '环3',
@@ -752,8 +759,8 @@ export async function runMasterMsdsAudit(options = {}) {
         'Section 2 CN/EN'
       );
       // 严禁非危品外生强塞20行虚假防范说明
-      const hasExoPrecautionCn = /操作时穿戴必要的防护用品/.test(cnS2Text);
-      const hasExoPrecautionEn = /Wear necessary protective equipment/.test(enS2Text);
+      const hasExoPrecautionCn = !srcHasPrecaution && /操作时穿戴必要的防护用品/.test(cnS2Text);
+      const hasExoPrecautionEn = !srcHasPrecaution && /Wear necessary protective equipment/.test(enS2Text);
       assert(
         !hasExoPrecautionCn && !hasExoPrecautionEn,
         '环3',
@@ -787,15 +794,20 @@ export async function runMasterMsdsAudit(options = {}) {
       return /^(?:化学品名称|成分|物质名称|组分|Chemical name|Components|Substance)$/i.test(c0) ||
              /^(?:CAS编号|CAS NO\.?|CAS号|CAS)$/i.test(c1);
     };
+    const isNoteRow = (r) => {
+      if (!r.cells || r.cells.length < 2) return true;
+      const c0 = (r.cells[0]?.text || '').trim();
+      return /请注意|Note|豁免|中和剂|已键合为盐|键合为盐|GHS危险性分类/i.test(c0);
+    };
     const cnComponents = cnBodyRows
-      .filter(r => !isHeaderRow(r))
+      .filter(r => !isHeaderRow(r) && !isNoteRow(r))
       .map(r => ({
         name: (r.cells[0]?.text || '').trim(),
         cas: (r.cells[1]?.text || '').trim(),
         conc: (r.cells[2]?.text || '').trim()
       }));
     const enComponents = enBodyRows
-      .filter(r => !isHeaderRow(r))
+      .filter(r => !isHeaderRow(r) && !isNoteRow(r))
       .map(r => ({
         name: (r.cells[0]?.text || '').trim(),
         cas: (r.cells[1]?.text || '').trim(),

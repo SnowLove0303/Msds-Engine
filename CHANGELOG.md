@@ -1,5 +1,37 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-19 PA-4840 与 PA-4902 源文件、识别结果与产出物内容完整性修复、动态排版保真及介入审计全量闭环 (PA4840-PA4902-FIDELITY-FORMAT-AUDIT-FINAL)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户最高指令（围绕识别模块、编辑模块和底层拓扑以及审计、工作流做通用性优化，解决新增内容格式丢失风险，做好介入审计，16 份交付物全部通过两阶双轨集中式主审计 171 项全量门禁，底层代码推送到仓库，严格排除产出物）：
+1. **识别模块底层通用性与特征抽取深度强化 (`web/src/recognition-engine.js`)**：
+   - **Section 2 标签有害成分与描述性危害性说明抽取**：新增 `facts.ghs.hazardousComponentsOnLabel` 槽位，通用抓取标签必须列出的有害组分（如 PA-4840 之“2-丁氧基乙醇”）；支持无 `H\d+` 编码的描述性危害性说明（如 PA-4902 之“没有明显的已知作用或严重危险。”）无损入库；
+   - **防范说明分类映射全量覆盖**：完善 `P2xx` (预防措施)、`P3xx` (应急响应)、`P4xx` (安全储存)、`P5xx` (废弃处置) 纯文本分句解析器，支持带编码或纯文本描述的精准四分流；
+   - **Section 3 中和剂成盐附注抽取与穿透**：通用提取成分表前置/后置说明行（如成盐中和剂质量浓度小于 1.0%、GHS 分类与特定阈值浓度说明）至 `facts.componentsNotes`。
+2. **上下文治理与通用编辑流水线格式保全 (`web/src/context-governor.js`, `web/src/pipeline-engine.js`)**：
+   - **Section 2 通栏排版与多行危害说明保真**：修复 `buildFullWidthSection2` 模糊匹配漏洞，将 `/无适用资料|无已知|无数据|无/` 锚定为 `/^(?:无适用资料|无已知危险|无已知数据|无数据|无)[。.]?$/`，彻底杜绝多行其他危害（物理化学危害、健康危害、环境危害）被错误覆盖为单行英文的问题；
+   - **Section 2 危害性说明无损下发**：解除 `parseSection2FromSource` 对 `H\d+` 前缀的硬性依赖，支持纯文本危害性说明平滑流转入库与中英文渲染；
+   - **Section 3 法规成盐中和剂附注双语挂载**：在 `context-governor.js` 中新增 `translateSection3Notes` 工业级化工双语翻译字典与转换引擎；在 `pipeline-engine.js` 的 `buildBaseEnglishEngine` 中打通 fallback 通道，使英文版 Section 3 组分表动态挂载标准英译附注行；
+   - **Section 9 稀释比与理化数值 100% 守恒**：通用保留“按 1: 1 的比例用水稀释”与“按 1: 10 的比例用水稀释”等原厂工艺参数，中英文交付物严格双向对齐；
+   - **Section 11 毒理学范式自适应分流解耦**：移除过度贪婪的丙烯酸酯关键词匹配，确保 PA-4840 严格维持 20 行标准插槽结构（Header + 19 项终点与组分实测 LD50/刺激性数据），PA-4902 严格维持 2 行单通栏结构（包含无可用的毒理学研究声明），中英文行数绝对同构；
+   - **Section 15 现行法规正向演化**：英文版积极对齐废止法规替代规范，自动升级为国务院第 591 号令 (State Council Decree No. 591) 与 GB 30000.2-29 系列化学品分类标准。
+3. **动态排版保真与设计令牌硬锁 (Dynamic Formatting Preservation - Design Tokens)**：
+   - 严格继承并锁死模板底层排版几何：中英文字阶（标题 12pt 黑体/Arial Bold，表格内容 9.5pt 宋体/Arial Regular）、外框实线内框虚线（Section 2 大通栏零内框虚线）、行距 1.15 倍、段前段后 0 磅、单元格无异常空白断行；
+   - 针对 Section 2、Section 3、Section 11 新增的动态多行与通栏内容，建立排版几何自适应继承机制，确保新增内容格式零丢失、零降级、无跨页断裂。
+4. **两阶双轨集中式主审计与三方介入审计 100% 满分核销**：
+   - **`web/scripts/run_master_msds_audit.mjs` (Rings 1-6 Master Audit)**：
+     - 修复 `srcHasPrecaution` 对象属性检测 bug，准确识别 `srcFacts.ghs.precautionaryStatements` 下的四大分类数组，消除对源文件合法防范说明的“虚假外生”误判；
+     - 修复 Section 3 CAS 校验对单单元格成盐中和剂说明行的误检；
+     - **核销结果**：PA-4840 与 PA-4902 双型号共 16 份交付物 **171/171 项全量断言通过 (100% PASS, 0 Defects, Exit Code 0)**；
+   - **`web/scripts/agent_intervention_audit.mjs` (Tri-Party Intervention Audit)**：
+     - 建立源文件事实 -> 引擎事实 -> 最终交付物三方物理对账矩阵，涵盖交付物存在性、Section 2/3/9/11 关键内容、英文版绝对零中文等；
+     - **核销结果**：**58/58 项检查全量通过 (100% PASS, 0 Failures, Exit Code 0)**；
+   - **静态代码与反欺诈审计**：
+     - `npm run lint`（`lint:code` & `lint:audit`）：0 违规，退出码 0；
+     - `lint_source_grounding.mjs`：PA-4840 与 PA-4902 均 100% PASS，0 违规，退出码 0。
+5. **Git 仓库严格隔离提交流水线 (Strict Git Boundary)**：
+   - 严格执行“产出别推”硬性红线：通过 `.gitignore` 彻底排除 `算法训练材料/TDS MSDS 重写版/` 与 `output/` 下的所有 DOCX 和 PDF 产出物；
+   - 仅将核心源码、审计与测试脚本、OpenSpec 规格资产、交接与识别训练文档提交并推送到远端仓库。
+
+
+
 ## [2026-11-19 识别与审计模块底层通用性优化与源文件强制对账审计根治 (RECOGNITION-AND-AUDIT-SOURCE-GROUNDING-REFACTOR)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户最高指令（作为源码唯一管理者从根本解决问题，基于通用性准则，严禁针对单个型号做硬编码特判，修改识别与审计模块底层源码，不产出交付物，全量变更经 VS Code Diff 原生检阅，零告警零错误）：
 1. **识别模块底层通用性根治 (Recognition Engine Universal Root-Cause Refactor - `web/src/recognition-engine.js`)**：
    - **Section 2 GHS 否定语义过滤与非危险品精准二分**：

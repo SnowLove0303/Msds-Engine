@@ -57,6 +57,50 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '蜡': 'Wax',
 
   // 溶剂与助剂
+  '2-丁氧基乙醇': '2-Butoxyethanol',
+  '水溶性丙烯酸树脂': 'Water-soluble acrylic resin',
+  '水溶性羟基丙烯酸树脂': 'Water-soluble hydroxy acrylic resin',
+  '水溶性丙烯酸聚合物树脂': 'Water-soluble acrylic polymer resin',
+  '丙烯酸聚合物分散体': 'Acrylic polymer dispersion',
+  '根据GHS不属于危险物': 'Not classified as a hazardous chemical according to GHS.',
+  '根据GHS不属于危险化学品': 'Not classified as a hazardous chemical according to GHS.',
+  '没有明显的已知作用或严重危险。': 'No known significant effects or critical hazards.',
+  '操作时穿戴必要的防护用品（手套、防护镜、工作服等）。': 'Wear necessary personal protective equipment (gloves, goggles, work clothing, etc.) during handling.',
+  '操作后彻底清洗身体接触部位。': 'Wash contact areas thoroughly after handling.',
+  '作业场所不得进食，饮水或吸烟。': 'Do not eat, drink, or smoke in work areas.',
+  '在室外或通风良好处操作。': 'Use only outdoors or in a well-ventilated area.',
+  '吸入：一旦吸入，如有不适，就医。': 'Inhalation: If inhaled and feeling unwell, seek medical attention.',
+  '眼睛、皮肤接触；': 'Eye and skin contact:',
+  '使用肥皂、清水等清洗即可。': 'Wash thoroughly with soap and water.',
+  '如有不适感，就医。': 'If feeling unwell, seek medical attention.',
+  '眼睛、皮肤接触；使用肥皂、清水等清洗即可。如有不适感，就医。': 'Eye and skin contact: Wash thoroughly with soap and water. If feeling unwell, seek medical attention.',
+  '眼睛、皮肤接触; 使用肥皂、清水等清洗即可。如有不适感, 就医。': 'Eye and skin contact: Wash thoroughly with soap and water. If feeling unwell, seek medical attention.',
+  '食入：立即漱口，禁止催吐，立即就医诊治。': 'Ingestion: Rinse mouth immediately. Do not induce vomiting. Seek immediate medical attention.',
+  '泄露：收集泄漏物。': 'Spill: Collect spillage.',
+  '灭火：火灾时，使用干粉、泡沫、二氧化碳灭火。': 'Fire: In case of fire, use dry powder, foam, or carbon dioxide to extinguish.',
+  '请置于避光、阴凉干燥处存放，存储温度应保持在5-35℃，避免霜冻，保持产品包装完整。': 'Store in a dark, cool, dry place. Maintain storage temperature between 5-35 °C, avoid freezing, and keep container intact.',
+  '每次取用之后立即密封，打开包装后尽快使用完毕。': 'Reseal container immediately after use; consume promptly once opened.',
+  '请置于避光、阴凉干燥处存放，存储温度应保持在5-35℃，避免霜冻，保持产品包装完整。每次取用之后立即密封，打开包装后尽快使用完毕。': 'Store in a dark, cool, dry place. Maintain storage temperature between 5-35 °C, avoid freezing, and keep container intact. Reseal container immediately after use; consume promptly once opened.',
+  '请置于避光、阴凉干燥处存放，存储温度应保持在5-35°C，避免霜冻，保持产品包装完整。每次取用之后立即密封，打开包装后尽快使用完毕。': 'Store in a dark, cool, dry place. Maintain storage temperature between 5-35 °C, avoid freezing, and keep container intact. Reseal container immediately after use; consume promptly once opened.',
+  '请置于避光、阴凉干燥处存放, 存储温度应保持在5-35°C, 避免霜冻, 保持产品包装完整。每次取用之后立即密封, 打开包装后尽快使用完毕。': 'Store in a dark, cool, dry place. Maintain storage temperature between 5-35 °C, avoid freezing, and keep container intact. Reseal container immediately after use; consume promptly once opened.',
+  '使用后的空桶未经无害化处理前，不得存储食物及其他物品，以免对人体、环境造成危害；': 'Empty drums must not be used to store food or other items before proper decontamination, to prevent hazard to humans and environment;',
+  '包装物的回收、利用、处置应符合国家及当地相关法律、法规规定，因包装物处置不当造成的危害及损失，由处置方承担。': 'Recycling, utilization, and disposal of packaging must comply with national and local regulations; liability for improper disposal rests with the disposer.',
+  '使用后的空桶未经无害化处理前，不得存储食物及其他物品，以免对人体、环境造成危害；包装物的回收、利用、处置应符合国家及当地相关法律、法规规定，因包装物处置不当造成的危害及损失，由处置方承担。': 'Empty drums must not be used to store food or other items before proper decontamination, to prevent hazard to humans and environment; recycling, utilization, and disposal of packaging must comply with national and local regulations; liability for improper disposal rests with the disposer.',
+  '使用后的空桶未经无害化处理前, 不得存储食物及其他物品, 以免对人体、环境造成危害; 包装物的回收、利用、处置应符合国家及当地相关法律、法规规定, 因包装物处置不当造成的危害及损失, 由处置方承担。': 'Empty drums must not be used to store food or other items before proper decontamination, to prevent hazard to humans and environment; recycling, utilization, and disposal of packaging must comply with national and local regulations; liability for improper disposal rests with the disposer.',
+  '物理化学危险：对水体、土壤可造成一定的污染。': 'Physical & chemical hazards: May cause some contamination to water bodies and soil.',
+  '物理化学危险：对水体、土壤可造成一定的污染': 'Physical & chemical hazards: May cause some contamination to water bodies and soil.',
+  '物理化学危险: 对水体、土壤可造成一定的污染。': 'Physical & chemical hazards: May cause some contamination to water bodies and soil.',
+  '物理化学危险: 对水体、土壤可造成一定的污染': 'Physical & chemical hazards: May cause some contamination to water bodies and soil.',
+  '健康危害：无': 'Health hazards: None.',
+  '健康危害: 无': 'Health hazards: None.',
+  '健康危害：无。': 'Health hazards: None.',
+  '环境危害：无危险物质释放，防止进入下水道，以防聚合物沉积阻塞下水道。': 'Environmental hazards: No hazardous substances released. Prevent entry into sewers to prevent polymer deposition and clogging.',
+  '环境危害：无危险物质释放，防止进入下水道，以防聚合物沉积阻塞下水道': 'Environmental hazards: No hazardous substances released. Prevent entry into sewers to prevent polymer deposition and clogging.',
+  '环境危害: 无危险物质释放，防止进入下水道，以防聚合物沉积阻塞下水道。': 'Environmental hazards: No hazardous substances released. Prevent entry into sewers to prevent polymer deposition and clogging.',
+  '没有明显的已知作用或严重危险。': 'No known significant effects or critical hazards.',
+  '没有明显的已知作用或严重危险': 'No known significant effects or critical hazards.',
+  '无明显的已知作用或严重危险。': 'No known significant effects or critical hazards.',
+  '无明显的已知作用或严重危险': 'No known significant effects or critical hazards.',
   '去离子水': 'Deionized water',
   '水': 'Water',
   '二丙二醇二甲醚': 'Dipropylene glycol dimethyl ether',
@@ -86,6 +130,10 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '氢氧化钠': 'Sodium hydroxide',
   '二甲基乙醇胺': 'N,N-Dimethylethanolamine',
   'N,N-二甲基乙醇胺': 'N,N-Dimethylethanolamine',
+  'N,N－二甲基乙醇胺': 'N,N-Dimethylethanolamine',
+  'N,N二甲基乙醇胺': 'N,N-Dimethylethanolamine',
+  '聚丙烯酸酯分散体': 'Polyacrylate dispersion',
+  '聚丙烯酸酯': 'Polyacrylate',
   '氨水': 'Ammonia water',
   '氢氧化铵': 'Ammonium hydroxide',
   '羟基聚氨酯分散体': 'Hydroxy polyurethane dispersion',
@@ -236,6 +284,69 @@ export function translateChemicalTerm(term) {
 }
 
 /**
+ * 翻译 Section 3 组分附注（如中和剂成盐说明、特定浓度限值等）至标准西文
+ */
+export function translateSection3Notes(notesText) {
+  if (!notesText || typeof notesText !== 'string') return '';
+  const lines = notesText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const enLines = lines.map(line => {
+    if (CHEMICAL_TRANSLATION_DICT[line]) return CHEMICAL_TRANSLATION_DICT[line];
+    if (/羟基丙烯酸酯聚合物.*GHS危险性分类[：:\s]*不适用/i.test(line)) {
+      return 'Hydroxyacrylate polymer GHS hazard classification: Not applicable.';
+    }
+    if (/请注意以下物质/i.test(line)) {
+      return 'Please note the following substances:';
+    }
+    let res = line;
+    if (/N,N[-－]?二甲基乙醇胺.*中和剂.*盐.*浓度/i.test(res)) {
+      res = res
+        .replace(/N,N[-－]?二甲基乙醇胺/g, 'N,N-Dimethylethanolamine')
+        .replace(/，中和剂/g, ', neutralizer')
+        .replace(/，已键合为盐/g, ', bonded as salt')
+        .replace(/，质量浓度/g, ', mass concentration ')
+        .replace(/小于/g, '< ')
+        .replace(/大于/g, '> ');
+    }
+    if (/GHS分类[：:\s]*/i.test(res)) {
+      res = res
+        .replace(/GHS分类[：:\s]*/i, 'GHS Classification: ')
+        .replace(/依然液体|易燃液体/g, 'Flammable liquid ')
+        .replace(/急性毒性/g, 'Acute toxicity ')
+        .replace(/吸入性|吸入/g, 'Inhalation ')
+        .replace(/经皮/g, 'Dermal ')
+        .replace(/经口/g, 'Oral ')
+        .replace(/皮肤腐蚀/g, 'Skin corrosion ')
+        .replace(/皮肤刺激/g, 'Skin irritation ')
+        .replace(/严重眼睛损伤|眼睛刺激/g, 'Eye damage/irritation ')
+        .replace(/特异性靶器官系统毒性（一次接触）/g, 'STOT SE ')
+        .replace(/特异性靶器官系统毒性（反复接触）/g, 'STOT RE ')
+        .replace(/特异性靶器官毒性（一次接触）/g, 'STOT SE ')
+        .replace(/特异性靶器官毒性（反复接触）/g, 'STOT RE ')
+        .replace(/；/g, '; ');
+    }
+    if (/特定(?:阈值|浓度|极限)?浓度/i.test(res)) {
+      res = res.replace(/特定(?:阈值|浓度|极限)?浓度[：:\s]*/i, 'Specific concentration limit: ');
+    }
+    if (/特异性靶器官系统毒性（一次接触）/i.test(res)) {
+      res = res.replace(/特异性靶器官系统毒性（一次接触）/g, 'STOT SE ');
+    }
+    if (/特异性靶器官毒性（一次接触）/i.test(res)) {
+      res = res.replace(/特异性靶器官毒性（一次接触）/g, 'STOT SE ');
+    }
+    res = res.replace(/CAS(?:号|编号)[：:\s]*保留/gi, 'CAS No.: Reserved');
+    res = res.replace(/CAS(?:号|编号)[：:\s]*/gi, 'CAS No.: ');
+    res = res.replace(/羟基丙烯酸酯聚合物/g, 'Hydroxyacrylate polymer');
+    res = res.replace(/，/g, ', ');
+    res = res.replace(/；/g, '; ');
+    res = res.replace(/：/g, ': ');
+    res = res.replace(/。/g, '. ');
+    res = res.replace(/\s+/g, ' ').trim();
+    return translateChemicalTerm(res) || res;
+  });
+  return enLines.join('\n');
+}
+
+/**
  * 规范化摄氏度符号与标点
  */
 export function sanitizeDegreeAndPunctuation(text) {
@@ -316,18 +427,22 @@ export function governContext(context1, overrides = {}) {
     isHazardous: !isNonHazardous,
     ghs: {
       isHazardous: !isNonHazardous,
-      // 非危险品绝对严禁生成象形图与信号词
+      // 非危险品绝对严禁生成象形图
       hasPictograms: isNonHazardous ? false : Boolean(raw.ghs?.hasPictograms),
       pictogramCount: isNonHazardous ? 0 : (raw.ghs?.pictogramCount || 0),
-      signalWord: isNonHazardous ? null : raw.ghs?.signalWord,
+      signalWord: raw.ghs?.signalWord || null,
       categories: isNonHazardous ? [] : (raw.ghs?.categories || []),
-      hazardStatements: isNonHazardous ? [] : (raw.ghs?.hazardStatements || []),
-      precautionaryStatements: isNonHazardous ? {
+      hazardStatements: (raw.ghs?.hazardStatements && raw.ghs.hazardStatements.length > 0)
+        ? raw.ghs.hazardStatements
+        : [],
+      precautionaryStatements: raw.ghs?.precautionaryStatements || {
         prevention: [],
         response: [],
         storage: [],
         disposal: []
-      } : (raw.ghs?.precautionaryStatements || { prevention: [], response: [], storage: [], disposal: [] })
+      },
+      otherHazards: raw.ghs?.otherHazards || null,
+      hazardousComponentsOnLabel: raw.ghs?.hazardousComponentsOnLabel || null
     },
     // 组分列表: 严格拆解为独立组分对象数组，杜绝字符串拼贴
     components: (raw.components || []).map(comp => ({
@@ -335,6 +450,9 @@ export function governContext(context1, overrides = {}) {
       cas: (comp.cas || '').trim(),
       conc: (comp.conc || '').trim()
     })),
+    componentsNotes: Array.isArray(raw.componentsNotes) ? [...raw.componentsNotes] : [],
+    otherHazards: raw.ghs?.otherHazards || null,
+    hazardousComponentsOnLabel: raw.ghs?.hazardousComponentsOnLabel || null,
     // 理化指标治理
     physicalProperties: (raw.physicalProperties || []).map(prop => ({
       label: sanitizeDegreeAndPunctuation(prop.label || ''),
@@ -418,17 +536,37 @@ export function governContext(context1, overrides = {}) {
       isHazardous: !isNonHazardous,
       hasPictograms: isNonHazardous ? false : Boolean(raw.ghs?.hasPictograms),
       pictogramCount: isNonHazardous ? 0 : (raw.ghs?.pictogramCount || 0),
-      signalWord: isNonHazardous ? null : (raw.ghs?.signalWord === '危险' ? 'Danger' : (raw.ghs?.signalWord === '警告' ? 'Warning' : (raw.ghs?.signalWord || 'Warning'))),
-      categories: isNonHazardous ? [] : (raw.ghs?.categories || []),
-      hazardStatements: isNonHazardous ? [] : (raw.ghs?.hazardStatements || []),
-      precautionaryStatements: isNonHazardous ? {
-        prevention: [],
-        response: [],
-        storage: [],
-        disposal: []
-      } : (raw.ghs?.precautionaryStatements || { prevention: [], response: [], storage: [], disposal: [] })
+      signalWord: raw.ghs?.signalWord === '危险' ? 'Danger' : (raw.ghs?.signalWord === '警告' ? 'Warning' : (raw.ghs?.signalWord ? translateChemicalTerm(raw.ghs.signalWord) : null)),
+      categories: isNonHazardous ? [] : (raw.ghs?.categories || []).map(c => translateChemicalTerm(c)),
+      hazardStatements: (raw.ghs?.hazardStatements || []).map(h => ({
+        code: h.code,
+        text: translateChemicalTerm(h.text || '')
+      })),
+      precautionaryStatements: {
+        prevention: (raw.ghs?.precautionaryStatements?.prevention || []).map(p => ({
+          code: p.code,
+          text: translateChemicalTerm(p.text || '')
+        })),
+        response: (raw.ghs?.precautionaryStatements?.response || []).map(p => ({
+          code: p.code,
+          text: translateChemicalTerm(p.text || '')
+        })),
+        storage: (raw.ghs?.precautionaryStatements?.storage || []).map(p => ({
+          code: p.code,
+          text: translateChemicalTerm(p.text || '')
+        })),
+        disposal: (raw.ghs?.precautionaryStatements?.disposal || []).map(p => ({
+          code: p.code,
+          text: translateChemicalTerm(p.text || '')
+        }))
+      },
+      otherHazards: Array.isArray(raw.ghs?.otherHazards) ? raw.ghs.otherHazards.map(oh => translateChemicalTerm(oh)) : null,
+      hazardousComponentsOnLabel: raw.ghs?.hazardousComponentsOnLabel ? translateChemicalTerm(raw.ghs.hazardousComponentsOnLabel) : null
     },
     components: enComponents,
+    componentsNotes: Array.isArray(raw.componentsNotes) ? raw.componentsNotes.map(n => translateSection3Notes(n)) : [],
+    otherHazards: Array.isArray(raw.ghs?.otherHazards) ? raw.ghs.otherHazards.map(oh => translateChemicalTerm(oh)) : null,
+    hazardousComponentsOnLabel: raw.ghs?.hazardousComponentsOnLabel ? translateChemicalTerm(raw.ghs.hazardousComponentsOnLabel) : null,
     physicalProperties: enPhysicalProperties,
     toxicology: JSON.parse(JSON.stringify(raw.toxicology || {})),
     ecology: JSON.parse(JSON.stringify(raw.ecology || {})),

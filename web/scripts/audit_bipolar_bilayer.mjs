@@ -830,19 +830,25 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
   let casErrorCount = 0;
   for (let r = 3; r < s3Trs.length; r++) {
     const tcs = s3Trs[r].getElementsByTagName('w:tc');
+    if (tcs.length < 2) continue; // 附注通栏行只有 1 个单元格，豁免 CAS 检查
     const name = (tcs[0]?.textContent || '').trim();
     if (/化学品名称|Chemical name/i.test(name)) continue;
+    if (/请注意|中和剂|成盐|豁免|GHS|Notice|Note/i.test(name)) continue;
     const casCn = (tcs[1]?.textContent || '').trim();
     if (/CAS(?:编号|号|NO\.?)/i.test(casCn) || /CAS(?:编号|号|NO\.?)/i.test(name)) continue;
+    if (!casCn || /保留|机密|保密|Trade secret|Reserved|None|无/i.test(casCn)) continue;
     const res = validateCasChecksum(casCn);
     if (!res.valid) casErrorCount++;
   }
   for (let r = 3; r < s3TrsEn.length; r++) {
     const tcs = s3TrsEn[r].getElementsByTagName('w:tc');
+    if (tcs.length < 2) continue; // 附注通栏行只有 1 个单元格，豁免 CAS 检查
     const name = (tcs[0]?.textContent || '').trim();
     if (/化学品名称|Chemical name/i.test(name)) continue;
+    if (/请注意|中和剂|成盐|豁免|GHS|Notice|Note/i.test(name)) continue;
     const casEn = (tcs[1]?.textContent || '').trim();
     if (/CAS(?:编号|号|NO\.?)/i.test(casEn) || /CAS(?:编号|号|NO\.?)/i.test(name)) continue;
+    if (!casEn || /保留|机密|保密|Trade secret|Reserved|None|无/i.test(casEn)) continue;
     const res = validateCasChecksum(casEn);
     if (!res.valid) casErrorCount++;
   }

@@ -23,6 +23,7 @@ import {
   deleteRow,
   addRowAfter,
   addNoteRowAfter,
+  renderFullWidthRow,
   formatSection11PreambleRow,
   writeStructuredToxicologyCellValue,
   renumberRecord,
@@ -1208,14 +1209,10 @@ export function extractSection3ExemptionNotes(sourceRecord) {
     if (row.index === 0) continue;
     const cells = row.cells || [];
     const combinedText = cells.map((c) => c.text || '').join(' ').trim();
+    if (!combinedText) continue;
 
-    // 过滤规则：若是成分数据表格行（含 CAS 号格式 \d+-\d+-\d+ 或百分比 %），严禁作为豁免附注提取
-    const isIngredientDataRow = /\d+-\d+-\d+/.test(combinedText) || /%|％/.test(combinedText);
-    if (isIngredientDataRow) {
-      continue;
-    }
-
-    if (/中和剂|成盐|键合为盐|游离胺|低于分类限值|特定阈值浓度|请注意以下物质|不适用/i.test(combinedText)) {
+    const isExemptionOrNote = /中和剂|成盐|键合为盐|游离胺|低于分类限值|特定(?:阈值|极限)?浓度|请注意以下物质|不适用/i.test(combinedText);
+    if (isExemptionOrNote) {
       // 若单元格内包含多段文字（如通过换行或多段落输入），拆分为离散行提取
       for (const cell of cells) {
         const cellText = (cell.text || '').trim();
@@ -1223,6 +1220,13 @@ export function extractSection3ExemptionNotes(sourceRecord) {
         const lines = cellText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
         notes.push(...lines);
       }
+      continue;
+    }
+
+    // 过滤规则：若是常规多列成分数据表格行（含 CAS 号格式 \d+-\d+-\d+ 或百分比 %），严禁作为豁免附注提取
+    const isIngredientDataRow = cells.length >= 2 && (/\d+-\d+-\d+/.test(combinedText) || /%|％/.test(combinedText));
+    if (isIngredientDataRow) {
+      continue;
     }
   }
   return notes.join('\n');
@@ -3947,7 +3951,19 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
             }
 
 
-            const neededTotalRows = startCompRow + comps.length;
+            const s3NotesRaw = (matchResult.facts?.componentsNotes && matchResult.facts.componentsNotes.length > 0)
+              ? matchResult.facts.componentsNotes.join('\n')
+              : (matchResult.facts?.section3ExemptionNotes || '');
+            const hasS3Notes = Boolean(s3NotesRaw && s3NotesRaw.trim());
+            const neededTotalRows = startCompRow + comps.length + (hasS3Notes ? 1 : 0);
+            while (tRecord.rows.length < neededTotalRows) {
+              try {
+                const updated = addRowAfter(editorEngine, tRecord, tRecord.rows.length - 1);
+                if (updated) tRecord = updated;
+              } catch (e) {
+                break;
+              }
+            }
             while (tRecord.rows.length > neededTotalRows) {
               try {
                 const updated = deleteRow(editorEngine, tRecord, tRecord.rows.length - 1);
@@ -3955,6 +3971,15 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
               } catch (e) {
                 break;
               }
+            }
+            if (hasS3Notes) {
+              const noteRowIdx = startCompRow + comps.length;
+              renderFullWidthRow(tRecord, noteRowIdx, s3NotesRaw.split('\n'), {
+                isEnglish: isEnglishTemplate,
+                borders: true,
+                totalWidth: 9781,
+                gridSpan: 3
+              });
             }
           } else {
             const firstCompRow = tRecord.rows[startCompRow];

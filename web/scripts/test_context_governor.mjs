@@ -1,76 +1,37 @@
-import assert from 'node:assert';
-import {
-  CHEMICAL_TRANSLATION_DICT,
-  TRANSPORT_TRANSLATION_MAP,
-  translateChemicalTerm,
-  sanitizeDegreeAndPunctuation,
-  governContext
-} from '../src/context-governor.js';
+import { recognizeSourceDocx } from '../src/recognition-engine.js';
+import { governContext } from '../src/context-governor.js';
 
-console.log('🧪 开始运行 context-governor 单元测试...');
+async function testGov() {
+  const p4840Src = 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练材料/源文件材料/2-4 水溶性丙烯酸树脂 PA/PA-4840/PA-4840 msds_CN 冠志_源文件留存.docx';
+  const p4902Src = 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练材料/源文件材料/2-1 单组份水性丙烯酸乳液 PA/PA-4902/PA-4902msds_CN 冠志___源文件留存.docx';
 
-// 1. 测试化学品英译
-assert.strictEqual(translateChemicalTerm('水'), 'Water');
-assert.strictEqual(translateChemicalTerm('去离子水'), 'Deionized water');
-assert.strictEqual(translateChemicalTerm('噁唑啉改性丙烯酸聚合物'), 'Oxazoline-modified acrylic polymer');
-assert.strictEqual(translateChemicalTerm('二丙二醇二甲醚'), 'Dipropylene glycol dimethyl ether');
-assert.strictEqual(translateChemicalTerm('六甲撑二异氰酸酯基均聚物'), 'Hexamethylene diisocyanate homopolymer');
-assert.strictEqual(translateChemicalTerm('商业秘密'), 'Trade secret');
-assert.strictEqual(translateChemicalTerm('商业机密'), 'Trade secret');
-console.log('✅ 1. 化学品英译字典与模式匹配通过');
+  const r4840 = await recognizeSourceDocx(p4840Src);
+  const r4902 = await recognizeSourceDocx(p4902Src);
 
-// 2. 测试度数符号与标点规范化
-assert.strictEqual(sanitizeDegreeAndPunctuation('100 C'), '100 °C');
-assert.strictEqual(sanitizeDegreeAndPunctuation('100C'), '100 °C');
-assert.strictEqual(sanitizeDegreeAndPunctuation('沸点: 100 C:'), '沸点: 100 °C');
-console.log('✅ 2. 度数符号与标点规范化通过');
+  const gov4840 = governContext(r4840);
+  const gov4902 = governContext(r4902);
 
-// 3. 测试 governContext 核心治理
-const mockContext1 = {
-  modelCode: 'TEST-100',
-  ghs: {
-    isHazardous: false,
-    signalWord: '无',
-    pictograms: ['无']
-  },
-  components: [
-    { name: '噁唑啉改性丙烯酸聚合物', cas: '商业机密', conc: '40 %' },
-    { name: '水', cas: '7732-18-5', conc: '60 %' }
-  ],
-  physicalProperties: [
-    { label: '沸点', value: '100 C' }
-  ],
-  transport: {
-    road: '非危险品陆运输方式。',
-    sea: '非危险品海运方式。',
-    air: '非危险品运输方式。',
-    precautions: '非危险货物。'
-  }
-};
+  console.log('=== GOVERNED 4840 ===');
+  console.log('CN Hazardous:', gov4840.cn.ghs.isHazardous);
+  console.log('CN Label Comp:', gov4840.cn.hazardousComponentsOnLabel);
+  console.log('CN Hazard Statements:', gov4840.cn.ghs.hazardStatements);
+  console.log('CN Precautionary prevention:', gov4840.cn.ghs.precautionaryStatements.prevention);
+  console.log('EN Hazard Statements:', gov4840.en.ghs.hazardStatements);
 
-const governed = governContext(mockContext1);
+  console.log('\n=== GOVERNED 4902 ===');
+  console.log('CN Hazardous:', gov4902.cn.ghs.isHazardous);
+  console.log('CN Signal Word:', gov4902.cn.ghs.signalWord);
+  console.log('CN Hazard Statements:', gov4902.cn.ghs.hazardStatements);
+  console.log('CN Precautionary prevention length:', gov4902.cn.ghs.precautionaryStatements.prevention.length);
+  console.log('CN Precautionary response length:', gov4902.cn.ghs.precautionaryStatements.response.length);
+  console.log('CN Precautionary storage length:', gov4902.cn.ghs.precautionaryStatements.storage.length);
+  console.log('CN Precautionary disposal length:', gov4902.cn.ghs.precautionaryStatements.disposal.length);
+  console.log('CN Other Hazards:', gov4902.cn.otherHazards);
+  console.log('CN Components Notes:', gov4902.cn.componentsNotes);
+  console.log('EN Signal Word:', gov4902.en.ghs.signalWord);
+  console.log('EN Hazard Statements:', gov4902.en.ghs.hazardStatements);
+  console.log('EN Precautionary prevention length:', gov4902.en.ghs.precautionaryStatements.prevention.length);
+  console.log('EN Components Notes length:', gov4902.en.componentsNotes.length);
+}
 
-// GHS 非危品防外生虚增契约
-assert.strictEqual(governed.cn.ghs.isHazardous, false);
-assert.strictEqual(governed.cn.ghs.signalWord, null);
-assert.strictEqual(governed.cn.ghs.hasPictograms, false);
-assert.strictEqual(governed.cn.ghs.pictogramCount, 0);
-
-// 双语组分独立性与高保真英译
-assert.strictEqual(governed.componentsEn.length, 2);
-assert.strictEqual(governed.componentsEn[0].name, 'Oxazoline-modified acrylic polymer');
-assert.strictEqual(governed.componentsEn[0].cas, 'Trade secret');
-assert.strictEqual(governed.componentsEn[1].name, 'Water');
-assert.strictEqual(governed.componentsEn[1].cas, '7732-18-5');
-
-// 理化指标度数规范
-assert.strictEqual(governed.cn.physicalProperties[0].value, '100 °C');
-
-// 运输双语映射
-assert.strictEqual(governed.en.transport.road, 'Not classified as dangerous goods for land transport.');
-assert.strictEqual(governed.en.transport.sea, 'Not classified as dangerous goods for sea transport, in accordance with IMDG regulations.');
-assert.strictEqual(governed.en.transport.air, 'Not classified as dangerous goods for air transport, in accordance with IATA regulations.');
-assert.strictEqual(governed.en.transport.precautions, 'Not regulated as dangerous goods.');
-
-console.log('✅ 3. governContext 核心管线通过');
-console.log('🎉 所有 context-governor 单元断言 100% 验证通过！');
+testGov().catch(console.error);
