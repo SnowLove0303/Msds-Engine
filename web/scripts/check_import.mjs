@@ -1,5 +1,9 @@
-import fs from 'fs';
+import fs from 'node:fs';
 
-const content = fs.readFileSync('F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/web/src/pipeline-engine.js', 'utf8');
-const lines = content.slice(0, 3000);
-console.log('Import check:', lines.includes('formatSection9LabelCell'));
+const content = fs.readFileSync('web/src/smart-matching.js', 'utf8');
+const lines = content.split('\n');
+lines.forEach((l, idx) => {
+  if (l.includes('getBenchmarkSpecsByCategory') && idx < 50) {
+    console.log(`${idx + 1}: ${l}`);
+  }
+});

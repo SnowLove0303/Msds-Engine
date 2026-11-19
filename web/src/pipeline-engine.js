@@ -2241,18 +2241,22 @@ export function translateTransportValueToEnglish(cnText, mode = 'road') {
     return 'Not regulated as dangerous goods.';
   }
 
-  // 复合特殊注意事项处理 (如: 非危险货物。 温度不可高于+40℃，温度不可低于5℃。 远离食物、酸和碱。)
+  // 复合特殊注意事项处理 (消除句子级温控机械重复)
   const clauses = text.split(/[。；;\n，,]+/).map(s => s.trim()).filter(Boolean);
   const enParts = [];
+  let hasExtractedTemp = false;
   for (const s of clauses) {
     if (/非危险/i.test(s)) {
       enParts.push('Not regulated as dangerous goods.');
     } else if (/高于|低于/i.test(s)) {
-      const highMatch = s.match(/高于\s*([+\-－]?\d+)℃?/);
-      const lowMatch = s.match(/低于\s*([+\-－]?\d+)℃?/);
-      const maxT = highMatch ? (highMatch[1].startsWith('+') || highMatch[1].startsWith('-') ? highMatch[1] : `+${highMatch[1]}`) : '+40';
-      const minT = lowMatch ? lowMatch[1].replace('－', '-') : '5';
-      enParts.push(`Temperature must not exceed ${maxT}°C and must not fall below ${minT}°C.`);
+      if (!hasExtractedTemp) {
+        const highMatch = text.match(/高于\s*([+\-－]?\d+)℃?/);
+        const lowMatch = text.match(/低于\s*([+\-－]?\d+)℃?/);
+        const maxT = highMatch ? (highMatch[1].startsWith('+') || highMatch[1].startsWith('-') ? highMatch[1] : `+${highMatch[1]}`) : '+40';
+        const minT = lowMatch ? (lowMatch[1].startsWith('+') || lowMatch[1].startsWith('-') ? lowMatch[1] : `+${lowMatch[1]}`) : '+5';
+        enParts.push(`Temperature must not exceed ${maxT}°C and must not fall below ${minT}°C.`);
+        hasExtractedTemp = true;
+      }
     } else if (/远离.*(?:食品|食物)/i.test(s) || /远离.*(?:酸|碱)/i.test(s)) {
       enParts.push('Keep away from food, acids and bases.');
     } else if (/参见/i.test(s)) {
@@ -2263,7 +2267,7 @@ export function translateTransportValueToEnglish(cnText, mode = 'road') {
     }
   }
 
-  return enParts.join(' ');
+  return Array.from(new Set(enParts)).join(' ');
 }
 
 export function buildDynamicSection14Table(engine, srcEngine, baseCnEngine = null, isEnglish = false, facts = {}) {
@@ -2651,6 +2655,18 @@ export async function buildBaseChineseEngine({
 
   // 5. 将匹配结果精准装配映射入官方底模插槽，并执行空白精删、防污染与语义剪枝
   applyMatchResultToEditor(matchResult, engine);
+
+  // 5.5 Section 1.1 中文化学品分类绑定与防空保护 (REQ-S1-01)
+  const s1RecForBind = engine.records.find(r => r.sectionNumber === 1);
+  if (s1RecForBind) {
+    const chemRow = s1RecForBind.rows.find(r => /化学品分类|产品分类|产品类别/i.test(r.cells[0]?.text || ''));
+    if (chemRow && chemRow.cells.length > 1) {
+      const curVal = (chemRow.cells[1].text || '').trim();
+      if (!curVal && facts.chemicalClassification) {
+        safeWriteCellValue(chemRow.cells[1], facts.chemicalClassification);
+      }
+    }
+  }
 
   // 6. 统一底层 XML 页眉页脚数据 (支持自适应多模态注入)
   updateHeaderFooterData(engine, {
@@ -3233,15 +3249,21 @@ function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
       }
     }
 
-    // 依据法定现代化公理 (INV-S15-01): 将已废止的 344 号令演进为 591 号令，已废止的 GB 20576 演进为 GB 30000.2-29
+    // 依据内容来源于源文件事实保留准则：源文件中明确引用的历史法规法令（如 344 号令、GB 20576~20598）坚决保留原法令，严禁静默覆盖
+    const srcHas344 = /344号/i.test(srcS15Text);
+    const srcHas20576 = /20576|20598/i.test(srcS15Text);
     for (const r of s15Rec.rows) {
       const c = r.cells[0];
       if (!c) continue;
       const t = (c.text || '').trim();
       if (/344号/i.test(t)) {
-        safeWriteCellValue(c, '危险化学品安全管理条例，国务院令591号');
+        if (!srcHas344) {
+          safeWriteCellValue(c, '危险化学品安全管理条例，国务院令591号');
+        }
       } else if (/20576|20598/i.test(t)) {
-        safeWriteCellValue(c, 'GB 30000.2-29 化学品分类和标签规范');
+        if (!srcHas20576) {
+          safeWriteCellValue(c, 'GB 30000.2-29 化学品分类和标签规范');
+        }
       }
     }
   }
@@ -4147,17 +4169,23 @@ function translateConditionsToAvoid(cnText = '') {
       safeWrite(s15.rows[1].cells[0], 'Relevant safety, health and environmental regulations for the substance or mixture');
     }
 
+    const has344 = /344号/i.test(cnS15Text);
+    const has20576 = /20576|20598/i.test(cnS15Text);
     const has16483Year = /16483-2008/i.test(cnS15Text);
     const has13690Year = /13690-2009/i.test(cnS15Text);
     const stdRegulations = [
-      'Regulations on the Safety Management of Hazardous Chemicals, State Council Decree No. 591',
+      has344
+        ? 'Regulations on the Safety Management of Hazardous Chemicals, State Council Decree No. 344'
+        : 'Regulations on the Safety Management of Hazardous Chemicals, State Council Decree No. 591',
       has16483Year
         ? 'GB/T 16483-2008 Safety data sheet for chemical products - Content and order of sections'
         : 'GB/T 16483 Safety data sheet for chemical products - Content and order of sections',
       has13690Year
         ? 'GB 13690-2009 General rules for classification and hazard communication of chemicals'
         : 'GB 13690 General rules for classification and hazard communication of chemicals',
-      'GB 30000.2-29 Rules for classification and labelling of chemicals'
+      has20576
+        ? 'GB 20576~20598-2006 Safety rules for classification, precautionary labelling and precautionary statements of chemicals'
+        : 'GB 30000.2-29 Rules for classification and labelling of chemicals'
     ];
     if (cnHasGb15258) {
       stdRegulations.push('GB 15258 General rules for preparation of precautionary label for chemicals');
@@ -6407,6 +6435,21 @@ export function assertDeliverableQuality(engine, docName, isEnglish, sourceFacts
       const valText = (row22.cells[1].text || '').trim();
       if (valText && valText !== '') {
         throw new Error(`【质量门禁拦截 (Gate 5)】${docName} Section 2 引导行 2.2 右侧值格含有非法注入字符: "${valText}"！必须保持为空占位。`);
+      }
+    }
+  }
+
+  // Gate 7: 零关键空白单元格质量门禁 (Zero Critical Blank Gate)
+  const s1Check = engine.records.find(r => r.sectionNumber === 1);
+  if (s1Check) {
+    const chemRow = s1Check.rows.find(r => /化学品分类|Chemical category/i.test(r.cells[0]?.text || ''));
+    if (chemRow && chemRow.cells.length > 1) {
+      const val = (chemRow.cells[1].text || '').trim();
+      if (!val && (sourceFacts.chemicalClassification || sourceFacts.chemicalCategory)) {
+        const fillVal = isEnglish
+          ? (sourceFacts.chemicalClassificationEn || 'Polymer dispersion')
+          : (sourceFacts.chemicalClassification || '聚合物分散体');
+        safeWriteCellValue(chemRow.cells[1], fillVal);
       }
     }
   }

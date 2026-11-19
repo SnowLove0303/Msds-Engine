@@ -1,13 +1,5 @@
-import fs from 'node:fs/promises';
+import fs from 'node:fs';
 
-async function search() {
-  const content = await fs.readFile('F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/web/src/pipeline-engine.js', 'utf8');
-  const lines = content.split('\n');
-  lines.forEach((line, idx) => {
-    if (/TEMPLATES_DIR/i.test(line)) {
-      console.log(`${idx + 1}: ${line}`);
-    }
-  });
-}
-
-search();
+const content = fs.readFileSync('web/src/pipeline-engine.js', 'utf8');
+const match = content.match(/TEMPLATES_DIR\s*=\s*([^;\n]+)/);
+console.log(match ? match[0] : 'not found');

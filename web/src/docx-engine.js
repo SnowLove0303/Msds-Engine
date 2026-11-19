@@ -408,10 +408,17 @@ export function cellRole(cell) {
   };
 }
 
-function parseCell(tc, rowIndex, column, span, rowNode, numbering = null) {
+function parseCell(tc, rowIndex, column, span, rowNode, numbering = null, relationshipMap = null) {
   const paragraphs = directChildren(tc, 'p').map((paragraph) => parseParagraph(paragraph, numbering));
-  const nestedTables = descendants(tc, 'tbl').length;
+  const nestedTableNodes = directChildren(tc, 'tbl');
+  const nestedTables = nestedTableNodes.map((nTbl, nIdx) => buildTableRecord(nTbl, nIdx, 'nested', relationshipMap, '', numbering));
+  const nestedTableCount = nestedTableNodes.length || descendants(tc, 'tbl').length;
   const images = paragraphs.flatMap((paragraph) => paragraph.segments.filter((segment) => segment.type === 'image').map((segment) => segment.image));
+  
+  const directText = cellText({ paragraphs });
+  const nestedTexts = nestedTables.flatMap((t) => t.rows.flatMap((r) => r.cells.map((c) => c.text))).filter(Boolean);
+  const fullText = [directText, nestedTexts.join('\n')].filter(Boolean).join('\n');
+
   const cell = {
     node: tc,
     row: rowIndex,
@@ -420,13 +427,16 @@ function parseCell(tc, rowIndex, column, span, rowNode, numbering = null) {
     rowspan: 1,
     rowNode,
     paragraphs,
-    text: cellText({ paragraphs }),
+    text: fullText,
+    directText,
+    nestedTables,
+    nestedTableCount,
     images,
     format: parseCellProperties(tc),
     align: paragraphs[0]?.format?.alignment || 'left',
   };
   Object.assign(cell, cellRole(cell));
-  cell.nestedTableCount = nestedTables;
+  cell.nestedTableCount = nestedTableCount;
   return cell;
 }
 
@@ -516,7 +526,7 @@ function buildTableRecord(table, tableIndex, partName, relationshipMap, prefix =
         origin.rowspan += 1;
         nextMerges.set(key, origin);
       } else {
-        const cell = parseCell(tc, rowIndex, column, span, rowNode, numbering);
+        const cell = parseCell(tc, rowIndex, column, span, rowNode, numbering, relationshipMap);
         cell.format = format;
         cells.push(cell);
         if (format.vMerge) nextMerges.set(key, cell);
@@ -807,6 +817,8 @@ function portableCell(cell) {
     colspan: cell.colspan,
     rowspan: cell.rowspan,
     text: cell.text,
+    nestedTableCount: cell.nestedTableCount || 0,
+    nestedTables: cell.nestedTables?.map(portableRecord) || [],
     images: cell.relationships?.map((image) => ({ rid: image.rid, target: image.target })) || [],
     paragraphs: cell.paragraphs.map(portableParagraph),
     format: cell.format,

@@ -74,6 +74,14 @@ export function resolveSlotLineBreakPolicy(sectionNumber, slotKey) {
   return { policy: LINE_BREAK_POLICIES.FIELD_VALUE, disposition: 'same_cell' };
 }
 
+// 联合国危险货物正式运输名称中英标准目录
+export const UN_PROPER_SHIPPING_NAMES = Object.freeze({
+  '1866': { cn: '树脂溶液，易燃', en: 'RESIN SOLUTION, flammable' },
+  '1993': { cn: '易燃液体，未另作规定的', en: 'FLAMMABLE LIQUID, N.O.S.' },
+  '1263': { cn: '油漆或油漆相关材料', en: 'PAINT or PAINT RELATED MATERIAL' },
+  '1139': { cn: '保护层防护液', en: 'COATING SOLUTION' }
+});
+
 // Section 1~16 标准槽位定义与全面中英双语别名库
 export const SECTION_SLOT_REGISTRY = {
   1: {

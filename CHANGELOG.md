@@ -1,5 +1,66 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-19 PA-4902 与 PA-4840 标准化覆写生产与全景逐句翻译法医审计 (PA4902-PA4840-CANONICAL-PRODUCTION-AUDIT)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户最高指令（使用标准化七步骤工作流，脱离识别模块，直接解读源文件底层 XML 事实，做好源文件内容审计与中英文逐句对照翻译审计，严禁修改底层引擎源码，坚守 INV-CORE-READONLY）：
+1. **法医级源文件底层事实穿透与无损继承 (Forensic XML DOM Grounding & Zero-Loss Ingestion)**：
+   - **PA-4902 事实锁定与归正**：
+     - 源文件 `PA-4902msds_CN 冠志__.docx` 物理载明“水溶性羟基丙烯酸树脂 PA-4902”，化学品分类为“丙烯酸聚合物”，初沸点约100℃，闪点约63℃（根据GB 30000判定为非危险物，无外生虚增）；
+     - 完整提取 4 组分真实比例（羟基丙烯酸酯共聚物 >48% + 水 >20% + 乙二醇单丁醚 20% + DMEA 3~4%）；
+     - 完整保留温控范围（-5℃~+50℃）；Section 14 消除澳洲“符合ADG准则”外生法规噪音，正规归正为“非危险品陆运输方式。”。
+   - **PA-4840 事实锁定与多组分毒理学 20 行动态拓扑**：
+     - 源文件 `PA-4840 msds_CN 冠志.docx` 载明 H412 水环境慢性 3 类，标签有害成分为 `2-丁氧基乙醇 (CAS: 111-76-2)`；
+     - 完整提取 Section 11 中针对“聚丙烯酸酯分散体”与“2-丁氧基乙醇”的全部微观毒理实验参数（OECD 404, 408, 413, 414, 423, 429, 451, 471, 474 导则，NOAEL 浓度与动物实验数据）；
+     - 准确提取存储温控（+5℃~+40℃）与非危运输法规（消除 ADG 污染）。
+2. **两款产品 8 格式全矩阵高保真覆写交付 (16 份交付物全部就绪)**：
+   - 分别产出至 `TDS MSDS 重写版/02-1 单组份水性丙烯酸乳液 PA/PA-4902/` 与 `TDS MSDS 重写版/02-4 水溶性丙烯酸树脂 PA/PA-4840/`；
+   - 借助 Windows WPS 原生 COM 接口完成矢量转译，所有 8 份 PDF 页数严格恒定为 5 页（零第 6 页跨页溢出），时间戳最大差值仅 0.0~8.2 秒。
+3. **两阶双轨机械确定性审计 100% 满分核销 (全部退出码 0)**：
+   - **双极双层全景法医审计 (`audit_bipolar_bilayer.mjs`)**：PA-4902 (165/165 PASS, 0 Failures), PA-4840 (165/165 PASS, 0 Failures)，退出码 0；
+   - **集中式中央主审计套件 (`run_master_msds_audit.mjs`)**：PA-4902 (171/171 PASS, 0 Defects, 🏆 AUDIT_PASSED), PA-4840 (170/170 PASS, 0 Defects, 🏆 AUDIT_PASSED)，退出码 0。
+4. **中英文逐句翻译对照与源文件内容继承深度审计 (Line-by-Line Dual-Display)**：
+   - 运行 `audit_translation_dual_display.mjs`：
+     - PA-4902: 88/88 (100.0%) 满分对齐，零中文残留，致命报警 0，轻微预警 0，退出码 0；
+     - PA-4840: 111/111 (100.0%) 满分对齐，零中文残留，致命报警 0，轻微预警 0，退出码 0；
+   - 编制两品类专属《中英文逐句翻译对照与源文件内容继承深度审计报告》，归档至 `体系交接文档/`。
+
+---
+
+## [2026-11-19 MSDS 引擎全景底层通用性根治与 19 项缺陷彻底核销 (UNIVERSAL-ENGINE-ROOT-CAUSE-REFACTOR)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户最高指令（作为源码唯一管理者从根本解决问题，基于通用性准则，严禁针对单个型号做硬编码特判，只修改底层引擎源码，不产出交付文档，全量代码变更必须通过 VS Code Diff 审核，零告警零错误）：
+1. **法医级缺陷根因穿透与全景通用性治理 (Forensic 5-Whys Root Cause & Universal Governance)**：
+   - **底座 DOCX 嵌套表格通用抽取 (`web/src/docx-engine.js`)**：
+     - **根因**：原 `parseCell` 仅提取直接子段落 `directChildren(tc, 'p')` 的文本，忽略了单元格内的直接子表格 `directChildren(tc, 'tbl')`。导致 PA-4914 等包含嵌套表格（如 Section 8 职业接触限值表）的文档在单元格层文本丢失，且无法获得结构化嵌套表格对象。
+     - **通用根治**：在 `parseCell` 中递归遍历 `directChildren(tc, 'tbl')`，调用 `buildTableRecord` 递归解析嵌套表格，将其挂载至 `cell.nestedTables`；同时将嵌套表格内所有单元格的文本自动汇总合并至 `cell.text`，既保证了文本全文索引的完整性，又提供了高保真结构化嵌套表格支持。
+   - **全景识别引擎跨行状态机与通用容差重构 (`web/src/recognition-engine.js`)**：
+     - **Section 1.1 分类与电话**：增设 `facts.chemicalClassification` 通用提取槽位与特征正则；将联系电话与应急电话从单正则解耦为双独立捕获通道，消除字段互相覆盖。
+     - **Section 2 GHS 跨行扫描状态机与容差提取**：针对散文换行排版，构建跨行扫描状态机，支持国标“警示词”同义词（`警示词/信号词/Signal Word`）；放宽复合 P 码加号空格容差（`/P\s*\d{3}\s*(?:\+\s*P\s*\d{3})*/g`），精准提取 `P370 + P378`；针对无括号格式的 P 语句群，建立纯 P 码前缀正则，将防范说明精准分流至预防（Prevention）、反应（Response）、储存（Storage）、处置（Disposal）四大法定义务组。
+     - **Section 8 限值嵌套表与手部防护多行聚合**：遍历 `cell.nestedTables` 动态捕获跨行/跨列的职业接触限值数据（包括纵向合并的 2 单元格行，自动继承上一行物质名与法规依据）；对手部防护规格中的材质、厚度、穿透时间等多行说明实施结构化聚合。
+     - **Section 11 皮肤/粘膜刺激性解耦与临床评估保全**：解耦主要皮肤刺激性（`skinIrritation`）与主要粘膜刺激性（`mucousMembraneIrritation`），避免单字段覆盖；保留临床评估与前言说明（`clinicalAssessment`），消除信息损耗。
+     - **Section 14 非危险品运输解耦与 ADG 从句保全**：建立非危险品运输语义先行判断，阻断非危品标题抢占 UN 编号和危害类别字段；保留陆海空各大运输法规的专属从句（包括中英文 `"Not classified as dangerous goods for land transport, in accordance with the ADG Code."`）。
+     - **Section 15 法规条目化切分**：将散文段落切分为结构化 `catalogs` 数组，为后续模板精准匹配与多行插入提供原子事实。
+   - **事实治理中枢透传与不可否定保护 (`web/src/context-governor.js` & `web/src/smart-matching.js`)**：
+     - **`context-governor.js`**：解耦 GHS 环境危害与运输非危险品判定，修正 GHS 环境危害导致的运输误判为危险品问题；建立 `UN_PROPER_SHIPPING_NAMES` 国际标准运输名称目录映射（如 UN 1866 映射为 `"RESIN SOLUTION, flammable"`）；在 `cn` 与 `en` 语料上下文中全量透传 `chemicalClassification`、`contactPhone`、`emergencyPhone` 及 GHS 危险性类别与说明。
+     - **`smart-matching.js`**：设立既有事实不可否定硬锁（`hasGhsInhalation`），严格禁止因毒理学无研究等单方面理由抹除吸入急性毒性；在 `applyMatchResultToEditor` 中全面兼容 `chemical_classification`、`chemical_category` 与 `product_type` 别名，根治 Section 1.1 右侧单元格空白顽疾。
+   - **流水线组装引擎非空门禁、动态限值渲染与文本去重 (`web/src/pipeline-engine.js`)**：
+     - **Section 1.1 零关键空白单元格门禁**：在 `assertDeliverableQuality` 中新增 Gate 7 检查，硬阻断关键单元格空白；优先绑定源文件提取的 `chemicalClassification`。
+     - **Section 8.2 工程控制与动态限值行插入**：纠正误将限值说明写入工程控制单元格的逻辑错误；支持依据 `facts.exposureControls.limits` 动态克隆与渲染标准 4 列职业接触限值行（物质 | 依据 | 类型 | 数值 / Substance | Basis | Type | Value），杜绝断头空表。
+     - **Section 14.4 运输温控特殊防范去重**：建立单次提取锁与句子级 Set 去重机制，彻底根治 `"Temperature must not exceed +40°C and must not fall below +5°C."` 机械重复两遍的问题。
+     - **Section 15 源文件历史法令保全**：建立源文件历史法令（如国务院第 344 号令、GB 20576~20598-2006）反覆盖保护机制，动态输出对应中英文版本，杜绝被高版本法令粗暴冲刷。
+2. **VS Code 原生两栏 Diff 协同检阅合流 (VS Code Native Review & Double-Check Gate)**：
+   - 所有 5 份核心修改源码均按规则逐一通过 `vscode-review` MCP 的 `review_diff_in_vscode` 提交用户在 VS Code 原生差异对比视图中审核批准并应用：
+     - `web/src/docx-engine.js` (Task 1, 状态: approved_and_applied)
+     - `web/src/recognition-engine.js` (Task 2, 状态: approved_and_applied)
+     - `web/src/context-governor.js` (Task 3, 状态: approved_and_applied)
+     - `web/src/smart-matching.js` (Task 3, 状态: approved_and_applied)
+     - `web/src/pipeline-engine.js` (Task 4, 状态: approved_and_applied)
+3. **两阶双轨机械与全要素双向物理核销 (100% 满分核销，零警告，退出码 0)**：
+   - **代码架构 Lint (`npm run lint`)**：
+     - `lint:code`：源码架构与反过拟合 10 大硬门禁 100% 通过，违规项 0，退出码 0；
+     - `lint:audit`：反虚假误报自检测试 100% 通过，退出码 0；
+   - **智能匹配批注验证 (`npm run test:annotations`)**：20/20 项审阅批注在智能匹配与编辑器写入端 100% 验证通过，退出码 0；
+   - **全景 19 项缺陷 1:1 双向物理核销清算 (`node web/scripts/verify_universal_engine_refactor.mjs`)**：
+     - 覆盖 PA-3654、PA-4914、EP-1501 全部测试用例，19 项缺陷 100% 物理消除，全部以 `[Measured]` 实测凭据退出码 0 通过！
+
+---
+
 ## [2026-11-19 EP-1501 源留存标准化覆写产出与全景审计翻译对照 (EP1501-CANONICAL-PRODUCTION-SOURCE-GROUNDED)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户最高指令（不是所有产出都要向 3654 一样做基准库匹配，核心还是遵循“内容源于源文件原则”，严格禁止调用执行覆写产出任务时遇到问题就定位修改源码，产出后做好审计和对照翻译）：
 1. **法医级缺陷根因穿透与治理 (Forensic 5-Whys Root Cause & Action)**：
    - **内容源于源文件绝对公理落地**：源留存文件 `EP-1501 msds_CN 冠志_源文件留存.docx` 的 Section 11 中物理上仅有 2 行（`11.毒性资料` + `该产品无可用的毒理学研究。`），无任何生殖毒性、特异性靶器官等微观终点。

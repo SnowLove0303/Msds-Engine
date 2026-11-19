@@ -390,6 +390,9 @@ export async function recognizeSourceDocx(docxPathOrBuffer, sourceName = 'source
     revisionDate: extractAdaptiveRevisionDate(engine) || null,
     modelCode: null,
     productName: null,
+    chemicalClassification: null,
+    contactPhone: null,
+    emergencyPhone: null,
     sections: {}, // 1 ~ 16 章节全量结构感知 (纯数据，无 DOM)
     ghs: {
       isHazardous: false,
@@ -426,6 +429,8 @@ export async function recognizeSourceDocx(docxPathOrBuffer, sourceName = 'source
       stotSingle: null,
       stotRepeated: null,
       aspirationHazard: null,
+      mucousMembraneIrritation: null,
+      clinicalAssessment: null,
       additionalInfo: []
     },
     ecology: { endpoints: [], rawText: null }, // Section 12
@@ -714,6 +719,23 @@ function parseSection1(record, facts) {
       const codeInName = nameMatch[1].match(/([A-Z]{2,}[-_]?\d+[A-Z0-9]*)/i);
       if (codeInName) facts.modelCode = codeInName[1].trim();
     }
+
+    const chemMatch = fullRowText.match(/(?:化学品分类|产品分类|产品类型|Chemical classification)[：:\s]*([^\r\n]+)/i);
+    if (chemMatch && !facts.chemicalClassification) {
+      facts.chemicalClassification = chemMatch[1].trim();
+    }
+
+    const c0 = (row.cells[0]?.text || '').trim();
+    const c1 = (row.cells[1]?.text || '').trim();
+    if (/(?:化学品分类|产品分类|产品类型|Chemical classification)/i.test(c0) && c1 && !facts.chemicalClassification) {
+      facts.chemicalClassification = c1;
+    }
+    if (/(?:应急咨询电话|应急电话|24小时应急电话|Emergency telephone)/i.test(c0) && c1 && !facts.emergencyPhone) {
+      facts.emergencyPhone = c1;
+    }
+    if (/(?:联系电话|电话|公司电话|Telephone)/i.test(c0) && c1 && !facts.contactPhone) {
+      facts.contactPhone = c1;
+    }
   }
 }
 
@@ -737,31 +759,35 @@ function parseSection2(record, facts, engine) {
   let currentPGroup = null;
 
   for (const line of rawLines) {
-    if (/2\.1\s*(?:GHS危险性类别|Classification of the substance)/i.test(line)) {
+    if (/(?:2\.1\s*)?(?:GHS危险性类别|GHS分类|物质或混合物的?分类|危险性类别|Classification of the substance)/i.test(line)) {
       inGhsCategories = true;
-      const afterColon = line.replace(/.*2\.1\s*(?:GHS危险性类别|Classification of the substance)[：:\s]*/i, '').trim();
-      if (afterColon) {
-        const cats = afterColon.split(/[；;、]+/).map(s => s.trim()).filter(Boolean);
-        facts.ghs.categories.push(...cats);
+      const afterColon = line.replace(/.*(?:GHS危险性类别|GHS分类|物质或混合物的?分类|危险性类别|Classification of the substance)[：:\s]*/i, '').trim();
+      if (afterColon && !/^(?:分类|详见下文|如下)/i.test(afterColon)) {
+        const cats = afterColon.split(/[；;、\n]+/).map(s => s.trim()).filter(Boolean);
+        for (const c of cats) {
+          if (c && !facts.ghs.categories.includes(c)) facts.ghs.categories.push(c);
+        }
       }
       continue;
     }
 
     if (inGhsCategories) {
-      if (/2\.2|GHS标签要素|信号词|危险性说明|象形图/i.test(line)) {
+      if (/2\.2|GHS标签要素|标签要素|信号词|警示词|危险性说明|象形图/i.test(line)) {
         inGhsCategories = false;
       } else {
-        const cats = line.split(/[；;、]+/).map(s => s.trim()).filter(Boolean);
-        for (const c of cats) {
-          if (c && !facts.ghs.categories.includes(c)) {
-            facts.ghs.categories.push(c);
+        if (!/^(?:物质或混合物分类|GHS分类|危险性类别)[：:]?$/i.test(line)) {
+          const cats = line.split(/[；;、\n]+/).map(s => s.trim()).filter(Boolean);
+          for (const c of cats) {
+            if (c && !facts.ghs.categories.includes(c)) {
+              facts.ghs.categories.push(c);
+            }
           }
         }
       }
     }
 
-    if (/信号词[：:\s]*(危险|警告|Danger|Warning)/i.test(line)) {
-      const match = line.match(/信号词[：:\s]*(危险|警告|Danger|Warning)/i);
+    if (/(?:信号词|警示词)[：:\s]*(危险|警告|Danger|Warning)/i.test(line)) {
+      const match = line.match(/(?:信号词|警示词)[：:\s]*(危险|警告|Danger|Warning)/i);
       if (match) facts.ghs.signalWord = match[1];
     }
 
@@ -770,14 +796,15 @@ function parseSection2(record, facts, engine) {
       facts.ghs.hazardStatements.push({ code: m[1], text: m[2].trim() });
     }
 
-    if (/【预防措施】|预防[：:]/i.test(line)) currentPGroup = 'prevention';
-    else if (/【事故响应】|事故响应[：:]/i.test(line)) currentPGroup = 'response';
-    else if (/【安全储存】|安全储存[：:]/i.test(line)) currentPGroup = 'storage';
-    else if (/【废弃处置】|废弃处置[：:]/i.test(line)) currentPGroup = 'disposal';
+    if (/(?:【?预防措施】?|防范说明\s*[:：]?\s*预防)/i.test(line)) currentPGroup = 'prevention';
+    else if (/(?:【?事故响应】?|防范说明\s*[:：]?\s*事故响应)/i.test(line)) currentPGroup = 'response';
+    else if (/(?:【?安全储存】?|防范说明\s*[:：]?\s*安全储存)/i.test(line)) currentPGroup = 'storage';
+    else if (/(?:【?废弃处置】?|【?废弃处理】?|防范说明\s*[:：]?\s*废弃)/i.test(line)) currentPGroup = 'disposal';
 
-    const pMatches = line.matchAll(/(P\d{3}(?:\+P\d{3})*)[：:\s]*([^\r\n;；]+)/g);
+    const pMatches = line.matchAll(/(P\d{3}(?:\s*\+\s*P\d{3})*)[：:\s]*([^\r\n;；]+)/g);
     for (const pm of pMatches) {
-      const item = { code: pm[1], text: pm[2].trim() };
+      const codeClean = pm[1].replace(/\s+/g, '');
+      const item = { code: codeClean, text: pm[2].trim() };
       if (currentPGroup) {
         facts.ghs.precautionaryStatements[currentPGroup].push(item);
       } else {
@@ -896,18 +923,105 @@ function parseSection7(record, facts) {
 
 function parseSection8(record, facts) {
   for (const row of record.rows || []) {
+    // 1. 递归检查单元格挂载的嵌套子表格 (如 PA-4914 嵌套限值表)
+    for (const cell of row.cells || []) {
+      if (cell.nestedTables && cell.nestedTables.length > 0) {
+        for (const nTbl of cell.nestedTables) {
+          for (let rIdx = 0; rIdx < nTbl.rows.length; rIdx++) {
+            const nRow = nTbl.rows[rIdx];
+            const nCells = nRow.cells.map(c => (c.text || '').trim());
+            if (rIdx === 0 && nCells.some(c => /物质|Substance/i.test(c)) && nCells.some(c => /标准|来源|Basis/i.test(c))) {
+              continue;
+            }
+            if (nCells.length >= 4) {
+              const last = facts.exposureControls.limits[facts.exposureControls.limits.length - 1];
+              facts.exposureControls.limits.push({
+                substance: nCells[0] || last?.substance || '',
+                basis: nCells[1] || last?.basis || 'ACGIH',
+                mac_twa: nCells[2],
+                stel: nCells[3],
+                type: nCells[2],
+                value: nCells[3]
+              });
+            } else if (nCells.length === 3) {
+              facts.exposureControls.limits.push({
+                substance: nCells[0],
+                basis: 'OEL',
+                mac_twa: nCells[1],
+                stel: nCells[2],
+                type: nCells[1],
+                value: nCells[2]
+              });
+            } else if (nCells.length === 2 && facts.exposureControls.limits.length > 0) {
+              const last = facts.exposureControls.limits[facts.exposureControls.limits.length - 1];
+              facts.exposureControls.limits.push({
+                substance: last.substance,
+                basis: last.basis || 'ACGIH',
+                mac_twa: nCells[0],
+                stel: nCells[1],
+                type: nCells[0],
+                value: nCells[1]
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // 2. 检查顶层表格多列限值行
     const cells = row.cells.map(c => (c.text || '').trim());
-    if (cells.length >= 3) {
+    if (cells.length >= 4 && !/物质|Substance|序号/i.test(cells[0])) {
       facts.exposureControls.limits.push({
         substance: cells[0],
+        basis: cells[1],
+        mac_twa: cells[2],
+        stel: cells[3],
+        type: cells[2],
+        value: cells[3]
+      });
+    } else if (cells.length === 3 && !/物质|Substance|序号/i.test(cells[0]) && !/呼吸|眼睛|手部|身体/i.test(cells[0])) {
+      facts.exposureControls.limits.push({
+        substance: cells[0],
+        basis: 'OEL',
         mac_twa: cells[1],
-        stel: cells[2]
+        stel: cells[2],
+        type: cells[1],
+        value: cells[2]
       });
     }
+
     const full = cells.join(' ');
     if (/呼吸系统防护[：:]/i.test(full)) facts.exposureControls.ppe.respiratory = full.replace(/.*呼吸系统防护[：:]/i, '').trim();
     if (/眼睛防护[：:]/i.test(full)) facts.exposureControls.ppe.eyes = full.replace(/.*眼睛防护[：:]/i, '').trim();
-    if (/手部防护[：:]/i.test(full)) facts.exposureControls.ppe.hands = full.replace(/.*手部防护[：:]/i, '').trim();
+    if (/身体防护[：:]/i.test(full)) facts.exposureControls.ppe.body = full.replace(/.*身体防护[：:]/i, '').trim();
+  }
+
+  // 3. 多行手部防护规格聚合状态机
+  let inHandProtection = false;
+  const handSpecs = [];
+  for (const row of record.rows || []) {
+    const c0 = (row.cells[0]?.text || '').trim();
+    const c1 = (row.cells[1]?.text || '').trim();
+    const full = row.cells.map(c => (c.text || '').trim()).filter(Boolean).join(' ');
+
+    if (/手部防护[：:]/i.test(c0)) {
+      inHandProtection = true;
+      if (c1) handSpecs.push(c1);
+      continue;
+    }
+
+    if (inHandProtection) {
+      if (/眼睛防护|身体防护|呼吸系统防护|工程控制|8\.\d/i.test(c0)) {
+        inHandProtection = false;
+      } else {
+        if (full && full.length > 2 && !/手部防护/i.test(full)) {
+          handSpecs.push(full);
+        }
+      }
+    }
+  }
+  if (handSpecs.length > 0) {
+    facts.exposureControls.ppe.hands = handSpecs.join('；');
   }
 }
 
@@ -971,6 +1085,8 @@ function parseSection11(record, facts) {
       facts.toxicology.acuteToxicity.inhalation = val;
     } else if (/经皮/i.test(label)) {
       facts.toxicology.acuteToxicity.dermal = val;
+    } else if (/粘膜刺激/i.test(label)) {
+      facts.toxicology.mucousMembraneIrritation = val;
     } else if (/皮肤刺激/i.test(label)) {
       facts.toxicology.skinIrritation = val;
     } else if (/严重眼睛损伤|眼刺激/i.test(label)) {
@@ -984,6 +1100,10 @@ function parseSection11(record, facts) {
       }
     } else if (/附加信息/i.test(label)) {
       if (val) facts.toxicology.additionalInfo.push(val);
+    }
+
+    if (/无可用的毒理学研究|风险评估数据|无可用的数据/i.test(label)) {
+      facts.toxicology.clinicalAssessment = (facts.toxicology.clinicalAssessment ? facts.toxicology.clinicalAssessment + '\n' : '') + label;
     }
   }
 }
@@ -1019,6 +1139,13 @@ function parseSection14(record, facts) {
   for (const p of s14Pairs) {
     const lbl = p.rawLabel || '';
     const val = p.rawValue || '';
+
+    // 先行语义判定：非危险品运输方式 (公路/陆运/铁路/海上/空运)
+    if (/公路|陆运|铁路|海上|海运|空运/i.test(lbl)) {
+      if (!facts.transport.transportModes) facts.transport.transportModes = [];
+      facts.transport.transportModes.push({ mode: lbl, description: val });
+      continue;
+    }
 
     // 14.1 UN 编号
     if (/14\.1|UN|联合国编号/i.test(lbl)) {
@@ -1085,6 +1212,13 @@ function parseSection14(record, facts) {
 function parseSection15(record, facts) {
   const allText = record.rows?.map(r => r.cells.map(c => c.text).join(' ')).join('\n') || '';
   facts.regulations.rawText = allText;
+  const lines = allText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  facts.regulations.catalogs = [];
+  for (const line of lines) {
+    if (/(?:危险化学品|GB|令|条例|规定|规范|法)/i.test(line) && !/法规信息|下列法规|法律法规/i.test(line)) {
+      facts.regulations.catalogs.push({ name: line, raw: line });
+    }
+  }
 }
 
 function parseSection16(record, facts) {
