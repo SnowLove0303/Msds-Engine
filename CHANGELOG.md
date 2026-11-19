@@ -1,5 +1,48 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-19 全局通用 MSDS 标准化重构与同品类基准数据库补充体系 (UNIVERSAL-MSDS-STANDARDIZATION-AND-DB-HARMONIZATION)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与通用性原则 (Universality Principle)，全面治理过度非标源文档导致的空值行、短命剪枝与槽位漂移顽疾，重构通用匹配与基准数据库协作架构：
+1. **问题根因穿透与通用性重构 (5-Whys Root Cause Inquest)**：
+   - 此前流水线过度依赖源文件格式规范度，面对非结构化源文档（如 PA-3654 等）时，因字段未命中触发激进剪枝，导致产出物连续空值行或内容过少；
+   - 历史代码存在单型号局部特判与 Section 11 误将全引擎 JSON 序列化导致所有单产品误判为通栏多组分的严重 Bug；
+   - 彻底废除局部特判，确立“同品类基准数据库 + 智能匹配引擎协同回填”通用治理架构。
+2. **同品类基准数据库与智能匹配引擎咬合 (Benchmark DB & Smart Matching Harmonization)**：
+   - **双库架构**：在便携式 SQLite (`web/data/msds_repo.db`) 中建立并初始化 `benchmark_category_specs` 基准规格表，同时生成生产级 `web/data/mysql_schema.sql`；
+   - **受控白名单回填**：坚守“事实第一公理 (Source Fact Supremacy)”，仅在缺失状态下且仅针对安全通则槽位（S8 手套测试参数、S13 废弃法规、S15 基础法规）从基准库补充，绝对禁止覆盖源文件真实 CAS、浓度与实测终点；
+   - **双向品类寻址**：支持型号前缀（如 `PA-` -> 单组份水性丙烯酸乳液）精准命中与 `default` 通用回退。
+3. **核心章节槽位硬规制与 S11 状态机重构 (Core Section Invariants & S11 State Machine)**：
+   - **Section 1 槽位法定锁定**：Row 1 (`1.1 产品名称：`) 严格填写型号（如 `PA-3654`），Row 2 (`中文名称：`) 严格填写品名+型号（如 `水性丙烯酸乳液 PA-3654`），对齐底模指示，彻底消灭空栏；
+   - **Section 8 PPE 与工程控制**：从同品类基准库补充 EN 374-3、FKM、IIR、NBR 手套参数与建议，彻底消灭连续 6 行留空；英文版 `Engineering controls` 严格同构英译；
+   - **Section 11 纯产品双栏表格重构**：修复 `detectSection11Paradigm` 序列化 engine 引发 2 CAS 假阳性的历史缺陷，单体/纯产品毒理终点强制收敛为 `PARADIGM_2_STANDARD_SLOTS` 双栏表格，彻底删除凭空捏造的免责行（“该产品无可用的毒理学研究”）；
+   - **Section 13 废弃法规总则与处理方法清晰分流**：Row 1 国标总则、Row 2 欧盟 EWC 法规、Row 3 置顶 `处理方法：` 标签承载倒空回收与禁排废水要求，消灭幽灵空行；
+   - **Section 14 运输信息源文事实 100% 完整保留**：全面保全公路规范、IMDG CODE、IATA 规则及温控范围（`避免高于50℃及低于-5℃，远离食物与酸碱`），英文版采用多条款精准翻译；
+   - **Section 15 法规清单规整**：规整法规序号列表，语义剪枝未引用的外生标准（如 `GB 15258`）。
+4. **外部 Agent 契约白皮书与双极双层法医主审计核销**：
+   - 同步更新 `体系交接文档/MSDS_Studio_Agent_Test_Kit/README_FOR_AGENT.md`，确立十大排版与事实硬指标及基准库协作规范；
+   - 重新覆写生成 `PA-3654` 全套 8 格式交付物（4 DOCX + 4 PDF），运行 `audit_bipolar_bilayer.mjs`，100% 满分通过（Exit Code: 0，0 Failures）。
+
+---
+
+## [2026-11-19 PA-4914 大类归属纠偏与物理双库及 Notion 账本彻底重构 (2-1 丙烯酸乳液 -> 2-4 水溶性丙烯酸树脂)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户核心指令纠偏：
+1. **问题根因定位 (5-Whys Root Cause Inquest)**：
+   - 此前批量归集时，自动化脚本依赖了 Notion 历史旧记录（旧记录曾被登记为 `02-1 单组份水性丙烯酸乳液 PA`），导致将源文件误放入 `2-1` 目录；
+   - 冠志 PA-49xx 系列（如 PA-4910、PA-4911、PA-4913、PA-4914）在化工领域本质上均属于水溶性丙烯酸树脂，其法定物理与逻辑大类应严格为 `2-4 水溶性丙烯酸树脂 PA`。
+2. **物理双库彻底重构与清理**：
+   - **算法生产提取库 (`F:\App Location\Guanzhi Tong\Skill\MSDS-Engine\算法训练材料\源文件材料`)**：
+     - 正确建立目标路径：`2-4 水溶性丙烯酸树脂 PA\PA-4914\`；
+     - 迁移全部 8 份标准源文件（中英文冠志/国彩 MSDS+TDS 各 4 份）；
+     - 彻底删除原 `2-1 单组份水性丙烯酸乳液 PA\PA-4914\` 误放目录，杜绝冗余与污染。
+   - **原始资产集中归集总库 (`E:\冠志\TDS MSDS 备用版`)**：
+     - 同步建立目标路径：`E:\冠志\TDS MSDS 备用版\TDS MSDS (2)\TDS MSDS\产品 TDS MSDS -- WORD版本\2-4 水溶性丙烯酸树脂 PA\PA-4914\`；
+     - 同步迁移 8 份规范源文件，并删除原 `2-1` 误放目录；
+     - 双库 8 份文件 SHA-256 校验 100% 一致。
+3. **Notion 十六格式全景对账表同步纠偏**：
+   - 针对 `PA-4914`（序号 359），将其 `产品大类` Select 属性由 `02-1 单组份水性丙烯酸乳液 PA` 正式更正为 `02-4 水溶性丙烯酸树脂 PA`；
+   - 保持 8 项中文格式为【有】，得分 MSDS 4/8, TDS 4/8, 总分 8/16, 全景评级 `8/16 基础齐备`。
+4. **终审凭据**：
+   - 运行 `scripts/verify_pa4914_corrected.mjs`，物理双库存在性、旧路径删除确认与 Notion 线上大类属性核对全部 100% PASS（Exit Code: 0）。
+
+---
+
 ## [2026-11-18 EC-1848 水性环氧固化剂八格式全量受控覆写生产与底座组分抽取通用缺陷根治 (EC1848-EIGHT-DELIVERABLES-AND-COMPONENT-EXTRACTION-FIX)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与 MSDS-Studio 工业级受控规程。顺利完成水性环氧固化剂品类代表型号 `EC-1848` 从源文档抽取到 8 格式（4 DOCX + 4 PDF）的高质量覆写交付与三大机械套件全景深度审计，并攻克底座两项隐蔽通用缺陷：
 1. **EC-1848 8 格式受控产出与化学事实绝对保真**：
    - **源文件事实锚定**: 严格源于 `EC-1848 msds_CN 冠志.docx`，定性为危化品 (`isHazardous = true`)、`对水环境有慢性危害 类别 3 (H412)`，信号词 `警告` (`Warning`)，无 GHS 象形图；

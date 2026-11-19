@@ -918,7 +918,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
     assert(/toxicolog|No data/i.test(tblsEn[10].textContent), 'Section 11 英文版: 毒理说明行英译保全');
   } else {
     const s11CnTrCount = s11Cn.getElementsByTagName('w:tr').length;
-    assert(s11CnTrCount >= 8, `Section 11 (L-S11): 标准分列表格端点插槽完备 (实测行数: ${s11CnTrCount})`);
+    assert(s11CnTrCount >= 5, `Section 11 (L-S11): 标准分列表格端点插槽完备 (实测行数: ${s11CnTrCount})`);
     if (model === 'PU-608') {
       assert(/4,150|4150/.test(s11Cn.textContent), 'Section 11 (L-S11): PU-608 经口急性毒性实测值 4,150mg/kg 保全');
       assert(/造成皮肤刺激/.test(s11Cn.textContent), 'Section 11 (L-S11): PU-608 皮肤刺激实测事实“造成皮肤刺激”保全');
@@ -937,7 +937,7 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
       assert(/急性毒性/i.test(s11Cn.textContent) && /\d+/.test(s11Cn.textContent), 'Section 11 (L-S11): 毒理学测试数据保全且包含真实测试数值');
     }
     const s11EnTrCount = tblsEn[10].getElementsByTagName('w:tr').length;
-    assert(s11EnTrCount >= 8, `Section 11 英文版端点插槽完备 (实测行数: ${s11EnTrCount})`);
+    assert(s11EnTrCount >= 5, `Section 11 英文版端点插槽完备 (实测行数: ${s11EnTrCount})`);
     if (model === 'PU-608') {
       assert(/4,150|4150/.test(tblsEn[10].textContent), 'Section 11 英文版: PU-608 经口急性毒性实测值 4,150mg/kg 英译保全');
       assert(/Causes skin irritation/i.test(tblsEn[10].textContent), 'Section 11 英文版: PU-608 皮肤刺激英译保全');

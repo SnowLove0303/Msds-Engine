@@ -1,3 +1,4 @@
+import { getBenchmarkSpecsByCategory } from './msds-db.js';
 import { translateChemicalTerm } from './context-governor.js';
 import fsSync from 'node:fs';
 
@@ -834,7 +835,7 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     'sec8.fkm_glove': 'Thickness ≥ 0.4 mm; Breakthrough time ≥ 480 min.',
     'sec8.iir_glove': 'Thickness ≥ 0.5 mm; Breakthrough time ≥ 480 min.',
     'sec8.nbr_glove': 'Thickness ≥ 0.35 mm; Breakthrough time ≥ 480 min.',
-    'sec8.glove_recommendation': 'Discard contaminated gloves.',
+
     'sec8.eye_protection': (() => {
       const cnS8Rec = baseCnEngine?.records?.find(r => r.sectionNumber === 8);
       const cnEye = cnS8Rec?.rows?.find(r => /眼睛防护/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
@@ -843,12 +844,25 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
       return cnEye || '';
     })(),
     'sec8.body_protection': 'Wear appropriate protective clothing.',
+    'sec8.glove_recommendation': (() => {
+      const cnS8Rec = baseCnEngine?.records?.find(r => r.sectionNumber === 8);
+      const cnRec = cnS8Rec?.rows?.find(r => /建议/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
+      if (!cnRec) return 'Discard contaminated gloves.';
+      if (/洗手/i.test(cnRec)) return 'Promptly replace contaminated gloves and wash hands thoroughly after removing gloves.';
+      return 'Discard contaminated gloves.';
+    })(),
     'sec8.engineering_controls': (() => {
       const cnS8Rec = baseCnEngine?.records?.find(r => r.sectionNumber === 8);
       const cnEng = cnS8Rec?.rows?.find(r => /工程控制/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
       if (!cnEng) return '';
-      if (/局部排风.*全面通风/i.test(cnEng)) {
+      if (/局部排风.*全面通风|全面通风.*局部排风/i.test(cnEng)) {
         return 'Use local exhaust or general ventilation to maintain workplace concentrations below occupational exposure limits; eyewash and safety shower facilities should be provided in the workplace.';
+      }
+      if (/提供充分的通风|充分通风|充分的通风排气|通风排气/i.test(cnEng)) {
+        return 'Provide adequate ventilation to maintain airborne concentrations at low levels.';
+      }
+      if (/通风|排风/i.test(cnEng)) {
+        return 'Provide adequate ventilation.';
       }
       if (/2006\/121|无可用的接触限值/i.test(cnEng)) {
         return 'No exposure limit information is available under EC Directive 2006/121/EC.';
@@ -856,7 +870,7 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
       if (/不含有职业接触限值|不含职业接触/i.test(cnEng)) {
         return 'Contains no substances with occupational exposure limit values.';
       }
-      return '';
+      return translateChemicalTerm(cnEng) || cnEng;
     })(),
 
     // Section 9
@@ -1902,15 +1916,15 @@ export function detectSection11Paradigm(section11FactsOrRecords) {
   if (typeof section11FactsOrRecords === 'string') {
     rawText = section11FactsOrRecords;
   } else if (Array.isArray(section11FactsOrRecords)) {
-    rawText = section11FactsOrRecords.map(item => (typeof item === 'string' ? item : item?.text || '')).join(' ');
+    rawText = section11FactsOrRecords.map(item => (typeof item === 'string' ? item : (item?.text || (item?.rows ? item.rows.map(r => (r.cells || []).map(c => c.text || '').join(' ')).join(' ') : '')))).join(' ');
+  } else if (section11FactsOrRecords.text && typeof section11FactsOrRecords.text === 'string') {
+    rawText = section11FactsOrRecords.text;
   } else if (section11FactsOrRecords.rows && Array.isArray(section11FactsOrRecords.rows)) {
     rawText = section11FactsOrRecords.rows.map(r => (r.cells || []).map(c => c.text || '').join(' ')).join(' ');
-  } else if (section11FactsOrRecords.node && typeof section11FactsOrRecords.node.textContent === 'string') {
-    rawText = section11FactsOrRecords.node.textContent;
   } else {
     try {
       rawText = JSON.stringify(section11FactsOrRecords, (key, value) => {
-        if (key === 'node' || key === 'record' || key === 'table' || key === 'parent') return undefined;
+        if (key === 'node' || key === 'record' || key === 'table' || key === 'parent' || key === 'engine' || key === 'records') return undefined;
         return value;
       });
     } catch {
@@ -2033,19 +2047,24 @@ export function buildDynamicSection11Table(engine, srcEngine, baseCnEngine = nul
   let endpoints = [];
   const cnS11 = baseCnEngine ? baseCnEngine.records.find(r => r.sectionNumber === 11) : null;
   if (cnS11 && isEnglish) {
-    if (cnS11.rows.length >= 4) {
-      for (let rIdx = 3; rIdx < cnS11.rows.length; rIdx++) {
-        const row = cnS11.rows[rIdx];
-        const rawLbl = (row.cells[0]?.text || '').trim();
-        const rawVal = (row.cells[row.cells.length - 1]?.text || '').trim();
-        if (!rawLbl) continue;
-        const cleanLbl = rawLbl.replace(/^\s*11\.\d+\s*/, '').replace(/[:：]$/, '');
-        endpoints.push({
-          cnLabel: cleanLbl,
-          enLabel: mapToxicologyLabelToEnglish(cleanLbl),
-          content: rawVal
-        });
+    for (let rIdx = 1; rIdx < cnS11.rows.length; rIdx++) {
+      const row = cnS11.rows[rIdx];
+      if (!row || !row.cells || row.cells.length === 0) continue;
+      // 若为单格说明前言行（非毒理终点），跳过
+      if (row.cells.length === 1 && !/11\.\d/i.test(row.cells[0]?.text || '')) {
+        continue;
       }
+      const rawLbl = (row.cells[0]?.text || '').trim();
+      const rawVal = (row.cells[row.cells.length - 1]?.text || '').trim();
+      if (!rawLbl) continue;
+      if (/无可用的毒理学研究|下面是这些成分|毒理学研究数据如下/i.test(rawLbl)) continue;
+
+      const cleanLbl = rawLbl.replace(/^\s*11\.\d+\s*/, '').replace(/[:：]$/, '');
+      endpoints.push({
+        cnLabel: cleanLbl,
+        enLabel: mapToxicologyLabelToEnglish(cleanLbl),
+        content: rawVal
+      });
     }
   }
 
@@ -2086,8 +2105,14 @@ export function buildDynamicSection11Table(engine, srcEngine, baseCnEngine = nul
     return;
   }
 
-  // 2. 动态自适应调整行数 (Row 0=标题, Row 1=声明1, Row 2=声明2, Row 3..N=终点)
-  const targetRowCount = 3 + endpoints.length;
+  // 1.5 判断源文件是否真正包含多组分/替代说明前言 (源事实防伪门禁)
+  const srcS11Rec = (srcEngine || baseCnEngine)?.records?.find(r => r.sectionNumber === 11);
+  const srcAllText = srcS11Rec ? (srcS11Rec.rows ? srcS11Rec.rows.map(r => r.cells.map(c => c.text).join(' ')).join(' ') : (srcS11Rec.text || '')) : '';
+  const srcHasPreamble = Boolean(facts.isMultiComponentComposite || facts.isMultiComponentS11 || /无可用的毒理学研究|下面是这些成分|毒理学研究数据如下|成分的毒理学数据/i.test(srcAllText));
+
+  const preambleRowCount = srcHasPreamble ? 2 : 0;
+  const targetRowCount = 1 + preambleRowCount + endpoints.length;
+
   while (s11.rows.length < targetRowCount) {
     s11 = addRowAfter(engine, s11, s11.rows.length - 1);
   }
@@ -2097,7 +2122,7 @@ export function buildDynamicSection11Table(engine, srcEngine, baseCnEngine = nul
 
   // 3. 几何拓扑规整：消除 vMerge 与多余列，固化 2800 / 6981 纯净双列结构
   for (let i = 0; i < endpoints.length; i++) {
-    const row = s11.rows[3 + i];
+    const row = s11.rows[1 + preambleRowCount + i];
     if (row?.node) {
       normalizeTwoColumnRow(row.node, 2800, 6981);
     }
@@ -2105,48 +2130,49 @@ export function buildDynamicSection11Table(engine, srcEngine, baseCnEngine = nul
   engine.refresh();
   s11 = engine.records.find(r => r.sectionNumber === 11);
 
-  // 4. 前言声明行排版 (Row 1 & Row 2)
-  if (s11.rows[1]) {
-    formatSection11PreambleRow(
-      s11.rows[1],
-      isEnglish ? 'No toxicological studies are available on the product.' : '该产品无可用的毒理学研究。',
-      isEnglish,
-      0
-    );
-  }
-  if (s11.rows[2]) {
-    const srcS11Rec = (srcEngine || baseCnEngine)?.records?.find(r => r.sectionNumber === 11 && r.rows);
-    const srcRow2Text = (srcS11Rec?.rows?.[2]?.cells[0]?.text || '').trim();
-    let preamble = !isEnglish ? '下面是这些成分的毒理学数据。' : 'The following is toxicological data for these ingredients:';
-    if (srcRow2Text) {
-      if (!isEnglish) {
-        preamble = srcRow2Text.endsWith('：') || srcRow2Text.endsWith(':') ? srcRow2Text : `${srcRow2Text}：`;
-      } else {
-        if (/类似产品/i.test(srcRow2Text)) {
-          preamble = 'Risk assessment data of similar products:';
-        } else if (/以[下为](?:是)?(.*?)毒理学数据/i.test(srcRow2Text)) {
-          const m = srcRow2Text.match(/以[下为](?:是)?(.*?)毒理学数据/i);
-          let targetChem = m[1].trim();
-          targetChem = translateChemicalTerm(targetChem) || targetChem;
-          targetChem = targetChem.replace(/N,N[－-]二甲基乙酰胺(?:\s*[（(]DMAC[）)])?/gi, 'N,N-Dimethylacetamide (DMAC)');
-          preamble = `The following is toxicological data for ${targetChem}:`;
+  // 4. 前言声明行排版 (仅当源事实具有说明行时保留，严禁凭空伪造)
+  if (srcHasPreamble) {
+    if (s11.rows[1]) {
+      formatSection11PreambleRow(
+        s11.rows[1],
+        isEnglish ? 'No toxicological studies are available on the product.' : '该产品无可用的毒理学研究。',
+        isEnglish,
+        0
+      );
+    }
+    if (s11.rows[2]) {
+      const srcRow2Text = (srcS11Rec?.rows?.[2]?.cells[0]?.text || '').trim();
+      let preamble = !isEnglish ? '下面是这些成分的毒理学数据。' : 'The following is toxicological data for these ingredients:';
+      if (srcRow2Text) {
+        if (!isEnglish) {
+          preamble = srcRow2Text.endsWith('：') || srcRow2Text.endsWith(':') ? srcRow2Text : `${srcRow2Text}：`;
         } else {
-          preamble = 'The following is toxicological data for these ingredients:';
+          if (/类似产品/i.test(srcRow2Text)) {
+            preamble = 'Risk assessment data of similar products:';
+          } else if (/以[下为](?:是)?(.*?)毒理学数据/i.test(srcRow2Text)) {
+            const m = srcRow2Text.match(/以[下为](?:是)?(.*?)毒理学数据/i);
+            let targetChem = m[1].trim();
+            targetChem = translateChemicalTerm(targetChem) || targetChem;
+            targetChem = targetChem.replace(/N,N[－-]二甲基乙酰胺(?:\s*[（(]DMAC[）)])?/gi, 'N,N-Dimethylacetamide (DMAC)');
+            preamble = `The following is toxicological data for ${targetChem}:`;
+          } else {
+            preamble = 'The following is toxicological data for these ingredients:';
+          }
         }
       }
+      formatSection11PreambleRow(
+        s11.rows[2],
+        preamble,
+        isEnglish,
+        34
+      );
     }
-    formatSection11PreambleRow(
-      s11.rows[2],
-      preamble,
-      isEnglish,
-      34
-    );
   }
 
   // 5. 动态装配每一个毒理终点 (11.1 ~ 11.N)
   for (let i = 0; i < endpoints.length; i++) {
     const ep = endpoints[i];
-    const row = s11.rows[3 + i];
+    const row = s11.rows[1 + preambleRowCount + i];
     if (!row || row.cells.length < 2) continue;
 
     const seqStr = `11.${i + 1}`;
@@ -2185,6 +2211,15 @@ export function translateTransportValueToEnglish(cnText, mode = 'road') {
   if (/^非危险品陆运输方式[，,]?\s*符合ADG准则[。.]?$/i.test(text)) {
     return 'Not classified as dangerous goods for land transport, in accordance with ADG regulations.';
   }
+  if (/公路运输规范|公路运输/i.test(text)) {
+    return 'Not classified as dangerous goods for land transport, in accordance with road transport regulations.';
+  }
+  if (/IMDG/i.test(text)) {
+    return 'Not classified as dangerous goods for sea transport, in accordance with IMDG Code.';
+  }
+  if (/IATA/i.test(text)) {
+    return 'Not classified as dangerous goods for air transport, in accordance with IATA Dangerous Goods Regulations.';
+  }
   if (/^非危险品海运方式[，,]?\s*符合IMDG准则[。.]?$/i.test(text)) {
     return 'Not classified as dangerous goods for sea transport, in accordance with IMDG regulations.';
   }
@@ -2205,9 +2240,9 @@ export function translateTransportValueToEnglish(cnText, mode = 'road') {
   }
 
   // 复合特殊注意事项处理 (如: 非危险货物。 温度不可高于+40℃，温度不可低于5℃。 远离食物、酸和碱。)
-  const sentences = text.split(/[。\n]+/).map(s => s.trim()).filter(Boolean);
+  const clauses = text.split(/[。；;\n，,]+/).map(s => s.trim()).filter(Boolean);
   const enParts = [];
-  for (const s of sentences) {
+  for (const s of clauses) {
     if (/非危险/i.test(s)) {
       enParts.push('Not regulated as dangerous goods.');
     } else if (/高于|低于/i.test(s)) {
@@ -2234,26 +2269,28 @@ export function buildDynamicSection14Table(engine, srcEngine, baseCnEngine = nul
   if (!s14) return;
 
   const effectiveSrc = baseCnEngine || srcEngine;
-  const srcS14 = effectiveSrc?.records?.find(r => r.sectionNumber === 14);
+  const s14Records = effectiveSrc?.records?.filter(r => r.sectionNumber === 14) || [];
 
   // 通用解构源文档 Section 14 所有行与多段落键值对
   const s14Pairs = [];
-  if (srcS14 && srcS14.rows) {
-    for (const row of srcS14.rows) {
-      const pairs = decomposeCellPairToFacts(row.cells?.[0], row.cells?.[1], row, 14);
-      s14Pairs.push(...pairs);
-    }
-  } else if (srcS14 && srcS14.text) {
-    const lines = srcS14.text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    for (const line of lines) {
-      const m = line.match(/^([^：:\s]+)[：:]\s*(.*)$/);
-      if (m) {
-        s14Pairs.push({ rawLabel: m[1].trim(), rawValue: m[2].trim() });
+  for (const rec of s14Records) {
+    if (rec && rec.rows) {
+      for (const row of rec.rows) {
+        const pairs = decomposeCellPairToFacts(row.cells?.[0], row.cells?.[1], row, 14);
+        s14Pairs.push(...pairs);
+      }
+    } else if (rec && rec.text) {
+      const lines = rec.text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      for (const line of lines) {
+        const m = line.match(/^([^：:\s]+)[：:]\s*(.*)$/);
+        if (m) {
+          s14Pairs.push({ rawLabel: m[1].trim(), rawValue: m[2].trim() });
+        }
       }
     }
   }
 
-  const srcS14Text = srcS14 ? (srcS14.rows ? srcS14.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n') : (srcS14.text || '')) : '';
+  const srcS14Text = s14Records.map(r => r.rows ? r.rows.map(row => row.cells.map(c => c.text).join(' ')).join('\n') : (r.text || '')).join('\n');
 
   const dgFacts = facts.dangerousGoods || facts.transport || {};
   const unMatch = srcS14Text.match(/UN\s*(\d{4})/i) || srcS14Text.match(/联合国编号\s*[:：]?\s*(\d{4})/i);
@@ -2397,7 +2434,7 @@ export function buildDynamicSection14Table(engine, srcEngine, baseCnEngine = nul
     valEn: marpolValEn
   });
 
-  const roadPair = s14Pairs.find(p => /公路|铁路|land|road|rail/i.test(p.rawLabel));
+  const roadPair = s14Pairs.find(p => /(?:公路|铁路|陆路|陆运|land|road|rail)/i.test(p.rawLabel));
   const seaPair = s14Pairs.find(p => /海运|海上|sea|maritime|imdg/i.test(p.rawLabel));
   const airPair = s14Pairs.find(p => /空运|航空|air|iata/i.test(p.rawLabel));
   const specPair14 = s14Pairs.find(p => /特殊|注意事项|防范|special/i.test(p.rawLabel));
@@ -2834,14 +2871,24 @@ function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
   let s13 = engine.records.find(r => r.sectionNumber === 13);
   if (s13) {
     if (s13.rows.length === 3) {
-      const origText = (s13.rows[1].cells[0]?.text || '').trim();
       s13 = addRowAfter(engine, s13, 1);
-      if (origText.includes('在欧盟领域内废弃')) {
-        const parts = origText.split(/\r?\n|。/);
-        const line1 = parts.find(p => p.includes('适用的国标') || p.includes('国家或当地法规')) || '必须遵守适用的国标、国家或当地法规进行废弃。';
-        const line2 = parts.find(p => p.includes('欧盟领域内废弃')) || '在欧盟领域内废弃，应根据欧洲废弃物分类（EWC）的适当法规。';
-        safeWriteCellValue(s13.rows[1].cells[0], line1.endsWith('。') ? line1 : line1 + '。');
-        safeWriteCellValue(s13.rows[2].cells[0], line2.endsWith('。') ? line2 : line2 + '。');
+    }
+    if (s13.rows.length >= 4) {
+      safeWriteCellValue(s13.rows[1].cells[0], '必须遵守适用的国标、国家或当地法规进行废弃。严格按照国家和地方危废与环保管理法规执行。');
+      safeWriteCellValue(s13.rows[2].cells[0], '在欧盟领域内废弃，应根据欧洲废弃物分类（EWC）的适当法规。');
+      if (s13.rows[3]?.cells[1]) {
+        let mVal = (s13.rows[3].cells[1].text || '').trim();
+        if (!mVal || mVal.includes('此处填写')) {
+          mVal = '尽可能将容器倒空（例如经倾倒，刮擦或排干直至“滴干”）。可根据化学工业现存的回收方案送往适当的收集点处理。容器应按照国家法令和环境相关法规进行回收。严禁直接排放至废水中。';
+        } else {
+          if (!mVal.includes('“滴干”')) {
+            mVal = `尽可能将容器倒空（例如经倾倒，刮擦或排干直至“滴干”）。${mVal}`;
+          }
+          if (!mVal.includes('严禁直接排放') && !mVal.includes('不能将废弃物通过废水')) {
+            mVal += ' 严禁直接排放至废水中。';
+          }
+        }
+        safeWriteCellValue(s13.rows[3].cells[1], mVal);
       }
     }
     const lastRow = s13.rows[s13.rows.length - 1];
@@ -2927,7 +2974,8 @@ function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
 
   // 9.5 Section 11 & Section 12 双范式动态分流处理 (Ps-openspec 2.0: 多组分走通栏，单组分如 PU-202A 走原版分列表格)
   const isMultiComponent = Boolean(facts.isMultiComponentComposite || facts.isMultiComponentS11);
-  const s11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || srcEngine?.records?.find(r => r.sectionNumber === 11) || null);
+  const s11Recs = srcEngine?.records?.filter(r => r.sectionNumber === 11) || [];
+  const s11Paradigm = isMultiComponent ? 'PARADIGM_1_FULL_WIDTH_MERGED' : detectSection11Paradigm(facts?.section11 || s11Recs);
   if (s11Paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED') {
     buildThreeTierSection11(engine, { ...facts, modelCode: modelCode || '', srcEngine }, false);
     cleanSection12Preambles(engine, false);
@@ -3091,6 +3139,23 @@ function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
         }
       }
     }
+    // 结合同品类基准库补充手部防护手套技术参数（消灭 6 行空值栏）
+    const benchmark = getBenchmarkSpecsByCategory(modelCode);
+    if (benchmark?.ppeHandSpecs) {
+      for (const row of s8.rows) {
+        const lbl = (row.cells[0]?.text || '').trim();
+        const valCell = row.cells.length > 1 ? row.cells[row.cells.length - 1] : null;
+        if (!valCell) continue;
+        const curVal = (valCell.text || '').trim();
+        if (!curVal) {
+          if (/氟化橡胶|FKM/i.test(lbl)) safeWriteCellValue(valCell, benchmark.ppeHandSpecs.fkm);
+          else if (/丁基橡胶|IIR/i.test(lbl)) safeWriteCellValue(valCell, benchmark.ppeHandSpecs.iir);
+          else if (/丁腈橡胶|NBR/i.test(lbl)) safeWriteCellValue(valCell, benchmark.ppeHandSpecs.nbr);
+          else if (/建议/i.test(lbl)) safeWriteCellValue(valCell, srcRecVal || benchmark.ppeHandSpecs.recommendation);
+        }
+      }
+    }
+
     const row82 = s8.rows.find(r => /8\.2\s*工程控制/i.test(r.cells[0]?.text || ''));
     const s8FullText = s8.rows.map(r => r.cells.map(c => c.text || '').join(' ')).join(' ');
     const isNoOEL = /不含有职业接触限值|不含职业接触|无可用的接触限值|2006\/121/i.test(s8FullText);
@@ -3151,7 +3216,7 @@ function formatSection7ChineseLabel(cell, seqStr, labelText, W_NS) {
   // 10.5 规范化 Section 15：源文件仅 4 部法规时，剔除底模外生强塞的 GB 15258
   let s15Rec = engine.records.find(r => r.sectionNumber === 15);
   if (s15Rec) {
-    const srcS15 = srcEngine?.records?.find(r => r.sectionNumber === 15 && r.rows);
+    const srcS15 = srcEngine?.records?.find(r => r.sectionNumber === 15);
     const srcS15Text = srcS15 && srcS15.rows ? srcS15.rows.map(r => r.cells.map(c => c.text).join(' ')).join(' ') : '';
     const srcHasGb15258 = /15258|安全标签编写/i.test(srcS15Text);
     if (!srcHasGb15258) {
