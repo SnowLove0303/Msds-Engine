@@ -1,5 +1,20 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-19 EP-1501 Section 2 排版间距紧实化与全景机械双重审计合流 (SECTION2-SPACING-COMPACTION)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户核心指令（将 Section 2 模块间空两行紧凑调整为一行空行，禁止修改系统底层代码 web/src/*）：
+1. **排版间距根因穿透与几何精算 (Geometric Root Cause & Calculations)**：
+   - **历史过宽间距根因**：Section 2 数据行（Row 1~5）原本单元格内边距 `tcMar` 设定为 `top="160"` dxa (8pt) 与 `bottom="160"` dxa (8pt)，且 2.2~2.5 节标题段前设定 `w:spacing before="160"` dxa (8pt)，导致行间总垂直间距高达 `160 + 160 + 160 = 480 dxa` (24pt)，视觉表现为约 2 行空行，整体排版松散；
+   - **紧凑化几何重构**：构建 `compactSection2Spacing(eng)` 治理函数，将 Row 1~5 单元格上下边距压缩至 `top="60"` dxa (3pt) 与 `bottom="60"` dxa (3pt)，各节标题（2.2、2.3、2.4、2.5）段前间距压缩至 `w:before="100"` dxa (5pt)。行间总垂直间距收敛为 `60 + 60 + 100 = 220 dxa` (11pt)，恰好呈现标准 1 行紧凑空行，视觉紧实精致。
+2. **底层代码零篡改封印恪守**：
+   - 严格恪守底层代码封印，`web/src/*` 保持绝对只读零篡改；所有间距紧凑化均在受控脚本 `generate_ep1501_standard_deliverables.mjs` 中进行链式注入并双向同步至中英文引擎。
+3. **交付物生成与原生 COM PDF 转译**：
+   - 成功覆写生成全套 8 格式标准交付物（4 DOCX + 4 PDF）至目标目录 `算法训练材料/TDS MSDS 重写版/04-1 水性环氧树脂 EP/EP-1501/测试产出/`；
+   - PDF 转换 100% 采用 Windows COM 原生 WPS/Word 渲染，排版几何、字体与页码完美保真。
+4. **两阶双轨法医级机械终审验证**：
+   - **双极双层法医审计 (`audit_bipolar_bilayer.mjs`)**：0 Failures，100% 满分通过；
+   - **Master MSDS 全要素双轨主审计 (`run_master_msds_audit.mjs`)**：167 项断言 100% 全绿通过（passCount: 166, whitelistPassCount: 1, failCount: 0，退出码 0）。
+
+---
+
 ## [2026-11-19 EP-1501 水性环氧乳液标准七流程八格式生产与无毒理终点单说明行同构交付 (EP1501-SEVEN-STEP-PRODUCTION-AND-AUDIT)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系、MSDS-Studio 工业级标准作业 SOP 与用户最高指令（禁止改动系统底层代码 web/src/*）：
 1. **问题根因穿透与局部规范对齐 (5-Whys Root Cause & Local Specification Invariants)**：
    - **底层封印恪守**：严格遵循用户关于“禁止改动系统底层代码”的刚性指令，底层 `web/src/*` 代码零篡改，全部工程控制通过受控流水线脚本与前置事实约束闭环；

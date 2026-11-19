@@ -48,6 +48,67 @@ const targetDir = 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练�
 
 const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
+/**
+ * 紧凑化 Section 2 (危险性概述 / Hazards Identification) 内容与标签间距
+ * 将原本约两行空行 (480 dxa / 24pt) 压缩为紧实的一行空行 (约 220 dxa / 11pt)
+ * 1. 单元格上下边距: w:top="60" dxa, w:bottom="60" dxa (共 120 dxa = 6pt)
+ * 2. 节标题起始段前间距: w:before="100" dxa (5pt)
+ * 垂直总间隙 = 60 + 60 + 100 = 220 dxa (11pt，恰好一行紧凑空行)
+ */
+function compactSection2Spacing(eng) {
+  const s2 = eng.records.find(r => r.sectionNumber === 2);
+  if (!s2 || !s2.rows) return;
+
+  for (let rIdx = 1; rIdx < s2.rows.length; rIdx++) {
+    const row = s2.rows[rIdx];
+    if (!row.node) continue;
+
+    // A. 紧凑化单元格上下内边距 (top=60, bottom=60)
+    const tcPr = row.node.getElementsByTagNameNS(W_NS, 'tcPr')[0];
+    if (tcPr) {
+      let tcMar = tcPr.getElementsByTagNameNS(W_NS, 'tcMar')[0];
+      if (!tcMar) {
+        tcMar = row.node.ownerDocument.createElementNS(W_NS, 'w:tcMar');
+        tcPr.appendChild(tcMar);
+      }
+      let top = tcMar.getElementsByTagNameNS(W_NS, 'top')[0];
+      if (!top) {
+        top = row.node.ownerDocument.createElementNS(W_NS, 'w:top');
+        tcMar.appendChild(top);
+      }
+      top.setAttributeNS(W_NS, 'w:w', '60');
+      top.setAttributeNS(W_NS, 'w:type', 'dxa');
+
+      let bottom = tcMar.getElementsByTagNameNS(W_NS, 'bottom')[0];
+      if (!bottom) {
+        bottom = row.node.ownerDocument.createElementNS(W_NS, 'w:bottom');
+        tcMar.appendChild(bottom);
+      }
+      bottom.setAttributeNS(W_NS, 'w:w', '60');
+      bottom.setAttributeNS(W_NS, 'w:type', 'dxa');
+    }
+
+    // B. 紧凑化主要节标题 (2.2, 2.3, 2.4, 2.5) 段前间距 (before=100)
+    const ps = Array.from(row.node.getElementsByTagNameNS(W_NS, 'p'));
+    for (const p of ps) {
+      const text = (p.textContent || '').trim();
+      if (/^(?:2\.[2-9]|(?:2\.\d+\s*)?(?:(?:GHS\s*)?标签要素|Label elements|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危害|其他危险|Other\s*Hazards?))/i.test(text)) {
+        let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')[0];
+        if (!pPr) {
+          pPr = row.node.ownerDocument.createElementNS(W_NS, 'w:pPr');
+          p.insertBefore(pPr, p.firstChild);
+        }
+        let spacing = pPr.getElementsByTagNameNS(W_NS, 'spacing')[0];
+        if (!spacing) {
+          spacing = row.node.ownerDocument.createElementNS(W_NS, 'w:spacing');
+          pPr.appendChild(spacing);
+        }
+        spacing.setAttributeNS(W_NS, 'w:before', '100');
+      }
+    }
+  }
+}
+
 async function main() {
   console.log('========================================================================');
   console.log(`  EP-1501 全套 8 格式标准受控交付物生产流水线 (Seven-Step SOP)`);
@@ -83,7 +144,7 @@ async function main() {
   const effectiveDate = !isOutdated ? baseCnEngine._adaptiveRevisionDate : todayDateStr;
 
   // 2. 局部规范强化与防污染治理
-  console.log('>>> [Step 2] 执行 Section 1 与 Section 11 规范强化...');
+  console.log('>>> [Step 2] 执行 Section 1、Section 2 与 Section 11 规范强化...');
   
   // Section 1 规范治理：
   // Row 1 题头 (1.1 产品名称：) 值格必须留空，防止污染
@@ -105,6 +166,9 @@ async function main() {
     }
   }
 
+  // Section 2 间距紧凑化治理
+  compactSection2Spacing(baseCnEngine);
+
   // Section 11 规范治理：
   // EP-1501 无毒理学终点，仅有单行免责说明行，剪除模板残留的 11.1 / 11.2 / 11.3 幽灵行
   let s11Cn = baseCnEngine.records.find(r => r.sectionNumber === 11);
@@ -123,6 +187,7 @@ async function main() {
     facts,
     revisionDate: effectiveDate
   });
+  compactSection2Spacing(baseEnEngine);
 
   // 4. 动态探知说明行数量并准备硬性质量门禁事实
   const s12RecordForAudit = baseCnEngine.records.find(r => r.sectionNumber === 12);
@@ -191,6 +256,7 @@ async function main() {
       if (eng.documentXml) enableCrossPageBreaksForAllSections(eng);
       applyGlobalTypographyProjection(eng, false);
       enforceStructuralTypographyInvariants(eng, false);
+      compactSection2Spacing(eng);
 
       const s8Rec = eng.records.find(r => r.sectionNumber === 8);
       if (s8Rec) {
@@ -259,6 +325,7 @@ async function main() {
       if (eng.documentXml) enableCrossPageBreaksForAllSections(eng);
       applyGlobalTypographyProjection(eng, true);
       enforceStructuralTypographyInvariants(eng, true);
+      compactSection2Spacing(eng);
 
       const s13Rec = eng.records.find(r => r.sectionNumber === 13);
       if (s13Rec) {
@@ -358,7 +425,21 @@ async function main() {
     throw new Error(`双极双层深度审计未通过，存在 ${auditRes.failCount} 项严重违章！`);
   }
 
-  console.log('\n🎉🎉🎉 [SUCCESS] EP-1501 标准 8 格式全套交付物生产完毕，并 100% 满分通过双极双层机械审计！');
+  // 10. 执行 Master MSDS 全要素双轨深度对账审计
+  console.log('\n========================================================================');
+  console.log('>>> [Step 8] 启动 Master MSDS 全要素双轨深度对账审计 (Master MSDS Audit)...');
+  console.log('========================================================================');
+  const masterAuditRes = await runMasterMsdsAudit({
+    model: modelCode,
+    targetDir,
+    sourceDocx: sourcePath
+  });
+  console.log('\n>>> [MASTER AUDIT] 审计结论:', masterAuditRes);
+  if (!masterAuditRes.success) {
+    throw new Error(`Master MSDS 深度审计未通过，存在 ${masterAuditRes.failCount} 项严重违章！`);
+  }
+
+  console.log('\n🎉🎉🎉 [SUCCESS] EP-1501 标准 8 格式全套交付物生产完毕，并 100% 满分通过双极双层与 Master MSDS 机械审计！');
 }
 
 main().catch(err => {
