@@ -32,8 +32,8 @@ const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, '../..');
 
 // 动态载入官方正规流水线构件
-const { recognizeSourceDocx } = await import('../../web/src/recognition-engine.js');
-const { governContext } = await import('../../web/src/context-governor.js');
+const { recognizeSourceDocx, serializeFactsToMarkdown } = await import('../../web/src/recognition-engine.js');
+const { governContext, buildStructuredContext2, serializeContext2ToMarkdown } = await import('../../web/src/context-governor.js');
 const { executeEightDeliverablesPipeline } = await import('../../web/src/pipeline-engine.js');
 
 function parseArgs() {
@@ -43,6 +43,7 @@ function parseArgs() {
     model: null,
     targetDir: null,
     facts: null,
+    stopAfter: null,
     skipAudit: false,
     help: false
   };
@@ -53,6 +54,7 @@ function parseArgs() {
     else if (arg.startsWith('--model=')) options.model = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
     else if (arg.startsWith('--targetDir=')) options.targetDir = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
     else if (arg.startsWith('--facts=')) options.facts = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--stopAfter=')) options.stopAfter = arg.split('=', 2)[1].replace(/^["']|["']$/g, '').toLowerCase();
     else if (arg === '--skipAudit') options.skipAudit = true;
     else if (!options.source && !arg.startsWith('--')) options.source = arg.replace(/^["']|["']$/g, '');
   }
@@ -121,11 +123,22 @@ MSDS-Studio 官方标准七步流水线 Runner
   const t1 = Date.now();
   const context1 = await recognizeSourceDocx(sourcePath, path.basename(sourcePath));
   context1.modelCode = modelCode;
-  console.log(`    ✓ 成功解析 16 章节原始事实 (${Date.now() - t1} ms)`);
+  const ctx1MdPath = path.join(targetDir, `${modelCode}_context1.md`);
+  fs.writeFileSync(ctx1MdPath, serializeFactsToMarkdown(context1), 'utf8');
+  console.log(`    ✓ 成功解析 16 章节原始事实 (${Date.now() - t1} ms) -> ${ctx1MdPath}`);
+  if (options.stopAfter === 'context1') {
+    console.log(`\n✅ [STOPPED AFTER PHASE 1] Context 1 已落盘校验: ${ctx1MdPath}`);
+    return;
+  }
 
   // Phase 2 & 3: 事实标准化治理与基准补全 (Context 2)
   console.log(`>>> [Phase 2 & 3/7] 规范治理与同品类基准库补全 (Context 2)...`);
   const t2 = Date.now();
+  const structuredCtx2 = buildStructuredContext2(context1);
+  const ctx2MdPath = path.join(targetDir, `${modelCode}_context2.md`);
+  fs.writeFileSync(ctx2MdPath, serializeContext2ToMarkdown(structuredCtx2), 'utf8');
+  const v = structuredCtx2.validation || {};
+  console.log(`    ✓ Context 2 结构化治理完成: 章节 ${v.coveredSections}/16 | 标注项 ${v.totalItems} | isValid=${v.isValid} -> ${ctx2MdPath}`);
   const governed = governContext(context1, { modelCode });
   const cn = governed.cn;
   const en = governed.en;
@@ -189,6 +202,10 @@ MSDS-Studio 官方标准七步流水线 Runner
   }
 
   console.log(`    ✓ 事实标准化完成，危化定性: ${pipelineFacts.isHazardous ? '危险品' : '非危险化学品'} (${Date.now() - t2} ms)`);
+  if (options.stopAfter === 'context2') {
+    console.log(`\n✅ [STOPPED AFTER PHASE 3] Context 1 & Context 2 已落盘校验，未触发写盘覆写。`);
+    return;
+  }
 
   // Phase 4, 5, 6: 模板加载、万能原语受控覆写与高保真矢量 PDF 转换
   console.log(`>>> [Phase 4, 5, 6/7] 执行母版受控覆写与 Windows WPS 原生 COM PDF 转译...`);
