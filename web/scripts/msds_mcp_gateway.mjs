@@ -143,6 +143,10 @@ async function main() {
     } else if (a === '--argsFile' && args[i + 1]) {
       const content = await fs.readFile(args[++i], 'utf8');
       toolArgs = JSON.parse(content);
+    } else if (a.startsWith('--source=')) {
+      toolArgs.sourceFilePath = a.slice(9);
+    } else if (a === '--source' && args[i + 1]) {
+      toolArgs.sourceFilePath = args[++i];
     } else if (a.startsWith('--out=')) {
       outPath = a.slice(6);
     } else if (a === '--out' && args[i + 1]) {
@@ -188,7 +192,7 @@ async function main() {
       if (outPath) {
         await fs.mkdir(path.dirname(outPath), { recursive: true });
         await fs.writeFile(outPath, md, 'utf8');
-        console.log(JSON.stringify({ status: 'success', tool, format: 'md', outPath, modelCode: data.modelCode, integrity: data.integrity || null }, null, 2));
+        console.log(JSON.stringify({ status: 'success', tool, format: 'md', outPath, modelCode: data.modelCode, integrity: data.integrity || null, validation: data.validation || null }, null, 2));
       } else {
         console.log(md);
       }

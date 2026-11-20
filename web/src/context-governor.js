@@ -969,32 +969,132 @@ export function buildStructuredContext2(context1) {
       }
     } else {
       // 其余标准章节 (S1, S4~S10, S12~S16): 精确纠正 Context 1 的误分类
+      const STANDARD_LABEL_EN = {
+        '产品名称': 'Product name', '中文名称': 'Product Chinese name', '化学品分类': 'Chemical category',
+        '产品使用建议和使用限制': 'Product use suggestions and restrictions', '供应商信息': 'Supplier information',
+        '供应商名称': 'Name of supplier', '供应商地址': 'Supplier address', '电话': 'Tel', '传真': 'Fax',
+        '一般措施': 'General measures', '误服': 'Ingestion', '接触眼睛': 'Eye contact', '接触皮肤': 'Skin contact', '吸入': 'Inhalation',
+        '合适的灭火剂': 'Suitable extinguishing agents', '不合适的灭火剂': 'Unsuitable extinguishing agents',
+        '物质或混合物的特殊危害': 'Special hazards of substances or mixtures', '消防预防措施和保护设备': 'Firefighting precautions and protective equipment',
+        '个人预防措施、应急程序': 'Personal precautions, protective equipment and emergency procedures', '环境保护措施': 'Environmental precautions', '污染物收集和清除的方法': 'Methods and material for containment and cleaning up',
+        '安全操作防范': 'Precautions for safe handling', '安全储存条件': 'Conditions for safe storage',
+        '控制参数': 'Control parameters', '暴露控制': 'Exposure controls', '呼吸系统防护': 'Respiratory protection',
+        '手部防护': 'Hand protection', '防护手套的合适材料': 'Suitable material for protective gloves', '建议': 'Recommendation',
+        '眼睛防护': 'Eye protection', '身体防护': 'Body protection', '工程控制': 'Engineering controls',
+        '化学稳定性': 'Chemical stability', '危险分解产物': 'Hazardous decomposition products', '可能的危害反应': 'Possibility of hazardous reactions',
+        '生态毒性': 'Ecotoxicity', '持久性和降解性': 'Persistence and degradability', '其他不利的影响': 'Other adverse effects',
+        '处理方法': 'Disposal methods', '公路和铁路运输': 'Road and rail transport', '海上运输': 'Maritime transport',
+        '空运': 'Air transport', '用户特殊注意事项': 'Special precautions for user',
+        '其它的规定': 'Other provisions', '其它规定': 'Other provisions', '符合下列法规要求': 'Complies with the following regulations'
+      };
+      const translateLineEn = (cnStr) => {
+        if (!cnStr) return '';
+        let t = sanitizeDegreeAndPunctuation(cnStr);
+        t = translateChemicalTerm(t);
+        t = t
+          .replace(/立即脱掉所有被污染的衣物[。.]?/g, 'Remove all contaminated clothing immediately.')
+          .replace(/禁止催吐[，,]?\s*须就医[。.]?/g, 'Do NOT induce vomiting. Seek medical attention.')
+          .replace(/撑开眼睑[，,]?\s*用温水长时间冲洗[（(]至少10分钟[）)][，,]?\s*就诊眼科医生[。.]?/g, 'Hold eyelids open and flush with plenty of warm water for at least 10 minutes. Consult an ophthalmologist.')
+          .replace(/立即用肥皂和大量的水冲洗[。.]?\s*若发生皮肤反应[，,]?\s*就医[。.]?/g, 'Wash immediately with plenty of soap and water. If skin reaction occurs, seek medical advice.')
+          .replace(/若刺激呼吸道[，,]?\s*就医[。.]?/g, 'If respiratory irritation occurs, seek medical advice.')
+          .replace(/二氧化碳（CO2）[，,]?\s*泡沫[，,]?\s*灭火粉末[，,]?\s*大火时应用喷洒水[。.]?/g, 'Carbon dioxide (CO2), foam, extinguishing powder. For large fires, use water spray.')
+          .replace(/高流量的水喷射[。.]?/g, 'High-volume water jet.')
+          .replace(/戴防护设备[。.]?/g, 'Wear protective equipment.')
+          .replace(/确保充分的通风\/排气[。.]?\s*令未授权人员离开[。.]?/g, 'Ensure adequate ventilation. Keep unauthorized persons away.')
+          .replace(/禁止排入下水道[，,]?\s*废水或土壤中[。.]?/g, 'Do not discharge into drains, wastewater, or soil.')
+          .replace(/根据EC指令2006\/121\/E[GC][，,]?\s*无可用的接触限值信息[。.]?/gi, 'No exposure limit information is available under EC Directive 2006/121/EC.')
+          .replace(/戴眼罩\/面罩[。.]?/g, 'Wear protective goggles/face shield.')
+          .replace(/穿着适当的防护服[。.]?/g, 'Wear appropriate protective clothing.')
+          .replace(/污染的手套应废弃[。.]?/g, 'Discard contaminated gloves.')
+          .replace(/喷涂过程中要求有呼吸防护设备[。.]?/g, 'Respiratory protection equipment is required during spraying.')
+          .replace(/非危险品陆运输方式[。.]?/g, 'Not classified as dangerous goods for land transport.')
+          .replace(/非危险品海运方式[，,]?\s*符合IMDG准则[。.]?/g, 'Not classified as dangerous goods for sea transport, in accordance with IMDG Code.')
+          .replace(/非危险品运输方式[，,]?\s*符合IATA准则[。.]?/g, 'Not classified as dangerous goods for air transport, in accordance with IATA Dangerous Goods Regulations.')
+          .replace(/温度不可高于\s*([+\-－−–]?\d+)\s*°?C[，,]?\s*温度不可低于\s*([+\-－−–]?\d+)\s*°?C[。.]?/gi, (_, hi, lo) => {
+            const norm = v => v.replace(/[－−–]/g, '-');
+            return `Temperature must not exceed ${norm(hi)}°C and must not fall below ${norm(lo)}°C.`;
+          })
+          .replace(/远离食物、酸和碱[。.]?/g, 'Keep away from food, acids and bases.')
+          .replace(/物质或混合物的相关安全、健康和环保法律法规/g, 'Relevant safety, health and environmental regulations for the substance or mixture.')
+          .replace(/危险化学品安全管理条例[，,]?\s*国务院令(?:591|344)号/g, 'Regulations on the Safety Management of Hazardous Chemicals, State Council Decree No. 591.')
+          .replace(/GB\/T\s*16483(?:-2008)?[^\n]*/g, 'GB/T 16483 Safety data sheet for chemical products - Content and order of sections.')
+          .replace(/GB\s*13690(?:-2009)?[^\n]*/g, 'GB 13690 General rules for classification and hazard communication of chemicals.')
+          .replace(/GB\s*(?:30000\.2-29|20576[^\n]*)/g, 'GB 30000.2-29 Rules for classification and labelling of chemicals.')
+          .replace(/GB\s*15258[^\n]*/g, 'GB 15258 General rules for preparation of precautionary label for chemicals.');
+        return t;
+      };
+
       for (const r of rows) {
         const c0 = r.cells?.[0]?.text?.trim() || '';
         const c1 = r.cells?.[1]?.text?.trim() || '';
         if (r.rowIndex === 0) {
-          items.push({ rowIndex: 0, role: 'SECTION_HEADER', bold: true, textCn: c0 || rawSec.title, textEn: translateChemicalTerm(c0 || rawSec.title) });
+          items.push({ rowIndex: 0, role: 'SECTION_HEADER', bold: true, textCn: c0 || rawSec.title, textEn: translateLineEn(c0 || rawSec.title) });
           continue;
         }
         const cellCount = (r.cells || []).length;
-        if (cellCount === 1) {
-          const seqInfo = parseSeqLabel(c0);
-          const isBoldLabel = /^(?:其它的规定|其它规定|符合下列法规要求|暴露控制|手部防护|处理方法)[：:]?$/i.test(c0);
+        if (s === 8 && cellCount >= 3) {
+          const fullRow = (r.cells || []).map(c => (c.text || '').trim()).join(' | ');
+          const isHdr = /物质|CAS|TWA|STEL|限值|OEL|组分|MAC/i.test(fullRow);
           items.push({
             rowIndex: r.rowIndex,
-            role: seqInfo.isSeq ? 'SEQ_LABEL' : (isBoldLabel ? 'SUB_LABEL' : 'EXPLANATION'),
+            role: isHdr ? 'TABLE_HEADER' : 'OEL_ROW',
+            bold: isHdr,
+            cellsCn: (r.cells || []).map(c => (c.text || '').trim()),
+            cellsEn: (r.cells || []).map(c => translateLineEn((c.text || '').trim()))
+          });
+          continue;
+        }
+        if (cellCount === 1) {
+          const seqInfo = parseSeqLabel(c0);
+          const ppeKv = s === 8 && c0.match(/^((?:氟化橡胶|丁基橡胶|丁腈橡胶)[^：:]*[：:])\s*(.*)$/);
+          if (ppeKv) {
+            items.push({
+              rowIndex: r.rowIndex,
+              role: 'SUB_LABEL',
+              seq: null,
+              labelCn: ppeKv[1],
+              valueCn: sanitizeDegreeAndPunctuation(ppeKv[2]),
+              labelEn: translateChemicalTerm(ppeKv[1]),
+              valueEn: sanitizeDegreeAndPunctuation(translateChemicalTerm(ppeKv[2])),
+              boldLabel: true,
+              boldValue: false,
+              indentDxa: 420
+            });
+            continue;
+          }
+          const isBoldLabel = /^(?:其它的规定|其它规定|符合下列法规要求|暴露控制|手部防护|处理方法)[：:]?$/i.test(c0);
+          const isRegItem = s === 15 && /^(?:危险化学品|GB)/i.test(c0);
+          items.push({
+            rowIndex: r.rowIndex,
+            role: seqInfo.isSeq ? 'SEQ_LABEL' : (isBoldLabel ? 'SUB_LABEL' : (isRegItem ? 'REGULATION_ITEM' : 'EXPLANATION')),
             seq: seqInfo.seq,
             labelCn: isBoldLabel || seqInfo.isSeq ? seqInfo.label : '—',
             valueCn: isBoldLabel || seqInfo.isSeq ? '' : sanitizeDegreeAndPunctuation(c0),
-            textEn: sanitizeDegreeAndPunctuation(translateChemicalTerm(c0)),
+            textEn: translateLineEn(c0),
             boldLabel: Boolean(isBoldLabel || seqInfo.isSeq),
             boldValue: false,
             indentDxa: seqInfo.isSeq ? seqInfo.indentDxa : 0
           });
+        } else if (!c0 && c1) {
+          items.push({
+            rowIndex: r.rowIndex,
+            role: 'EXPLANATION',
+            seq: null,
+            labelCn: '—',
+            valueCn: sanitizeDegreeAndPunctuation(c1),
+            textEn: translateLineEn(c1),
+            boldLabel: false,
+            boldValue: false,
+            indentDxa: 0
+          });
         } else {
           const seqInfo = parseSeqLabel(c0);
-          const cleanValCn = sanitizeDegreeAndPunctuation(c1);
+          let cleanValCn = sanitizeDegreeAndPunctuation(c1);
+          if (s === 1 && /中文名称|产品中文名称/i.test(seqInfo.cleanKey) && cleanValCn && modelCode && !cleanValCn.toUpperCase().includes(modelCode.toUpperCase())) {
+            cleanValCn = `${cleanValCn} ${modelCode}`;
+          }
           const condMatch = cleanValCn.match(/^(.*?)\s*[（(]([^()（）]+)[）)]\s*$/);
+          const lblEnBase = STANDARD_LABEL_EN[seqInfo.cleanKey] || translateChemicalTerm(seqInfo.label.replace(/[：:]/g, ''));
           items.push({
             rowIndex: r.rowIndex,
             role: seqInfo.isSeq ? 'SEQ_LABEL' : 'SUB_LABEL',
@@ -1004,8 +1104,8 @@ export function buildStructuredContext2(context1) {
             valueCn: cleanValCn,
             valuePure: condMatch ? condMatch[1].trim() : cleanValCn,
             conditionCn: condMatch ? condMatch[2].trim() : null,
-            labelEn: seqInfo.seq ? `${seqInfo.seq} ${translateChemicalTerm(seqInfo.label.replace(/[：:]/g, ''))}:` : translateChemicalTerm(seqInfo.label),
-            valueEn: sanitizeDegreeAndPunctuation(translateChemicalTerm(cleanValCn)),
+            labelEn: seqInfo.seq ? `${seqInfo.seq} ${lblEnBase}:` : `${lblEnBase}:`,
+            valueEn: translateLineEn(cleanValCn),
             boldLabel: true,
             boldValue: false,
             indentDxa: seqInfo.indentDxa
@@ -1025,6 +1125,14 @@ export function buildStructuredContext2(context1) {
     };
   }
 
+  let totalItems = 0;
+  let emptySectionsCount = 0;
+  for (let s = 1; s <= 16; s++) {
+    const cnt = annotatedSections[s]?.itemsCount || 0;
+    totalItems += cnt;
+    if (cnt === 0) emptySectionsCount++;
+  }
+
   return {
     modelCode,
     generatedAt: new Date().toISOString(),
@@ -1032,7 +1140,13 @@ export function buildStructuredContext2(context1) {
     isHazardous: governed.cn.isHazardous,
     governedModel: governed,
     sections: annotatedSections,
-    editorOps
+    editorOps,
+    validation: {
+      coveredSections: 16 - emptySectionsCount,
+      emptySectionsCount,
+      totalItems,
+      isValid: emptySectionsCount === 0 && totalItems > 0
+    }
   };
 }
 
