@@ -29,8 +29,15 @@ async function testSample(label, filePath) {
   const elapsedMs = Date.now() - t0;
 
   const errors = [];
-  if (!c2.validation?.isValid || c2.validation.coveredSections !== 16) {
+  if (!c2.validation || c2.validation.coveredSections !== 16 || c2.validation.emptySectionsCount !== 0 || c2.validation.totalItems <= 0) {
     errors.push(`章节未全覆盖 (${c2.validation?.coveredSections}/16)`);
+  }
+
+  // 检查 S3 多行组分已拆分为独立行，且非迁移项均具备 placement 网格定位
+  for (const it of (c2.sections?.[3]?.items || [])) {
+    if (it.role === 'COMPONENT_ROW' && /\r?\n/.test(it.cellsCn?.[0] || '')) {
+      errors.push(`S3 R${it.rowIndex} 组分名称仍含换行未拆行`);
+    }
   }
 
   // 检查 S1.1 CN 中文名称是否规范携带 modelCode

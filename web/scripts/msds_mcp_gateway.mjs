@@ -147,6 +147,10 @@ async function main() {
       toolArgs.sourceFilePath = a.slice(9);
     } else if (a === '--source' && args[i + 1]) {
       toolArgs.sourceFilePath = args[++i];
+    } else if (a.startsWith('--translations=')) {
+      toolArgs.translationsJsonPath = a.slice(15);
+    } else if (a === '--translations' && args[i + 1]) {
+      toolArgs.translationsJsonPath = args[++i];
     } else if (a.startsWith('--out=')) {
       outPath = a.slice(6);
     } else if (a === '--out' && args[i + 1]) {

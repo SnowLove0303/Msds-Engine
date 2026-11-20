@@ -43,6 +43,7 @@ function parseArgs() {
     model: null,
     targetDir: null,
     facts: null,
+    translations: null,
     stopAfter: null,
     skipAudit: false,
     help: false
@@ -54,6 +55,7 @@ function parseArgs() {
     else if (arg.startsWith('--model=')) options.model = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
     else if (arg.startsWith('--targetDir=')) options.targetDir = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
     else if (arg.startsWith('--facts=')) options.facts = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--translations=')) options.translations = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
     else if (arg.startsWith('--stopAfter=')) options.stopAfter = arg.split('=', 2)[1].replace(/^["']|["']$/g, '').toLowerCase();
     else if (arg === '--skipAudit') options.skipAudit = true;
     else if (!options.source && !arg.startsWith('--')) options.source = arg.replace(/^["']|["']$/g, '');
@@ -132,13 +134,21 @@ MSDS-Studio 官方标准七步流水线 Runner
   }
 
   // Phase 2 & 3: 事实标准化治理与基准补全 (Context 2)
-  console.log(`>>> [Phase 2 & 3/7] 规范治理与同品类基准库补全 (Context 2)...`);
+  console.log(`>>> [Phase 2 & 3/7] 规范治理与全量英译/标准化表格校验 (Context 2)...`);
   const t2 = Date.now();
-  const structuredCtx2 = buildStructuredContext2(context1);
+  let agentTranslations = null;
+  if (options.translations && fs.existsSync(options.translations)) {
+    agentTranslations = JSON.parse(fs.readFileSync(options.translations, 'utf8'));
+    console.log(`    ℹ️ 已加载 Agent 全量逐句英译回填字典: ${options.translations}`);
+  }
+  const structuredCtx2 = buildStructuredContext2(context1, { translations: agentTranslations });
   const ctx2MdPath = path.join(targetDir, `${modelCode}_context2.md`);
   fs.writeFileSync(ctx2MdPath, serializeContext2ToMarkdown(structuredCtx2), 'utf8');
   const v = structuredCtx2.validation || {};
-  console.log(`    ✓ Context 2 结构化治理完成: 章节 ${v.coveredSections}/16 | 标注项 ${v.totalItems} | isValid=${v.isValid} -> ${ctx2MdPath}`);
+  console.log(`    ✓ Context 2 结构化治理完成: 章节 ${v.coveredSections}/16 | 标注项 ${v.totalItems} | 待补译中文残留 ${v.untranslatedCount} | isValid=${v.isValid} -> ${ctx2MdPath}`);
+  if (v.untranslatedCount > 0) {
+    console.warn(`    ⚠️ [GATE] 尚有 ${v.untranslatedCount} 项英文槽位含中文，请 Agent 逐句翻译后通过 --translations=<json> 回填！`);
+  }
   const governed = governContext(context1, { modelCode });
   const cn = governed.cn;
   const en = governed.en;

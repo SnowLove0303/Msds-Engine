@@ -70,12 +70,12 @@ flowchart TD
   2. 隔离注册地址、电话（广州 020 vs 清远英德 0763）、传真与邮编；
   3. 确立 8 格式标准交付矩阵（4 DOCX + 4 PDF）。
 
-### Phase 3: 事实标准化治理与基准库补全 (Content Governance to Context 2)
-- **底层承载模块**：【规范治理引擎】(`context-governor.js`) + 【同品类基准库】(`msds-db.js`)；
+### Phase 3: 事实标准化治理与全量英译/标准化表格门禁 (Content Governance to Context 2)
+- **底层承载模块**：【规范治理引擎】(`context-governor.js`) + 【Agent 逐句全量英译】；
 - **规程要求**：
-  1. 中英双轨专业术语标准化（遵循 RFC 2119 / GHS 标准英译）；
-  2. 单位与符号标准化：度数统一为西文半角 `°C`（根除全角 `℃`），冒号统一为西文半角带空格 `": "`；
-  3. 联动基准数据库：对源文档确实缺失的手套防范参数（EN 374-3、厚度、穿透时间）、Section 8 职业接触限值进行标准化回填，杜绝产生大面积空行。
+  1. **强制全量逐句英文翻译（严禁仅靠静态映射）**：每次源文件都有新内容，Agent 必须对全部 16 章节的标签、正文、数值、说明行与表头执行逐句全量英译；若 Context 2 存在任何中文残留（`untranslatedCount > 0`），`isValid` 为 `false`，必须将待译清单逐句补译并通过 `--translations=<json>` 回填至 `0` 中文残留；
+  2. **全 16 章节标准化表格与精准格位**：Context 2 全部 16 章节必须使用标准化表格（双列 `Col 0 | Col 1`、通栏合并 `colSpan=2`、多行多列 `S3/S8/S14`），严禁把值或通栏内容全塞入第一列，Section 3 多组分强制拆分为一行一条记录；
+  3. **单位与符号标准化**：度数统一为西文半角 `°C`（根除全角 `℃`），冒号统一为西文半角带空格 `": "`。
 
 ### Phase 4: 官方底模加载与前置值格清零 (Template Loading & Wiping)
 - **底层承载模块**：【OpenXML 底座】([templates/](file:///F:/App%20Location/Guanzhi%20Tong/Skill/MSDS-Engine/%E4%BD%93%E7%B3%BB%E4%BA%A4%E6%8E%A5%E6%96%87%E6%A1%A3/MSDS_Studio_Agent_Test_Kit/templates/))；

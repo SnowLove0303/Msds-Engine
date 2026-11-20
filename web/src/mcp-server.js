@@ -420,7 +420,9 @@ const TOOLS = [
       type: 'object',
       properties: {
         context1JsonPath: { type: 'string', description: '可选：Context 1 JSON 文件路径' },
-        sourceFilePath: { type: 'string', description: '可选：若未传 context1JsonPath，则自动先识别源 DOCX 生成 Context 1 再治理为 Context 2' }
+        sourceFilePath: { type: 'string', description: '可选：若未传 context1JsonPath，则自动先识别源 DOCX 生成 Context 1 再治理为 Context 2' },
+        translationsJsonPath: { type: 'string', description: '可选：Agent 逐句全量英译回填 JSON 文件路径' },
+        translations: { type: 'object', description: '可选：Agent 逐句全量英译映射对象 { cnText: enText }' }
       }
     }
   }
@@ -437,7 +439,11 @@ async function handleToolCall(name, args) {
     } else {
       throw new Error('必须提供有效的 context1JsonPath 或 sourceFilePath');
     }
-    const ctx2 = buildStructuredContext2(context1);
+    let translations = args.translations || null;
+    if (!translations && args.translationsJsonPath && fs.existsSync(args.translationsJsonPath)) {
+      translations = JSON.parse(fs.readFileSync(args.translationsJsonPath, 'utf8'));
+    }
+    const ctx2 = buildStructuredContext2(context1, { translations });
     return {
       ...ctx2,
       context2Markdown: serializeContext2ToMarkdown(ctx2)
