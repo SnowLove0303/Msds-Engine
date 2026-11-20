@@ -13,6 +13,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
+import { serializeFactsToMarkdown } from '../src/recognition-engine.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -121,6 +122,8 @@ async function main() {
   const args = process.argv.slice(2);
   let tool = null;
   let toolArgs = {};
+  let outPath = null;
+  let format = 'json';
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -140,13 +143,21 @@ async function main() {
     } else if (a === '--argsFile' && args[i + 1]) {
       const content = await fs.readFile(args[++i], 'utf8');
       toolArgs = JSON.parse(content);
+    } else if (a.startsWith('--out=')) {
+      outPath = a.slice(6);
+    } else if (a === '--out' && args[i + 1]) {
+      outPath = args[++i];
+    } else if (a.startsWith('--format=')) {
+      format = a.slice(9).toLowerCase();
+    } else if (a === '--format' && args[i + 1]) {
+      format = args[++i].toLowerCase();
     } else if (!tool && !a.startsWith('-')) {
       tool = a;
     }
   }
 
   if (!tool) {
-    console.error('用法: node msds_mcp_gateway.mjs --tool=<tool_name> [--args=\'<json_string>\'] [--argsFile=<path_to_json>]');
+    console.error('用法: node msds_mcp_gateway.mjs --tool=<tool_name> [--args=\'<json_string>\'] [--argsFile=<path_to_json>] [--out=<file>] [--format=json|md]');
     console.error('查询全量工具: node msds_mcp_gateway.mjs --list-tools');
     process.exit(1);
   }
@@ -156,8 +167,35 @@ async function main() {
     if (tool === '__list__') {
       console.log('=== MSDS-Engine 官方可用 MCP 工具清单 ===');
       console.log(JSON.stringify(result, null, 2));
+    } else if (format === 'md' && tool === 'msds_recognize_source') {
+      const textPayload = result?.result?.content?.[0]?.text;
+      const facts = textPayload ? JSON.parse(textPayload) : (result?.result || result);
+      const md = [
+        serializeFactsToMarkdown(facts),
+        '\n## MCP 统一入口调用与物理无损自检指纹',
+        `- **MCP 工具**: \`msds_recognize_source\` (via \`web/scripts/msds_mcp_gateway.mjs\`)`,
+        `- **原始非空段落数**: ${facts.integrity?.rawParagraphCount ?? '—'}`,
+        `- **原始字符数 / 提取字符数**: ${facts.integrity?.rawCharCount ?? '—'} / ${facts.integrity?.extractedCharCount ?? '—'} (守恒率: ${facts.integrity?.conservationRatio ?? '—'}%)`,
+        `- **16 章节覆盖**: ${facts.integrity?.coveredSectionsCount ?? '—'}/16 (空缺: ${facts.integrity?.emptySections?.length ? facts.integrity.emptySections.join(', ') : '无'})`,
+        `- **未匹配原始段落数**: ${facts.integrity?.missingParagraphCount ?? '—'}`,
+        `- **无损判定**: ${facts.integrity?.isLossless ? 'PASS (100% 无损)' : 'WARN'}`
+      ].join('\n');
+      if (outPath) {
+        await fs.mkdir(path.dirname(outPath), { recursive: true });
+        await fs.writeFile(outPath, md, 'utf8');
+        console.log(JSON.stringify({ status: 'success', tool, format: 'md', outPath, modelCode: facts.modelCode, integrity: facts.integrity }, null, 2));
+      } else {
+        console.log(md);
+      }
     } else {
-      console.log(JSON.stringify({ status: 'success', tool, result }, null, 2));
+      const jsonOut = JSON.stringify({ status: 'success', tool, result }, null, 2);
+      if (outPath) {
+        await fs.mkdir(path.dirname(outPath), { recursive: true });
+        await fs.writeFile(outPath, jsonOut, 'utf8');
+        console.log(JSON.stringify({ status: 'success', tool, format: 'json', outPath }, null, 2));
+      } else {
+        console.log(jsonOut);
+      }
     }
     process.exit(0);
   } catch (err) {
