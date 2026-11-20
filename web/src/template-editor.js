@@ -11,6 +11,7 @@ if (!globalThis.DOMParser || !globalThis.XMLSerializer) {
 import {
   loadDocx,
   writeCellValue,
+  writeCellLabel,
   clearSectionValues,
   restoreSectionToTemplate,
   deleteRow as deleteDocxRow,
@@ -288,6 +289,19 @@ export async function createWorkSession(templateKeyOrOptions = 'CN_Guanzhi', wor
     applyCompanyPreset(session, tplInfo.language === 'en' ? 'Guocai_en' : 'Guocai_zh');
   }
 
+  // 英文底模 Section 6 错位消防标签自愈 (底模错印为 6.1 Firefighting precautions，依法规自愈为 6.1 Personal precautions)
+  if (session.isEnglish) {
+    const s6 = engine.records?.find(r => r.sectionNumber === 6);
+    if (s6 && Array.isArray(s6.rows)) {
+      for (const row of s6.rows) {
+        const c0 = row.cells?.[0];
+        if (c0 && /6\.1/i.test(c0.text || '') && /Firefighting precautions/i.test(c0.text || '')) {
+          writeCellLabel(c0, '6.1  Personal precautions, protective equipment and emergency procedures：', true);
+        }
+      }
+    }
+  }
+
   return session;
 }
 
@@ -487,6 +501,11 @@ export function writeCellValueToSession(session, { sectionNumber, rowIndex, cell
   const cell = row.cells?.[cellIndex];
   if (!cell) throw new Error(`Cell ${cellIndex} not found in Section ${sectionNumber} Row ${rowIndex}`);
 
+  if (!cell.editable) {
+    cell.editable = true;
+    cell.protectedReason = null;
+  }
+
   writeCellValue(cell, text, {
     bold: false,
     fontSize: session.isEnglish ? '19' : '24',
@@ -593,6 +612,12 @@ export async function saveSession(session, outputPath) {
   suppressTrailingDocumentParagraph(session.engine);
   enableCrossPageBreaksForAllSections(session.engine);
   healAllTableTopologies(session.engine.documentXml);
+
+  for (const record of session.engine.records || []) {
+    if (record.kind === 'table') {
+      enforceTableStandardBorders(record);
+    }
+  }
 
   const arrayBuf = await session.engine.exportArrayBuffer();
   fs.writeFileSync(outputPath, Buffer.from(arrayBuf));
@@ -935,21 +960,33 @@ export function enforceFlushLeftValues(session, secNum) {
 
   for (let rIdx = 1; rIdx < (record.rows || []).length; rIdx++) {
     const row = record.rows[rIdx];
-    for (let cIdx = 1; cIdx < (row.cells || []).length; cIdx++) {
+    const startCol = (secNum === 13) ? 0 : 1;
+    for (let cIdx = startCol; cIdx < (row.cells || []).length; cIdx++) {
       const cell = row.cells[cIdx];
       if (!cell?.node) continue;
 
+      const doc = cell.node.ownerDocument || session.engine.documentXml;
       const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
       for (const p of ps) {
-        const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
-        if (pPr) {
-          const ind = pPr.getElementsByTagNameNS(W_NS, 'ind')?.[0];
-          if (ind) {
-            pPr.removeChild(ind);
-          }
-          const tabsNodes = Array.from(pPr.getElementsByTagNameNS(W_NS, 'tabs'));
-          tabsNodes.forEach(n => pPr.removeChild(n));
+        let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
+        if (!pPr) {
+          pPr = doc.createElementNS(W_NS, 'w:pPr');
+          p.insertBefore(pPr, p.firstChild);
         }
+        const ind = pPr.getElementsByTagNameNS(W_NS, 'ind')?.[0];
+        if (ind) {
+          pPr.removeChild(ind);
+        }
+        const tabsNodes = Array.from(pPr.getElementsByTagNameNS(W_NS, 'tabs'));
+        tabsNodes.forEach(n => pPr.removeChild(n));
+
+        // 核心排版硬指标：清除 both/center 等异常对齐，强制设置为 left 靠左对齐 (INV-VALUE-INDENT-DICHOTOMY)
+        let jc = pPr.getElementsByTagNameNS(W_NS, 'jc')?.[0];
+        if (!jc) {
+          jc = doc.createElementNS(W_NS, 'w:jc');
+          pPr.appendChild(jc);
+        }
+        jc.setAttributeNS(W_NS, 'w:val', 'left');
 
         const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
         for (const r of runs) {
@@ -1044,4 +1081,37 @@ export function checkpoint(session, name = 'default') {
  */
 export function rollback(session, name = 'default') {
   return rollbackSession(session, name);
+}
+
+/**
+ * Section 3 成分网格居中对齐强化 (Format Section 3 Grid Center)
+ * 审计规范要求：S3 表头行及组分数据行（r >= 3）所有单元格必须居中对齐 (jc=center)
+ */
+export function formatSection3GridCenter(session) {
+  const record = (session.engine.records || []).find(r => r.sectionNumber === 3);
+  if (!record || !Array.isArray(record.rows)) return { success: false };
+
+  for (let rIdx = 3; rIdx < record.rows.length; rIdx++) {
+    const row = record.rows[rIdx];
+    for (const cell of (row.cells || [])) {
+      if (!cell?.node) continue;
+      const doc = cell.node.ownerDocument || session.engine.documentXml;
+      const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
+      for (const p of ps) {
+        let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
+        if (!pPr) {
+          pPr = doc.createElementNS(W_NS, 'w:pPr');
+          p.insertBefore(pPr, p.firstChild);
+        }
+        let jc = pPr.getElementsByTagNameNS(W_NS, 'jc')?.[0];
+        if (!jc) {
+          jc = doc.createElementNS(W_NS, 'w:jc');
+          pPr.appendChild(jc);
+        }
+        jc.setAttributeNS(W_NS, 'w:val', 'center');
+      }
+    }
+  }
+  session.modifiedSections.add(3);
+  return { success: true, sectionNumber: 3 };
 }

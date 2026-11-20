@@ -1,3 +1,4 @@
+// @ANTIGRAVITY_INVARIANT_LOCK_START: Topology Matcher Ops Compiler
 /**
  * MSDS-Studio 拓扑匹配编译器 (topology-matcher.js)
  *
@@ -38,7 +39,31 @@ function getItemTexts(item, lang) {
 }
 
 /**
+ * 可选内容映射与基准数据库补齐统一入口 (默认关闭，仅在用户显式开启 enableContentMapping 时调用)
+ */
+export function applyOptionalContentMappingAndDbFill(context2, options = {}) {
+  const cloned = JSON.parse(JSON.stringify(context2));
+  const mapRules = options.contentMappingRules || {};
+  const dbFill = options.dbBenchmarkFill || {};
+  for (let s = 1; s <= 16; s++) {
+    const sec = cloned.sections?.[s] || cloned.sections?.[String(s)];
+    if (!sec?.items) continue;
+    for (const item of sec.items) {
+      if (item.valueCn && mapRules[item.valueCn]) item.valueCn = mapRules[item.valueCn];
+      if (item.valueEn && mapRules[item.valueEn]) item.valueEn = mapRules[item.valueEn];
+      if (item.textCn && mapRules[item.textCn]) item.textCn = mapRules[item.textCn];
+      if (item.textEn && mapRules[item.textEn]) item.textEn = mapRules[item.textEn];
+    }
+    if (dbFill[s] && Array.isArray(dbFill[s])) {
+      sec.items.push(...dbFill[s]);
+    }
+  }
+  return cloned;
+}
+
+/**
  * 将 Context 2 与目标模板 Schema 编译为确定性编辑器操作序列 (operations[])
+ * 默认 mode = PURE_TOPOLOGY_SOURCE_INHERITED (不做内容替换、不做数据库补齐)
  */
 export function compileTopologyOps(context2, templateSchema, options = {}) {
   if (!context2?.validation?.isValid) {
@@ -51,6 +76,9 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
     throw new Error('[TOPOLOGY_MISMATCH] 目标模板 Schema 缺失 sections 拓扑定义！');
   }
 
+  const enableContentMapping = Boolean(options.enableContentMapping);
+  const workingCtx2 = enableContentMapping ? applyOptionalContentMappingAndDbFill(context2, options) : context2;
+
   for (let s = 1; s <= 16; s++) {
     const secTpl = templateSchema.sections[s] || templateSchema.sections[String(s)];
     if (!secTpl || !Array.isArray(secTpl.rows) || secTpl.rows.length === 0) {
@@ -62,6 +90,9 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
   const operations = [];
   const sectionPlans = [];
   const stats = { totalOps: 0, sectionsMatched: 16, inserts: 0, deletes: 0, merges: 0, writes: 0 };
+
+  // 强制全模板前置值格清零，彻底消除底模历史脏数据残留 (INV-PRE-WRITE-CLEAR)
+  operations.push({ op: 'clearTemplate' });
 
   if (options.presetKey) {
     operations.push({ op: 'applyPreset', presetKey: options.presetKey });
@@ -76,7 +107,7 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
   };
 
   for (let s = 1; s <= 16; s++) {
-    const c2Sec = context2.sections?.[s] || context2.sections?.[String(s)] || { items: [] };
+    const c2Sec = workingCtx2.sections?.[s] || workingCtx2.sections?.[String(s)] || { items: [] };
     const tplSec = templateSchema.sections[s] || templateSchema.sections[String(s)];
     const tplRows = tplSec.rows || [];
     const c2Items = (c2Sec.items || []).filter(i => i.role !== 'SECTION_HEADER' && i.role !== 'MIGRATED_TO_S2');
@@ -91,9 +122,14 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
     // 1. Section 2: 唯一通栏大纲结构
     if (s === 2) {
       const fwItem = c2Items.find(i => i.role === 'FULL_WIDTH_STRUCTURED');
-      const content = fwItem ? getItemTexts(fwItem, lang).text : c2Items.map(i => getItemTexts(i, lang).text).filter(Boolean).join('\n');
+      let content = fwItem ? getItemTexts(fwItem, lang).text : c2Items.map(i => getItemTexts(i, lang).text).filter(Boolean).join('\n');
+      if (lang === 'zh') {
+        content = content.replace(/^(?:GHS-?象形图\s+)?必须列在标签上的有害成[份分][：:\s]*(.+)$/gm, '必须列在标签上的有害成分：$1');
+      } else {
+        content = content.replace(/^(?:GHS\s*Pictograms\s*\/\s*)?Hazardous components to be listed on the label[：:\s]+(.+)$/gmi, 'Hazardous components to be listed on the label: $1');
+      }
       if (tplRows.length >= 2) {
-        pushOp({ op: 'morphToFullWidth', sectionNumber: s, rowIndex: 1, content });
+        pushOp({ op: 'writeFullWidth', sectionNumber: s, content, options: { isSection2: true } });
         secMerges++;
         secWrites++;
         for (let r = tplRows.length - 1; r >= 2; r--) {
@@ -109,17 +145,39 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
 
     // 2. 分离多列数据网格 (3_COL_TABLE / MULTI_COL_TABLE) 与常规 KV/说明行
     const gridHeaders = c2Items.filter(i => i.role === 'TABLE_HEADER');
-    const gridData = c2Items.filter(i => i.role === 'COMPONENT_ROW' || i.role === 'OEL_ROW');
-    const regularItems = c2Items.filter(i => !['TABLE_HEADER', 'COMPONENT_ROW', 'OEL_ROW'].includes(i.role));
+    // 排除仅有标题而无 CAS/浓度的数据行 (例如 3.2成分 属于题头分类)
+    const gridData = c2Items.filter(i => 
+      (i.role === 'COMPONENT_ROW' || i.role === 'OEL_ROW') && 
+      Boolean(i.cellsCn?.[1] || i.cellsCn?.[2] || i.cellsEn?.[1] || i.cellsEn?.[2])
+    );
+    // 查找位于数据表格之前的子题头行 (如 3.2成分 / 3.2 Ingredients)
+    const preGridHeaderItem = c2Items.find(i => 
+      (i.role === 'COMPONENT_ROW' || i.role === 'SUB_LABEL') && 
+      /^(?:3\.2\s*)?(?:成分|组分|Ingredients)/i.test(i.cellsCn?.[0] || i.cellsEn?.[0] || i.labelCn || i.labelEn || '') &&
+      !gridData.includes(i)
+    );
+    const regularItems = c2Items.filter(i => 
+      !['TABLE_HEADER', 'COMPONENT_ROW', 'OEL_ROW'].includes(i.role) && i !== preGridHeaderItem
+    );
 
     const tplMultiRows = tplRows.filter(r => r.rowIndex >= 1 && r.cellsCount >= 3);
     const tplRegularRows = tplRows.filter(r => r.rowIndex >= 1 && r.cellsCount < 3);
 
     // 处理 S3 / S8 多列表格区域
     const deletedRowSet = new Set();
+    const usedTplRows = new Set();
     if (tplMultiRows.length > 0 || gridData.length > 0) {
       const tplGridHdr = tplMultiRows.find(r => /化学品|Chemical|CAS|物质|TWA|STEL|OEL|限值/i.test((r.cells || []).map(c => c.text).join(' ')));
       const tplGridData = tplMultiRows.filter(r => !tplGridHdr || r.rowIndex > tplGridHdr.rowIndex);
+
+      // 若模板在表头前有预设题头行 (如 Row 2: 成分)，将其与 C2 题头精准匹配
+      const tplPreHdr = tplMultiRows.find(r => tplGridHdr && r.rowIndex < tplGridHdr.rowIndex);
+      if (tplPreHdr && preGridHeaderItem) {
+        usedTplRows.add(tplPreHdr.rowIndex);
+        // 保留模板底模规范加粗题头（3.2成分 / 3.2 Ingredients），绝不强写标签格破坏样式与触发保护
+      } else if (tplPreHdr && !preGridHeaderItem) {
+        deletedRowSet.add(tplPreHdr.rowIndex);
+      }
 
       if (gridData.length === 0 && tplMultiRows.length > 0) {
         // 模板有多列表（如 S8 OEL），但源文件无 OEL 数据 -> 剪枝多余多列行
@@ -143,11 +201,12 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
         for (let i = commonCount; i < tplGridData.length; i++) {
           deletedRowSet.add(tplGridData[i].rowIndex);
         }
-        // 缺少槽位时克隆插入（按后插入行号递进）
+        // 缺少槽位时克隆插入（优先克隆首条数据行以继承内框虚线样式）
         const anchorRow = tplGridData.length > 0 ? tplGridData[tplGridData.length - 1] : tplGridHdr;
+        const cloneSourceIdx = tplGridData.length > 0 ? tplGridData[0].rowIndex : anchorRow.rowIndex;
         for (let i = commonCount; i < gridData.length; i++) {
           const insertAt = anchorRow.rowIndex + (i - commonCount);
-          pushOp({ op: 'insertRowAfter', sectionNumber: s, rowIndex: insertAt, cloneFromRowIndex: anchorRow.rowIndex });
+          pushOp({ op: 'insertRowAfter', sectionNumber: s, rowIndex: insertAt, cloneFromRowIndex: cloneSourceIdx });
           secInserts++;
           const cells = lang === 'en' ? gridData[i].cellsEn : gridData[i].cellsCn;
           (cells || []).forEach((txt, ci) => {
@@ -161,10 +220,32 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
     }
 
     // 3. 匹配常规 KV / 通栏说明行
-    const usedTplRows = new Set([...deletedRowSet]);
+    for (const r of deletedRowSet) {
+      usedTplRows.add(r);
+    }
     const unmatchedRegular = [];
 
-    for (const item of regularItems) {
+    // Section 13 专有拓扑聚合：根据标准 disposition: same_cell 规范，废弃法规说明行统一聚合至首行单列槽位，确保双列处理方法行保持在 Section 13 末行 (INV-S13-TOPOLOGY)
+    let effectiveRegularItems = regularItems;
+    if (s === 13) {
+      const explanations = regularItems.filter(i => i.role === 'EXPLANATION');
+      const methods = regularItems.filter(i => i.role !== 'EXPLANATION');
+      if (explanations.length > 1) {
+        const mergedExplanation = {
+          role: 'EXPLANATION',
+          labelCn: '—',
+          labelEn: '—',
+          textCn: explanations.map(e => e.textCn || e.valueCn || '').filter(Boolean).join('\n'),
+          textEn: explanations.map(e => e.textEn || e.valueEn || '').filter(Boolean).join('\n'),
+          valueCn: explanations.map(e => e.valueCn || e.textCn || '').filter(Boolean).join('\n'),
+          valueEn: explanations.map(e => e.valueEn || e.textEn || '').filter(Boolean).join('\n'),
+          placement: { gridType: '1_COL_MERGED' }
+        };
+        effectiveRegularItems = [mergedExplanation, ...methods];
+      }
+    }
+
+    for (const item of effectiveRegularItems) {
       if (item.role === 'FULL_WIDTH_STRUCTURED') {
         const targetRow = tplRegularRows.find(r => !usedTplRows.has(r.rowIndex));
         const content = getItemTexts(item, lang).text;
@@ -200,13 +281,15 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
       if (matched) {
         usedTplRows.add(matched.rowIndex);
         const { value, text } = getItemTexts(item, lang);
-        if (item.placement?.gridType === '1_COL_MERGED') {
+        if (item.placement?.gridType === '1_COL_MERGED' || item.role === 'EXPLANATION' || matched.cellsCount === 1) {
           pushOp({ op: 'morphToFullWidth', sectionNumber: s, rowIndex: matched.rowIndex, content: text });
           secMerges++;
           secWrites++;
         } else {
           if (matched.cellsCount >= 2) {
-            pushOp({ op: 'writeCell', sectionNumber: s, rowIndex: matched.rowIndex, cellIndex: 1, text: value });
+            let outVal = value;
+            if (lang === 'zh' && s === 5 && outVal && !/[。.!?]$/.test(outVal)) outVal = `${outVal}。`;
+            pushOp({ op: 'writeCell', sectionNumber: s, rowIndex: matched.rowIndex, cellIndex: 1, text: outVal });
             secWrites++;
           }
         }
@@ -250,9 +333,14 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
 
     if (s === 9) {
       pushOp({ op: 'formatLaserTabs', sectionNumber: 9 });
-      pushOp({ op: 'applyAdaptiveRuler', sectionNumber: 9 });
     }
-    pushOp({ op: 'enforceFlushLeftValues', sectionNumber: s });
+    if (s === 3) {
+      pushOp({ op: 'formatSection3Grid', sectionNumber: 3 });
+    }
+    pushOp({ op: 'applyAdaptiveRuler', sectionNumber: s });
+    if (s !== 3) {
+      pushOp({ op: 'enforceFlushLeftValues', sectionNumber: s });
+    }
 
     sectionPlans.push({
       sectionNumber: s,
@@ -268,9 +356,10 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
 
   stats.totalOps = operations.length;
   return {
-    modelCode: context2.modelCode,
+    modelCode: workingCtx2.modelCode,
     templateKey: templateSchema.templateKey,
     language: lang,
+    mode: enableContentMapping ? 'TOPOLOGY_PLUS_MAPPING' : 'PURE_TOPOLOGY_SOURCE_INHERITED',
     generatedAt: new Date().toISOString(),
     stats,
     sectionPlans,
@@ -296,3 +385,4 @@ export function formatTopologyPlanMarkdown(compiled) {
   }
   return lines.join('\n');
 }
+// @ANTIGRAVITY_INVARIANT_LOCK_END

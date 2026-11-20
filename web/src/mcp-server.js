@@ -43,6 +43,7 @@ import {
   mergeCells,
   applyAdaptiveRuler,
   enforceFlushLeftValues,
+  formatSection3GridCenter,
   validateTopologicalInvariants
 } from './template-editor.js';
 import { planAuditTargets, verifyAuditContract } from './audit-planner.js';
@@ -747,6 +748,8 @@ async function handleToolCall(name, args) {
           applyAdaptiveRuler(session, op.sectionNumber);
         } else if (op.op === 'enforceFlushLeftValues') {
           enforceFlushLeftValues(session, op.sectionNumber);
+        } else if (op.op === 'formatSection3Grid') {
+          formatSection3GridCenter(session);
         } else if (op.op === 'validateInvariants') {
           const invRes = validateTopologicalInvariants(session, op.sectionNumber);
           if (!invRes.valid) {

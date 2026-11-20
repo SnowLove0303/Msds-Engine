@@ -34,7 +34,26 @@ const REPO_ROOT = path.resolve(__dirname, '../..');
 // 动态载入官方正规流水线构件
 const { recognizeSourceDocx, serializeFactsToMarkdown } = await import('../../web/src/recognition-engine.js');
 const { governContext, buildStructuredContext2, serializeContext2ToMarkdown, saveTranslationsToMemory } = await import('../../web/src/context-governor.js');
-const { executeEightDeliverablesPipeline } = await import('../../web/src/pipeline-engine.js');
+const { compileTopologyOps } = await import('../../web/src/topology-matcher.js');
+const { convertBatchDocxToPdf } = await import('../../web/src/pdf-converter.js');
+const {
+  inspectTemplateSchema,
+  createWorkSession,
+  saveSession,
+  clearTemplateValues,
+  clearSectionValuesInSession,
+  applyCompanyPreset,
+  writeCellValueToSession,
+  writeFullWidthSection,
+  formatSection9LaserTabs,
+  deleteRowFromSession,
+  insertRowIntoSession,
+  insertRowAfter,
+  morphToFullWidth,
+  applyAdaptiveRuler,
+  enforceFlushLeftValues,
+  formatSection3GridCenter
+} = await import('../../web/src/template-editor.js');
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -46,6 +65,8 @@ function parseArgs() {
     translations: null,
     stopAfter: null,
     phase: null,
+    enableContentMapping: false,
+    allowDirty: false,
     skipAudit: false,
     help: false
   };
@@ -59,6 +80,8 @@ function parseArgs() {
     else if (arg.startsWith('--translations=')) options.translations = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
     else if (arg.startsWith('--stopAfter=')) options.stopAfter = arg.split('=', 2)[1].replace(/^["']|["']$/g, '').toLowerCase();
     else if (arg.startsWith('--phase=')) options.phase = arg.split('=', 2)[1].replace(/^["']|["']$/g, '').toLowerCase();
+    else if (arg === '--enableContentMapping') options.enableContentMapping = true;
+    else if (arg === '--allowDirty') options.allowDirty = true;
     else if (arg === '--skipAudit') options.skipAudit = true;
     else if (!options.source && !arg.startsWith('--')) options.source = arg.replace(/^["']|["']$/g, '');
   }
@@ -266,45 +289,56 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
     return;
   }
 
-  // Phase 4, 5, 6: 模板加载、万能原语受控覆写与高保真矢量 PDF 转换
-  console.log(`>>> [Phase 4, 5, 6/7] 执行母版受控覆写与 Windows WPS 原生 COM PDF 转译...`);
+  // Phase 4, 5, 6: Context 2 -> 拓扑匹配编译器 -> 编辑器原语写入 -> Windows WPS 原生 COM PDF 转译
+  if (!v.isValid) {
+    console.error(`❌ [CONTEXT2 GATE BLOCKED] Context 2 尚未通过零中文/数字守恒校验，禁止进入 Phase 4~6 写盘！`);
+    process.exit(1);
+  }
+  console.log(`>>> [Phase 4, 5, 6/7] 基于 Context 2 执行拓扑匹配 (${options.enableContentMapping ? 'TOPOLOGY+MAPPING' : 'PURE_TOPOLOGY_SOURCE_INHERITED'}) 与 WPS PDF 转译...`);
   const t3 = Date.now();
-  let sourceBuffer = fs.readFileSync(sourcePath);
-  try {
-    const zip = await JSZip.loadAsync(sourceBuffer);
-    const docXmlFile = zip.file('word/document.xml');
-    if (docXmlFile) {
-      let docXml = await docXmlFile.async('string');
-      let changed = false;
-      if (docXml.includes('<w:t>无资料</w:t>')) {
-        docXml = docXml.replace(/<w:t>无资料<\/w:t>/g, '<w:t>无数据</w:t>');
-        changed = true;
-      }
-      if (docXml.includes('<w:t>可能有刺激性</w:t>')) {
-        docXml = docXml.replace(/<w:t>可能有刺激性<\/w:t>/g, '<w:t>轻微刺激</w:t>');
-        changed = true;
-      }
-      if (docXml.includes('<w:t>易燃</w:t>')) {
-        docXml = docXml.replace(/<w:t>易燃<\/w:t>/g, '<w:t>不适用</w:t>');
-        changed = true;
-      }
-      if (changed) {
-        zip.file('word/document.xml', docXml);
-        sourceBuffer = await zip.generateAsync({ type: 'nodebuffer' });
-        console.log(`    ℹ️ 已在上游数据平面自动完成源文档非标同义词归正`);
-      }
+  const targets = [
+    { templateKey: 'CN_Guanzhi', presetKey: 'CN_Guanzhi', fileName: `${modelCode} msds_CN 冠志.docx` },
+    { templateKey: 'CN_Guocai', presetKey: 'CN_Guocai', fileName: `${modelCode} msds_CN 国彩.docx` },
+    { templateKey: 'EN_Guanzhi', presetKey: 'EN_Guanzhi', fileName: `${modelCode} msds_EN Guanzhi.docx` },
+    { templateKey: 'EN_Guocai', presetKey: 'EN_Guocai', fileName: `${modelCode} msds_EN Guocai.docx` }
+  ];
+
+  const docxItemsForPdf = [];
+  for (const tgt of targets) {
+    const schema = await inspectTemplateSchema(tgt.templateKey);
+    const compiled = compileTopologyOps(structuredCtx2, schema, {
+      presetKey: tgt.presetKey,
+      enableContentMapping: options.enableContentMapping
+    });
+    const session = await createWorkSession(tgt.templateKey);
+    session.modelCode = modelCode;
+    for (const op of compiled.operations) {
+      if (op.op === 'clearTemplate') clearTemplateValues(session);
+      else if (op.op === 'clearSectionValues') clearSectionValuesInSession(session, { sectionNumber: op.sectionNumber });
+      else if (op.op === 'applyPreset') applyCompanyPreset(session, op.presetKey);
+      else if (op.op === 'writeCell') writeCellValueToSession(session, { sectionNumber: op.sectionNumber, rowIndex: op.rowIndex, cellIndex: op.cellIndex, text: op.text || '' });
+      else if (op.op === 'writeFullWidth') writeFullWidthSection(session, { sectionNumber: op.sectionNumber, content: op.content || op.text || '', options: op.options || {} });
+      else if (op.op === 'formatLaserTabs') formatSection9LaserTabs(session);
+      else if (op.op === 'deleteRow') deleteRowFromSession(session, { sectionNumber: op.sectionNumber, rowIndex: op.rowIndex });
+      else if (op.op === 'insertRow') insertRowIntoSession(session, { sectionNumber: op.sectionNumber, targetRowIndex: op.targetRowIndex || op.rowIndex, cloneFromRowIndex: op.cloneFromRowIndex });
+      else if (op.op === 'insertRowAfter') insertRowAfter(session, op.sectionNumber, op.rowIndex ?? 0, op.cloneFromRowIndex);
+      else if (op.op === 'morphToFullWidth') morphToFullWidth(session, op.sectionNumber, op.rowIndex ?? 0, op.content || op.text || '', op.options || {});
+      else if (op.op === 'applyAdaptiveRuler') applyAdaptiveRuler(session, op.sectionNumber);
+      else if (op.op === 'enforceFlushLeftValues') enforceFlushLeftValues(session, op.sectionNumber);
+      else if (op.op === 'formatSection3Grid') formatSection3GridCenter(session);
     }
-  } catch (e) {
-    console.warn(`    ⚠️ 上游源文档非标词归正跳过: ${e.message}`);
+    const outDocxPath = path.join(targetDir, tgt.fileName);
+    await saveSession(session, outDocxPath);
+    docxItemsForPdf.push({ docxBuffer: fs.readFileSync(outDocxPath), fileName: tgt.fileName });
+    console.log(`    ✓ 生成 DOCX: ${tgt.fileName} (${compiled.mode}, ${compiled.stats.totalOps} ops)`);
   }
 
-  const result = await executeEightDeliverablesPipeline({
-    modelCode,
-    cnGroundTruthPath: sourcePath,
-    cnGroundTruthBuffer: sourceBuffer,
-    targetDir,
-    facts: pipelineFacts
-  });
+  const pdfResults = await convertBatchDocxToPdf(docxItemsForPdf);
+  for (const pRes of pdfResults) {
+    const outPdfPath = path.join(targetDir, pRes.pdfName || pRes.fileName.replace(/\.docx$/i, '.pdf'));
+    fs.writeFileSync(outPdfPath, pRes.pdfBuffer);
+    console.log(`    ✓ 生成 PDF:  ${path.basename(outPdfPath)} (${pRes.size} bytes, ${pRes.backend})`);
+  }
   console.log(`    ✓ 8 格式全矩阵交付物生成完毕 (4 DOCX + 4 PDF) (${Date.now() - t3} ms)`);
   if (options.stopAfter === 'produce') {
     console.log(`\n✅ [STOPPED AFTER PHASE 6] 8 份交付物已生成至: ${targetDir}`);
