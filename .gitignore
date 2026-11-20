@@ -67,3 +67,8 @@ docker/fonts/*
 scratch/
 temp_sessions/
 web/output_exact/
+
+# User database & execution log data (local user data only, strictly excluded from repo)
+web/data/user_exec_logs.db*
+user_data/
+

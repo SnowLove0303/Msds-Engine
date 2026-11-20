@@ -19,7 +19,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import { JSDOM } from 'jsdom';
 const { default: JSZip } = await import('../../node_modules/jszip/lib/index.js');
 
@@ -54,6 +54,15 @@ const {
   enforceFlushLeftValues,
   formatSection3GridCenter
 } = await import('../../web/src/template-editor.js');
+const {
+  createExecutionRun,
+  updateRunPhase,
+  recordWorkflowError,
+  recordAuditFindings,
+  finishExecutionRun,
+  parseAuditOutput,
+  closeUserExecDb
+} = await import('../../web/src/user-exec-db.js');
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -65,6 +74,8 @@ function parseArgs() {
     translations: null,
     stopAfter: null,
     phase: null,
+    user: null,
+    actorType: 'human',
     enableContentMapping: false,
     allowDirty: false,
     skipAudit: false,
@@ -80,6 +91,8 @@ function parseArgs() {
     else if (arg.startsWith('--translations=')) options.translations = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
     else if (arg.startsWith('--stopAfter=')) options.stopAfter = arg.split('=', 2)[1].replace(/^["']|["']$/g, '').toLowerCase();
     else if (arg.startsWith('--phase=')) options.phase = arg.split('=', 2)[1].replace(/^["']|["']$/g, '').toLowerCase();
+    else if (arg.startsWith('--user=')) options.user = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--actorType=')) options.actorType = arg.split('=', 2)[1].replace(/^["']|["']$/g, '').toLowerCase();
     else if (arg === '--enableContentMapping') options.enableContentMapping = true;
     else if (arg === '--allowDirty') options.allowDirty = true;
     else if (arg === '--skipAudit') options.skipAudit = true;
@@ -87,6 +100,37 @@ function parseArgs() {
   }
 
   return options;
+}
+
+const execTracker = {
+  runId: null,
+  phase: 'INIT',
+  startedAt: Date.now()
+};
+
+function runAuditAndRecord(auditorName, scriptPath, args, runId) {
+  const res = spawnSync('node', [scriptPath, ...args], {
+    encoding: 'utf-8',
+    maxBuffer: 50 * 1024 * 1024
+  });
+  if (res.stdout) process.stdout.write(res.stdout);
+  if (res.stderr) process.stderr.write(res.stderr);
+
+  const combined = `${res.stdout || ''}\n${res.stderr || ''}`;
+  const findings = parseAuditOutput(auditorName, combined);
+  if (runId && findings.length > 0) {
+    recordAuditFindings(runId, findings);
+  }
+  const ok = res.status === 0;
+  if (!ok && runId) {
+    recordWorkflowError({
+      runId,
+      phase: 'PHASE_7_AUDIT',
+      errorCode: `${auditorName}_BLOCKED`,
+      message: `${auditorName} exited with code ${res.status} (captured ${findings.length} findings)`
+    });
+  }
+  return { ok, status: res.status, findingsCount: findings.length };
 }
 
 async function main() {
@@ -171,8 +215,19 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
   fs.mkdirSync(targetDir, { recursive: true });
   verifyReadonlyEngineGuard(targetDir, process.argv.includes('--devAllowDirty'));
 
+  execTracker.startedAt = Date.now();
+  execTracker.runId = createExecutionRun({
+    userId: options.user,
+    actorType: options.actorType,
+    modelCode,
+    sourcePath,
+    targetDir,
+    mode: options.enableContentMapping ? 'TOPOLOGY_PLUS_MAPPING' : 'PURE_TOPOLOGY_SOURCE_INHERITED'
+  });
+
   console.log(`============================================================`);
   console.log(`🚀 [MSDS-Studio Test Kit] 启动标准七步法覆写生产流水线`);
+  console.log(`   • 执行批次: ${execTracker.runId}`);
   console.log(`   • 产品型号: ${modelCode}`);
   console.log(`   • 源文件路径: ${sourcePath}`);
   console.log(`   • 输出目录: ${targetDir}`);
@@ -181,19 +236,26 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
   // Phase 1~6 仅在非 --phase=audit 模式下执行
   if (options.phase !== 'audit') {
     // Phase 1: 源文件事实感知 (Context 1 抽取)
+    execTracker.phase = 'PHASE_1_RECOGNITION';
+    updateRunPhase(execTracker.runId, execTracker.phase);
     console.log(`>>> [Phase 1/7] 识别模块事实感知与 Context 1 抽取...`);
   const t1 = Date.now();
   const context1 = await recognizeSourceDocx(sourcePath, path.basename(sourcePath));
   context1.modelCode = modelCode;
   const ctx1MdPath = path.join(targetDir, `${modelCode}_context1.md`);
   fs.writeFileSync(ctx1MdPath, serializeFactsToMarkdown(context1), 'utf8');
+  updateRunPhase(execTracker.runId, execTracker.phase, { context1Path: ctx1MdPath });
   console.log(`    ✓ 成功解析 16 章节原始事实 (${Date.now() - t1} ms) -> ${ctx1MdPath}`);
   if (options.stopAfter === 'context1') {
+    finishExecutionRun(execTracker.runId, { status: 'SUCCESS', durationMs: Date.now() - execTracker.startedAt, summary: { stoppedAfter: 'context1' } });
+    closeUserExecDb();
     console.log(`\n✅ [STOPPED AFTER PHASE 1] Context 1 已落盘校验: ${ctx1MdPath}`);
     return;
   }
 
   // Phase 2 & 3: 事实标准化治理与基准补全 (Context 2)
+  execTracker.phase = 'PHASE_2_3_GOVERNANCE';
+  updateRunPhase(execTracker.runId, execTracker.phase);
   console.log(`>>> [Phase 2 & 3/7] 规范治理与全量英译/标准化表格校验 (Context 2)...`);
   const t2 = Date.now();
   let agentTranslations = null;
@@ -283,13 +345,18 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
     }
   }
 
+  updateRunPhase(execTracker.runId, execTracker.phase, { context2Path: ctx2MdPath });
   console.log(`    ✓ 事实标准化完成，危化定性: ${pipelineFacts.isHazardous ? '危险品' : '非危险化学品'} (${Date.now() - t2} ms)`);
   if (options.stopAfter === 'context2') {
+    finishExecutionRun(execTracker.runId, { status: 'SUCCESS', durationMs: Date.now() - execTracker.startedAt, summary: { stoppedAfter: 'context2' } });
+    closeUserExecDb();
     console.log(`\n✅ [STOPPED AFTER PHASE 3] Context 1 & Context 2 已落盘校验，未触发写盘覆写。`);
     return;
   }
 
   // Phase 4, 5, 6: Context 2 -> 拓扑匹配编译器 -> 编辑器原语写入 -> Windows WPS 原生 COM PDF 转译
+  execTracker.phase = 'PHASE_4_6_PRODUCTION';
+  updateRunPhase(execTracker.runId, execTracker.phase);
   if (!v.isValid) {
     console.error(`❌ [CONTEXT2 GATE BLOCKED] Context 2 尚未通过零中文/数字守恒校验，禁止进入 Phase 4~6 写盘！`);
     process.exit(1);
@@ -341,6 +408,8 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
   }
   console.log(`    ✓ 8 格式全矩阵交付物生成完毕 (4 DOCX + 4 PDF) (${Date.now() - t3} ms)`);
   if (options.stopAfter === 'produce') {
+    finishExecutionRun(execTracker.runId, { status: 'SUCCESS', durationMs: Date.now() - execTracker.startedAt, summary: { stoppedAfter: 'produce' } });
+    closeUserExecDb();
     console.log(`\n✅ [STOPPED AFTER PHASE 6] 8 份交付物已生成至: ${targetDir}`);
     console.log(`   👉 请 Agent 确认产出已生成后，运行 --phase=audit 触发机械审计并同步开展介入审计！`);
     return;
@@ -349,16 +418,23 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
 
   // Phase 7: 两阶双轨全要素法医级深度主审计 + Agent 介入审计速查包生成
   if (!options.skipAudit) {
+    execTracker.phase = 'PHASE_7_AUDIT';
+    updateRunPhase(execTracker.runId, execTracker.phase);
     console.log(`\n>>> [Phase 7/7] 执行两阶双轨审计（机械审计 + 同步生成 Agent 介入审计速查包）...`);
     const t4 = Date.now();
 
     // 7.0 六类角色与拓扑样式强化机械审计 (标题/序号/标签/值/说明行/页眉页脚)
     console.log(`    • 执行六类角色与拓扑样式强化审计 (audit_topology_roles.mjs)...`);
-    const rolesCmd = `node "${path.resolve(REPO_ROOT, 'web/scripts/audit_topology_roles.mjs')}" --targetDir="${targetDir}" --model=${modelCode} --source="${sourcePath}"`;
-    try {
-      execSync(rolesCmd, { stdio: 'inherit' });
-    } catch (e) {
+    const rolesRes = runAuditAndRecord(
+      'TOPOLOGY_ROLES',
+      path.resolve(REPO_ROOT, 'web/scripts/audit_topology_roles.mjs'),
+      [`--targetDir=${targetDir}`, `--model=${modelCode}`, `--source=${sourcePath}`],
+      execTracker.runId
+    );
+    if (!rolesRes.ok) {
       console.error(`      ❌ 角色与拓扑样式机械审计失败，发布阻断！`);
+      finishExecutionRun(execTracker.runId, { status: 'AUDIT_BLOCKED', durationMs: Date.now() - execTracker.startedAt, summary: { blockedBy: 'TOPOLOGY_ROLES' } });
+      closeUserExecDb();
       process.exit(1);
     }
 
@@ -366,34 +442,56 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
     console.log(`    • 同步生成 Agent 介入审计速查包 (generate_agent_audit_brief.mjs)...`);
     const briefCmd = `node "${path.resolve(REPO_ROOT, 'web/scripts/generate_agent_audit_brief.mjs')}" --targetDir="${targetDir}" --model=${modelCode} --source="${sourcePath}"`;
     execSync(briefCmd, { stdio: 'inherit' });
+    const briefPath = path.join(targetDir, `${modelCode}_agent_audit_brief.md`);
+    if (fs.existsSync(briefPath)) {
+      updateRunPhase(execTracker.runId, execTracker.phase, { auditBriefPath: briefPath });
+    }
 
     // 7.1 双极双层法医级全景深度审计 (165项)
     console.log(`    • 执行双极双层法医深度审计 (audit_bipolar_bilayer.mjs)...`);
-    const bilayerCmd = `node "${path.resolve(REPO_ROOT, 'web/scripts/audit_bipolar_bilayer.mjs')}" "${targetDir}" "${modelCode}"`;
-    try {
-      execSync(bilayerCmd, { stdio: 'inherit' });
-      console.log(`      ✅ 双极双层法医审计 100% 满分通过！`);
-    } catch (e) {
+    const bilayerRes = runAuditAndRecord(
+      'BIPOLAR_BILAYER',
+      path.resolve(REPO_ROOT, 'web/scripts/audit_bipolar_bilayer.mjs'),
+      [targetDir, modelCode],
+      execTracker.runId
+    );
+    if (!bilayerRes.ok) {
       console.error(`      ❌ 双极双层审计失败，发布阻断！`);
+      finishExecutionRun(execTracker.runId, { status: 'AUDIT_BLOCKED', durationMs: Date.now() - execTracker.startedAt, summary: { blockedBy: 'BIPOLAR_BILAYER' } });
+      closeUserExecDb();
       process.exit(1);
     }
+    console.log(`      ✅ 双极双层法医审计 100% 满分通过！`);
 
     // 7.2 集中式中央主审计套件 (170项)
     console.log(`    • 执行集中式中央主审计套件 (run_master_msds_audit.mjs)...`);
-    const masterAuditCmd = `node "${path.resolve(REPO_ROOT, 'web/scripts/run_master_msds_audit.mjs')}" --model=${modelCode} --targetDir="${targetDir}" --source="${sourcePath}"`;
-    try {
-      execSync(masterAuditCmd, { stdio: 'inherit' });
-      console.log(`      ✅ 中央主审计 100% 满分通过 (🏆 AUDIT_PASSED)！`);
-    } catch (e) {
+    const masterRes = runAuditAndRecord(
+      'MASTER_AUDIT',
+      path.resolve(REPO_ROOT, 'web/scripts/run_master_msds_audit.mjs'),
+      [`--model=${modelCode}`, `--targetDir=${targetDir}`, `--source=${sourcePath}`],
+      execTracker.runId
+    );
+    if (!masterRes.ok) {
       console.error(`      ❌ 中央主审计失败，发布阻断！`);
+      finishExecutionRun(execTracker.runId, { status: 'AUDIT_BLOCKED', durationMs: Date.now() - execTracker.startedAt, summary: { blockedBy: 'MASTER_AUDIT' } });
+      closeUserExecDb();
       process.exit(1);
     }
+    console.log(`      ✅ 中央主审计 100% 满分通过 (🏆 AUDIT_PASSED)！`);
 
     console.log(`    ✓ 全部审计套件通过 (${Date.now() - t4} ms)`);
   }
 
+  finishExecutionRun(execTracker.runId, {
+    status: 'SUCCESS',
+    durationMs: Date.now() - execTracker.startedAt,
+    summary: { skipAudit: options.skipAudit }
+  });
+  closeUserExecDb();
+
   console.log(`\n============================================================`);
   console.log(`🎉 [SUCCESS] 🏆 ${modelCode} 标准七步覆写全流程执行完毕！`);
+  console.log(`   • 执行批次: ${execTracker.runId} (已记录至用户执行数据库)`);
   console.log(`   • 产出目录: ${targetDir}`);
   console.log(`   • 交付成果: 4 份 DOCX + 4 份高保真矢量 PDF 全部通过终审 (退出码 0)`);
   console.log(`============================================================\n`);
@@ -401,5 +499,24 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
 
 main().catch(err => {
   console.error('\n❌ 流水线执行异常中断:', err);
+  if (execTracker.runId) {
+    try {
+      recordWorkflowError({
+        runId: execTracker.runId,
+        phase: execTracker.phase || 'UNKNOWN',
+        errorCode: err?.code || err?.name || 'UNHANDLED_EXCEPTION',
+        message: err?.message || String(err),
+        stackTrace: err?.stack || ''
+      });
+      finishExecutionRun(execTracker.runId, {
+        status: 'FAILED',
+        durationMs: Date.now() - execTracker.startedAt,
+        summary: { failedPhase: execTracker.phase, error: err?.message || String(err) }
+      });
+      closeUserExecDb();
+    } catch {
+      // 避免数据库记录异常掩盖原始堆栈
+    }
+  }
   process.exit(1);
 });

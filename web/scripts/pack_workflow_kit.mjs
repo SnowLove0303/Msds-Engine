@@ -12,7 +12,13 @@ function addDirectoryToZip(dirPath, zipFolder) {
   const entries = fs.readdirSync(dirPath, { withFileTypes: true });
   for (const entry of entries) {
     const fullPath = path.join(dirPath, entry.name);
-    if (entry.name === 'node_modules' || entry.name === '.git' || entry.name.startsWith('scratch_')) {
+    if (
+      entry.name === 'node_modules' ||
+      entry.name === '.git' ||
+      entry.name === 'user_data' ||
+      entry.name.startsWith('scratch_') ||
+      entry.name.startsWith('user_exec_logs.db')
+    ) {
       continue;
     }
     if (entry.isDirectory()) {
