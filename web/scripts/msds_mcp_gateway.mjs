@@ -167,23 +167,28 @@ async function main() {
     if (tool === '__list__') {
       console.log('=== MSDS-Engine 官方可用 MCP 工具清单 ===');
       console.log(JSON.stringify(result, null, 2));
-    } else if (format === 'md' && tool === 'msds_recognize_source') {
+    } else if (format === 'md' && (tool === 'msds_recognize_source' || tool === 'msds_govern_context2')) {
       const textPayload = result?.result?.content?.[0]?.text;
-      const facts = textPayload ? JSON.parse(textPayload) : (result?.result || result);
-      const md = [
-        serializeFactsToMarkdown(facts),
-        '\n## MCP 统一入口调用与物理无损自检指纹',
-        `- **MCP 工具**: \`msds_recognize_source\` (via \`web/scripts/msds_mcp_gateway.mjs\`)`,
-        `- **原始非空段落数**: ${facts.integrity?.rawParagraphCount ?? '—'}`,
-        `- **原始字符数 / 提取字符数**: ${facts.integrity?.rawCharCount ?? '—'} / ${facts.integrity?.extractedCharCount ?? '—'} (守恒率: ${facts.integrity?.conservationRatio ?? '—'}%)`,
-        `- **16 章节覆盖**: ${facts.integrity?.coveredSectionsCount ?? '—'}/16 (空缺: ${facts.integrity?.emptySections?.length ? facts.integrity.emptySections.join(', ') : '无'})`,
-        `- **未匹配原始段落数**: ${facts.integrity?.missingParagraphCount ?? '—'}`,
-        `- **无损判定**: ${facts.integrity?.isLossless ? 'PASS (100% 无损)' : 'WARN'}`
-      ].join('\n');
+      const data = textPayload ? JSON.parse(textPayload) : (result?.result || result);
+      let md = '';
+      if (tool === 'msds_govern_context2') {
+        md = data.context2Markdown || '';
+      } else {
+        md = [
+          serializeFactsToMarkdown(data),
+          '\n## MCP 统一入口调用与物理无损自检指纹',
+          `- **MCP 工具**: \`msds_recognize_source\` (via \`web/scripts/msds_mcp_gateway.mjs\`)`,
+          `- **原始非空段落数**: ${data.integrity?.rawParagraphCount ?? '—'}`,
+          `- **原始字符数 / 提取字符数**: ${data.integrity?.rawCharCount ?? '—'} / ${data.integrity?.extractedCharCount ?? '—'} (守恒率: ${data.integrity?.conservationRatio ?? '—'}%)`,
+          `- **16 章节覆盖**: ${data.integrity?.coveredSectionsCount ?? '—'}/16 (空缺: ${data.integrity?.emptySections?.length ? data.integrity.emptySections.join(', ') : '无'})`,
+          `- **未匹配原始段落数**: ${data.integrity?.missingParagraphCount ?? '—'}`,
+          `- **无损判定**: ${data.integrity?.isLossless ? 'PASS (100% 无损)' : 'WARN'}`
+        ].join('\n');
+      }
       if (outPath) {
         await fs.mkdir(path.dirname(outPath), { recursive: true });
         await fs.writeFile(outPath, md, 'utf8');
-        console.log(JSON.stringify({ status: 'success', tool, format: 'md', outPath, modelCode: facts.modelCode, integrity: facts.integrity }, null, 2));
+        console.log(JSON.stringify({ status: 'success', tool, format: 'md', outPath, modelCode: data.modelCode, integrity: data.integrity || null }, null, 2));
       } else {
         console.log(md);
       }

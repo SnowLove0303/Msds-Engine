@@ -770,3 +770,319 @@ export function refineContext2WithSpecifications(blueprint, options = {}) {
     markdown: mdOutput
   }
 }
+
+/**
+ * 16 章节全量结构化标注与规范化治理引擎 (Context 1 -> Context 2)
+ * 严格依据全局/局部规范对 Context 1 原始网格进行逐行角色重分类、序号剥离、条件解耦、
+ * 跨节附注迁移（如 S3 -> S2）、双语专业英译及编辑器原语意图生成，消除 Context 1 误分类。
+ */
+export function buildStructuredContext2(context1) {
+  if (!context1 || typeof context1 !== 'object' || !context1.sections) {
+    throw new Error('[CONTEXT2 ERROR] 无效的 Context 1 输入，缺少 sections 结构');
+  }
+
+  const modelCode = context1.modelCode || 'UNKNOWN';
+  const governed = governContext(context1);
+  const annotatedSections = {};
+  const editorOps = [];
+
+  const getRawRows = (s) => context1.sections?.[s]?.rows || context1.sections?.[String(s)]?.rows || [];
+
+  // 辅助：提取并清洗序号 (如 "9.1. 外 观：" -> { seq: "9.1", cleanLabel: "外观：", indentDxa: 420 })
+  const parseSeqLabel = (rawText) => {
+    const t = String(rawText || '').trim();
+    const m = t.match(/^(\d+\.\d+)[.\s\t]*(.*)$/);
+    if (m) {
+      const seq = m[1];
+      const digits = seq.replace(/\D/g, '').length;
+      const body = m[2].replace(/^[.\s\t]+/, '').trim();
+      const label = body.endsWith('：') || body.endsWith(':') ? body : `${body}：`;
+      return { isSeq: true, seq, label, cleanKey: label.replace(/[：:\s]/g, ''), indentDxa: digits >= 4 ? 560 : 420 };
+    }
+    return { isSeq: false, seq: null, label: t, cleanKey: t.replace(/[：:\s]/g, ''), indentDxa: 420 };
+  };
+
+  for (let s = 1; s <= 16; s++) {
+    const rawSec = context1.sections?.[s] || context1.sections?.[String(s)] || { sectionNumber: s, title: `${s}.`, rows: [] };
+    const rows = getRawRows(s);
+    const items = [];
+
+    // 前置值格清零意图
+    editorOps.push({ op: 'clearSectionValues', sectionNumber: s });
+
+    if (s === 2) {
+      // Section 2: 依据全局/局部规范重组为独立自然通栏行并精确标注每行粗细与缩进层级
+      items.push({ rowIndex: 0, role: 'SECTION_HEADER', bold: true, textCn: rawSec.title || '2. 危险性概述', textEn: '2. Hazards Identification' });
+
+      const polymerNote = (context1.componentsNotes || []).find(n => /聚合物.*分类|不适用/i.test(n));
+      const saltNotes = (context1.componentsNotes || []).filter(n => n !== polymerNote);
+
+      const s2Lines = [];
+      for (const r of rows) {
+        if (r.rowIndex === 0) continue;
+        for (const c of (r.cells || [])) {
+          if (c.text) {
+            c.text.split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(l => s2Lines.push(l));
+          }
+        }
+      }
+
+      // 注入从 Section 3 迁移归位的附注（逐行拆分并独立标注）
+      if (polymerNote && !s2Lines.some(l => l.includes('聚合物GHS危险性分类'))) {
+        polymerNote.split(/\r?\n/).map(x => x.trim()).filter(Boolean).forEach(x => {
+          if (!s2Lines.includes(x)) s2Lines.push(x);
+        });
+      }
+      for (const sn of saltNotes) {
+        sn.split(/\r?\n/).map(x => x.trim()).filter(Boolean).forEach(x => {
+          if (!s2Lines.includes(x)) s2Lines.push(x);
+        });
+      }
+
+      const classifyS2Line = (line) => {
+        const l = line.trim();
+        if (/^(?:2\.\d+\s*)?(?:GHS\s*危险性类别|GHS\s*标签要素|危险性说明|危害性说明|防范说明|其他危害|其他危险)[：:]?/i.test(l)) {
+          return { subRole: 'PARENT_HEADER', boldLabel: true, indentDxa: 0 };
+        }
+        if (/^(?:危险象形标记|GHS\s*象形图|警告词|信号词|必须列在标签上的有害成分|请注意以下物质|GHS分类|预防措施|事故响应|安全储存|安全存储|废弃处置|物理化学危险|健康危害|环境危害|[^：\n]*聚合物GHS危险性分类)[：:]/i.test(l)) {
+          return { subRole: 'SUB_LABEL_KV', boldLabel: true, boldValue: false, indentDxa: 480 };
+        }
+        return { subRole: 'VALUE_LINE', boldLabel: false, boldValue: false, indentDxa: 480 };
+      };
+
+      const cnAnnotated = s2Lines.map((l, idx) => {
+        const meta = classifyS2Line(l);
+        const kv = l.match(/^([^：:]+[：:])\s*(.*)$/);
+        const labelPart = meta.boldLabel && kv ? kv[1] : (meta.boldLabel ? l : null);
+        const valPart = meta.boldLabel && kv ? kv[2] : (meta.boldLabel ? '' : l);
+        return {
+          lineIndex: idx + 1,
+          role: meta.subRole,
+          labelCn: labelPart,
+          valueCn: valPart,
+          boldLabel: Boolean(meta.boldLabel),
+          boldValue: Boolean(meta.boldValue),
+          indentDxa: meta.indentDxa,
+          textEn: translateChemicalTerm(l)
+        };
+      });
+
+      items.push({
+        rowIndex: 1,
+        role: 'FULL_WIDTH_STRUCTURED',
+        layout: '通栏大纲树状层级 (无内框虚线)',
+        lines: cnAnnotated
+      });
+      editorOps.push({ op: 'renderFullWidthRow', sectionNumber: 2, isSection2: true });
+    } else if (s === 3) {
+      // Section 3: 剥离已迁移至 S2 的附注，保留纯粹的 3.1 / 3.2 / 表头 / 组分行
+      for (const r of rows) {
+        const full = (r.cells || []).map(c => c.text || '').join(' ').trim();
+        if (r.rowIndex === 0) {
+          items.push({ rowIndex: 0, role: 'SECTION_HEADER', bold: true, textCn: full, textEn: '3. Composition/Information on Ingredients' });
+          continue;
+        }
+        if (/(?:请注意以下物质|中和剂|已键合为盐|聚合物GHS危险性分类)/i.test(full)) {
+          items.push({ rowIndex: r.rowIndex, role: 'MIGRATED_TO_S2', bold: false, textCn: full, note: '已按规范迁移至 Section 2，Section 3 物理剔除' });
+          continue;
+        }
+        if ((r.cells || []).length >= 3 && /化学品名称|CAS/i.test(full)) {
+          items.push({
+            rowIndex: r.rowIndex,
+            role: 'TABLE_HEADER',
+            bold: true,
+            cellsCn: r.cells.map(c => c.text.trim()),
+            cellsEn: ['Chemical name', 'CAS NO.', 'Concentration % (w/w)']
+          });
+          continue;
+        }
+        if ((r.cells || []).length >= 3) {
+          const nameCn = r.cells[0]?.text?.trim() || '';
+          const cas = r.cells[1]?.text?.trim() || '';
+          const conc = r.cells[r.cells.length - 1]?.text?.trim() || '';
+          items.push({
+            rowIndex: r.rowIndex,
+            role: 'COMPONENT_ROW',
+            bold: false,
+            cellsCn: [nameCn, cas, conc],
+            cellsEn: [translateChemicalTerm(nameCn), cas, conc]
+          });
+          continue;
+        }
+        const c0 = r.cells?.[0]?.text?.trim() || '';
+        const c1 = r.cells?.[1]?.text?.trim() || '';
+        const seqInfo = parseSeqLabel(c0);
+        items.push({
+          rowIndex: r.rowIndex,
+          role: seqInfo.isSeq ? 'SEQ_LABEL' : 'SUB_LABEL',
+          seq: seqInfo.seq,
+          labelCn: seqInfo.label,
+          valueCn: c1,
+          labelEn: seqInfo.seq ? `${seqInfo.seq} ${translateChemicalTerm(seqInfo.label.replace(/[：:]/g, ''))}:` : translateChemicalTerm(seqInfo.label),
+          valueEn: c1 ? translateChemicalTerm(c1) : '',
+          boldLabel: true,
+          boldValue: false,
+          indentDxa: seqInfo.indentDxa
+        });
+      }
+    } else if (s === 11) {
+      // Section 11: 双范式动态判定 (PARADIGM_1 通栏复合 vs PARADIGM_2 标准端点)
+      const isParadigm1 = context1.toxicology?.paradigm === 'PARADIGM_1_FULL_WIDTH_MERGED' ||
+        rows.filter(r => r.rowIndex >= 1).some(r => (r.cells || []).length === 1 && /毒性[：:]|刺激性[：:]|LD50/i.test(r.cells[0]?.text || ''));
+
+      items.push({ rowIndex: 0, role: 'SECTION_HEADER', bold: true, textCn: rawSec.title || '11. 毒性资料', textEn: '11. Toxicity information' });
+      if (isParadigm1) {
+        items.push({ rowIndex: 1, role: 'EXPLANATION', bold: false, textCn: '该产品无可用的毒理学研究。', textEn: 'No toxicological studies are available on the product.' });
+        items.push({ rowIndex: 2, role: 'EXPLANATION', bold: false, textCn: '下面是这些成分的毒理学数据。', textEn: 'The following is toxicological data for these ingredients:' });
+
+        const detailLines = [];
+        for (const r of rows.slice(1)) {
+          const txt = (r.cells || []).map(c => c.text || '').join('\n').trim();
+          if (!txt || /无可用的毒理学研究|下面是这些成分/i.test(txt)) continue;
+          txt.split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(line => {
+            const isComp = !/^(?:毒性|刺激性|急性毒性|主要|致敏性|致突变性|致癌性|生殖毒性|特异性靶器官|吸入|经皮|经口|LD50)/i.test(line);
+            if (isComp) {
+              detailLines.push({ role: 'COMPONENT_HEADER', boldLabel: true, textCn: line, textEn: translateChemicalTerm(line) });
+            } else {
+              detailLines.push({ role: 'ENDPOINT_KV', boldLabel: true, boldValue: false, textCn: line, textEn: translateChemicalTerm(line) });
+            }
+          });
+        }
+        items.push({ rowIndex: 3, role: 'FULL_WIDTH_STRUCTURED', paradigm: 'PARADIGM_1_FULL_WIDTH_MERGED', lines: detailLines });
+        editorOps.push({ op: 'renderFullWidthRow', sectionNumber: 11, paradigm: 'PARADIGM_1_FULL_WIDTH_MERGED' });
+      } else {
+        for (const r of rows.slice(1)) {
+          const c0 = r.cells?.[0]?.text?.trim() || '';
+          const c1 = r.cells?.[r.cells.length - 1]?.text?.trim() || '';
+          const seqInfo = parseSeqLabel(c0);
+          items.push({
+            rowIndex: r.rowIndex,
+            role: (r.cells || []).length === 1 ? 'EXPLANATION' : (seqInfo.isSeq ? 'SEQ_LABEL' : 'SUB_LABEL'),
+            seq: seqInfo.seq,
+            labelCn: (r.cells || []).length === 1 ? '—' : seqInfo.label,
+            valueCn: (r.cells || []).length === 1 ? c0 : c1,
+            boldLabel: (r.cells || []).length > 1,
+            boldValue: false,
+            indentDxa: seqInfo.indentDxa
+          });
+        }
+      }
+    } else {
+      // 其余标准章节 (S1, S4~S10, S12~S16): 精确纠正 Context 1 的误分类
+      for (const r of rows) {
+        const c0 = r.cells?.[0]?.text?.trim() || '';
+        const c1 = r.cells?.[1]?.text?.trim() || '';
+        if (r.rowIndex === 0) {
+          items.push({ rowIndex: 0, role: 'SECTION_HEADER', bold: true, textCn: c0 || rawSec.title, textEn: translateChemicalTerm(c0 || rawSec.title) });
+          continue;
+        }
+        const cellCount = (r.cells || []).length;
+        if (cellCount === 1) {
+          const seqInfo = parseSeqLabel(c0);
+          const isBoldLabel = /^(?:其它的规定|其它规定|符合下列法规要求|暴露控制|手部防护|处理方法)[：:]?$/i.test(c0);
+          items.push({
+            rowIndex: r.rowIndex,
+            role: seqInfo.isSeq ? 'SEQ_LABEL' : (isBoldLabel ? 'SUB_LABEL' : 'EXPLANATION'),
+            seq: seqInfo.seq,
+            labelCn: isBoldLabel || seqInfo.isSeq ? seqInfo.label : '—',
+            valueCn: isBoldLabel || seqInfo.isSeq ? '' : sanitizeDegreeAndPunctuation(c0),
+            textEn: sanitizeDegreeAndPunctuation(translateChemicalTerm(c0)),
+            boldLabel: Boolean(isBoldLabel || seqInfo.isSeq),
+            boldValue: false,
+            indentDxa: seqInfo.isSeq ? seqInfo.indentDxa : 0
+          });
+        } else {
+          const seqInfo = parseSeqLabel(c0);
+          const cleanValCn = sanitizeDegreeAndPunctuation(c1);
+          const condMatch = cleanValCn.match(/^(.*?)\s*[（(]([^()（）]+)[）)]\s*$/);
+          items.push({
+            rowIndex: r.rowIndex,
+            role: seqInfo.isSeq ? 'SEQ_LABEL' : 'SUB_LABEL',
+            seq: seqInfo.seq,
+            labelCn: seqInfo.label,
+            cleanKey: seqInfo.cleanKey,
+            valueCn: cleanValCn,
+            valuePure: condMatch ? condMatch[1].trim() : cleanValCn,
+            conditionCn: condMatch ? condMatch[2].trim() : null,
+            labelEn: seqInfo.seq ? `${seqInfo.seq} ${translateChemicalTerm(seqInfo.label.replace(/[：:]/g, ''))}:` : translateChemicalTerm(seqInfo.label),
+            valueEn: sanitizeDegreeAndPunctuation(translateChemicalTerm(cleanValCn)),
+            boldLabel: true,
+            boldValue: false,
+            indentDxa: seqInfo.indentDxa
+          });
+        }
+      }
+      if (s === 9) {
+        editorOps.push({ op: 'formatLaserTabs', sectionNumber: 9, ruler: '420/560 dxa' });
+      }
+    }
+
+    annotatedSections[s] = {
+      sectionNumber: s,
+      title: rawSec.title,
+      itemsCount: items.length,
+      items
+    };
+  }
+
+  return {
+    modelCode,
+    generatedAt: new Date().toISOString(),
+    stage: 'CONTEXT_2_STRUCTURED_GOVERNED',
+    isHazardous: governed.cn.isHazardous,
+    governedModel: governed,
+    sections: annotatedSections,
+    editorOps
+  };
+}
+
+/**
+ * 将结构化 Context 2 序列化为人类与 Editor Agent 可直读核销的 Markdown 规范文档
+ */
+export function serializeContext2ToMarkdown(ctx2) {
+  const lines = [];
+  lines.push(`# ${ctx2.modelCode} Context 2 结构化标注与覆写治理资产`);
+  lines.push('');
+  lines.push(`> **生成时间**：${ctx2.generatedAt}`);
+  lines.push(`> **数据阶段**：\`${ctx2.stage}\` (100% 溯源 Context 1，已完成角色重分类、跨节迁移与规范校准)`);
+  lines.push(`> **产品型号**：\`${ctx2.modelCode}\` | **GHS 判定**：${ctx2.isHazardous ? '危险化学品' : '非危险化学品 (未分类)'}`);
+  lines.push('');
+  lines.push('## 一、 全局治理核心决策摘要');
+  lines.push(`- **Section 1 品名/分类**：\`${ctx2.governedModel?.cn?.productName || ctx2.modelCode}\` / \`${ctx2.governedModel?.cn?.chemicalClassification || '—'}\` （EN: \`${ctx2.governedModel?.en?.productName || '—'}\`）`);
+  lines.push(`- **Section 2 防外生虚增**：${ctx2.isHazardous ? '保留危险分类与象形图' : '非危品通栏模式，严禁虚增象形图/信号词；已将 S3 聚合物免责与成盐附注迁移归位至 S2'}`);
+  lines.push(`- **Section 11 毒理学范式**：\`${ctx2.sections?.[11]?.items?.find(i => i.paradigm)?.paradigm || 'PARADIGM_2_STANDARD_SLOTS'}\``);
+  lines.push(`- **编辑器调度意图总数**：${ctx2.editorOps.length} 项（全章节前置值格清零 + 动态拓扑渲染 + 激光标尺投影）`);
+  lines.push('');
+  lines.push('## 二、 16 章节逐行结构化标注清单（可直接驱动 MCP 编辑器写入）');
+
+  for (let s = 1; s <= 16; s++) {
+    const sec = ctx2.sections[s];
+    if (!sec) continue;
+    lines.push('');
+    lines.push(`### 第 ${s} 节：${sec.title || s}`);
+    lines.push('');
+    lines.push('| 行索引 | 标注角色 (Role) | 序号 | 粗细/缩进 | 中文标签 (Label) | 中文值 (Value) | 英文映射 (EN) |');
+    lines.push('| :---: | :--- | :---: | :---: | :--- | :--- | :--- |');
+    for (const item of sec.items) {
+      const esc = (v) => String(v ?? '—').replace(/\|/g, '\\|').replace(/\n/g, ' ↵ ');
+      if (item.role === 'FULL_WIDTH_STRUCTURED') {
+        lines.push(`| ${item.rowIndex} | \`${item.role}\` | — | 通栏多段 | **见下方逐行明细** | 共 ${item.lines.length} 行结构化正文 | 同左 (1:1 镜像) |`);
+        for (const sub of item.lines) {
+          const styleStr = `${sub.boldLabel ? '标签加粗' : '常规'}${sub.indentDxa ? ` / ${sub.indentDxa}dxa` : ''}`;
+          lines.push(`| ↳ L${sub.lineIndex || ''} | \`${sub.role}\` | — | ${styleStr} | ${esc(sub.labelCn || '—')} | ${esc(sub.valueCn ?? sub.textCn)} | ${esc(sub.textEn)} |`);
+        }
+      } else if (item.role === 'TABLE_HEADER' || item.role === 'COMPONENT_ROW') {
+        lines.push(`| ${item.rowIndex} | \`${item.role}\` | — | ${item.bold ? '加粗' : '常规'} | ${esc(item.cellsCn?.[0])} | ${esc((item.cellsCn || []).slice(1).join(' \\| '))} | ${esc((item.cellsEn || []).join(' \\| '))} |`);
+      } else if (item.role === 'MIGRATED_TO_S2') {
+        lines.push(`| ${item.rowIndex} | \`${item.role}\` | — | 已迁移 | — | ${esc(item.textCn)} | *(迁移至 Section 2)* |`);
+      } else {
+        const styleStr = `${item.boldLabel ? '标签加粗' : '常规'}${item.indentDxa ? ` / ${item.indentDxa}dxa` : ''}`;
+        const cnLbl = item.labelCn || (item.role === 'SECTION_HEADER' ? item.textCn : '—');
+        const cnVal = item.valueCn ?? (item.role === 'EXPLANATION' ? item.textCn : '—');
+        const enTxt = item.labelEn && item.valueEn ? `${item.labelEn} ${item.valueEn}` : (item.textEn || item.labelEn || item.valueEn || '—');
+        lines.push(`| ${item.rowIndex} | \`${item.role}\` | ${item.seq || '—'} | ${styleStr} | ${esc(cnLbl)} | ${esc(cnVal)} | ${esc(enTxt)} |`);
+      }
+    }
+  }
+  return lines.join('\n');
+}

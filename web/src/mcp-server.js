@@ -11,6 +11,7 @@ console.log = (...args) => process.stderr.write(args.map(a => typeof a === 'obje
 console.error = (...args) => process.stderr.write(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ') + '\n');
 
 import { recognizeSourceDocx, serializeFactsToMarkdown } from './recognition-engine.js';
+import { buildStructuredContext2, serializeContext2ToMarkdown } from './context-governor.js';
 import {
   createWorkSession,
   saveSession,
@@ -411,10 +412,38 @@ const TOOLS = [
         sectionNumber: { type: 'number', description: '可选的特定章节编号 (1~16)' }
       }
     }
+  },
+  {
+    name: 'msds_govern_context2',
+    description: '工序二统一入口：基于 Context 1 事实（或指定源 DOCX）执行全局/局部规范标注重分类、序号剥离、跨节附注迁移、双语英译及编辑器调度意图生成，产出标准 Context 2 结构化资产。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        context1JsonPath: { type: 'string', description: '可选：Context 1 JSON 文件路径' },
+        sourceFilePath: { type: 'string', description: '可选：若未传 context1JsonPath，则自动先识别源 DOCX 生成 Context 1 再治理为 Context 2' }
+      }
+    }
   }
 ];
 
 async function handleToolCall(name, args) {
+  if (name === 'msds_govern_context2') {
+    let context1 = null;
+    if (args.context1JsonPath && fs.existsSync(args.context1JsonPath)) {
+      context1 = JSON.parse(fs.readFileSync(args.context1JsonPath, 'utf8'));
+    } else if (args.sourceFilePath && fs.existsSync(args.sourceFilePath)) {
+      const buf = fs.readFileSync(args.sourceFilePath);
+      context1 = await recognizeSourceDocx(buf, path.basename(args.sourceFilePath));
+    } else {
+      throw new Error('必须提供有效的 context1JsonPath 或 sourceFilePath');
+    }
+    const ctx2 = buildStructuredContext2(context1);
+    return {
+      ...ctx2,
+      context2Markdown: serializeContext2ToMarkdown(ctx2)
+    };
+  }
+
   if (name === 'msds_recognize_source') {
     const filePath = args.sourceFilePath;
     if (!fs.existsSync(filePath)) throw new Error(`Source file not found: ${filePath}`);
