@@ -791,7 +791,13 @@ function parseSection2(record, facts, engine) {
         if (txt) {
           txt.split(/\r?\n/).forEach(l => {
             const line = l.trim();
-            if (line) rawLines.push(line);
+            if (line) {
+              rawLines.push(line);
+              if (/(?:请注意以下物质|中和剂|已键合为盐|键合为盐)/i.test(line)) {
+                if (!facts.componentsNotes) facts.componentsNotes = [];
+                if (!facts.componentsNotes.includes(line)) facts.componentsNotes.push(line);
+              }
+            }
           });
         }
       }
@@ -1405,39 +1411,22 @@ function parseSection14(record, facts) {
     if (/14\.5|环境危|海洋污染物|marine pollutant|environmental hazard/i.test(lbl)) {
       facts.transport.marinePollutant = val;
     }
-    // 特殊防范措施 / 用户特殊注意事项 (支持 14.4 与 14.6 等不同编号源模板)
+    // 特殊防范措施 / 用户特殊注意事项 (支持 14.4 与 14.6 等不同编号源模板；Context 1 仅保留源事实)
     if (/特殊防范|特殊注意事项|用户特殊注意事项|special precautions/i.test(lbl)) {
       facts.transport.specialPrecautions.primaryCn = val;
-      facts.transport.specialPrecautions.primaryEn = val.includes('参见')
-        ? val.replace(/参见(?:第)?(\d+)[-－—~](\d+)节/, 'See sections $1-$2.')
-        : (/See sections/i.test(val) ? val : null);
+      facts.transport.specialPrecautions.primaryEn = null;
       facts.transport.specialPrecautions.hasPrecautions = true;
     }
-    // 附加信息 (子标签)
+    // 附加信息 (子标签；Context 1 仅保留源事实)
     if (/附加信息|additional information/i.test(lbl)) {
       facts.transport.additionalInfo.rawCn = val;
-      const lines = val.split('\n').map(l => l.trim()).filter(Boolean);
-      facts.transport.additionalInfo.itemsCn = lines;
-      facts.transport.additionalInfo.itemsEn = lines.map(line => {
-        let en = line;
-        if (/具可燃性/i.test(line)) {
-          let tMax = '+35';
-          let tMin = '-10';
-          const mHigh = line.match(/高于\s*([+\-－]?\d+)℃/);
-          const mLow = line.match(/低于\s*([+\-－]?\d+)℃/);
-          if (mHigh) tMax = mHigh[1].startsWith('+') ? mHigh[1] : `+${mHigh[1]}`;
-          if (mLow) tMin = mLow[1].replace('－', '-');
-          en = `Flammable. Temperature must not exceed ${tMax}°C and must not fall below ${tMin}°C.`;
-        } else if (/远离食物|远离.*酸.*碱/i.test(line)) {
-          en = 'Keep away from food, acids and bases.';
-        }
-        return en;
-      });
+      facts.transport.additionalInfo.itemsCn = val.split('\n').map(l => l.trim()).filter(Boolean);
+      facts.transport.additionalInfo.itemsEn = [];
     }
     // 14.7 MARPOL
     if (/14\.7|MARPOL|IBC/i.test(lbl)) {
       facts.transport.marpol.valCn = val;
-      facts.transport.marpol.valEn = /不适用/i.test(val) ? 'Not applicable.' : val;
+      facts.transport.marpol.valEn = null;
     }
   }
 }
