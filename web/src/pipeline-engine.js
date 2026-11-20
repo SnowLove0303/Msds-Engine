@@ -278,6 +278,15 @@ export function translateChemicalCategoryToEnglish(cnCategory, cnName = '') {
   if (/噁唑啉/i.test(combined)) {
     return 'Oxazoline-modified polymer aqueous dispersion';
   }
+  if (/水溶性.*丙烯酸.*聚合物.*树脂|水溶性丙烯酸聚合物树脂/i.test(combined)) {
+    return 'Water-soluble acrylic polymer resin';
+  }
+  if (/水溶性.*羟基.*丙烯酸.*树脂/i.test(combined)) {
+    return 'Water-soluble hydroxyl-functional acrylic resin';
+  }
+  if (/丙烯酸聚合物分散体/i.test(combined)) {
+    return 'Acrylic polymer dispersion';
+  }
   if (/丙烯酸/i.test(combined)) {
     return 'Aqueous acrylic dispersion';
   }
@@ -418,6 +427,7 @@ export function translateAppearance(val) {
   else if (/乳白/i.test(trimmed)) app = 'Milky white liquid';
   else if (/均质/i.test(trimmed) && /微黄|淡黄/i.test(trimmed)) app = 'Light yellow homogeneous liquid';
   else if (/微黄.*透明|淡黄.*透明|透明.*微黄|透明.*淡黄/i.test(trimmed)) app = 'Light yellow transparent liquid';
+  else if (/黄(?:色)?.*透明|透明.*黄/i.test(trimmed)) app = 'Yellow transparent liquid';
   else if (/透明/i.test(trimmed)) app = 'Transparent liquid';
   else if (/微黄|淡黄/i.test(trimmed)) app = 'Slightly yellowish liquid';
   else if (/均质/i.test(trimmed)) app = 'Homogeneous liquid';
@@ -486,6 +496,10 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
           prodName = `Epoxy resin ${modelCode}`;
         } else if (/蜡/i.test(cnName + ' ' + cnCategory)) {
           prodName = `Waterborne wax emulsion ${modelCode}`;
+        } else if (/水溶性.*羟基.*丙烯酸.*树脂/i.test(cnName + ' ' + cnCategory)) {
+          prodName = `Water-soluble hydroxyl-functional acrylic resin ${modelCode}`;
+        } else if (/水溶性.*丙烯酸.*树脂/i.test(cnName + ' ' + cnCategory)) {
+          prodName = `Water-soluble acrylic resin ${modelCode}`;
         } else if (/丙烯酸/i.test(cnName + ' ' + cnCategory)) {
           prodName = `Aqueous acrylic dispersion ${modelCode}`;
         } else {
@@ -736,12 +750,12 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
       const specText = (specRow?.cells[1]?.text || '').trim();
       if (specText) {
         const parts = [isDangerousGoods ? 'Flammable.' : 'Not regulated as dangerous goods.'];
-        const highMatch = specText.match(/高于\s*([+\-－]?\d+)℃/);
-        const lowMatch = specText.match(/低于\s*([+\-－]?\d+)℃/);
+        const highMatch = specText.match(/高于\s*([+\-－−–]?\d+)℃/);
+        const lowMatch = specText.match(/低于\s*([+\-－−–]?\d+)℃/);
         if (highMatch || lowMatch) {
           const normalizeTemp = (m, def) => {
             if (!m) return def;
-            let val = m[1].replace('－', '-');
+            let val = m[1].replace(/[－−–]/g, '-');
             if (!val.startsWith('+') && !val.startsWith('-')) val = `+${val}`;
             return val;
           };
@@ -839,7 +853,7 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     'sec8.eye_protection': (() => {
       const cnS8Rec = baseCnEngine?.records?.find(r => r.sectionNumber === 8);
       const cnEye = cnS8Rec?.rows?.find(r => /眼睛防护/i.test(r.cells[0]?.text || ''))?.cells?.[1]?.text?.trim() || '';
-      if (/眼罩|面罩/i.test(cnEye)) return 'Wear safety glasses/face shield.';
+      if (/眼罩|面罩/i.test(cnEye)) return 'Wear protective goggles/face shield.';
       if (/建议使用护目镜|护目镜/i.test(cnEye)) return 'Protective goggles are recommended.';
       return cnEye || '';
     })(),
@@ -912,9 +926,23 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     'sec12.other_effects': sec12OtherEffects,
 
     // Section 13
-    'sec13.line1': 'Dispose of in accordance with applicable national standards and national or local regulations.',
+    'sec13.line1': (() => {
+      const cnS13 = baseCnEngine?.records?.find(r => r.sectionNumber === 13);
+      const r1Text = (cnS13?.rows?.[1]?.cells?.[0]?.text || '').trim();
+      if (/危废与环保管理法规/i.test(r1Text)) {
+        return 'Dispose of in accordance with applicable national standards and national or local regulations. Waste disposal must strictly comply with national and local regulations on hazardous waste management and environmental protection.';
+      }
+      return 'Dispose of in accordance with applicable national standards and national or local regulations.';
+    })(),
     'sec13.line2': 'Within the European Union, dispose of in accordance with the applicable provisions of the European Waste Catalogue (EWC).',
-    'sec13.general': 'Dispose of in accordance with applicable national standards and national or local regulations.\nWithin the European Union, dispose of in accordance with the applicable provisions of the European Waste Catalogue (EWC).',
+    'sec13.general': (() => {
+      const cnS13 = baseCnEngine?.records?.find(r => r.sectionNumber === 13);
+      const r1Text = (cnS13?.rows?.[1]?.cells?.[0]?.text || '').trim();
+      const l1 = /危废与环保管理法规/i.test(r1Text)
+        ? 'Dispose of in accordance with applicable national standards and national or local regulations. Waste disposal must strictly comply with national and local regulations on hazardous waste management and environmental protection.'
+        : 'Dispose of in accordance with applicable national standards and national or local regulations.';
+      return `${l1}\nWithin the European Union, dispose of in accordance with the applicable provisions of the European Waste Catalogue (EWC).`;
+    })(),
     'sec13.methods': 'Empty containers as completely as possible (e.g., by pouring, scraping, or draining until “drip-dry”).\nThey may be sent to an appropriate collection point under existing chemical industry recycling schemes.\nRecycle containers in accordance with national regulations and applicable environmental requirements.\nDo not discharge waste via wastewater.',
 
     // Section 14 (Dangerous Goods dynamic support REQ-04)
@@ -1750,7 +1778,7 @@ export function extractPolymerS2Notes(facts = {}) {
       if (mSub[0].includes('小于2.0%') || mSub[0].includes('<2.0%')) concStr = '< 2.0%';
       else if (mSub[0].includes('小于1.0%') || mSub[0].includes('<1.0%')) concStr = '< 1.0%';
       let threshold = '';
-      if (mSub[0].includes('特定阈值') || raw.includes('特定阈值')) {
+      if (mSub[0].includes('特定阈值')) {
         threshold = ', specific concentration limit >= 5%';
       }
       enLines.push(`N,N-Dimethylethanolamine, neutralizing agent, bonded as salt, mass concentration ${concStr}${threshold}`);
@@ -1760,19 +1788,19 @@ export function extractPolymerS2Notes(facts = {}) {
     enLines.push('GHS classification:');
 
     cnLines.push('易燃液体3 H226；');
-    enLines.push('Flammable liquid 3, H226;');
+    enLines.push('Flammable liquid 3, H226.');
 
     cnLines.push('急性毒性4 吸入性 H332；');
-    enLines.push('Acute toxicity 4, Inhalation, H332;');
+    enLines.push('Acute toxicity 4, Inhalation, H332.');
 
     cnLines.push('急性毒性4 经皮H312；');
-    enLines.push('Acute toxicity 4, Dermal, H312;');
+    enLines.push('Acute toxicity 4, Dermal, H312.');
 
     cnLines.push('皮肤腐蚀1B H314；');
-    enLines.push('Skin corrosion 1B, H314;');
+    enLines.push('Skin corrosion 1B, H314.');
 
     cnLines.push('特异性靶器官系统毒性（一次接触）3 H335；');
-    enLines.push('Specific target organ toxicity - single exposure 3, H335;');
+    enLines.push('Specific target organ toxicity (single exposure), Category 3, H335.');
 
     if (/特定阈值浓度/i.test(raw) && !cnLines.some(l => l.includes('特定阈值浓度'))) {
       cnLines.push('特定阈值浓度≥5%');
@@ -2520,10 +2548,16 @@ export function translateTransportValueToEnglish(cnText, mode = 'road') {
       enParts.push('Not regulated as dangerous goods.');
     } else if (/高于|低于/i.test(s)) {
       if (!hasExtractedTemp) {
-        const highMatch = text.match(/高于\s*([+\-－]?\d+)℃?/);
-        const lowMatch = text.match(/低于\s*([+\-－]?\d+)℃?/);
-        const maxT = highMatch ? (highMatch[1].startsWith('+') || highMatch[1].startsWith('-') ? highMatch[1] : `+${highMatch[1]}`) : '+40';
-        const minT = lowMatch ? (lowMatch[1].startsWith('+') || lowMatch[1].startsWith('-') ? lowMatch[1] : `+${lowMatch[1]}`) : '+5';
+        const highMatch = text.match(/高于\s*([+\-－−–]?\d+)℃?/);
+        const lowMatch = text.match(/低于\s*([+\-－−–]?\d+)℃?/);
+        const normT = (m, def) => {
+          if (!m) return def;
+          let v = m[1].replace(/[－−–]/g, '-');
+          if (!v.startsWith('+') && !v.startsWith('-')) v = `+${v}`;
+          return v;
+        };
+        const maxT = normT(highMatch, '+40');
+        const minT = normT(lowMatch, '+5');
         enParts.push(`Temperature must not exceed ${maxT}°C and must not fall below ${minT}°C.`);
         hasExtractedTemp = true;
       }
@@ -3680,7 +3714,7 @@ export function translateToxicologyValueToEnglish(cnText, endpoint = '') {
   t = t.replace(/染毒途径\s*[:：]\s*吸入性?/g, 'Route of exposure: Inhalation');
   t = t.replace(/染毒途径\s*[:：]\s*腹膜内的?/g, 'Route of exposure: Intraperitoneal');
   t = t.replace(/染毒途径\s*[:：]\s*/g, 'Route of exposure: ');
-  t = t.replace(/[（(]?接触持续时间\s*[:：]\s*(\d+)\s*天\s*[（(]包装后的第\s*([\d-]+)\s*天[）)][）)]?/g, '(duration of exposure: $1 days (days $2 post-coitum))');
+  t = t.replace(/[（(]?接触持续时间\s*[:：]\s*(\d+)\s*天\s*[（(]包装后的第\s*([\d-]+)\s*天[）)][）)]?/g, ' (duration of exposure: $1 days (days $2 post-coitum))');
   t = t.replace(/染毒频次\s*[:：]\s*[（(]?一天\s*(\d+)\s*小时\s*[,，]\s*一周\s*(\d+)\s*天[）)]?/g, 'Exposure frequency: ($1 hours/day, $2 days/week)');
   t = t.replace(/染毒频次\s*[:：]\s*[（(]?(\d+)\s*小时[\/／]天\s*[,，]\s*(\d+)\s*天[\/／]周[）)]?/g, 'Exposure frequency: $1 hours/day, $2 days/week');
   t = t.replace(/(\d+)\s*小时[\/／]天/g, '$1 hours/day');
@@ -3722,8 +3756,8 @@ export function translateToxicologyValueToEnglish(cnText, endpoint = '') {
   t = t.replace(/评估\s*[:：]\s*此物质或混合物无急性呼吸毒性/g, 'Assessment: The substance or mixture has no acute respiratory toxicity');
   t = t.replace(/聚氨酯/g, 'Polyurethane');
   t = t.replace(/OECD化学品测试指南\s*(\d+)/gi, 'OECD Test Guideline $1');
-  t = t.replace(/此物质或混合物无急性呼吸毒性/g, 'The substance or mixture has no acute inhalation toxicity');
-  t = t.replace(/此物质或混合物无急性皮肤毒性/g, 'The substance or mixture has no acute dermal toxicity');
+  t = t.replace(/此物质或混合物无急性呼吸毒性/g, 'The substance or mixture has no acute inhalation toxicity.');
+  t = t.replace(/此物质或混合物无急性皮肤毒性/g, 'The substance or mixture has no acute dermal toxicity.');
   t = t.replace(/无皮肤刺激(?:性)?[.。]?/g, 'No skin irritation.');
   t = t.replace(/轻微一过性刺激[，, ]*短期内可恢复[，, ]*不属于严重眼刺激物[.。]?/g, 'Slight transient irritation, reversible within a short period, not classified as serious eye irritant.');
   t = t.replace(/AMES试验呈阴性[，, ]*无致突变性[.。]?/gi, 'Negative in AMES test, non-mutagenic.');
@@ -3750,9 +3784,9 @@ export function translateToxicologyValueToEnglish(cnText, endpoint = '') {
   t = t.replace(/半数致死剂量\s*[（(]\s*LD50\s*[）)]\s*大鼠\s*[:：]\s*/gi, 'LD50 / Oral / Rat: ');
   t = t.replace(/方法\s*[:：]\s*OECD化学品测试指南\s*(\d+)/gi, 'Method: OECD Test Guideline $1');
   t = t.replace(/对类似产品(?:的)?(?:毒理学)?研究/g, 'Studies on a similar product');
-  t = t.replace(/评估\s*[:：]\s*此物质或混合物无急性皮肤毒性/g, 'Assessment: The substance or mixture has no acute dermal toxicity');
+  t = t.replace(/评估\s*[:：]\s*此物质或混合物无急性皮肤毒性/g, 'Assessment: The substance or mixture has no acute dermal toxicity.');
   t = t.replace(/试验环境\s*[:：]\s*粉尘\/烟雾/g, 'Test atmosphere: dust/mist');
-  t = t.replace(/评估\s*[:：]\s*此物质或混合物无急性呼吸毒性/g, 'Assessment: The substance or mixture has no acute inhalation toxicity');
+  t = t.replace(/评估\s*[:：]\s*此物质或混合物无急性呼吸毒性/g, 'Assessment: The substance or mixture has no acute inhalation toxicity.');
   t = t.replace(/分类\s*[:：]\s*无皮肤刺激/g, 'Classification: No skin irritation');
   t = t.replace(/分类\s*[:：]\s*无眼睛刺激/g, 'Classification: No eye irritation');
   t = t.replace(/根据Buehler\s*[（(]经皮试验[）)]\s*皮肤致敏性\s*[:：]/g, 'Buehler Test (dermal):');
@@ -5870,7 +5904,7 @@ export function standardizeEnglishTypographyAndLabels(engine) {
           const c1 = cells[1];
           cleanTabsInNode(c1, W_NS);
           const c1Text = (c1.textContent || '').trim();
-          if (/^(?:Oral|Inhalation|Dermal|Fertility|Eye|Skin|Respiratory):?/i.test(c1Text)) {
+          if (cells.length >= 3 && /^(?:Oral|Inhalation|Dermal|Fertility|Eye|Skin|Respiratory):?/i.test(c1Text)) {
             let cleanSub = c1Text.replace(/：/g, ':').trim();
             if (!cleanSub.endsWith(':')) cleanSub += ':';
             const p = c1.getElementsByTagNameNS(W_NS, 'p')[0];

@@ -4022,7 +4022,7 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
           if (eyeItem?.value) {
             const cleanEye = eyeItem.value.trim();
             const valToWrite = isEnglishTemplate
-              ? (/眼罩|面罩/i.test(cleanEye) ? 'Wear safety glasses/face shield.' : (/建议使用护目镜|护目镜/i.test(cleanEye) ? 'Protective goggles are recommended.' : cleanEye))
+              ? (/眼罩|面罩/i.test(cleanEye) ? 'Wear protective goggles/face shield.' : (/建议使用护目镜|护目镜/i.test(cleanEye) ? 'Protective goggles are recommended.' : cleanEye))
               : cleanEye;
             try { writeCellValue(eyeRow.cells[eyeRow.cells.length - 1], valToWrite, editorEngine.roleStyles?.value); injectedCount++; } catch (e) {}
           } else {
