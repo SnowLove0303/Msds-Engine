@@ -5349,7 +5349,7 @@ export function enforceStructuralTypographyInvariants(eng, isEn = false) {
         if (runs.length === 0) continue;
 
         const isSectionHeader = /^(?:2\.\d+\s*)?(?:GHS\s*危险性类别|GHS\s*分类|Classification of the substance or mixture|GHS\s*Classification|GHS\s*标签要素|Label elements|GHS\s*Label\s*Elements|危险性说明|危害性说明|Hazard\s*statements?|防范说明|Precautionary\s*statements?|其他危害|其他危险|Other\s*hazards?)[：:]?/i.test(fullText);
-        const isSubLabelPrefix = /^(?:(?:GHS\s*)?(?:象形图|pictograms?)|危险象形标记|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components which must be listed on the label)|(?:(?:请)?注意以下物质|需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal))[：:]/i.test(fullText);
+        const isSubLabelPrefix = /^(?:(?:GHS\s*)?(?:象形图|pictograms?)|危险象形标记|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components which must be listed on the label)|(?:(?:请)?注意以下物质|需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:物理化学危险|健康危害|环境危害|Physical and chemical hazards|Health hazards|Environmental hazards)|(?:羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification)|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal))[：:]/i.test(fullText);
 
         const setRunBold = (runNode, bold) => {
           let rPr = runNode.getElementsByTagNameNS(W_NS, 'rPr')[0] || doc.createElementNS(W_NS, 'w:rPr');

@@ -3204,7 +3204,8 @@ export function extractToxicologicalEndpointsFromSource(srcEngine) {
     { key: 'stot_single', cnLabel: 'STOT评估-一次性接触', enLabel: 'Specific target organ toxicity (single exposure)', match: /(?:^|\n)\s*(?:11\.\d+\s*)?STOT评估-一次性接触[：:]?/i },
     { key: 'stot_repeated', cnLabel: 'STOT评估-重复性接触', enLabel: 'Specific target organ toxicity (repeated exposure)', match: /(?:^|\n)\s*(?:11\.\d+\s*)?STOT评估-重复性接触[：:]?/i },
     { key: 'aspiration', cnLabel: '吸入危害', enLabel: 'Aspiration hazard', match: /(?:^|\n)\s*(?:11\.\d+\s*)?(?:吸入危害|吸入危险)[：:]?/i },
-    { key: 'cmr', cnLabel: 'CMR评估', enLabel: 'CMR assessment', match: /(?:^|\n)\s*(?:11\.\d+\s*)?CMR评估[：:]?/i }
+    { key: 'cmr', cnLabel: 'CMR评估', enLabel: 'CMR assessment', match: /(?:^|\n)\s*(?:11\.\d+\s*)?CMR评估[：:]?/i },
+    { key: 'additional_info', cnLabel: '附加信息', enLabel: 'Additional information', match: /(?:^|\n)\s*(?:11\.\d+\s*)?附加信息[：:]?/i }
   ];
 
   const occurrences = [];
@@ -3227,6 +3228,9 @@ export function extractToxicologicalEndpointsFromSource(srcEngine) {
     let body = rawText.slice(cur.endIndex, nextStart).trim();
     if (cur.key === 'acute_oral') {
       body = body.replace(/^(?:经口|经口毒性)[：:\s]*/i, '').trim();
+    }
+    if (cur.key === 'additional_info') {
+      body = body.replace(/^(?:附加信息|Additional information)[：:\s]*/i, '').trim();
     }
     endpoints.push({
       key: cur.key,
@@ -3867,8 +3871,8 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
               continue;
             }
             const isComponentHeader = options.isEnglish
-              ? /^(?:N,N-Dimethylacetamide|Hydroxy polyacrylate dispersion|Propylene glycol butyl ether|2-\(2-Butoxyethoxy\)ethanol)[:：]\s*$/i.test(line.trim()) || (li === 0 && /^[^:\n]+[:：]\s*$/i.test(line.trim()) && !/^(?:Toxicity|Irritation|Acute toxicity|Primary|Sensitization|Mutagenicity|Carcinogenicity|Reproductive|Specific target|Aspiration|Additional)[:：]/i.test(line.trim()))
-              : /^(?:N,N-二甲基乙酰胺|羟基聚丙烯酸酯分散体|丙二醇丁醚|二乙二醇丁醚)[：:]\s*$/.test(line.trim()) || (li === 0 && /^[^：\n]+[：:]\s*$/.test(line.trim()) && !/^(?:毒性|刺激性|急性毒性|主要|致敏性|致突变性|致癌性|生殖毒性|特异性靶器官|吸入危险|附加信息)[：:]/.test(line.trim()));
+              ? /^(?:N,N-Dimethylacetamide|Hydroxy polyacrylate dispersion|Water-soluble hydroxy polyacrylate|Propylene glycol butyl ether|2-\(2-Butoxyethoxy\)ethanol|Ethylene glycol monobutyl ether|2-Butoxyethanol)[:：]?\s*$/i.test(line.trim()) || (li === 0 && /^[^:\n]+[:：]?\s*$/i.test(line.trim()) && !/^(?:Toxicity|Irritation|Acute toxicity|Primary|Sensitization|Mutagenicity|Carcinogenicity|Reproductive|Specific target|Aspiration|Additional)[:：]/i.test(line.trim()))
+              : /^(?:N,N-二甲基乙酰胺|水溶性羟基聚丙烯酸酯|羟基聚丙烯酸酯(?:分散体)?|乙二醇丁醚|丙二醇丁醚|二乙二醇丁醚|2-丁氧基乙醇)[：:]?\s*$/.test(line.trim()) || (li === 0 && /^[^：\n]+[：:]?\s*$/.test(line.trim()) && !/^(?:毒性|刺激性|急性毒性|主要|致敏性|致突变性|致癌性|生殖毒性|特异性靶器官|吸入危险|附加信息)[：:]/.test(line.trim()));
             if (isComponentHeader) {
               runSpecs.push({ text: line, bold: true });
             } else {
@@ -3880,13 +3884,20 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
                 const prefixSpace = options.isEnglish ? ' ' : '';
                 runSpecs.push({ text: subLabel, bold: true });
                 if (restVal) {
-                  // 嵌套子标签匹配
-                  const innerMatch = restVal.match(/^((?:经皮（鼠）LD50|吸入（鼠）LD50|经口（鼠）LD50|经皮|吸入|经口|物种|分类|结果|病理变化|Dermal|Oral|Inhalation|Species|Classification|Result)[：:])\s*(.*)$/i);
-                  if (innerMatch) {
-                    runSpecs.push({ text: prefixSpace + innerMatch[1], bold: true });
-                    if (innerMatch[2]) runSpecs.push({ text: prefixSpace + innerMatch[2], bold: false });
+                  // 嵌套子标签匹配（支持分号分隔的二级指标，如 "无资料；刺激性：无资料" 或 "No data available; Irritation: No data available."）
+                  const semiMatch = restVal.match(/^(.*?)([；;]\s*(?:刺激性|Irritation)[：:])\s*(.*)$/i);
+                  if (semiMatch) {
+                    if (semiMatch[1]) runSpecs.push({ text: prefixSpace + semiMatch[1], bold: false });
+                    runSpecs.push({ text: semiMatch[2], bold: true });
+                    if (semiMatch[3]) runSpecs.push({ text: prefixSpace + semiMatch[3], bold: false });
                   } else {
-                    runSpecs.push({ text: prefixSpace + restVal, bold: false });
+                    const innerMatch = restVal.match(/^((?:经皮（鼠）LD50|吸入（鼠）LD50|经口（鼠）LD50|经皮|吸入|经口|物种|分类|结果|病理变化|Dermal|Oral|Inhalation|Species|Classification|Result)[：:])\s*(.*)$/i);
+                    if (innerMatch) {
+                      runSpecs.push({ text: prefixSpace + innerMatch[1], bold: true });
+                      if (innerMatch[2]) runSpecs.push({ text: prefixSpace + innerMatch[2], bold: false });
+                    } else {
+                      runSpecs.push({ text: prefixSpace + restVal, bold: false });
+                    }
                   }
                 }
               } else {
