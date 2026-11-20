@@ -106,12 +106,45 @@ MSDS-Studio 官方标准七步流水线 Runner
     modelCode = m ? m[1].toUpperCase() : baseName.replace(/\.[^/.]+$/, '').trim();
   }
 
+function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
+  // 1. 严禁在输出目录或工作区生成调用 MSDS-Engine 的临时脚本
+  if (fs.existsSync(targetDir)) {
+    const adHocScripts = fs.readdirSync(targetDir).filter(f => /\.(?:mjs|js|cjs|py|ps1|sh)$/i.test(f));
+    if (adHocScripts.length > 0) {
+      console.error(`❌ [AD_HOC_SCRIPT_BLOCKED] 检测到临时脚本产出 (${adHocScripts.join(', ')})！工作流调用期间严禁生成任何临时脚本！`);
+      process.exit(1);
+    }
+  }
+
+  // 2. 严禁在工作流调用期间修改受控源码 (豁免合法沉淀的 translation-memory.json)
+  if (!allowDirty && fs.existsSync(path.join(REPO_ROOT, '.git'))) {
+    try {
+      const statusOut = execSync('git status --porcelain web/src web/scripts web/templates "标准化流程"', {
+        cwd: REPO_ROOT,
+        encoding: 'utf8'
+      }).trim();
+      const violations = statusOut
+        .split(/\r?\n/)
+        .map(l => l.trim())
+        .filter(Boolean)
+        .filter(l => !l.endsWith('web/src/translation-memory.json') && !l.includes('/output/'));
+      if (violations.length > 0) {
+        console.error(`❌ [SOURCE_TAMPER_BLOCKED] 检测到系统受控源码/脚本被修改或新增临时文件，工作流调用期间严禁修改源码：\n  ${violations.join('\n  ')}`);
+        process.exit(1);
+      }
+    } catch {
+      // 非 Git 环境跳过 git status 检查
+    }
+  }
+}
+
   // 3. 解析目标输出目录
   const targetDir = options.targetDir
     ? path.resolve(options.targetDir)
     : path.resolve(__dirname, 'output', modelCode);
 
   fs.mkdirSync(targetDir, { recursive: true });
+  verifyReadonlyEngineGuard(targetDir, process.argv.includes('--devAllowDirty'));
 
   console.log(`============================================================`);
   console.log(`🚀 [MSDS-Studio Test Kit] 启动标准七步法覆写生产流水线`);
