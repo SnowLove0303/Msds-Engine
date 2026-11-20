@@ -140,6 +140,27 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '商业机密': 'Trade secret',
   '商业秘密': 'Trade secret',
 
+  // GHS 危害说明与分类 (含 PA-4840 源文多项危害描述)
+  '急性毒性4经口吞咽有害': 'Harmful if swallowed.',
+  '急性毒性4经口吞咽有害。': 'Harmful if swallowed.',
+  '急性毒性4经皮皮肤接触有害': 'Harmful in contact with skin.',
+  '急性毒性4经皮皮肤接触有害。': 'Harmful in contact with skin.',
+  '急性毒性4吸入性吸入有害': 'Harmful if inhaled.',
+  '急性毒性4吸入性吸入有害。': 'Harmful if inhaled.',
+  '眼睛刺激2 造成严重的眼刺激': 'Causes serious eye irritation.',
+  '眼睛刺激2 造成严重的眼刺激。': 'Causes serious eye irritation.',
+  '皮肤刺激2 造成皮肤刺激': 'Causes skin irritation.',
+  '皮肤刺激2 造成皮肤刺激，': 'Causes skin irritation.',
+  '皮肤刺激2 造成皮肤刺激。': 'Causes skin irritation.',
+  '对水生生物有害并具有长期持续影响': 'Harmful to aquatic life with long lasting effects.',
+  '对水生生物有害并具有长期持续影响。': 'Harmful to aquatic life with long lasting effects.',
+  'H412 对水生生物有害并具有长期持续影响': 'H412 Harmful to aquatic life with long lasting effects.',
+  'H412 对水生生物有害并具有长期持续影响。': 'H412 Harmful to aquatic life with long lasting effects.',
+  '羟基丙烯酸酯聚合物GHS危险性分类：不适用': 'Hydroxy acrylic polymer GHS classification: Not applicable;',
+  '羟基丙烯酸酯聚合物GHS危险性分类：不适用；': 'Hydroxy acrylic polymer GHS classification: Not applicable;',
+  '危险象形标记：无': 'GHS pictograms: None',
+  '警告词：警告': 'Signal word: Warning',
+
   // 理化状态与外观描述
   '液体': 'Liquid',
   '乳白液体': 'Milky white liquid',

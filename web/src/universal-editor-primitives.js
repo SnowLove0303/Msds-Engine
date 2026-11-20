@@ -742,6 +742,10 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
         }
       } else {
         // 2.4 单列表格行 (cells.length === 1, 如 Section 2, 11, 15 等通栏行)
+        if (sectionNumber === 11 && rIdx >= 1) {
+          // Section 11 通栏行全量豁免，严禁压平段落或破坏 renderFullWidthRow 的细粒度排版与软回车
+          continue;
+        }
         const cell = cells[0];
         const ps = Array.from(cell.getElementsByTagNameNS(W_NS, 'p'));
         for (const p of ps) {

@@ -132,10 +132,19 @@ export async function lintSourceGrounding(sourceDocxPath, cnDocxPath, enDocxPath
   const enS2Text = enS2 ? enS2.rows.map(r => r.cells.map(c => c.text || '').join(' ')).join('\n') : '';
 
   if (srcIsNonHaz) {
-    if (/H412|H315|H332|H317|Category\s*\d/i.test(enS2Text)) {
+    const enS2WithoutNotes = enS2Text
+      .replace(/Please note the following substance[\s\S]*?(?=GHS pictograms|Signal word|2\.\d|$)/i, '')
+      .replace(/bonded as salt[\s\S]*?(?=GHS pictograms|Signal word|2\.\d|$)/i, '')
+      .replace(/neutralizing agent[\s\S]*?(?=GHS pictograms|Signal word|2\.\d|$)/i, '')
+      .replace(/Hydroxy acrylic polymer GHS classification:\s*Not applicable;?/gi, '');
+    if (/H412|H315|H332|H317|Category\s*\d/i.test(enS2WithoutNotes)) {
       recordViolation('LINT-S2-01', 2, '源文档为非危品，产出英文严禁残留危化品分类或 H 声明！', '无 H 声明与分类', '检出 H 声明或 Category 残留');
     }
-    if (/(?:危险性类别|GHS分类)[：:\s]*(?!无|不适用|不属于危险)/i.test(cnS2Text) && /类别\s*[1-4]/i.test(cnS2Text)) {
+    const cnS2WithoutNotes = cnS2Text
+      .replace(/请注意以下物质[\s\S]*?(?=危险象形标记|警告词|信号词|2\.\d|$)/i, '')
+      .replace(/已键合为盐[\s\S]*?(?=危险象形标记|警告词|信号词|2\.\d|$)/i, '')
+      .replace(/中和剂[\s\S]*?(?=危险象形标记|警告词|信号词|2\.\d|$)/i, '');
+    if (/(?:危险性类别|GHS分类)[：:\s]*(?!无|不适用|不属于危险)/i.test(cnS2WithoutNotes) && /类别\s*[1-4]/i.test(cnS2WithoutNotes)) {
       recordViolation('LINT-S2-02', 2, '源文档明确为非危险品，产出中文严禁捏造危险性类别！', '非危险品分类', '检出具体危险性类别');
     }
   }
@@ -269,8 +278,11 @@ if (process.argv[1]?.endsWith('lint_source_grounding.mjs')) {
   const args = process.argv.slice(2);
   let srcArg, cnArg, enArg;
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--source') srcArg = args[++i];
+    if (args[i].startsWith('--source=')) srcArg = args[i].slice(9);
+    else if (args[i] === '--source') srcArg = args[++i];
+    else if (args[i].startsWith('--cn=')) cnArg = args[i].slice(5);
     else if (args[i] === '--cn') cnArg = args[++i];
+    else if (args[i].startsWith('--en=')) enArg = args[i].slice(5);
     else if (args[i] === '--en') enArg = args[++i];
   }
 

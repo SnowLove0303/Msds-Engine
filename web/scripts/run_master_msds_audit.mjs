@@ -739,12 +739,17 @@ export async function runMasterMsdsAudit(options = {}) {
     }
 
     if (isNonHaz) {
+      const enS2WithoutNotes = enS2Text
+        .replace(/Please note the following substance[\s\S]*?(?=GHS pictograms|Signal word|2\.\d|$)/i, '')
+        .replace(/bonded as salt[\s\S]*?(?=GHS pictograms|Signal word|2\.\d|$)/i, '')
+        .replace(/neutralizing agent[\s\S]*?(?=GHS pictograms|Signal word|2\.\d|$)/i, '')
+        .replace(/Hydroxy acrylic polymer GHS classification:\s*Not applicable;?/gi, '');
       assert(
-        !/H412|H315|Category|H332|H317/i.test(enS2Text),
+        !/H412|H315|Category|H332|H317/i.test(enS2WithoutNotes),
         '环3',
         'Section 2 非危品纯度',
         '中文为非危险品时，英文版严禁残留旧模板危化品分类与 H 声明',
-        enS2Text.slice(0, 150),
+        enS2WithoutNotes.slice(0, 150),
         'Section 2 EN'
       );
       // 严禁非危品外生冒出“警告词：警告”或“Signal word: Warning”
@@ -1602,7 +1607,12 @@ export async function runMasterMsdsAudit(options = {}) {
   const s2RecEn = enDocx.records.find(r => r.sectionNumber === 2);
   const cnS2TextAll = s2RecCn ? s2RecCn.rows.map(r => r.cells.map(c => c.text).join(' ')).join(' ') : '';
   const enS2TextAll = s2RecEn ? s2RecEn.rows.map(r => r.cells.map(c => c.text).join(' ')).join(' ') : '';
-  if (/易燃|可燃/i.test(cnS2TextAll)) {
+  const cnS2WithoutSaltNotes = cnS2TextAll
+    .replace(/请注意以下物质[\s\S]*?(?=危险象形标记|警告词|信号词|2\.\d|$)/i, '')
+    .replace(/已键合为盐[\s\S]*?(?=危险象形标记|警告词|信号词|2\.\d|$)/i, '')
+    .replace(/其纯物质分类[\s\S]*?\)/gi, '');
+  const isFlammableHazard = /易燃|可燃/i.test(cnS2WithoutSaltNotes) && !/根据GHS不属于危险|未被归类为危险化学品|非危险品/i.test(cnS2WithoutSaltNotes);
+  if (isFlammableHazard) {
     const s2HasP403Cn = /P403/i.test(cnS2TextAll);
     const s2HasP501Cn = /P501/i.test(cnS2TextAll);
     const s2HasP403En = /P403/i.test(enS2TextAll);

@@ -3954,7 +3954,8 @@ export function applyMatchResultToEditor(matchResult, editorEngine) {
             const s3NotesRaw = (matchResult.facts?.componentsNotes && matchResult.facts.componentsNotes.length > 0)
               ? matchResult.facts.componentsNotes.join('\n')
               : (matchResult.facts?.section3ExemptionNotes || '');
-            const hasS3Notes = Boolean(s3NotesRaw && s3NotesRaw.trim());
+            const isPolymerExemption = /羟基丙烯酸酯聚合物|成盐|中和剂|请注意以下物质/i.test(s3NotesRaw);
+            const hasS3Notes = Boolean(s3NotesRaw && s3NotesRaw.trim()) && !isPolymerExemption;
             const neededTotalRows = startCompRow + comps.length + (hasS3Notes ? 1 : 0);
             while (tRecord.rows.length < neededTotalRows) {
               try {

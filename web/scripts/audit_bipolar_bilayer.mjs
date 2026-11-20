@@ -418,9 +418,9 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
     let s11UnclosedCnCount = 0;
     s11CnPs.forEach((p, idx) => {
       const t = getPText(p).trim();
-      if (model === 'PA-3223') {
+      if (model === 'PA-3223' || model === 'PA-4902') {
         if (idx === 0) {
-          if (!t.endsWith('；') && !t.endsWith(';')) s11UnclosedCnCount++;
+          if (!t.endsWith('；') && !t.endsWith(';') && !t.endsWith('无资料')) s11UnclosedCnCount++;
         } else {
           if (!t.endsWith('刺激性：无资料') && !t.endsWith('无资料')) s11UnclosedCnCount++;
         }
@@ -669,7 +669,15 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
       if (model === 'PA-4780' || /2-Butoxyethanol/i.test(s2EnText)) {
         assert(/2-Butoxyethanol/i.test(s2EnText), `Section 2 (L-S2 EN): ${model} 英文有害成份 2-Butoxyethanol 保全`);
       }
-    } else if (model === 'PA-3223' || /成盐|N,N-二甲基乙醇胺/.test(s2Text)) {
+    } else if (model === 'PA-4902') {
+      assert(/请注意以下物质：/.test(s2Text) && /N,N-二甲基乙醇胺/.test(s2Text), 'Section 2 (L-S2): 成盐豁免附注准确锚定保全');
+      assert(/危险象形标记：无/.test(s2Text), 'Section 2 (L-S2): 危险象形标记：无 保全');
+      assert(/警告词：警告/.test(s2Text), 'Section 2 (L-S2): 警告词：警告 保全');
+      const s2EnText = Array.from(tblsEn[1].getElementsByTagName('w:tr')).slice(1).map(r => r.textContent).join(' ');
+      assert(/GHS pictograms:\s*None/i.test(s2EnText), 'Section 2 (L-S2 EN): PA-4902 英文象形图 None 保全');
+      assert(/Signal word:\s*Warning/i.test(s2EnText), 'Section 2 (L-S2 EN): PA-4902 英文警告词 Warning 保全');
+      assert(/Please note the following substance/i.test(s2EnText), 'Section 2 (L-S2 EN): PA-4902 英文成盐中和剂迁移保全');
+    } else if (model === 'PA-3223') {
       // PA-3223 Mode B 专属成盐豁免与 5 级缩进断言
       assert(!/商业机密|7732-18-5|46±5/.test(s2Text), 'Section 2 (L-S2): 无菌覆写，彻底切断 Section 3 成分数据行穿透污染');
       assert(/请注意以下物质：/.test(s2Text) && /N,N-二甲基乙醇胺/.test(s2Text), 'Section 2 (L-S2): 成盐豁免附注准确锚定保全');
@@ -911,6 +919,9 @@ export async function runBipolarBilayerAudit(customTargetDir = null, customModel
       assert(/Causes serious eye irritation/i.test(tblsEn[10].textContent), 'Section 11 英文版 (L-S11 EN): PA-4780 眼睛刺激英译保全');
     } else if (model === 'PA-3223') {
       assert(/羟基聚丙烯酸酯分散体/.test(s11Row3Text) && /丙二醇丁醚/.test(s11Row3Text) && /二乙二醇丁醚/.test(s11Row3Text), 'Section 11 (L-S11): PA-3223 组分实测毒理试验数据 100% 内容守恒且无空值截断');
+    } else if (model === 'PA-4902') {
+      assert(/水溶性羟基聚丙烯酸酯/.test(s11Row3Text) && /乙二醇丁醚/.test(s11Row3Text), 'Section 11 (L-S11): PA-4902 组分实测毒理试验数据 100% 内容守恒且无空值截断');
+      assert(/Water-soluble hydroxy polyacrylate/i.test(tblsEn[10].textContent), 'Section 11 英文版 (L-S11 EN): PA-4902 组分毒理学英译保全');
     } else if (model === 'PU-202A') {
       assert(/N,N[-－]二甲基乙酰胺/.test(s11Row3Text), 'Section 11 (L-S11): PU-202A DMAC 实测毒理试验数据保全');
     } else {
