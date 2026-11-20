@@ -33,7 +33,7 @@ const REPO_ROOT = path.resolve(__dirname, '../..');
 
 // 动态载入官方正规流水线构件
 const { recognizeSourceDocx, serializeFactsToMarkdown } = await import('../../web/src/recognition-engine.js');
-const { governContext, buildStructuredContext2, serializeContext2ToMarkdown } = await import('../../web/src/context-governor.js');
+const { governContext, buildStructuredContext2, serializeContext2ToMarkdown, saveTranslationsToMemory } = await import('../../web/src/context-governor.js');
 const { executeEightDeliverablesPipeline } = await import('../../web/src/pipeline-engine.js');
 
 function parseArgs() {
@@ -145,9 +145,21 @@ MSDS-Studio 官方标准七步流水线 Runner
   const ctx2MdPath = path.join(targetDir, `${modelCode}_context2.md`);
   fs.writeFileSync(ctx2MdPath, serializeContext2ToMarkdown(structuredCtx2), 'utf8');
   const v = structuredCtx2.validation || {};
-  console.log(`    ✓ Context 2 结构化治理完成: 章节 ${v.coveredSections}/16 | 标注项 ${v.totalItems} | 待补译中文残留 ${v.untranslatedCount} | isValid=${v.isValid} -> ${ctx2MdPath}`);
+  console.log(`    ✓ Context 2 结构化治理完成: 章节 ${v.coveredSections}/16 | 标注项 ${v.totalItems} | TM库 ${v.tmSize ?? 0} 条 | 待补译 ${v.untranslatedCount} | 数字异常 ${v.numericMismatchCount ?? 0} | isValid=${v.isValid} -> ${ctx2MdPath}`);
   if (v.untranslatedCount > 0) {
-    console.warn(`    ⚠️ [GATE] 尚有 ${v.untranslatedCount} 项英文槽位含中文，请 Agent 逐句翻译后通过 --translations=<json> 回填！`);
+    const untranslatedPath = path.join(targetDir, `${modelCode}_untranslated.json`);
+    fs.writeFileSync(untranslatedPath, JSON.stringify(v.untranslatedTemplate || {}, null, 2) + '\n', 'utf8');
+    console.warn(`    ⚠️ [GATE 3A->3B] 已自动导出待译模板: ${untranslatedPath}`);
+    console.warn(`       请 Agent 逐句翻译填满上述 JSON 的空值后，传 --translations="${untranslatedPath}" 复跑！`);
+  } else if (agentTranslations && (v.numericMismatchCount ?? 0) === 0) {
+    const saved = saveTranslationsToMemory(agentTranslations);
+    console.log(`    💾 [TM 沉淀] 新增 ${saved.added} 条专业英译已写入映射数据库 (累计 ${saved.total} 条): ${saved.path}`);
+  }
+  if ((v.numericMismatchCount ?? 0) > 0) {
+    console.error(`    ❌ [NUMERIC GATE] 发现 ${v.numericMismatchCount} 条译文丢失原文数字/CAS，已阻断沉淀，请修正：`);
+    for (const nm of (v.numericMismatches || []).slice(0, 10)) {
+      console.error(`       - S${nm.sectionNumber} R${nm.rowIndex} [${nm.field}] 缺失 "${nm.missingNumber}" | CN="${nm.cnSource}" | EN="${nm.currentEn}"`);
+    }
   }
   const governed = governContext(context1, { modelCode });
   const cn = governed.cn;

@@ -11,7 +11,7 @@ console.log = (...args) => process.stderr.write(args.map(a => typeof a === 'obje
 console.error = (...args) => process.stderr.write(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ') + '\n');
 
 import { recognizeSourceDocx, serializeFactsToMarkdown } from './recognition-engine.js';
-import { buildStructuredContext2, serializeContext2ToMarkdown } from './context-governor.js';
+import { buildStructuredContext2, serializeContext2ToMarkdown, saveTranslationsToMemory } from './context-governor.js';
 import {
   createWorkSession,
   saveSession,
@@ -444,8 +444,13 @@ async function handleToolCall(name, args) {
       translations = JSON.parse(fs.readFileSync(args.translationsJsonPath, 'utf8'));
     }
     const ctx2 = buildStructuredContext2(context1, { translations });
+    let tmSaved = null;
+    if (translations && ctx2.validation?.untranslatedCount === 0 && ctx2.validation?.numericMismatchCount === 0) {
+      tmSaved = saveTranslationsToMemory(translations);
+    }
     return {
       ...ctx2,
+      tmSaved,
       context2Markdown: serializeContext2ToMarkdown(ctx2)
     };
   }

@@ -70,11 +70,11 @@ flowchart TD
   2. 隔离注册地址、电话（广州 020 vs 清远英德 0763）、传真与邮编；
   3. 确立 8 格式标准交付矩阵（4 DOCX + 4 PDF）。
 
-### Phase 3: 事实标准化治理与全量英译/标准化表格门禁 (Content Governance to Context 2)
-- **底层承载模块**：【规范治理引擎】(`context-governor.js`) + 【Agent 逐句全量英译】；
-- **规程要求**：
-  1. **强制全量逐句英文翻译（严禁仅靠静态映射）**：每次源文件都有新内容，Agent 必须对全部 16 章节的标签、正文、数值、说明行与表头执行逐句全量英译；若 Context 2 存在任何中文残留（`untranslatedCount > 0`），`isValid` 为 `false`，必须将待译清单逐句补译并通过 `--translations=<json>` 回填至 `0` 中文残留；
-  2. **全 16 章节标准化表格与精准格位**：Context 2 全部 16 章节必须使用标准化表格（双列 `Col 0 | Col 1`、通栏合并 `colSpan=2`、多行多列 `S3/S8/S14`），严禁把值或通栏内容全塞入第一列，Section 3 多组分强制拆分为一行一条记录；
+### Phase 3: 先中文治理、后英文逐句翻译与映射数据库沉淀 (Context 2 Two-Stage + TM)
+- **底层承载模块**：【规范治理引擎】(`context-governor.js`) + 【持久化映射数据库】(`web/src/translation-memory.json`) + 【Agent 逐句英译】；
+- **双阶作业规程**：
+  1. **Stage 3A（先做好中文分类与内容处理）**：先执行 Context 2 治理，完成 16 章节角色重分类、多行多列拆分（`S3/S8/S14`）、通栏合并（`colSpan=2`）、S1.1 CN 中文名规范与 S3→S2 迁移，同时自动命中 `translation-memory.json`，并将未命中的新句子导出为 `<MODEL>_untranslated.json`；
+  2. **Stage 3B（再做英文逐句翻译与自动沉淀）**：Agent 读取 `<MODEL>_untranslated.json` 逐句翻译所有新句子后，通过 `--translations=<MODEL>_untranslated.json` 回填；校验通过 **0 中文残留 + 数字/CAS 100% 守恒** 后，系统自动将新译文沉淀写入 `translation-memory.json` 供后续永久复用；
   3. **单位与符号标准化**：度数统一为西文半角 `°C`（根除全角 `℃`），冒号统一为西文半角带空格 `": "`。
 
 ### Phase 4: 官方底模加载与前置值格清零 (Template Loading & Wiping)

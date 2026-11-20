@@ -11,6 +11,50 @@
  * 6. 统一治理度数符号 (°C) 与西文标点，为阶段 4 编辑器装配提供纯净完备的双语数据模型。
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __cgFilename = fileURLToPath(import.meta.url);
+const __cgDirname = path.dirname(__cgFilename);
+export const TRANSLATION_MEMORY_PATH = path.resolve(__cgDirname, 'translation-memory.json');
+
+export function loadTranslationMemory() {
+  try {
+    if (fs.existsSync(TRANSLATION_MEMORY_PATH)) {
+      const raw = JSON.parse(fs.readFileSync(TRANSLATION_MEMORY_PATH, 'utf8'));
+      return raw && typeof raw === 'object' ? raw : {};
+    }
+  } catch {
+    // 忽略损坏的记忆库，回退为空字典
+  }
+  return {};
+}
+
+/**
+ * 将经过校验的 Agent 逐句英译沉淀至持久化映射数据库 (translation-memory.json)
+ */
+export function saveTranslationsToMemory(entries) {
+  if (!entries || typeof entries !== 'object') return { added: 0, total: 0 };
+  const current = loadTranslationMemory();
+  let added = 0;
+  for (const [k, v] of Object.entries(entries)) {
+    if (k === 'byKey' || !v || typeof v !== 'string') continue;
+    const normK = String(k).replace(/\r\n/g, '\n').trim();
+    const normV = v.replace(/\r\n/g, '\n').trim();
+    if (!normK || !normV || /[\u4e00-\u9fff]/.test(normV)) continue;
+    if (current[normK] !== normV) {
+      current[normK] = normV;
+      added++;
+    }
+  }
+  if (added > 0) {
+    const sorted = Object.fromEntries(Object.keys(current).sort().map(key => [key, current[key]]));
+    fs.writeFileSync(TRANSLATION_MEMORY_PATH, JSON.stringify(sorted, null, 2) + '\n', 'utf8');
+  }
+  return { added, total: Object.keys(current).length, path: TRANSLATION_MEMORY_PATH };
+}
+
 // 通用化工与聚合物高保真英译字典
 export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   // 聚合物与树脂
@@ -786,7 +830,8 @@ export function buildStructuredContext2(context1, options = {}) {
   const annotatedSections = {};
   const editorOps = [];
 
-  // Agent 逐句全量翻译注入字典 (支持扁平 { cnText: enText } 或 { byKey: { "S1:R2": enText } })
+  // Agent 逐句全量翻译注入字典 + 持久化翻译记忆库 (优先级: 本次 --translations > 记忆库 TM > 内置标准词典)
+  const tm = loadTranslationMemory();
   const rawTrans = options?.translations && typeof options.translations === 'object' ? options.translations : {};
   const transByKey = rawTrans.byKey && typeof rawTrans.byKey === 'object' ? rawTrans.byKey : {};
   const resolveEn = (cnText, fallbackEn, keyHint = null) => {
@@ -794,8 +839,10 @@ export function buildStructuredContext2(context1, options = {}) {
     const raw = String(cnText ?? '').replace(/\r\n/g, '\n').trim();
     if (!raw) return fallbackEn ?? '';
     if (rawTrans[raw]) return String(rawTrans[raw]).trim();
+    if (tm[raw]) return String(tm[raw]).trim();
     const noColon = raw.replace(/[：:]$/, '').trim();
     if (rawTrans[noColon]) return String(rawTrans[noColon]).trim();
+    if (tm[noColon]) return String(tm[noColon]).trim();
     return fallbackEn ?? '';
   };
 
@@ -1236,6 +1283,12 @@ export function buildStructuredContext2(context1, options = {}) {
           const condMatch = cleanValCn.match(/^(.*?)\s*[（(]([^()（）]+)[）)]\s*$/);
           const lblEnBase = STANDARD_LABEL_EN[seqInfo.cleanKey] || translateChemicalTerm(seqInfo.label.replace(/[：:]/g, ''));
           const defaultLblEn = seqInfo.seq ? `${seqInfo.seq} ${lblEnBase}:` : `${lblEnBase}:`;
+          let defaultValEn = translateLineEn(cleanValCn);
+          if (s === 1 && /中文名称|产品中文名称/i.test(seqInfo.cleanKey) && modelCode && !defaultValEn.toUpperCase().includes(modelCode.toUpperCase())) {
+            const baseCn = cleanValCn.replace(new RegExp(`\\s*${modelCode.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i'), '').trim();
+            const baseEn = /水溶性.*丙烯酸树脂/.test(baseCn) ? 'Water-soluble acrylic resin' : translateLineEn(baseCn);
+            defaultValEn = `${baseEn} ${modelCode}`.trim();
+          }
           items.push({
             rowIndex: r.rowIndex,
             role: seqInfo.isSeq ? 'SEQ_LABEL' : 'SUB_LABEL',
@@ -1246,7 +1299,7 @@ export function buildStructuredContext2(context1, options = {}) {
             valuePure: condMatch ? condMatch[1].trim() : cleanValCn,
             conditionCn: condMatch ? condMatch[2].trim() : null,
             labelEn: resolveEn(seqInfo.label, defaultLblEn, `S${s}:R${r.rowIndex}:L`),
-            valueEn: resolveEn(cleanValCn, translateLineEn(cleanValCn), `S${s}:R${r.rowIndex}:V`),
+            valueEn: resolveEn(cleanValCn, defaultValEn, `S${s}:R${r.rowIndex}:V`),
             boldLabel: true,
             boldValue: false,
             indentDxa: seqInfo.indentDxa,
@@ -1342,6 +1395,44 @@ export function buildStructuredContext2(context1, options = {}) {
     }
   }
 
+  // 构建去重待译模板 + 数字/CAS 守恒校验
+  const untranslatedTemplate = {};
+  for (const u of untranslatedItems) {
+    const key = String(u.cnSource || '').replace(/\r\n/g, '\n').trim();
+    if (key && !(key in untranslatedTemplate)) {
+      untranslatedTemplate[key] = '';
+    }
+  }
+
+  const numericMismatches = [];
+  const checkNumericConservation = (sectionNumber, rowIndex, field, cnSrc, enVal) => {
+    if (!cnSrc || !enVal || hasCJK(enVal)) return;
+    const strippedCn = String(cnSrc).replace(/^\s*\d+(?:\.\d+)*\s*/, '');
+    const nums = strippedCn.match(/\d+(?:[.-]\d+)*/g) || [];
+    const normEn = String(enVal).replace(/[－−–]/g, '-').replace(/³/g, '3').replace(/²/g, '2').replace(/¹/g, '1');
+    for (const n of nums) {
+      if (!normEn.includes(n) && !normEn.includes(n.replace(/-/g, ' '))) {
+        numericMismatches.push({ sectionNumber, rowIndex, field, missingNumber: n, cnSource: cnSrc, currentEn: enVal });
+        break;
+      }
+    }
+  };
+  for (let s = 1; s <= 16; s++) {
+    for (const item of (annotatedSections[s]?.items || [])) {
+      if (item.role === 'MIGRATED_TO_S2' || item.role === 'SECTION_HEADER') continue;
+      if (item.role === 'FULL_WIDTH_STRUCTURED') {
+        for (const sub of (item.lines || [])) {
+          checkNumericConservation(s, `L${sub.lineIndex}`, 'textEn', sub.textCn, sub.textEn);
+        }
+      } else if (item.role === 'TABLE_HEADER' || item.role === 'COMPONENT_ROW' || item.role === 'OEL_ROW') {
+        (item.cellsEn || []).forEach((cEn, ci) => checkNumericConservation(s, item.rowIndex, `cellsEn[${ci}]`, item.cellsCn?.[ci], cEn));
+      } else {
+        checkNumericConservation(s, item.rowIndex, 'valueEn', item.valueCn, item.valueEn);
+        checkNumericConservation(s, item.rowIndex, 'textEn', item.textCn, item.textEn);
+      }
+    }
+  }
+
   return {
     modelCode,
     generatedAt: new Date().toISOString(),
@@ -1354,10 +1445,14 @@ export function buildStructuredContext2(context1, options = {}) {
       coveredSections: 16 - emptySectionsCount,
       emptySectionsCount,
       totalItems,
+      tmSize: Object.keys(tm).length,
       untranslatedCount: untranslatedItems.length,
+      numericMismatchCount: numericMismatches.length,
       needsAgentTranslation: untranslatedItems.length > 0,
       untranslatedItems,
-      isValid: emptySectionsCount === 0 && totalItems > 0 && untranslatedItems.length === 0
+      untranslatedTemplate,
+      numericMismatches,
+      isValid: emptySectionsCount === 0 && totalItems > 0 && untranslatedItems.length === 0 && numericMismatches.length === 0
     }
   };
 }

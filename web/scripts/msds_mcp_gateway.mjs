@@ -196,7 +196,12 @@ async function main() {
       if (outPath) {
         await fs.mkdir(path.dirname(outPath), { recursive: true });
         await fs.writeFile(outPath, md, 'utf8');
-        console.log(JSON.stringify({ status: 'success', tool, format: 'md', outPath, modelCode: data.modelCode, integrity: data.integrity || null, validation: data.validation || null }, null, 2));
+        let untranslatedPath = null;
+        if (tool === 'msds_govern_context2' && data.validation?.untranslatedCount > 0 && data.validation?.untranslatedTemplate) {
+          untranslatedPath = path.join(path.dirname(outPath), `${data.modelCode || 'MSDS'}_untranslated.json`);
+          await fs.writeFile(untranslatedPath, JSON.stringify(data.validation.untranslatedTemplate, null, 2) + '\n', 'utf8');
+        }
+        console.log(JSON.stringify({ status: 'success', tool, format: 'md', outPath, untranslatedPath, modelCode: data.modelCode, integrity: data.integrity || null, tmSaved: data.tmSaved || null, validation: data.validation || null }, null, 2));
       } else {
         console.log(md);
       }
