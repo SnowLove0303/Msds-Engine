@@ -44,6 +44,8 @@ import {
   applyAdaptiveRuler,
   enforceFlushLeftValues,
   formatSection3GridCenter,
+  pruneRowsSafely,
+  applyTopologyTypographyLock,
   validateTopologicalInvariants
 } from './template-editor.js';
 import { planAuditTargets, verifyAuditContract } from './audit-planner.js';
@@ -750,6 +752,10 @@ async function handleToolCall(name, args) {
           enforceFlushLeftValues(session, op.sectionNumber);
         } else if (op.op === 'formatSection3Grid') {
           formatSection3GridCenter(session);
+        } else if (op.op === 'pruneSafely') {
+          pruneRowsSafely(session, op.sectionNumber, op.rowIndices || []);
+        } else if (op.op === 'applyTopologyLock') {
+          applyTopologyTypographyLock(session, op.typographyProfile || null);
         } else if (op.op === 'validateInvariants') {
           const invRes = validateTopologicalInvariants(session, op.sectionNumber);
           if (!invRes.valid) {

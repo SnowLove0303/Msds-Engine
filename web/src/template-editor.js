@@ -195,11 +195,44 @@ export async function inspectTemplateSchema(templateKey = 'CN_Guanzhi') {
     };
   }
 
+  const isEnTpl = tplInfo.language === 'en';
+  const detectedValueSz = (() => {
+    const counts = new Map();
+    for (const record of engine.records || []) {
+      for (const row of (record.rows || []).slice(1)) {
+        const valCell = row.cells?.[1];
+        if (!valCell?.node) continue;
+        const szNodes = Array.from(valCell.node.getElementsByTagNameNS(W_NS, 'sz'));
+        for (const sn of szNodes) {
+          const v = sn.getAttributeNS(W_NS, 'val') || sn.getAttribute('w:val');
+          if (v) counts.set(v, (counts.get(v) || 0) + 1);
+        }
+      }
+    }
+    let best = isEnTpl ? '19' : '24';
+    let maxC = 0;
+    for (const [v, c] of counts.entries()) {
+      if (c > maxC) { maxC = c; best = v; }
+    }
+    return best;
+  })();
+
+  const typographyProfile = {
+    isEnglish: isEnTpl,
+    fontFamily: isEnTpl ? 'Arial' : '宋体',
+    seqFontFamily: isEnTpl ? 'Arial' : 'Times New Roman',
+    labelFontSize: isEnTpl ? '19' : '24',
+    seqFontSize: isEnTpl ? '19' : '21',
+    valueFontSize: isEnTpl ? '19' : (detectedValueSz || '24'),
+    tabStops: { tierA: 420, tierB: 560 }
+  };
+
   return {
     templateKey: tplInfo.key,
     name: tplInfo.name,
     language: tplInfo.language,
     company: tplInfo.company,
+    typographyProfile,
     sections: sectionsSchema,
     availableChannels: [
       'createWorkSession',
@@ -601,6 +634,40 @@ export function applyCompanyPreset(session, presetKey) {
 
   stampDocumentIdentity(session.engine, { companyName: result.companyName, shortName: result.shortName });
   session.modifiedSections.add(1);
+
+  // 扩展支持 Preset 全拓扑占位 (REQ-PRE-01: 不局限于 S1.3，支持任意章节 sectionSlots 覆盖)
+  const lockedSlots = new Set([
+    '供应商名称', '供应商地址', '联系电话', '传真', '应急电话', '应急咨询电话',
+    'suppliername', 'supplieraddress', 'tel', 'fax', 'emergencytelephone', 'emergencyphone', 'companyname'
+  ]);
+  const slots = Array.isArray(preset.sectionSlots) ? preset.sectionSlots : [];
+  for (const slot of slots) {
+    const secNum = Number(slot.sectionNumber);
+    const rec = (session.engine.records || []).find(r => r.sectionNumber === secNum);
+    if (!rec || !Array.isArray(rec.rows)) continue;
+    const anchorNorm = String(slot.matchAnchor || slot.label || '').replace(/[\s\t:：.．、()（）]/g, '').toLowerCase();
+    if (!anchorNorm) continue;
+    lockedSlots.add(anchorNorm);
+
+    for (const row of rec.rows) {
+      const c0Norm = String(row.cells?.[0]?.text || '').replace(/[\s\t:：.．、()（）]/g, '').toLowerCase();
+      if (c0Norm === anchorNorm || c0Norm.includes(anchorNorm)) {
+        const targetCell = row.cells?.[slot.cellIndex ?? (row.cells.length > 1 ? 1 : 0)];
+        if (targetCell) {
+          if (!targetCell.editable) targetCell.editable = true;
+          writeCellValue(targetCell, isEn ? (slot.valueEn ?? slot.value ?? '') : (slot.valueCn ?? slot.value ?? ''), {
+            bold: false,
+            fontSize: isEn ? '19' : '24',
+            fontFamily: isEn ? 'Arial' : '宋体'
+          });
+          session.modifiedSections.add(secNum);
+        }
+        break;
+      }
+    }
+  }
+  session.presetLockedSlots = lockedSlots;
+
   return { success: true, presetKey, companyName: result.companyName, shortName: result.shortName };
 }
 
@@ -1114,4 +1181,268 @@ export function formatSection3GridCenter(session) {
   }
   session.modifiedSections.add(3);
   return { success: true, sectionNumber: 3 };
+}
+
+/**
+ * 编辑器智能安全剪枝原语 (Safe Topological Row Pruning - REQ-EDT-PRUNE-01~02)
+ * 在执行删行前校验父子层级关系：若候选行属于父级分类题头（如 Hand protection / 8.1 控制参数 / 1.3 供应商信息）
+ * 且下方仍存在至少一个存活的有效子行，则拒绝误删，保护文档树结构完整性。
+ */
+export function pruneRowsSafely(session, sectionNumber, rowIndices = []) {
+  const record = (session.engine.records || []).find(r => r.sectionNumber === sectionNumber);
+  if (!record || !Array.isArray(record.rows)) return { success: false, deleted: [], protected: [] };
+
+  const deleteSet = new Set(rowIndices.map(Number));
+  const sortedDesc = Array.from(deleteSet).sort((a, b) => b - a);
+  const parentHeaderRegex = /^(?:1\.3\s*供应商信息|Supplier\s*information|3\.2\s*成分|3\.2\s*Ingredients|8\.1\s*控制参数|Exposure\s*controls|8\.2\s*暴露控制|手部防护|Hand\s*protection|呼吸系统防护|Respiratory\s*protection|眼睛防护|Eye\s*protection|身体防护|Skin\s*and\s*body\s*protection)/i;
+
+  const deleted = [];
+  const protectedRows = [];
+
+  for (const rIdx of sortedDesc) {
+    const row = record.rows[rIdx];
+    if (!row) continue;
+    const c0Text = String(row.cells?.[0]?.text || '').trim();
+    const isParentHeader = parentHeaderRegex.test(c0Text);
+
+    if (isParentHeader) {
+      // 检查后续是否存在不被删除的非空子行
+      let hasSurvivingChild = false;
+      for (let k = rIdx + 1; k < record.rows.length; k++) {
+        if (deleteSet.has(k)) continue;
+        const childRow = record.rows[k];
+        const childText = (childRow?.cells || []).map(c => (c.text || '').trim()).join('');
+        if (childText) {
+          hasSurvivingChild = true;
+          break;
+        }
+      }
+      if (hasSurvivingChild) {
+        protectedRows.push({ rowIndex: rIdx, label: c0Text });
+        deleteSet.delete(rIdx);
+        continue;
+      }
+    }
+
+    deleteDocxRow(session.engine, record, rIdx);
+    deleted.push(rIdx);
+  }
+
+  if (deleted.length > 0) session.modifiedSections.add(sectionNumber);
+  return { success: true, sectionNumber, deleted, protected: protectedRows };
+}
+
+function setRunStyleNodes(doc, runNode, { fontFamily, fontSize, bold } = {}) {
+  let rPr = runNode.getElementsByTagNameNS(W_NS, 'rPr')?.[0];
+  if (!rPr) {
+    rPr = doc.createElementNS(W_NS, 'w:rPr');
+    runNode.insertBefore(rPr, runNode.firstChild);
+  }
+  if (fontFamily) {
+    let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')?.[0];
+    if (!rFonts) {
+      rFonts = doc.createElementNS(W_NS, 'w:rFonts');
+      rPr.appendChild(rFonts);
+    }
+    rFonts.setAttributeNS(W_NS, 'w:ascii', fontFamily);
+    rFonts.setAttributeNS(W_NS, 'w:hAnsi', fontFamily);
+    rFonts.setAttributeNS(W_NS, 'w:eastAsia', fontFamily);
+    rFonts.setAttributeNS(W_NS, 'w:cs', fontFamily);
+  }
+  if (fontSize) {
+    let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')?.[0];
+    if (!sz) {
+      sz = doc.createElementNS(W_NS, 'w:sz');
+      rPr.appendChild(sz);
+    }
+    sz.setAttributeNS(W_NS, 'w:val', String(fontSize));
+
+    let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')?.[0];
+    if (!szCs) {
+      szCs = doc.createElementNS(W_NS, 'w:szCs');
+      rPr.appendChild(szCs);
+    }
+    szCs.setAttributeNS(W_NS, 'w:val', String(fontSize));
+  }
+  if (bold === true) {
+    if (!rPr.getElementsByTagNameNS(W_NS, 'b')?.[0]) {
+      rPr.appendChild(doc.createElementNS(W_NS, 'w:b'));
+    }
+  }
+}
+
+/**
+ * 拓扑驱动的编辑器全局几何与字体硬锁 (Apply Topology Typography Lock - REQ-TOPO-LOCK-01~02)
+ * 严格以当前模板提取的 typographyProfile 为唯一准绳，统一字号、字体、子题头加粗、单 <w:tab/> 与 420/560 dxa 标尺。
+ */
+export function applyTopologyTypographyLock(session, typographyProfile = null) {
+  const isEn = Boolean(typographyProfile?.isEnglish ?? session.isEnglish);
+  const profile = {
+    isEnglish: isEn,
+    fontFamily: typographyProfile?.fontFamily || (isEn ? 'Arial' : '宋体'),
+    seqFontFamily: typographyProfile?.seqFontFamily || (isEn ? 'Arial' : 'Times New Roman'),
+    labelFontSize: typographyProfile?.labelFontSize || (isEn ? '19' : '24'),
+    seqFontSize: typographyProfile?.seqFontSize || (isEn ? '19' : '21'),
+    valueFontSize: typographyProfile?.valueFontSize || (isEn ? '19' : '24'),
+    tabStops: typographyProfile?.tabStops || { tierA: 420, tierB: 560 }
+  };
+
+  const doc = session.engine.documentXml;
+  if (!doc) return { success: false };
+
+  // 1. 英文版全篇标点纯度兜底：清除残留全角冒号
+  if (isEn) {
+    const allTs = Array.from(doc.getElementsByTagNameNS(W_NS, 't'));
+    for (const tNode of allTs) {
+      if (tNode.textContent && /：/.test(tNode.textContent)) {
+        tNode.textContent = tNode.textContent.replace(/：/g, ':');
+      }
+    }
+  }
+
+  for (const record of session.engine.records || []) {
+    const secNum = record.sectionNumber;
+    if (!Array.isArray(record.rows)) continue;
+
+    // 终态安全清理：在所有写入与追加结束后，剔除无任何文本内容的纯空幽灵行
+    for (let rIdx = record.rows.length - 1; rIdx >= 1; rIdx--) {
+      const rowText = (record.rows[rIdx]?.cells || []).map(c => (c.text || '').trim()).join('');
+      if (!rowText) {
+        deleteDocxRow(session.engine, record, rIdx);
+      }
+    }
+
+    // 探测本章节最大编号位数 (Tier A: 420 dxa, Tier B: 560 dxa)
+    let has4DigitSeq = false;
+    for (let rIdx = 1; rIdx < record.rows.length; rIdx++) {
+      const t = (record.rows[rIdx]?.cells?.[0]?.text || '').trim();
+      const sm = t.match(/^(\d+\.\d+)/);
+      if (sm && sm[1].length >= 5) {
+        has4DigitSeq = true;
+        break;
+      }
+    }
+    const targetTabDxa = has4DigitSeq ? profile.tabStops.tierB : profile.tabStops.tierA;
+
+    for (let rIdx = 1; rIdx < record.rows.length; rIdx++) {
+      const row = record.rows[rIdx];
+      const cells = row.cells || [];
+
+      for (let cIdx = 0; cIdx < cells.length; cIdx++) {
+        const cell = cells[cIdx];
+        if (!cell?.node) continue;
+        if (secNum === 9 && cIdx === 0) continue;
+
+        const isLabelCol = (cIdx === 0 && cells.length >= 2);
+        const rawCellText = (cell.text || '').trim();
+
+        // A. 结构性子题头强制加粗判定
+        const mustBoldCell = isLabelCol && (
+          /^(?:8\.1\b|控制参数|Control\s*parameters|暴露控制|Exposure\s*controls|手部防护|Hand\s*protection|其它的规定|其它规定|Other\s*provisions|符合下列法规|Complies\s*with\s*the\s*following|处理方法|Disposal\s*methods)/i.test(rawCellText)
+        );
+        const mustBoldSingleCol = (cells.length === 1) && (
+          /^(?:其它的规定|其它规定|Other\s*provisions|符合下列法规|Complies\s*with\s*the\s*following|8\.1\b|控制参数|Control\s*parameters|暴露控制|Exposure\s*controls|手部防护|Hand\s*protection)/i.test(rawCellText)
+        );
+
+        // B. 编号标签单 <w:tab/> 间隔与 420/560 dxa 悬挂缩进规范化 (跳过 Section 9 已有激光垂线专职处理)
+        let formattedFirstP = null;
+        if (cIdx === 0 && secNum !== 9) {
+          const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
+          const firstP = ps[0];
+          const pText = (firstP?.textContent || '').replace(/\u00A0/g, ' ').trim();
+          const seqMatch = pText.match(/^(\d+\.\d+)[\s\t]+(.+)$/);
+          if (firstP && seqMatch) {
+            const seqStr = seqMatch[1];
+            const labelBody = seqMatch[2].trim();
+            let pPr = firstP.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
+            if (!pPr) {
+              pPr = doc.createElementNS(W_NS, 'w:pPr');
+              firstP.insertBefore(pPr, firstP.firstChild);
+            }
+            const oldTabs = Array.from(pPr.getElementsByTagNameNS(W_NS, 'tabs'));
+            oldTabs.forEach(n => pPr.removeChild(n));
+
+            let indEl = pPr.getElementsByTagNameNS(W_NS, 'ind')?.[0];
+            if (!indEl) {
+              indEl = doc.createElementNS(W_NS, 'w:ind');
+              pPr.appendChild(indEl);
+            }
+            indEl.setAttributeNS(W_NS, 'w:left', String(targetTabDxa));
+            indEl.setAttributeNS(W_NS, 'w:hanging', String(targetTabDxa));
+            if (indEl.hasAttributeNS(W_NS, 'firstLine')) indEl.removeAttributeNS(W_NS, 'firstLine');
+
+            const oldRuns = Array.from(firstP.getElementsByTagNameNS(W_NS, 'r'));
+            oldRuns.forEach(r => firstP.removeChild(r));
+
+            const seqRun = doc.createElementNS(W_NS, 'w:r');
+            const seqT = doc.createElementNS(W_NS, 'w:t');
+            seqT.textContent = seqStr;
+            seqRun.appendChild(seqT);
+            seqRun.appendChild(doc.createElementNS(W_NS, 'w:tab'));
+            setRunStyleNodes(doc, seqRun, {
+              fontFamily: profile.seqFontFamily,
+              fontSize: profile.seqFontSize,
+              bold: true
+            });
+
+            const bodyRun = doc.createElementNS(W_NS, 'w:r');
+            const bodyT = doc.createElementNS(W_NS, 'w:t');
+            bodyT.setAttribute('xml:space', 'preserve');
+            bodyT.textContent = labelBody;
+            bodyRun.appendChild(bodyT);
+            setRunStyleNodes(doc, bodyRun, {
+              fontFamily: profile.fontFamily,
+              fontSize: profile.labelFontSize,
+              bold: true
+            });
+
+            firstP.appendChild(seqRun);
+            firstP.appendChild(bodyRun);
+            formattedFirstP = firstP;
+          }
+
+          // 英文 Section 8 Recommendation: 420 dxa 左缩进对齐
+          if (isEn && secNum === 8 && /^Recommendation\s*:/i.test(rawCellText) && firstP) {
+            let pPr = firstP.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
+            if (!pPr) {
+              pPr = doc.createElementNS(W_NS, 'w:pPr');
+              firstP.insertBefore(pPr, firstP.firstChild);
+            }
+            let indEl = pPr.getElementsByTagNameNS(W_NS, 'ind')?.[0];
+            if (!indEl) {
+              indEl = doc.createElementNS(W_NS, 'w:ind');
+              pPr.appendChild(indEl);
+            }
+            indEl.setAttributeNS(W_NS, 'w:left', String(profile.tabStops.tierA));
+          }
+        }
+
+        // C. 全局字体与字阶锁 (依据 typographyProfile 严格投影；跳过已重构的 formattedFirstP 的 Run)
+        const psAll = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
+        const targetSz = (cIdx === 0) ? profile.labelFontSize : profile.valueFontSize;
+        for (const p of psAll) {
+          const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
+          const pRPr = pPr?.getElementsByTagNameNS(W_NS, 'rPr')?.[0];
+          if (pRPr) {
+            const pSzs = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'sz'));
+            for (const psNode of pSzs) psNode.setAttributeNS(W_NS, 'w:val', String(targetSz));
+            const pSzCss = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'szCs'));
+            for (const pscNode of pSzCss) pscNode.setAttributeNS(W_NS, 'w:val', String(targetSz));
+          }
+          if (p === formattedFirstP) continue;
+          const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+          for (const r of runs) {
+            setRunStyleNodes(doc, r, {
+              fontFamily: profile.fontFamily,
+              fontSize: targetSz,
+              bold: (mustBoldCell || mustBoldSingleCol) ? true : undefined
+            });
+          }
+        }
+      }
+    }
+    session.modifiedSections.add(secNum);
+  }
+
+  return { success: true, profile };
 }

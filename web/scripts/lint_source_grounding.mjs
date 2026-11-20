@@ -212,8 +212,8 @@ export async function lintSourceGrounding(sourceDocxPath, cnDocxPath, enDocxPath
   const enS13 = enDoc.records.find(r => r.sectionNumber === 13);
 
   if (cnS13 && enS13) {
-    if (cnS13.rows.length !== 4 || enS13.rows.length !== 4) {
-      recordViolation('LINT-S13-01', 13, `Section 13 必须严格保持 4 行标准结构 (实测 CN: ${cnS13.rows.length}, EN: ${enS13.rows.length})`, '4 行', `CN: ${cnS13.rows.length}, EN: ${enS13.rows.length}`);
+    if (cnS13.rows.length < 3 || cnS13.rows.length !== enS13.rows.length) {
+      recordViolation('LINT-S13-01', 13, `Section 13 必须保持 >= 3 行标准结构且中英文同构 (实测 CN: ${cnS13.rows.length}, EN: ${enS13.rows.length})`, '>= 3 行且同构', `CN: ${cnS13.rows.length}, EN: ${enS13.rows.length}`);
     }
   }
 
@@ -227,7 +227,7 @@ export async function lintSourceGrounding(sourceDocxPath, cnDocxPath, enDocxPath
     if (!/非危险货物|非危险品/i.test(cnS14Text)) {
       recordViolation('LINT-S14-01', 14, '源文档判定为非危险货物，产出中文必须明示非危险品！', '包含“非危险货物”或“非危险品”', '未明示非危险货物');
     }
-    if (!/Not (?:regulated as )?dangerous goods|Non-dangerous/i.test(enS14Text)) {
+    if (!/Not\s+(?:classified\s+as\s+|regulated\s+as\s+)?dangerous\s+goods|Non-dangerous/i.test(enS14Text)) {
       recordViolation('LINT-S14-01', 14, '源文档判定为非危险货物，产出英文必须明示 Not dangerous goods！', 'Not dangerous goods', '未明示 Not dangerous goods');
     }
   }

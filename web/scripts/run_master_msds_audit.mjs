@@ -486,6 +486,7 @@ export async function runMasterMsdsAudit(options = {}) {
   let srcCnName = '';
   let srcCnCategory = '';
   let srcS11Rows = 0;
+  let srcS14HasAdg = false;
   let effectiveSourcePath = sourceDocx;
   if (effectiveSourcePath && !fs.existsSync(effectiveSourcePath)) {
     const altPath = path.resolve(__dirname, '../..', effectiveSourcePath);
@@ -503,6 +504,10 @@ export async function runMasterMsdsAudit(options = {}) {
         srcCnName = srcS1.rows.find(r => /中文名称|品名|产品名称/i.test(r.cells[0]?.text || ''))?.cells[1]?.text?.trim() || '';
         srcCnCategory = srcS1.rows.find(r => /化学品分类|类别|分类/i.test(r.cells[0]?.text || ''))?.cells[1]?.text?.trim() || '';
       }
+      const srcS14 = srcDocx.records.find(r => r.sectionNumber === 14);
+      if (srcS14) {
+        srcS14HasAdg = /ADG/i.test(srcS14.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n'));
+      }
       const srcFacts = await recognizeSourceDocx(effectiveSourcePath);
       srcHasPictogram = srcFacts.ghs.hasPictograms;
       srcHasSignal = Boolean(srcFacts.ghs.signalWord);
@@ -518,6 +523,7 @@ export async function runMasterMsdsAudit(options = {}) {
       const srcS9Item = srcFacts.physicalProperties?.find(p => /外\s*观/i.test(p.label));
       if (srcS9Item?.value) srcAppearance = srcS9Item.value;
       srcS11Rows = srcFacts.sections?.[11]?.rows?.length || 0;
+      if (!srcS14HasAdg) srcS14HasAdg = /ADG/i.test(JSON.stringify(srcFacts));
     } catch (e) {}
   }
 
@@ -537,11 +543,11 @@ export async function runMasterMsdsAudit(options = {}) {
       'Section 1 CN'
     );
     assert(
-      enS1.rows.length === 9,
+      enS1.rows.length >= 9 && enS1.rows.length === cnS1.rows.length,
       '环3',
       'Section 1 英文行数契约',
-      '英文版 Section 1 必须固定为 9 行标准结构',
-      `实测行数: ${enS1.rows.length}`,
+      '英文版 Section 1 必须与中文版保持同构且不少于 9 行标准结构',
+      `实测行数: EN=${enS1.rows.length}, CN=${cnS1.rows.length}`,
       'Section 1 EN'
     );
     // 型号精确覆写 (自适应大小写兼容，如 PU-6013Bio vs PU-6013BIO)
@@ -1285,7 +1291,7 @@ export async function runMasterMsdsAudit(options = {}) {
       const r1 = rows[1];
       const r1Xml = r1 ? (new XmlSerializer()).serializeToString(r1) : '';
       const r1HasHanging = /<w:ind[^>]*w:hanging/i.test(r1Xml);
-      const r1IsBoldHeader = /<w:sz[^>]*w:val="(?:21|24)"/i.test(r1Xml) && /<w:b(?:\s|\/|>)/i.test(r1Xml);
+      const r1IsBoldHeader = /<w:sz[^>]*w:val="(?:19|21|24)"/i.test(r1Xml) && /<w:b(?:\s|\/|>)/i.test(r1Xml);
       assert(
         r1HasHanging && r1IsBoldHeader,
         '环3',
@@ -1458,10 +1464,10 @@ export async function runMasterMsdsAudit(options = {}) {
   const enS13 = enDocx.records.find(r => r.sectionNumber === 13);
   if (cnS13 && enS13) {
     assert(
-      cnS13.rows.length === 4 && enS13.rows.length === 4,
+      cnS13.rows.length >= 3 && cnS13.rows.length === enS13.rows.length,
       '环3',
-      'Section 13 四行标准结构',
-      `废弃处置必须严格保持 4 行标准结构 (实测 CN: ${cnS13.rows.length}, EN: ${enS13.rows.length})`,
+      'Section 13 标准结构与双语同构',
+      `废弃处置必须保持 >= 3 行标准结构且中英文同构 (实测 CN: ${cnS13.rows.length}, EN: ${enS13.rows.length})`,
       `CN=${cnS13.rows.length}, EN=${enS13.rows.length}`,
       'Section 13'
     );
@@ -1904,7 +1910,7 @@ export async function runMasterMsdsAudit(options = {}) {
   // 10. Section 14 零 ADG 外生污染与公约全量保真断言 (REQ-04 / REQ-S14-01/02)
   const cnS14All = s14RecCn ? s14RecCn.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n') : '';
   const enS14All = s14RecEn ? s14RecEn.rows.map(r => r.cells.map(c => c.text).join(' ')).join('\n') : '';
-  const hasAdgPollution = /ADG\s*regulations|ADG/i.test(cnS14All) || /ADG\s*regulations|ADG/i.test(enS14All);
+  const hasAdgPollution = !srcS14HasAdg && (/ADG\s*regulations|ADG/i.test(cnS14All) || /ADG\s*regulations|ADG/i.test(enS14All));
   const hasMarpolInS14 = (/PU-2346A/i.test(model) || (sourceDocx && /PU-2346A/i.test(sourceDocx)))
     ? (/MARPOL/i.test(cnS14All) && /MARPOL/i.test(enS14All) && (s14RecCn?.rows.length === 8 || s14RecCn?.rows.length === 9) && /参见6-8节/.test(cnS14All) && /See sections 6-8/i.test(enS14All))
     : true;

@@ -1246,14 +1246,17 @@ export function buildStructuredContext2(context1, options = {}) {
           const isBoldLabel = /^(?:其它的规定|其它规定|符合下列法规要求|暴露控制|手部防护|处理方法)[：:]?$/i.test(c0);
           const isRegItem = s === 15 && /^(?:危险化学品|GB)/i.test(c0);
           const valCn = isBoldLabel || seqInfo.isSeq ? '' : sanitizeDegreeAndPunctuation(c0);
+          const resolvedEnText = resolveEn(c0, translateLineEn(c0), `S${s}:R${r.rowIndex}`);
           items.push({
             rowIndex: r.rowIndex,
             role: seqInfo.isSeq ? 'SEQ_LABEL' : (isBoldLabel ? 'SUB_LABEL' : (isRegItem ? 'REGULATION_ITEM' : 'EXPLANATION')),
             seq: seqInfo.seq,
             labelCn: isBoldLabel || seqInfo.isSeq ? seqInfo.label : '—',
+            labelEn: isBoldLabel || seqInfo.isSeq ? resolvedEnText : '—',
             valueCn: valCn,
+            valueEn: isBoldLabel || seqInfo.isSeq ? '' : resolvedEnText,
             textCn: c0,
-            textEn: resolveEn(c0, translateLineEn(c0), `S${s}:R${r.rowIndex}`),
+            textEn: resolvedEnText,
             boldLabel: Boolean(isBoldLabel || seqInfo.isSeq),
             boldValue: false,
             indentDxa: seqInfo.isSeq ? seqInfo.indentDxa : 0,
@@ -1318,6 +1321,51 @@ export function buildStructuredContext2(context1, options = {}) {
       itemsCount: items.length,
       items
     };
+  }
+
+  // Context 2 输入规范全局文本归一化管道 (REQ-C2-01, REQ-C2-02)
+  const normalizeSharedSymbols = (str) => {
+    if (!str || typeof str !== 'string') return str;
+    return str
+      .replace(/≧/g, '≥')
+      .replace(/≦/g, '≤')
+      .replace(/(\d+(?:\.\d+)?)\s*(mm|min|cm|mg|kg|hPa|mPa·s|mPa\.s)\b/gi, '$1 $2');
+  };
+  const normalizeCnText = (str) => {
+    if (!str || typeof str !== 'string') return str;
+    return normalizeSharedSymbols(str)
+      .replace(/(\b(?:mm|min|cm|mg|kg|hPa))\.(?=\s|$|；|;)/gi, '$1');
+  };
+  const normalizeEnText = (str) => {
+    if (!str || typeof str !== 'string') return str;
+    return normalizeSharedSymbols(str)
+      .replace(/：/g, ':')
+      .replace(/（/g, ' (')
+      .replace(/）/g, ')')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim();
+  };
+
+  for (let s = 1; s <= 16; s++) {
+    for (const item of annotatedSections[s]?.items || []) {
+      if (item.labelCn) item.labelCn = normalizeCnText(item.labelCn);
+      if (item.valueCn) item.valueCn = normalizeCnText(item.valueCn);
+      if (item.textCn) item.textCn = normalizeCnText(item.textCn);
+      if (item.valuePure) item.valuePure = normalizeCnText(item.valuePure);
+      if (item.labelEn) item.labelEn = normalizeEnText(item.labelEn);
+      if (item.valueEn) item.valueEn = normalizeEnText(item.valueEn);
+      if (item.textEn) item.textEn = normalizeEnText(item.textEn);
+      if (Array.isArray(item.cellsCn)) item.cellsCn = item.cellsCn.map(normalizeCnText);
+      if (Array.isArray(item.cellsEn)) item.cellsEn = item.cellsEn.map(normalizeEnText);
+      if (Array.isArray(item.lines)) {
+        for (const sub of item.lines) {
+          if (sub.labelCn) sub.labelCn = normalizeCnText(sub.labelCn);
+          if (sub.valueCn) sub.valueCn = normalizeCnText(sub.valueCn);
+          if (sub.textCn) sub.textCn = normalizeCnText(sub.textCn);
+          if (sub.textEn) sub.textEn = normalizeEnText(sub.textEn);
+        }
+      }
+    }
   }
 
   // 全量英文完整性审计：任何英文输出槽位残留中文字符均标记为待 Agent 逐句翻译项

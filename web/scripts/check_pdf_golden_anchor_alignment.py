@@ -12,7 +12,7 @@ all_passed = True
 # Target sections that follow the Golden Anchor 80.28pt rule (Section 8, 9, 10, 11, 14)
 TARGET_SEQS = r'^(?:8\.[12]|9\.\d+|10\.\d+|11\.\d+|14\.\d+)\b'
 SUB_KEYWORDS = [
-    '呼吸系统防护', '手部防护', '防护手套的合适材料', '建议', '眼睛防护', '身体防护',
+    '呼吸系统防护', '手部防护', '防护手套的合适材料', '建议：', '建议:', '眼睛防护', '身体防护',
     'Respiratory protection', 'Hand protection', 'Suitable material', 'Eye/face protection', 'Skin and body protection'
 ]
 

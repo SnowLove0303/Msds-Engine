@@ -52,7 +52,9 @@ const {
   morphToFullWidth,
   applyAdaptiveRuler,
   enforceFlushLeftValues,
-  formatSection3GridCenter
+  formatSection3GridCenter,
+  pruneRowsSafely,
+  applyTopologyTypographyLock
 } = await import('../../web/src/template-editor.js');
 const {
   createExecutionRun,
@@ -393,6 +395,8 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
       else if (op.op === 'applyAdaptiveRuler') applyAdaptiveRuler(session, op.sectionNumber);
       else if (op.op === 'enforceFlushLeftValues') enforceFlushLeftValues(session, op.sectionNumber);
       else if (op.op === 'formatSection3Grid') formatSection3GridCenter(session);
+      else if (op.op === 'pruneSafely') pruneRowsSafely(session, op.sectionNumber, op.rowIndices || []);
+      else if (op.op === 'applyTopologyLock') applyTopologyTypographyLock(session, op.typographyProfile || null);
     }
     const outDocxPath = path.join(targetDir, tgt.fileName);
     await saveSession(session, outDocxPath);

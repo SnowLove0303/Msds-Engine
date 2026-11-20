@@ -98,6 +98,12 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
     operations.push({ op: 'applyPreset', presetKey: options.presetKey });
   }
 
+  const PRESET_LOCKED_ANCHORS = new Set([
+    '供应商信息', '供应商名称', '供应商地址', '联系电话', '传真', '应急电话', '应急咨询电话',
+    'supplierinformation', 'suppliername', 'supplieraddress', 'tel', 'fax', 'emergencytelephone', 'emergencyphone', 'companyname',
+    ...(Array.isArray(options.presetProtectedAnchors) ? options.presetProtectedAnchors : [])
+  ]);
+
   const pushOp = (opObj) => {
     operations.push(opObj);
     if (opObj.op === 'insertRowAfter' || opObj.op === 'insertRow') stats.inserts++;
@@ -280,17 +286,25 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
 
       if (matched) {
         usedTplRows.add(matched.rowIndex);
-        const { value, text } = getItemTexts(item, lang);
-        if (item.placement?.gridType === '1_COL_MERGED' || item.role === 'EXPLANATION' || matched.cellsCount === 1) {
-          pushOp({ op: 'morphToFullWidth', sectionNumber: s, rowIndex: matched.rowIndex, content: text });
-          secMerges++;
-          secWrites++;
-        } else {
-          if (matched.cellsCount >= 2) {
-            let outVal = value;
-            if (lang === 'zh' && s === 5 && outVal && !/[。.!?]$/.test(outVal)) outVal = `${outVal}。`;
-            pushOp({ op: 'writeCell', sectionNumber: s, rowIndex: matched.rowIndex, cellIndex: 1, text: outVal });
+        const tplRowAnchor = normAnchor(matched.cells?.[0]?.text);
+        const isPresetProtected = Boolean(options.presetKey) && (
+          PRESET_LOCKED_ANCHORS.has(itemAnchor) ||
+          PRESET_LOCKED_ANCHORS.has(itemAnchorEn) ||
+          PRESET_LOCKED_ANCHORS.has(tplRowAnchor)
+        );
+        if (!isPresetProtected) {
+          const { value, text } = getItemTexts(item, lang);
+          if (item.placement?.gridType === '1_COL_MERGED' || item.role === 'EXPLANATION' || matched.cellsCount === 1) {
+            pushOp({ op: 'morphToFullWidth', sectionNumber: s, rowIndex: matched.rowIndex, content: text });
+            secMerges++;
             secWrites++;
+          } else {
+            if (matched.cellsCount >= 2) {
+              let outVal = value;
+              if (lang === 'zh' && s === 5 && outVal && !/[。.!?]$/.test(outVal)) outVal = `${outVal}。`;
+              pushOp({ op: 'writeCell', sectionNumber: s, rowIndex: matched.rowIndex, cellIndex: 1, text: outVal });
+              secWrites++;
+            }
           }
         }
       } else {
@@ -298,18 +312,18 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
       }
     }
 
-    // 未匹配的模板常规行加入倒序删除集合
+    // 未匹配的模板常规行加入倒序删除集合，交由编辑器 pruneSafely 执行安全剪枝
     for (const r of tplRegularRows) {
       if (!usedTplRows.has(r.rowIndex)) {
         deletedRowSet.add(r.rowIndex);
       }
     }
 
-    // 倒序删除多余/未匹配模板行 (防行号偏移)
+    // 倒序交由编辑器执行安全剪枝 (保护父级分类题头)
     const rowsToDelete = Array.from(deletedRowSet).sort((a, b) => b - a);
-    for (const rIdx of rowsToDelete) {
-      pushOp({ op: 'deleteRow', sectionNumber: s, rowIndex: rIdx });
-      secDeletes++;
+    if (rowsToDelete.length > 0) {
+      pushOp({ op: 'pruneSafely', sectionNumber: s, rowIndices: rowsToDelete });
+      secDeletes += rowsToDelete.length;
     }
 
     // 追加未匹配到的新 Context 2 行
@@ -353,6 +367,15 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
       strategy: gridData.length > 0 ? 'MULTI_GRID+KV' : 'KV_ANCHOR+PRUNE'
     });
   }
+
+  // 终态 Preset 独占覆写保障 + 拓扑驱动的编辑器全局几何硬锁
+  if (options.presetKey) {
+    operations.push({ op: 'applyPreset', presetKey: options.presetKey });
+  }
+  operations.push({
+    op: 'applyTopologyLock',
+    typographyProfile: templateSchema.typographyProfile || null
+  });
 
   stats.totalOps = operations.length;
   return {
