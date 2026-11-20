@@ -12,6 +12,7 @@ console.error = (...args) => process.stderr.write(args.map(a => typeof a === 'ob
 
 import { recognizeSourceDocx, serializeFactsToMarkdown } from './recognition-engine.js';
 import { buildStructuredContext2, serializeContext2ToMarkdown, saveTranslationsToMemory } from './context-governor.js';
+import { compileTopologyOps, formatTopologyPlanMarkdown } from './topology-matcher.js';
 import {
   createWorkSession,
   saveSession,
@@ -425,10 +426,53 @@ const TOOLS = [
         translations: { type: 'object', description: '可选：Agent 逐句全量英译映射对象 { cnText: enText }' }
       }
     }
+  },
+  {
+    name: 'msds_compile_topology_ops',
+    description: '拓扑匹配编译器：将已校验通过的 Context 2 与目标模板 Schema（msds_get_template_schema）精准对齐，编译出紧凑《拓扑对齐编译计划》与确定性 operations[]，可选直接联动编辑器执行输出 DOCX。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sourceFilePath: { type: 'string', description: '源 DOCX 文件路径' },
+        templateKey: { type: 'string', description: '目标模板 Key（如 CN_Guanzhi, EN_Guanzhi, CN_Guocai, EN_Guocai）' },
+        translationsJsonPath: { type: 'string', description: '可选：Agent 翻译 JSON 路径' },
+        presetKey: { type: 'string', description: '可选：企业预设 Key' },
+        outputPath: { type: 'string', description: '可选：若传入且 execute=true，则直接编译并写入目标 DOCX' },
+        execute: { type: 'boolean', description: '可选：是否直接调用 msds_execute_editor_ops 执行写入' }
+      },
+      required: ['sourceFilePath', 'templateKey']
+    }
   }
 ];
 
 async function handleToolCall(name, args) {
+  if (name === 'msds_compile_topology_ops') {
+    if (!args.sourceFilePath || !fs.existsSync(args.sourceFilePath)) {
+      throw new Error(`必须提供有效的 sourceFilePath: ${args.sourceFilePath || '未指定'}`);
+    }
+    const buf = fs.readFileSync(args.sourceFilePath);
+    const context1 = await recognizeSourceDocx(buf, path.basename(args.sourceFilePath));
+    let translations = args.translations || null;
+    if (!translations && args.translationsJsonPath && fs.existsSync(args.translationsJsonPath)) {
+      translations = JSON.parse(fs.readFileSync(args.translationsJsonPath, 'utf8'));
+    }
+    const ctx2 = buildStructuredContext2(context1, { translations });
+    const schema = await inspectTemplateSchema(args.templateKey || 'CN_Guanzhi');
+    const compiled = compileTopologyOps(ctx2, schema, { presetKey: args.presetKey });
+    let execResult = null;
+    if (args.execute && args.outputPath) {
+      execResult = await handleToolCall('msds_execute_editor_ops', {
+        templateKey: args.templateKey || 'CN_Guanzhi',
+        outputPath: args.outputPath,
+        operations: compiled.operations
+      });
+    }
+    return {
+      ...compiled,
+      topologyPlanMarkdown: formatTopologyPlanMarkdown(compiled),
+      execution: execResult
+    };
+  }
   if (name === 'msds_govern_context2') {
     let context1 = null;
     if (args.context1JsonPath && fs.existsSync(args.context1JsonPath)) {

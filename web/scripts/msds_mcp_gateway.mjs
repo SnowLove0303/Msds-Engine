@@ -151,6 +151,17 @@ async function main() {
       toolArgs.translationsJsonPath = a.slice(15);
     } else if (a === '--translations' && args[i + 1]) {
       toolArgs.translationsJsonPath = args[++i];
+    } else if (a.startsWith('--template=')) {
+      toolArgs.templateKey = a.slice(11);
+    } else if (a === '--template' && args[i + 1]) {
+      toolArgs.templateKey = args[++i];
+    } else if (a.startsWith('--preset=')) {
+      toolArgs.presetKey = a.slice(9);
+    } else if (a.startsWith('--execute')) {
+      toolArgs.execute = true;
+    } else if (a.startsWith('--docxOut=')) {
+      toolArgs.outputPath = a.slice(10);
+      toolArgs.execute = true;
     } else if (a.startsWith('--out=')) {
       outPath = a.slice(6);
     } else if (a === '--out' && args[i + 1]) {
@@ -175,11 +186,13 @@ async function main() {
     if (tool === '__list__') {
       console.log('=== MSDS-Engine 官方可用 MCP 工具清单 ===');
       console.log(JSON.stringify(result, null, 2));
-    } else if (format === 'md' && (tool === 'msds_recognize_source' || tool === 'msds_govern_context2')) {
+    } else if (format === 'md' && (tool === 'msds_recognize_source' || tool === 'msds_govern_context2' || tool === 'msds_compile_topology_ops')) {
       const textPayload = result?.result?.content?.[0]?.text;
       const data = textPayload ? JSON.parse(textPayload) : (result?.result || result);
       let md = '';
-      if (tool === 'msds_govern_context2') {
+      if (tool === 'msds_compile_topology_ops') {
+        md = data.topologyPlanMarkdown || '';
+      } else if (tool === 'msds_govern_context2') {
         md = data.context2Markdown || '';
       } else {
         md = [
