@@ -107,12 +107,15 @@ flowchart TD
   2. 依托本地 Windows TrueType 字体度量与排版引擎，将 4 份 DOCX 转译为**严格 5 页**的矢量 PDF；
   3. Word 与 PDF 1:1 像素级复刻，边框、字距与页码绝对重合。
 
-### Phase 7: 两阶双轨全要素集中式主审计终审 (Two-Step Deep Master Audit)
-- **底层承载模块**：【两阶双轨审计模块】(`audit_bipolar_bilayer.mjs` + `run_master_msds_audit.mjs`)；
-- **规程要求**：
-  1. **第一阶·机械确定性审计**：165 项双极双层全要素法医断言 + 170 项集中式中央主审计，验证 PDF 物理字号 9.5pt 与 Section 9 标签 80.28pt 垂直对齐；
-  2. **第二阶·智能体语义保真审计**：16 章节双语逐句逐槽位 1:1 对账，核销“英文版零中文残留 (Gate 4)”与“测试条件零丢失”；
-  3. **退出码 0 门禁**：真实控制台退出码 0 (`Exit Code 0`) 作为唯一合格发布判定。
+### Phase 7: 两阶双轨集中式审计终审（机械审计 + 同步 Agent 介入审计）
+- **触发编排**：Phase 4~6 覆写产出（4 DOCX + 4 PDF）生成并经 Agent 确认结果已产出后，使用 `--phase=audit` 触发**机械审计**，并同步开展 **Agent 介入审计**；
+- **轨道 A·机械审计 (`audit_topology_roles.mjs` + `audit_bipolar_bilayer.mjs` + `run_master_msds_audit.mjs`)**：
+  1. 强化区分**标题、序号、标签、值、说明行、页眉页脚**六类角色及字体字号、缩进、双主体隔离、脏数据猎杀；
+  2. 核验表格边框、PDF 9.50pt/80.28pt 渲染样式及源文件 vs 产出 1:1 内容继承；
+  3. 真实退出码 `0` (`Exit Code 0`) 为机械放行充要条件。
+- **轨道 B·Agent 同步介入审计 (`generate_agent_audit_brief.mjs` -> `<MODEL>_agent_audit_brief.md`)**：
+  1. 自动生成免读 330KB Pipeline 源码的《Agent 介入审计速查包》（含 Pipeline/全局/局部规范精炼要点 + 16 章节源文/CN/EN 对照快照 + 页眉页脚对比）；
+  2. Agent 同步执行非机械语义核销（事实继承、逐句翻译地道性、逻辑合理性）并出具最终审计结论。
 
 ---
 

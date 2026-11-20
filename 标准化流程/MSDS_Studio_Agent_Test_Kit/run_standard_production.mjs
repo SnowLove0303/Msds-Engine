@@ -45,6 +45,7 @@ function parseArgs() {
     facts: null,
     translations: null,
     stopAfter: null,
+    phase: null,
     skipAudit: false,
     help: false
   };
@@ -57,6 +58,7 @@ function parseArgs() {
     else if (arg.startsWith('--facts=')) options.facts = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
     else if (arg.startsWith('--translations=')) options.translations = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
     else if (arg.startsWith('--stopAfter=')) options.stopAfter = arg.split('=', 2)[1].replace(/^["']|["']$/g, '').toLowerCase();
+    else if (arg.startsWith('--phase=')) options.phase = arg.split('=', 2)[1].replace(/^["']|["']$/g, '').toLowerCase();
     else if (arg === '--skipAudit') options.skipAudit = true;
     else if (!options.source && !arg.startsWith('--')) options.source = arg.replace(/^["']|["']$/g, '');
   }
@@ -153,8 +155,10 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
   console.log(`   • 输出目录: ${targetDir}`);
   console.log(`============================================================\n`);
 
-  // Phase 1: 源文件事实感知 (Context 1 抽取)
-  console.log(`>>> [Phase 1/7] 识别模块事实感知与 Context 1 抽取...`);
+  // Phase 1~6 仅在非 --phase=audit 模式下执行
+  if (options.phase !== 'audit') {
+    // Phase 1: 源文件事实感知 (Context 1 抽取)
+    console.log(`>>> [Phase 1/7] 识别模块事实感知与 Context 1 抽取...`);
   const t1 = Date.now();
   const context1 = await recognizeSourceDocx(sourcePath, path.basename(sourcePath));
   context1.modelCode = modelCode;
@@ -302,11 +306,32 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
     facts: pipelineFacts
   });
   console.log(`    ✓ 8 格式全矩阵交付物生成完毕 (4 DOCX + 4 PDF) (${Date.now() - t3} ms)`);
+  if (options.stopAfter === 'produce') {
+    console.log(`\n✅ [STOPPED AFTER PHASE 6] 8 份交付物已生成至: ${targetDir}`);
+    console.log(`   👉 请 Agent 确认产出已生成后，运行 --phase=audit 触发机械审计并同步开展介入审计！`);
+    return;
+  }
+  } // end if (options.phase !== 'audit')
 
-  // Phase 7: 两阶双轨全要素法医级深度主审计
+  // Phase 7: 两阶双轨全要素法医级深度主审计 + Agent 介入审计速查包生成
   if (!options.skipAudit) {
-    console.log(`\n>>> [Phase 7/7] 执行两阶双轨集中式主审计核销...`);
+    console.log(`\n>>> [Phase 7/7] 执行两阶双轨审计（机械审计 + 同步生成 Agent 介入审计速查包）...`);
     const t4 = Date.now();
+
+    // 7.0 六类角色与拓扑样式强化机械审计 (标题/序号/标签/值/说明行/页眉页脚)
+    console.log(`    • 执行六类角色与拓扑样式强化审计 (audit_topology_roles.mjs)...`);
+    const rolesCmd = `node "${path.resolve(REPO_ROOT, 'web/scripts/audit_topology_roles.mjs')}" --targetDir="${targetDir}" --model=${modelCode} --source="${sourcePath}"`;
+    try {
+      execSync(rolesCmd, { stdio: 'inherit' });
+    } catch (e) {
+      console.error(`      ❌ 角色与拓扑样式机械审计失败，发布阻断！`);
+      process.exit(1);
+    }
+
+    // 7.0b 同步生成 Agent 介入审计速查包 (免通读 330KB Pipeline 源码)
+    console.log(`    • 同步生成 Agent 介入审计速查包 (generate_agent_audit_brief.mjs)...`);
+    const briefCmd = `node "${path.resolve(REPO_ROOT, 'web/scripts/generate_agent_audit_brief.mjs')}" --targetDir="${targetDir}" --model=${modelCode} --source="${sourcePath}"`;
+    execSync(briefCmd, { stdio: 'inherit' });
 
     // 7.1 双极双层法医级全景深度审计 (165项)
     console.log(`    • 执行双极双层法医深度审计 (audit_bipolar_bilayer.mjs)...`);
