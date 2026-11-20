@@ -1468,10 +1468,13 @@ export function serializeFactsToMarkdown(facts) {
   md += '## 一、核心元数据清单 (Metadata)\n\n';
   md += '| 属性字段 | 提取事实值 | 判定依据 |\n';
   md += '| :--- | :--- | :--- |\n';
+  const hazBasis = facts.ghs?.isHazardous
+    ? 'Section 2 载明 GHS 危险性分类/警示信息'
+    : 'Section 2 明示非危险品，无象形图/信号词';
   md += '| **产品型号 (Model Code)** | `' + model + '` | Section 1 行 1 匹配提取 |\n';
   md += '| **产品中文品名 (Product Name)** | `' + prodName + '` | Section 1 行 2 匹配提取 |\n';
   md += '| **化学品分类 (Chemical Category)** | `' + category + '` | Section 1 匹配提取 |\n';
-  md += '| **GHS 危害性分类** | **' + isHaz + '** | Section 2 明示非危险品，无象形图/信号词 |\n';
+  md += '| **GHS 危害性分类** | **' + isHaz + '** | ' + hazBasis + ' |\n';
   md += '| **CAS 组分数量** | ' + (facts.components?.length || 0) + ' 个组分 | Section 3 表格提取 |\n';
   md += '| **理化参数项数** | ' + (facts.physicalProperties?.length || 0) + ' 项原始指标 | Section 9 提取 |\n\n';
 

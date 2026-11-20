@@ -295,7 +295,7 @@ export function translateChemicalTerm(term) {
   if (/非危险品.*ADG/i.test(trimmed)) return 'Not classified as dangerous goods for land transport, in accordance with the ADG Code.'
   if (/非危险品.*IATA/i.test(trimmed)) return 'Not classified as dangerous goods for air transport, in accordance with IATA regulations.'
   if (/非危险品.*IMDG/i.test(trimmed)) return 'Not classified as dangerous goods for sea transport, in accordance with IMDG regulations.'
-  if (/非危险(品|货物)/i.test(trimmed)) return 'Not classified as dangerous goods.'
+  if (/^非危险(?:品|货物)[。.]?$/i.test(trimmed)) return 'Not classified as dangerous goods.'
   if (/丙烯酸.*多元醇/i.test(trimmed)) return 'Acrylic polyol'
   if (/多元醇/i.test(trimmed)) return 'Polyol'
   if (/树脂溶液/i.test(trimmed)) return 'Resin solution'
@@ -1013,14 +1013,6 @@ export function buildStructuredContext2(context1, options = {}) {
           textEn: resolveEn('该产品无可用的毒理学研究。', 'No toxicological studies are available on the product.', 'S11:R1'),
           placement: { gridType: '1_COL_MERGED', colSpan: 2, targetCol: '0..1 (通栏合并)' }
         });
-        items.push({
-          rowIndex: 2,
-          role: 'EXPLANATION',
-          bold: false,
-          textCn: '下面是这些成分的毒理学数据。',
-          textEn: resolveEn('下面是这些成分的毒理学数据。', 'The following is toxicological data for these ingredients:', 'S11:R2'),
-          placement: { gridType: '1_COL_MERGED', colSpan: 2, targetCol: '0..1 (通栏合并)' }
-        });
 
         const detailLines = [];
         for (const r of rows.slice(1)) {
@@ -1039,14 +1031,24 @@ export function buildStructuredContext2(context1, options = {}) {
             });
           });
         }
-        items.push({
-          rowIndex: 3,
-          role: 'FULL_WIDTH_STRUCTURED',
-          paradigm: 'PARADIGM_1_FULL_WIDTH_MERGED',
-          placement: { gridType: '1_COL_MERGED', colSpan: 2, targetCol: '0..1 (通栏合并)' },
-          lines: detailLines
-        });
-        editorOps.push({ op: 'renderFullWidthRow', sectionNumber: 11, paradigm: 'PARADIGM_1_FULL_WIDTH_MERGED' });
+        if (detailLines.length > 0) {
+          items.push({
+            rowIndex: 2,
+            role: 'EXPLANATION',
+            bold: false,
+            textCn: '下面是这些成分的毒理学数据。',
+            textEn: resolveEn('下面是这些成分的毒理学数据。', 'The following is toxicological data for these ingredients:', 'S11:R2'),
+            placement: { gridType: '1_COL_MERGED', colSpan: 2, targetCol: '0..1 (通栏合并)' }
+          });
+          items.push({
+            rowIndex: 3,
+            role: 'FULL_WIDTH_STRUCTURED',
+            paradigm: 'PARADIGM_1_FULL_WIDTH_MERGED',
+            placement: { gridType: '1_COL_MERGED', colSpan: 2, targetCol: '0..1 (通栏合并)' },
+            lines: detailLines
+          });
+          editorOps.push({ op: 'renderFullWidthRow', sectionNumber: 11, paradigm: 'PARADIGM_1_FULL_WIDTH_MERGED' });
+        }
       } else {
         for (const r of rows.slice(1)) {
           const c0 = r.cells?.[0]?.text?.trim() || '';
@@ -1129,7 +1131,8 @@ export function buildStructuredContext2(context1, options = {}) {
           .replace(/非危险品陆运输方式[。.]?/g, 'Not classified as dangerous goods for land transport.')
           .replace(/非危险品海运方式[，,]?\s*符合IMDG准则[。.]?/g, 'Not classified as dangerous goods for sea transport, in accordance with IMDG Code.')
           .replace(/非危险品运输方式[，,]?\s*符合IATA准则[。.]?/g, 'Not classified as dangerous goods for air transport, in accordance with IATA Dangerous Goods Regulations.')
-          .replace(/温度不可高于\s*([+\-－−–]?\d+)\s*°?C[，,]?\s*温度不可低于\s*([+\-－−–]?\d+)\s*°?C[。.]?/gi, (_, hi, lo) => {
+          .replace(/非危险(?:品|货物)[。.]?\s*/g, 'Not classified as dangerous goods. ')
+          .replace(/温度不可高于\s*([+\-－−–]?\d+)\s*(?:°C|℃|C)?[，,]?\s*温度不可低于\s*([+\-－−–]?\d+)\s*(?:°C|℃|C)?[。.]?/gi, (_, hi, lo) => {
             const norm = v => v.replace(/[－−–]/g, '-');
             return `Temperature must not exceed ${norm(hi)}°C and must not fall below ${norm(lo)}°C.`;
           })
