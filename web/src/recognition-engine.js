@@ -693,6 +693,47 @@ export async function recognizeSourceDocx(docxPathOrBuffer, sourceName = 'source
     if (baseMatch) facts.modelCode = baseMatch[1].toUpperCase();
   }
 
+  // 3. 内置物理无损自检指纹 (Physical Integrity & Lossless Checksum)
+  const W_NS_LOCAL = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const bodyNode = engine.documentXml?.getElementsByTagNameNS(W_NS_LOCAL, 'body')?.[0];
+  const rawParagraphs = bodyNode ? Array.from(bodyNode.getElementsByTagNameNS(W_NS_LOCAL, 'p')).map(p => (p.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean) : [];
+  const rawCharCount = rawParagraphs.join('').replace(/\s+/g, '').length;
+
+  const c1Joined = [];
+  const coveredSections = [];
+  const emptySections = [];
+  for (let s = 1; s <= 16; s++) {
+    const sec = facts.sections[s];
+    if (sec && sec.rowsCount > 0) {
+      coveredSections.push(s);
+    } else {
+      emptySections.push(s);
+    }
+    if (sec?.title) c1Joined.push(sec.title);
+    for (const r of (sec?.rows || [])) {
+      for (const c of (r.cells || [])) {
+        if (c.text) c1Joined.push(c.text);
+      }
+    }
+  }
+  const c1Compact = c1Joined.join('\n').replace(/\s+/g, '');
+  const missingParagraphs = rawParagraphs.filter(line => {
+    const compact = line.replace(/\s+/g, '');
+    return compact.length >= 2 && !c1Compact.includes(compact);
+  });
+
+  facts.integrity = {
+    rawParagraphCount: rawParagraphs.length,
+    rawCharCount,
+    extractedCharCount: c1Compact.length,
+    conservationRatio: rawCharCount > 0 ? Number(((c1Compact.length / rawCharCount) * 100).toFixed(2)) : 0,
+    coveredSectionsCount: coveredSections.length,
+    emptySections,
+    missingParagraphCount: missingParagraphs.length,
+    missingParagraphs: missingParagraphs.slice(0, 20),
+    isLossless: emptySections.length === 0 && missingParagraphs.length === 0
+  };
+
   return facts;
 }
 
@@ -854,20 +895,7 @@ function parseSection2(record, facts, engine) {
           t = stripped;
         }
       }
-      if (!t) {
-        const DEFAULT_H_TEXTS = {
-          H412: '对水生生物有害并具有长期持续影响。',
-          H226: '易燃液体和蒸气。',
-          H302: '吞咽有害。',
-          H312: '皮肤接触有害。',
-          H314: '造成严重皮肤灼伤和眼损伤。',
-          H315: '造成皮肤刺激。',
-          H319: '造成严重眼刺激。',
-          H332: '吸入有害。',
-          H335: '可能引起呼吸道刺激。'
-        };
-        t = DEFAULT_H_TEXTS[code] || '';
-      }
+      // 严格遵循 Context 1 零虚构公理：若源文仅载明 H 码而无叙述文本，保持为空字符串，交由 Context 2 治理层按需补全
       return t;
     };
 
@@ -1368,8 +1396,8 @@ function parseSection14(record, facts) {
       const m = val.match(/(\d)/);
       facts.transport.hazardClass = m ? m[1] : val;
     }
-    // 14.4 包装类型
-    if (/14\.4|包装[组类]型?|packing group/i.test(lbl)) {
+    // 包装类型（严禁按 14.4 序号盲目强绑，仅凭语义关键词匹配）
+    if (/包装[组类]型?|packing\s*group/i.test(lbl) && !/特殊|注意|非危险|温度|高于|低于/i.test(lbl + ' ' + val)) {
       const m = val.match(/([I|V]+)/i);
       facts.transport.packingGroup = m ? m[1] : val;
     }
@@ -1377,12 +1405,12 @@ function parseSection14(record, facts) {
     if (/14\.5|环境危|海洋污染物|marine pollutant|environmental hazard/i.test(lbl)) {
       facts.transport.marinePollutant = val;
     }
-    // 14.6 特殊防范措施 (主标签)
-    if (/14\.6|特殊防范|特殊注意事项|special precautions/i.test(lbl)) {
+    // 特殊防范措施 / 用户特殊注意事项 (支持 14.4 与 14.6 等不同编号源模板)
+    if (/特殊防范|特殊注意事项|用户特殊注意事项|special precautions/i.test(lbl)) {
       facts.transport.specialPrecautions.primaryCn = val;
       facts.transport.specialPrecautions.primaryEn = val.includes('参见')
         ? val.replace(/参见(?:第)?(\d+)[-－—~](\d+)节/, 'See sections $1-$2.')
-        : (/See sections/i.test(val) ? val : 'See sections 6-8.');
+        : (/See sections/i.test(val) ? val : null);
       facts.transport.specialPrecautions.hasPrecautions = true;
     }
     // 附加信息 (子标签)
