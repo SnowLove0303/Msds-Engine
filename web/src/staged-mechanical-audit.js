@@ -605,6 +605,39 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
     });
   }
 
+  // @FIX_TAG(2026-11-23/staged-mechanical-audit/FIX-BILINGUAL-SEQ-SYMMETRY): 12. 中英文双语子序号 1:1 对称校验 (防止如 S7 7.1/7.2 或 S8 8.1/8.2 在 CN 丢失而 EN 存在)
+  for (const [cnKey, enKey] of [['CN_Guanzhi', 'EN_Guanzhi'], ['CN_Guocai', 'EN_Guocai']]) {
+    const cnEng = loaded[cnKey]?.engine;
+    const enEng = loaded[enKey]?.engine;
+    if (!cnEng || !enEng) continue;
+    const seqMismatches = [];
+    for (const s of [1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15]) {
+      const getSeqs = (eng) => {
+        const rec = (eng.records || []).find(r => r.sectionNumber === s);
+        if (!rec) return [];
+        const out = [];
+        for (let rIdx = 1; rIdx < (rec.rows || []).length; rIdx++) {
+          const c0 = (rec.rows[rIdx]?.cells?.[0]?.text || '').trim();
+          const m = c0.match(/^(\d+\.\d+)/);
+          if (m) out.push(m[1]);
+        }
+        return out;
+      };
+      const cnSeqs = getSeqs(cnEng);
+      const enSeqs = getSeqs(enEng);
+      if (cnSeqs.join(',') !== enSeqs.join(',')) {
+        seqMismatches.push(`S${s}(CN=[${cnSeqs.join(',')}] vs EN=[${enSeqs.join(',')}])`);
+      }
+    }
+    check(seqMismatches.length === 0, {
+      severity: 'CRITICAL',
+      ruleId: 'P5_BILINGUAL_SEQ_SYMMETRY',
+      sectionRef: `${cnKey}<->${enKey}`,
+      title: `${cnKey}/${enKey}: 中英文各章节子序号 1:1 对称校验`,
+      measuredDetail: seqMismatches.length === 0 ? '100% 双语子序号对称' : seqMismatches.join('; ')
+    });
+  }
+
   return summarize();
 }
 

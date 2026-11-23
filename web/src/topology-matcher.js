@@ -296,10 +296,11 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
         );
         if (!isPresetProtected) {
           const { label, value, text } = getItemTexts(item, lang);
-          // @FIX_TAG(2026-11-23/topology-matcher/FIX-SEQ-SYNC): 若 Context 2 携带序号(如 S7 7.1/7.2, S8 8.1/8.2)而模板标签无序号或序号不同，同步写入 cell 0 确保 CN/EN 序号 1:1 对称
-          const seqPrefixLabel = item.seq && !/^\d+\.\d+/.test(label) ? `${item.seq}\t${label}` : label;
+          // @FIX_TAG(2026-11-23/topology-matcher/FIX-SEQ-SYNC): 若 Context 2 携带序号(如 S7 7.1/7.2, S8 8.1/8.2)，统一规范为 "X.Y\tLabel" 格式；含序号的 1_COL_MERGED 标题行(SEQ_LABEL/SUB_LABEL)同步写入 seqPrefixLabel，确保 CN/EN 序号 1:1 对称且不丢失
+          const cleanLabelNoSeq = item.seq ? label.replace(/^\d+\.\d+[\s\t]*/, '') : label;
+          const seqPrefixLabel = item.seq ? `${item.seq}\t${cleanLabelNoSeq}` : label;
           if (item.placement?.gridType === '1_COL_MERGED' || item.role === 'EXPLANATION' || matched.cellsCount === 1) {
-            const mergedContent = (item.role === 'SUB_LABEL' && item.seq && !(item.valueCn || item.valueEn))
+            const mergedContent = ((item.role === 'SUB_LABEL' || item.role === 'SEQ_LABEL') && item.seq && !(item.valueCn || item.valueEn))
               ? seqPrefixLabel
               : text;
             pushOp({
@@ -317,7 +318,7 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
             secWrites++;
           } else {
             if (matched.cellsCount >= 2) {
-              if (item.seq && extractSeq(matched.cells?.[0]?.text) !== item.seq && seqPrefixLabel) {
+              if (item.seq && seqPrefixLabel && (extractSeq(matched.cells?.[0]?.text) !== item.seq || !String(matched.cells?.[0]?.text || '').includes('\t'))) {
                 pushOp({ op: 'writeCell', sectionNumber: s, rowIndex: matched.rowIndex, cellIndex: 0, text: seqPrefixLabel, bold: true });
                 secWrites++;
               }
@@ -352,14 +353,21 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
       appendCursor++;
       const { label, value, text } = getItemTexts(item, lang);
       if (item.placement?.gridType === '1_COL_MERGED' || item.role === 'FULL_WIDTH_STRUCTURED') {
+        // @FIX_TAG(2026-11-23/topology-matcher/FIX-UNMATCHED-SEQ): 未匹配追加的 1_COL_MERGED 带序号标题行(如 S8 8.1/8.2 控制参数)同样强制规范 "X.Y\tLabel" 与加粗，确保 CN/EN 1:1 对称
+        const rawSeqSource = label || text;
+        const cleanSeqSource = item.seq ? String(rawSeqSource || '').replace(/^\d+\.\d+[\s\t]*/, '') : rawSeqSource;
+        const seqPrefixContent = item.seq ? `${item.seq}\t${cleanSeqSource}` : text;
+        const mergedContent = ((item.role === 'SUB_LABEL' || item.role === 'SEQ_LABEL') && item.seq)
+          ? seqPrefixContent
+          : text;
         pushOp({
           op: 'morphToFullWidth',
           sectionNumber: s,
           rowIndex: appendCursor,
-          content: text,
+          content: mergedContent,
           options: {
-            bold: Boolean(item.boldLabel && !(item.valueCn || item.valueEn)),
-            boldSubheaders: Boolean(item.boldLabel && (item.valueCn || item.valueEn)),
+            bold: Boolean((item.boldLabel && !(item.valueCn || item.valueEn)) || item.role === 'SEQ_LABEL'),
+            boldSubheaders: Boolean(item.boldLabel && (item.valueCn || item.valueEn) && item.role !== 'SEQ_LABEL'),
             indentDxa: item.indentDxa || 0
           }
         });

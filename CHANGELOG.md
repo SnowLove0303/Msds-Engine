@@ -1,5 +1,12 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-23 S7/S8 双语子序号与标签对齐根因修复及双语序号对称机械门禁下沉 (S7-S8-BILINGUAL-SEQ-SYMMETRY)]
+1. **拓扑匹配器双语子序号规范化与持久化 (`web/src/topology-matcher.js`)**：
+   - **修复 S8 `8.1 暴露控制：` / `8.2 控制参数：` 与 S7 `7.1` / `7.2` 在中文版丢失序号 (`FIX-SEQ-SYNC`, `FIX-UNMATCHED-SEQ`)**：统一将带序号条目规范为 `X.Y\tLabel`；在 `matched` 与 `unmatchedRegular` 的 `1_COL_MERGED`（含 `SEQ_LABEL`/`SUB_LABEL`）分支同步写入 `seqPrefixLabel` 并强制加粗；双列 KV 行在模板原标签缺少 `\t` 时强制显式写回 `cellIndex: 0`，避免 `deleteRow` 重建表记录导致隐式序号丢失，再由 `applyAdaptiveRuler` 统一按行序重排 `8.1` / `8.2` 并锁定 `420/420 dxa` 悬挂缩进。
+2. **机械审计下沉 (`web/src/staged-mechanical-audit.js`)**：
+   - **新增 `P5_BILINGUAL_SEQ_SYMMETRY` (`FIX-BILINGUAL-SEQ-SYMMETRY`)**：在 `PHASE_5_DOCX` 硬性比对 `CN_Guanzhi` vs `EN_Guanzhi`、`CN_Guocai` vs `EN_Guocai` 各章节（`S1, S4..S15`）子序号序列，出现双语子序号不对称立即阻断。
+3. **验证与同步**：`npm run lint`（0 违规 + 防误报自测全过），`MSDS_Studio_7Phase_Workflow_Kit.zip` 已重打包；`OS-8000` / `OS-8030` / `OS-8501` / `OS-8503` / `OS-8503DMM` 全 5 个型号 40 份交付物全部 `SUCCESS`（`PHASE_5_DOCX` 73/73、`PHASE_6_PDF` 12/12，报错 0 / FAIL 0 / WARN 0）。
+
 ## [2026-11-23 Ps-openspec 全体系维护指南、角色驱动排版真源与 OS 系列全量根因修复闭环 (PS-OPENSPEC-MAINTENANCE-GOVERNANCE)]
 1. **Ps-openspec 系统维护体系与防复发机制落地 (`ARCHITECTURE.md`, `MAINTENANCE_GUIDE.md`, `AGENTS.md`, `web/scripts/lint_code_invariants.mjs`, `openspec/changes/build-ps-openspec-maintenance-system/`)**：
    - **8 大模块权责拓扑与排障速查卡**：明确识别、内容治理、拓扑匹配、底层原语与编辑器、机械审计、静态 Lint、全局/局部规范、Agent 执行层的唯一主责边界，建立“现象 → 唯一责任模块”路由决策树；
