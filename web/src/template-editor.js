@@ -539,6 +539,26 @@ export function writeCellValueToSession(session, { sectionNumber, rowIndex, cell
     cell.protectedReason = null;
   }
 
+  // @FIX_TAG(2026-11-23/template-editor/FIX-CELL0-REPLACE): 改写 cellIndex=0 标签格时直接重建单段单 Run，彻底清零原 labelNodes 防新旧标签叠加
+  if (cellIndex === 0 && cell.node) {
+    const doc = cell.node.ownerDocument;
+    const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
+    const firstP = ps[0] || cell.node.appendChild(doc.createElementNS(W_NS, 'w:p'));
+    for (let pi = ps.length - 1; pi >= 1; pi--) cell.node.removeChild(ps[pi]);
+    Array.from(firstP.getElementsByTagNameNS(W_NS, 'r')).forEach(r => firstP.removeChild(r));
+    const run = doc.createElementNS(W_NS, 'w:r');
+    const t = doc.createElementNS(W_NS, 'w:t');
+    t.setAttribute('xml:space', 'preserve');
+    t.textContent = String(text ?? '');
+    run.appendChild(t);
+    firstP.appendChild(run);
+    cell.labelNodes = [];
+    cell.valueNodes = [run];
+    cell.text = String(text ?? '');
+    session.modifiedSections.add(sectionNumber);
+    return { success: true, sectionNumber, rowIndex, cellIndex };
+  }
+
   writeCellValue(cell, text, {
     bold: Boolean(bold),
     fontSize: session.isEnglish ? '19' : '24',
@@ -1523,15 +1543,17 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
             pPr = doc.createElementNS(W_NS, 'w:pPr');
             p.insertBefore(pPr, p.firstChild);
           }
-          // @FIX_TAG(2026-11-23/template-editor/FIX-NO-JUSTIFY-BOTH): 全篇表体段落禁用 both/distribute 两端对齐，未显式居中者统一注入 jc=left
-          let jcEl = pPr.getElementsByTagNameNS(W_NS, 'jc')?.[0];
-          const curJc = jcEl ? (jcEl.getAttributeNS(W_NS, 'val') || jcEl.getAttribute('w:val')) : null;
-          if (!curJc || curJc === 'both' || curJc === 'distribute') {
-            if (!jcEl) {
-              jcEl = doc.createElementNS(W_NS, 'w:jc');
-              pPr.appendChild(jcEl);
+          // @FIX_TAG(2026-11-23/template-editor/FIX-NO-JUSTIFY-BOTH): 全篇表体段落禁用 both/distribute 两端对齐，未显式居中者统一注入 jc=left（保留 S3 3列成分表居中对齐）
+          if (!(secNum === 3 && cells.length >= 3)) {
+            let jcEl = pPr.getElementsByTagNameNS(W_NS, 'jc')?.[0];
+            const curJc = jcEl ? (jcEl.getAttributeNS(W_NS, 'val') || jcEl.getAttribute('w:val')) : null;
+            if (!curJc || curJc === 'both' || curJc === 'distribute') {
+              if (!jcEl) {
+                jcEl = doc.createElementNS(W_NS, 'w:jc');
+                pPr.appendChild(jcEl);
+              }
+              jcEl.setAttributeNS(W_NS, 'w:val', 'left');
             }
-            jcEl.setAttributeNS(W_NS, 'w:val', 'left');
           }
           const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')?.[0];
           if (pRPr) {

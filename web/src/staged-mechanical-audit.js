@@ -582,6 +582,27 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
       title: `${spKey}: 多段落带序号标签续行缩进垂线齐平校验`,
       measuredDetail: contIndentHits.length === 0 ? '0 处续行挂在序号下' : contIndentHits.slice(0, 5).join(', ')
     });
+
+    // @FIX_TAG(2026-11-23/staged-mechanical-audit/FIX-DUP-SEQ-LABEL): 11. 防止改写 cell 0 标签时新旧序号标签文本叠加拼接 (如 S9 "9.3...9.4...")
+    const dupSeqHits = [];
+    for (const rec of (eng.records || [])) {
+      const s = rec.sectionNumber;
+      if (!s || s === 2 || s === 14 || s === 16) continue;
+      for (let rIdx = 1; rIdx < (rec.rows || []).length; rIdx++) {
+        const c0Txt = (rec.rows[rIdx]?.cells?.[0]?.text || '').trim();
+        const matches = c0Txt.match(/\b\d+\.\d+\b/g) || [];
+        if (matches.length >= 2) {
+          dupSeqHits.push(`S${s}:R${rIdx}(${matches.join(',')})`);
+        }
+      }
+    }
+    check(dupSeqHits.length === 0, {
+      severity: 'CRITICAL',
+      ruleId: 'P5_NO_DUPLICATE_SEQ_IN_LABEL',
+      sectionRef: spKey,
+      title: `${spKey}: 左侧标签单元格防重拼接校验`,
+      measuredDetail: dupSeqHits.length === 0 ? '0 处重复序号拼接' : dupSeqHits.slice(0, 5).join(', ')
+    });
   }
 
   return summarize();

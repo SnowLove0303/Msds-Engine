@@ -1377,9 +1377,13 @@ export function buildStructuredContext2(context1, options = {}) {
             placement: { gridType: '1_COL_MERGED', colSpan: 2, targetCol: '0..1 (通栏合并)' }
           });
         } else {
-          // 通用多行打包 KV 拆分：如源文单行内同时打包了多个序号标签与对应换行值 (如 S9 "9.5水溶性：\n9.6粘度/25℃：" -> "可混溶的\n＜500 mPa·s")
+          // @FIX_TAG(2026-11-23/context-governor/FIX-SPACE-PACKED-KV): 通用多行打包 KV 拆分：兼容右值被压成单行空格分隔（如 "无数据 65℃"）
           const c0Lines = c0.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
-          const c1Lines = c1.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+          let c1Lines = c1.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+          if (c0Lines.length > 1 && c0Lines.every(l => /^\d+\.\d+/.test(l)) && c1Lines.length === 1) {
+            const spaceTokens = c1Lines[0].match(/无数据|不适用|\S+/g) || [];
+            if (spaceTokens.length === c0Lines.length) c1Lines = spaceTokens;
+          }
           const kvPairs = (c0Lines.length > 1 && c0Lines.every(l => /^\d+\.\d+/.test(l)) && c0Lines.length === c1Lines.length)
             ? c0Lines.map((l, idx) => ({ rawLbl: l, rawVal: c1Lines[idx] }))
             : [{ rawLbl: c0, rawVal: c1 }];
