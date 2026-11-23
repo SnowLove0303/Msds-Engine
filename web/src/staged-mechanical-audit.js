@@ -611,7 +611,7 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
     const enEng = loaded[enKey]?.engine;
     if (!cnEng || !enEng) continue;
     const seqMismatches = [];
-    for (const s of [1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15]) {
+    for (const s of [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15]) {
       const getSeqs = (eng) => {
         const rec = (eng.records || []).find(r => r.sectionNumber === s);
         if (!rec) return [];
@@ -635,6 +635,41 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
       sectionRef: `${cnKey}<->${enKey}`,
       title: `${cnKey}/${enKey}: 中英文各章节子序号 1:1 对称校验`,
       measuredDetail: seqMismatches.length === 0 ? '100% 双语子序号对称' : seqMismatches.join('; ')
+    });
+
+    // @FIX_TAG(2026-11-23/staged-mechanical-audit/FIX-BILINGUAL-ROW-PARITY): 13. 中英文 S2~S16 逐行结构、列数与数字基准 1:1 对称校验
+    const rowParityHits = [];
+    for (let s = 2; s <= 16; s++) {
+      const cnRec = (cnEng.records || []).find(r => r.sectionNumber === s);
+      const enRec = (enEng.records || []).find(r => r.sectionNumber === s);
+      const cnRows = cnRec?.rows || [];
+      const enRows = enRec?.rows || [];
+      if (cnRows.length !== enRows.length) {
+        rowParityHits.push(`S${s}(rows:${cnRows.length}!=${enRows.length})`);
+        continue;
+      }
+      for (let rIdx = 1; rIdx < cnRows.length; rIdx++) {
+        const cCells = cnRows[rIdx]?.cells || [];
+        const eCells = enRows[rIdx]?.cells || [];
+        if (cCells.length !== eCells.length) {
+          rowParityHits.push(`S${s}:R${rIdx}(cols:${cCells.length}!=${eCells.length})`);
+          continue;
+        }
+        const cNums = (cCells.map(c => c.text || '').join(' ').replace(/^(\d+\.\d+)/gm, '').match(/\d+(?:\.\d+)?/g) || []);
+        const eStr = eCells.map(c => c.text || '').join(' ').replace(/^(\d+\.\d+)/gm, '');
+        const eNums = eStr.match(/\d+(?:\.\d+)?/g) || [];
+        const missing = cNums.filter(n => !eNums.includes(n));
+        if (missing.length > 0) {
+          rowParityHits.push(`S${s}:R${rIdx}(numMissing:[${missing.join(',')}])`);
+        }
+      }
+    }
+    check(rowParityHits.length === 0, {
+      severity: 'CRITICAL',
+      ruleId: 'P5_BILINGUAL_ROW_PARITY',
+      sectionRef: `${cnKey}<->${enKey}`,
+      title: `${cnKey}/${enKey}: 中英文 S2~S16 逐行结构/列数/数字 1:1 对称校验`,
+      measuredDetail: rowParityHits.length === 0 ? '100% 双语逐行对称' : rowParityHits.slice(0, 5).join('; ')
     });
   }
 

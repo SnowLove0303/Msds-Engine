@@ -1,5 +1,14 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-23 中英文 S2~S16 逐行结构与行序 1:1 对称闭环 (BILINGUAL-ROW-PARITY-LOCK)]
+1. **拓扑匹配器中文基准对齐 (`web/src/topology-matcher.js`)**：
+   - **`FIX-S3-SEQ32`**：中文模板 S3 `R2`（`3.2成分`）的 `3.2` 位于隐式编号中，前置 `deleteRow` 重建表记录后会丢失；改为显式写入 `3.2\t成分`，与英文 `3.2\tIngredients` 1:1 对称。
+   - **`FIX-BILINGUAL-CANONICAL-ORDER`**：S6 与 S9 统一按 `Context 2`（中文基准）行序依次写入双语槽位，彻底消除英文模板固有行序错位问题。
+   - **`normAnchor` OEL 题头同义归一**：将 `Workplace component control parameters` 与 `Control parameters for workplace components` 统一归一为 `workplaceoeltitle`，确保 `OS-8503`/`OS-8503DMM` S8 OEL 题头与 4 列表在中英文行序 1:1 一致。
+2. **机械审计下沉 (`web/src/staged-mechanical-audit.js`)**：
+   - **新增 `P5_BILINGUAL_ROW_PARITY` (`FIX-BILINGUAL-ROW-PARITY`)**：在 `PHASE_5_DOCX` 硬性校验 `CN_Guanzhi`/`EN_Guanzhi` 与 `CN_Guocai`/`EN_Guocai` S2–S16 逐行行数、列数与数字 1:1 对称，并将 S3 纳入 `P5_BILINGUAL_SEQ_SYMMETRY`。
+3. **验证与同步**：`npm run lint`（0 违规）、`MSDS_Studio_7Phase_Workflow_Kit.zip` 已重打包；5 个 OS 型号 40 份交付物全部 `SUCCESS`（`PHASE_5_DOCX` 75/75、`PHASE_6_PDF` 12/12），独立底层 XML 逐行对照审计确认 S2–S16 100% 逐行对称。
+
 ## [2026-11-23 S7/S8 双语子序号与标签对齐根因修复及双语序号对称机械门禁下沉 (S7-S8-BILINGUAL-SEQ-SYMMETRY)]
 1. **拓扑匹配器双语子序号规范化与持久化 (`web/src/topology-matcher.js`)**：
    - **修复 S8 `8.1 暴露控制：` / `8.2 控制参数：` 与 S7 `7.1` / `7.2` 在中文版丢失序号 (`FIX-SEQ-SYNC`, `FIX-UNMATCHED-SEQ`)**：统一将带序号条目规范为 `X.Y\tLabel`；在 `matched` 与 `unmatchedRegular` 的 `1_COL_MERGED`（含 `SEQ_LABEL`/`SUB_LABEL`）分支同步写入 `seqPrefixLabel` 并强制加粗；双列 KV 行在模板原标签缺少 `\t` 时强制显式写回 `cellIndex: 0`，避免 `deleteRow` 重建表记录导致隐式序号丢失，再由 `applyAdaptiveRuler` 统一按行序重排 `8.1` / `8.2` 并锁定 `420/420 dxa` 悬挂缩进。

@@ -17,7 +17,8 @@ function normAnchor(text) {
     .replace(/[：:\s\-_–—()（）/]/g, '')
     .toLowerCase()
     .replace(/complywith/g, 'complieswith')
-    .replace(/regulatoryrequirements?/g, 'regulations');
+    .replace(/regulatoryrequirements?/g, 'regulations')
+    .replace(/workplacecomponentcontrolparameters|controlparametersforworkplacecomponents/g, 'workplaceoeltitle');
 }
 
 function extractSeq(text) {
@@ -256,6 +257,51 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
       }
     }
 
+    // @FIX_TAG(2026-11-23/topology-matcher/FIX-S3-SEQ32): 中文模板 S3 R2 "3.2成分" 的 3.2 位于隐式编号中，deleteRow 重建后会丢失；强制显式写入 "3.2\t成分" 确保与 EN "3.2\tIngredients" 1:1 对称
+    if (s === 3 && lang === 'zh' && tplRows[2] && /^(?:3\.2\s*)?成分$/.test((tplRows[2].cells?.[0]?.text || '').trim())) {
+      pushOp({ op: 'writeCell', sectionNumber: 3, rowIndex: 2, cellIndex: 0, text: '3.2\t成分', bold: true });
+      secWrites++;
+    }
+
+    // @FIX_TAG(2026-11-23/topology-matcher/FIX-BILINGUAL-CANONICAL-ORDER): S6 与 S9 模板在中英文间存在固有行序差异，按 Context 2(中文基准)顺序依次覆写双语槽位，确保 CN/EN 逐行 1:1 对齐
+    if (s === 6 || s === 9) {
+      effectiveRegularItems.forEach((item, idx) => {
+        const { label, value, text } = getItemTexts(item, lang);
+        const cleanLabelNoSeq = item.seq ? label.replace(/^\d+\.\d+[\s\t]*/, '') : label;
+        const seqPrefixLabel = item.seq ? `${item.seq}\t${cleanLabelNoSeq}` : label;
+        if (idx < tplRegularRows.length) {
+          const targetRow = tplRegularRows[idx];
+          usedTplRows.add(targetRow.rowIndex);
+          if (item.placement?.gridType === '1_COL_MERGED' || item.role === 'EXPLANATION' || targetRow.cellsCount === 1) {
+            const mergedContent = ((item.role === 'SUB_LABEL' || item.role === 'SEQ_LABEL') && item.seq && !(item.valueCn || item.valueEn))
+              ? seqPrefixLabel
+              : text;
+            pushOp({
+              op: 'morphToFullWidth',
+              sectionNumber: s,
+              rowIndex: targetRow.rowIndex,
+              content: mergedContent,
+              options: {
+                bold: Boolean((item.boldLabel && !(item.valueCn || item.valueEn)) || item.role === 'SEQ_LABEL'),
+                boldSubheaders: Boolean(item.boldLabel && (item.valueCn || item.valueEn) && item.role !== 'SEQ_LABEL'),
+                indentDxa: item.indentDxa || 0
+              }
+            });
+            secMerges++;
+            secWrites++;
+          } else {
+            if (seqPrefixLabel) {
+              pushOp({ op: 'writeCell', sectionNumber: s, rowIndex: targetRow.rowIndex, cellIndex: 0, text: seqPrefixLabel, bold: true });
+              secWrites++;
+            }
+            pushOp({ op: 'writeCell', sectionNumber: s, rowIndex: targetRow.rowIndex, cellIndex: 1, text: value });
+            secWrites++;
+          }
+        } else {
+          unmatchedRegular.push(item);
+        }
+      });
+    } else {
     for (const item of effectiveRegularItems) {
       if (item.role === 'FULL_WIDTH_STRUCTURED') {
         const targetRow = tplRegularRows.find(r => !usedTplRows.has(r.rowIndex));
@@ -332,6 +378,7 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
       } else {
         unmatchedRegular.push(item);
       }
+    }
     }
 
     // 未匹配的模板常规行加入倒序删除集合，交由编辑器 pruneSafely 执行安全剪枝
