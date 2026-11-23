@@ -1,5 +1,17 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-23 Ps-openspec 全体系维护指南、角色驱动排版真源与 OS 系列全量根因修复闭环 (PS-OPENSPEC-MAINTENANCE-GOVERNANCE)]
+1. **Ps-openspec 系统维护体系与防复发机制落地 (`ARCHITECTURE.md`, `MAINTENANCE_GUIDE.md`, `AGENTS.md`, `web/scripts/lint_code_invariants.mjs`, `openspec/changes/build-ps-openspec-maintenance-system/`)**：
+   - **8 大模块权责拓扑与排障速查卡**：明确识别、内容治理、拓扑匹配、底层原语与编辑器、机械审计、静态 Lint、全局/局部规范、Agent 执行层的唯一主责边界，建立“现象 → 唯一责任模块”路由决策树；
+   - **防覆盖封印静态校验 (`LINT-LOCK-01`)**：在 `lint_code_invariants.mjs` 新增全量 `web/src/*.js` `@ANTIGRAVITY_INVARIANT_LOCK_START/END` 成对完整性硬门禁，防止后续修改误删或截断核心封印块；
+   - **每次修改显式标识 (`@FIX_TAG`) & 最小 OpenSpec 模板**：固化源码 `@FIX_TAG` 注释规范与单次缺陷修复 OpenSpec 最小归档模板。
+2. **角色驱动单一排版真源与底层下沉修复 (`228e653` & `39ce540`)**：
+   - **OOXML 底层与原语 (`docx-engine.js`, `universal-editor-primitives.js`)**：`writeCellValue` 写值自动注入 `vAlign="center"` 并清除单行过高固定 `trHeight`（解决 S11.2 居上与行高异常）；`renderFullWidthRow` 补全 S2 `2.0 紧急情况概述`、`GHS-象形图` 层级识别；`bindEntityPresetToDocument` 默认注入当天修订日期；
+   - **内容处理规范 (`context-governor.js`)**：新增 S9 多行打包 KV 自动拆行、S8 扁平 OEL 块结构化解析、S8 `8.1 控制参数` + `不含有职业接触限值的物质` 配对、S5 续行归并进 `SEQ_LABEL`、过滤全空行；
+   - **拓扑匹配与会话锁 (`topology-matcher.js`, `template-editor.js`)**：改为语义锚点优先匹配、新增行同步写 `cellIndex: 0`（加粗）与 `cellIndex: 1`、先克隆再剪枝；`morphToFullWidth` 透传 `bold/indentDxa`；`applyTopologyTypographyLock` 跳过 S2 并统一所有未编号 KV 标签 `w:left=420/560` 且清除 `hanging/firstLine/*Chars`；
+   - **机械审计下沉 (`staged-mechanical-audit.js`)**：在 `PHASE_5_DOCX` 新增 `P5_KV_LABEL_NON_EMPTY`、`P5_LABEL_INDENT_ALIGN`、`P5_KV_VALIGN_CENTER` 三项硬门禁。
+3. **验证与调用包同步**：`OS-8000` / `OS-8030` / `OS-8501` / `OS-8503` / `OS-8503DMM` 全部 40 份交付物通过全量机械审计（`SUCCESS`, 0 报错），`MSDS_Studio_7Phase_Workflow_Kit.zip` 已同步重新打包。
+
 ## [2026-11-19 PA-4840 与 PA-4902 源文件、识别结果与产出物内容完整性修复、动态排版保真及介入审计全量闭环 (PA4840-PA4902-FIDELITY-FORMAT-AUDIT-FINAL)] - 严格遵循 OrbitStack (Ps-openspec) 轨道工程体系与用户最高指令（围绕识别模块、编辑模块和底层拓扑以及审计、工作流做通用性优化，解决新增内容格式丢失风险，做好介入审计，16 份交付物全部通过两阶双轨集中式主审计 171 项全量门禁，底层代码推送到仓库，严格排除产出物）：
 1. **识别模块底层通用性与特征抽取深度强化 (`web/src/recognition-engine.js`)**：
    - **Section 2 标签有害成分与描述性危害性说明抽取**：新增 `facts.ghs.hazardousComponentsOnLabel` 槽位，通用抓取标签必须列出的有害组分（如 PA-4840 之“2-丁氧基乙醇”）；支持无 `H\d+` 编码的描述性危害性说明（如 PA-4902 之“没有明显的已知作用或严重危险。”）无损入库；

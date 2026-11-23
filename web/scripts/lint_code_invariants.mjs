@@ -152,6 +152,28 @@ checkFile(path.join(SCRIPTS_DIR, 'audit_16_sections_bilingual_fidelity.mjs'), [
   }
 ]);
 
+// 4. LINT-LOCK-01: 校验 web/src/*.js 中所有 @ANTIGRAVITY_INVARIANT_LOCK_START / END 封印标记必须完整成对
+if (fs.existsSync(SRC_DIR)) {
+  for (const fileName of fs.readdirSync(SRC_DIR)) {
+    if (!fileName.endsWith('.js')) continue;
+    const fp = path.join(SRC_DIR, fileName);
+    const srcText = fs.readFileSync(fp, 'utf-8');
+    const starts = (srcText.match(/@ANTIGRAVITY_INVARIANT_LOCK_START/g) || []).length;
+    const ends = (srcText.match(/@ANTIGRAVITY_INVARIANT_LOCK_END/g) || []).length;
+    if (starts !== ends) {
+      violations.push({
+        ruleId: 'LINT-LOCK-01',
+        severity: 'ERROR',
+        file: path.relative('F:/App Location/Guanzhi Tong/Skill/MSDS-Engine', fp),
+        lineNum: 1,
+        code: `START=${starts}, END=${ends}`,
+        message: '源码防篡改封印标记 @ANTIGRAVITY_INVARIANT_LOCK_START 与 END 数量不成对，存在截断或破坏风险！',
+        remediation: '核对并恢复成对的 @ANTIGRAVITY_INVARIANT_LOCK_START / END 注释标记。'
+      });
+    }
+  }
+}
+
 // 输出 Lint 结果
 console.log(`扫描完成。发现违规项: ${violations.length} 项\n`);
 

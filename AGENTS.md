@@ -66,3 +66,5 @@
   - 核心模块: `web/src/docx-engine.js`, `web/src/universal-editor-primitives.js`, `web/src/template-editor.js`, `web/src/recognition-engine.js`, `web/src/audit-planner.js`, `web/src/mcp-server.js`
 - 系统架构、顶层拓扑与跨端契约
   - 权威来源: `ARCHITECTURE.md`
+- 工程维护指南、现象→模块路由、防复发闭环与 `@FIX_TAG` 标识规范
+  - 权威来源: `MAINTENANCE_GUIDE.md`

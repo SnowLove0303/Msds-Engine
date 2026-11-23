@@ -154,3 +154,20 @@ Web 客户端与无头 Agent 服务统一遵循标准 REST 协议与 JSON 数据
    - Section 13：严格重构为 4 行结构（2 行独立单列通栏说明行 + Disposal methods 双居中加粗 + 处置正文纯左对齐）；
 5. **页脚法定规范**：Cell 0 公司全称型号强制绝对左对齐，Cell 1 `Revision Date:` 首字母大写强制绝对右对齐且同步当前最新时间；
 6. **全流程 8 大自动化质量断言门禁 (Gate 1 ~ 8)**：所有发布前必须通过自动化断言（包含 Gate 8 值格常规体与字体纯净度断言，数值严禁加粗、中文严禁 Calibri 污染），任何一项失败立即抛出异常熔断。
+
+---
+
+## Ps-openspec 全体系 8 大功能模块权责拓扑 (8-Pillar Module Ownership)
+
+为使人机协同维护时能够按图索骥、杜绝跨层打补丁，系统确立以下 8 大功能模块的唯一主责边界：
+
+| 层级 / 支柱 | 核心文件 / 资产 | 唯一主责范围 | 禁止越权行为 |
+| :--- | :--- | :--- | :--- |
+| **1. 识别模块** | `web/src/recognition-engine.js` | 物理读取源 DOCX 16 章节原始表格、段落与文本（`Context 1`），忠实留存事实指纹 | 禁止在识别阶段捏造/改写或丢弃源文行 |
+| **2. 内容处理规范层** | `web/src/context-governor.js`, `bilingual-mapping-set.js`, `cas-validator.js` | 角色归类（`SECTION_HEADER` / `SEQ_LABEL` / `SUB_LABEL` / `EXPLANATION` / `OEL_ROW`）、多行打包拆行、S5 续行归并、S8 扁平 OEL 解析、逐句英译与数字守恒校验（`Context 2`） | 禁止跨节捏造外部理化/毒理端点 |
+| **3. 拓扑匹配引擎** | `web/src/topology-matcher.js`（含 `@ANTIGRAVITY_INVARIANT_LOCK`）, `smart-matching.js` | 将 `Context 2` 条目与母版拓扑对齐（语义锚点优先、禁止仅凭序号盲目覆写）、编译原子操作（先规范克隆再 `pruneSafely`）、透传角色样式标志 | 禁止在匹配层篡改化学事实或翻译文本 |
+| **4. 底层原语与编辑器** | `web/src/docx-engine.js`, `universal-editor-primitives.js`, `template-editor.js`, `template-topology-recognizer.js` | OOXML 节点读写、`writeCellValue`（`vAlign="center"` 与过高 `trHeight` 清理）、`renderFullWidthRow`（S2 5 级树状层级）、`bindEntityPresetToDocument`（主体绑定与当天修订日期注入）、`applyTopologyTypographyLock`（**角色驱动单一排版真源**统一投影） | 禁止各调用方绕过原语直写冲突字体/字阶/缩进 |
+| **5. 机械审计门禁** | `web/src/staged-mechanical-audit.js`, `web/scripts/run_staged_mechanical_audit.mjs`, `web/scripts/check_pdf_golden_anchor_alignment.py` | `PHASE_1` ~ `PHASE_6_PDF` 纯确定性硬门禁（零中文残留、数字守恒、双语对称、`P5_TAB_PURITY`、`P5_KV_LABEL_NON_EMPTY`、`P5_LABEL_INDENT_ALIGN`、`P5_KV_VALIGN_CENTER`、PDF `80.28pt/87.28pt` 物理坐标） | 禁止在审计脚本中写死特定型号或特判跳过 |
+| **6. 静态架构 Lint** | `web/scripts/lint_code_invariants.mjs`, `web/scripts/lint_audit_false_positives.mjs` | 源码反过拟合 10 大硬阻断检查、反假报错白名单自检、`@ANTIGRAVITY_INVARIANT_LOCK` 成对完整性校验（`LINT-LOCK-01`） | 禁止以禁用规则或屏蔽报错方式绕过 `npm run lint` |
+| **7. 全局与局部规范** | `AGENTS.md`, `PROJECT_CONSTITUTION.md`, `MAINTENANCE_GUIDE.md`, `openspec/specs/` | 定义最高法定不变量、双清单门禁、排障路由决策树、防复发下沉与 `@FIX_TAG` 标识契约 | 禁止先改代码后补规格或私自否定既有合法逻辑 |
+| **8. Agent 执行层** | `标准化流程/MSDS_Studio_Agent_Test_Kit/run_standard_production.mjs`, `web/scripts/generate_agent_audit_brief.mjs`, `msds-studio` Skill | 编排标准 7 阶段产出、落盘 `Context 1/2` 与 `*_agent_audit_brief.md` 供敌手语义核销、记录 `user_exec_logs.db` | 禁止跳过标准流水线编写临时脚本直改 DOCX |
