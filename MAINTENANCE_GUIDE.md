@@ -77,3 +77,14 @@
 1. `proposal.md`：原话/现象指纹 + `1:1 RTM`（问题点 → 预期行为）+ 拟变/保持现状双清单。
 2. `specs/<domain>/spec.md`：至少 1 条 RFC 2119 契约（`SHALL` / `SHALL NOT`）及对应机械审计/Lint 落点。
 3. `tasks.md`：单焦点原子任务（`[-] 定位与修复` → `[-] 补充机械审计/Lint` → `[-] 实测验证` → `[-] @FIX_TAG 与 CHANGELOG 闭环`）。
+
+---
+
+## 六、 Agent 执行层联动核查铁律（每次修改必检）
+
+任何底层/治理/拓扑/审计修复完成后，**必须**同步检查 Agent 执行层，确保任意 Agent 按标准调用即可直接获得正确产出：
+
+1. **待译字典与记忆库 (`web/src/translation-memory.json`)**：新增结构化拆分槽位时，补充标准双语术语至 TM，避免 `Gate 3A->3B` 无谓中断。
+2. **介入审计速查包 (`web/scripts/generate_agent_audit_brief.mjs`)**：确保 Agent 审计时可直接核销 CN vs EN（除 S1 外）行序、序号与拓扑对称性。
+3. **分发调用包 (`web/scripts/pack_workflow_kit.mjs`)**：每次修改引擎/审计/流水线代码后，必须重跑 `node web/scripts/pack_workflow_kit.mjs` 刷新 `MSDS_Studio_7Phase_Workflow_Kit.zip`。
+4. **7 阶段真机回归**：使用 `run_standard_production.mjs` 跑通全流程并确认 `user_exec_logs.db` 状态为 `SUCCESS`。

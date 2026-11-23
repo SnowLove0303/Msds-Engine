@@ -8,13 +8,16 @@
  * 3. 严禁修改或捏造任何化学事实与翻译文本；遇未知/不兼容模板直接报错阻断。
  */
 
+// @FIX_TAG(2026-11-23/topology-matcher/FIX-ANCHOR-SYNONYM): 补齐 S15 法规导语中英同义归一化，确保 EN S15 位置与 CN 1:1 一致
 function normAnchor(text) {
   return String(text || '')
     .replace(/^\s*\d+(?:\.\d+)*\.?\s*/, '')
     .replace(/阀值/g, '阈值')
     .replace(/其它/g, '其他')
-    .replace(/[：:\s\-_()（）/]/g, '')
-    .toLowerCase();
+    .replace(/[：:\s\-_–—()（）/]/g, '')
+    .toLowerCase()
+    .replace(/complywith/g, 'complieswith')
+    .replace(/regulatoryrequirements?/g, 'regulations');
 }
 
 function extractSeq(text) {
@@ -292,13 +295,18 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
           PRESET_LOCKED_ANCHORS.has(tplRowAnchor)
         );
         if (!isPresetProtected) {
-          const { value, text } = getItemTexts(item, lang);
+          const { label, value, text } = getItemTexts(item, lang);
+          // @FIX_TAG(2026-11-23/topology-matcher/FIX-SEQ-SYNC): 若 Context 2 携带序号(如 S7 7.1/7.2, S8 8.1/8.2)而模板标签无序号或序号不同，同步写入 cell 0 确保 CN/EN 序号 1:1 对称
+          const seqPrefixLabel = item.seq && !/^\d+\.\d+/.test(label) ? `${item.seq}\t${label}` : label;
           if (item.placement?.gridType === '1_COL_MERGED' || item.role === 'EXPLANATION' || matched.cellsCount === 1) {
+            const mergedContent = (item.role === 'SUB_LABEL' && item.seq && !(item.valueCn || item.valueEn))
+              ? seqPrefixLabel
+              : text;
             pushOp({
               op: 'morphToFullWidth',
               sectionNumber: s,
               rowIndex: matched.rowIndex,
-              content: text,
+              content: mergedContent,
               options: {
                 bold: Boolean(item.boldLabel && !(item.valueCn || item.valueEn)),
                 boldSubheaders: Boolean(item.boldLabel && (item.valueCn || item.valueEn)),
@@ -309,6 +317,10 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
             secWrites++;
           } else {
             if (matched.cellsCount >= 2) {
+              if (item.seq && extractSeq(matched.cells?.[0]?.text) !== item.seq && seqPrefixLabel) {
+                pushOp({ op: 'writeCell', sectionNumber: s, rowIndex: matched.rowIndex, cellIndex: 0, text: seqPrefixLabel, bold: true });
+                secWrites++;
+              }
               let outVal = value;
               if (lang === 'zh' && s === 5 && outVal && !/[。.!?]$/.test(outVal)) outVal = `${outVal}。`;
               pushOp({ op: 'writeCell', sectionNumber: s, rowIndex: matched.rowIndex, cellIndex: 1, text: outVal });

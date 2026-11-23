@@ -533,6 +533,55 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
       title: `${spKey}: 双列 KV 单元格垂直居中校验 (vAlign=center)`,
       measuredDetail: valignHits.length === 0 ? '100% 垂直居中' : valignHits.slice(0, 5).join(', ')
     });
+
+    // @FIX_TAG(2026-11-23/staged-mechanical-audit/FIX-NO-JUSTIFY-BOTH): 10. 禁止两端对齐 (both/distribute) 与多段落标签续行缩进校验
+    const bothHits = [];
+    const contIndentHits = [];
+    for (const rec of (eng.records || [])) {
+      const s = rec.sectionNumber;
+      if (!s) continue;
+      for (let rIdx = 1; rIdx < (rec.rows || []).length; rIdx++) {
+        const cells = rec.rows[rIdx]?.cells || [];
+        cells.forEach((cell, ci) => {
+          if (!cell?.node) return;
+          const ps = Array.from(cell.node.getElementsByTagName('w:p'));
+          ps.forEach((p, pi) => {
+            const jc = p.getElementsByTagName('w:jc')?.[0]?.getAttribute('w:val');
+            if (jc === 'both' || jc === 'distribute') {
+              bothHits.push(`S${s}:R${rIdx}:C${ci}:P${pi}(${jc})`);
+            }
+          });
+          if (ci === 0 && cells.length >= 2 && s !== 9 && ps.length > 1) {
+            const t0 = (ps[0]?.textContent || '').trim();
+            if (/^\d+\.\d+/.test(t0)) {
+              for (let pi = 1; pi < ps.length; pi++) {
+                const pt = (ps[pi]?.textContent || '').trim();
+                if (!pt) continue;
+                const cInd = ps[pi].getElementsByTagName('w:ind')?.[0];
+                const leftVal = Number(cInd?.getAttribute('w:left') || 0);
+                if (leftVal < 400) {
+                  contIndentHits.push(`S${s}:R${rIdx}:P${pi}(left=${leftVal})`);
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+    check(bothHits.length === 0, {
+      severity: 'FAIL',
+      ruleId: 'P5_NO_JUSTIFY_BOTH',
+      sectionRef: spKey,
+      title: `${spKey}: 禁止表体使用两端对齐 (both/distribute)`,
+      measuredDetail: bothHits.length === 0 ? '0 处两端对齐' : bothHits.slice(0, 5).join(', ')
+    });
+    check(contIndentHits.length === 0, {
+      severity: 'FAIL',
+      ruleId: 'P5_LABEL_CONTINUATION_INDENT',
+      sectionRef: spKey,
+      title: `${spKey}: 多段落带序号标签续行缩进垂线齐平校验`,
+      measuredDetail: contIndentHits.length === 0 ? '0 处续行挂在序号下' : contIndentHits.slice(0, 5).join(', ')
+    });
   }
 
   return summarize();

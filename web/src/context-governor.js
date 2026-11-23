@@ -834,16 +834,22 @@ export function buildStructuredContext2(context1, options = {}) {
   const tm = loadTranslationMemory();
   const rawTrans = options?.translations && typeof options.translations === 'object' ? options.translations : {};
   const transByKey = rawTrans.byKey && typeof rawTrans.byKey === 'object' ? rawTrans.byKey : {};
+  // @FIX_TAG(2026-11-23/context-governor/FIX-PUNCT-SPACE): 英文标点后粘连自愈与多余空格压缩
+  const healEnSpacing = (str) => String(str ?? '')
+    .replace(/([a-z][.!?])([A-Za-z])/g, '$1 $2')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+
   const resolveEn = (cnText, fallbackEn, keyHint = null) => {
-    if (keyHint && transByKey[keyHint]) return String(transByKey[keyHint]).trim();
+    if (keyHint && transByKey[keyHint]) return healEnSpacing(transByKey[keyHint]);
     const raw = String(cnText ?? '').replace(/\r\n/g, '\n').trim();
-    if (!raw) return fallbackEn ?? '';
-    if (rawTrans[raw]) return String(rawTrans[raw]).trim();
-    if (tm[raw]) return String(tm[raw]).trim();
+    if (!raw) return healEnSpacing(fallbackEn ?? '');
+    if (rawTrans[raw]) return healEnSpacing(rawTrans[raw]);
+    if (tm[raw]) return healEnSpacing(tm[raw]);
     const noColon = raw.replace(/[：:]$/, '').trim();
-    if (rawTrans[noColon]) return String(rawTrans[noColon]).trim();
-    if (tm[noColon]) return String(tm[noColon]).trim();
-    return fallbackEn ?? '';
+    if (rawTrans[noColon]) return healEnSpacing(rawTrans[noColon]);
+    if (tm[noColon]) return healEnSpacing(tm[noColon]);
+    return healEnSpacing(fallbackEn ?? '');
   };
 
   const STANDARD_SECTION_TITLE_EN = {
@@ -1275,21 +1281,29 @@ export function buildStructuredContext2(context1, options = {}) {
             }
           }
           const seqInfo = parseSeqLabel(c0);
+          // @FIX_TAG(2026-11-23/context-governor/FIX-S8-GLOVE-KV): S8 手套明细按标准拆分为 2_COL_KV（标签-值），与模板双列拓扑1:1对齐
           const ppeKv = s === 8 && c0.match(/^((?:氟化橡胶|丁基橡胶|丁腈橡胶)[^：:]*[：:])\s*(.*)$/);
           if (ppeKv) {
+            const lblCn = ppeKv[1].replace(/:$/, '：');
             const valCn = sanitizeDegreeAndPunctuation(ppeKv[2]);
+            const defaultLblEn = lblCn
+              .replace(/氟化橡胶\s*[–-]\s*FKM[：:]?/, 'Fluororubber – FKM:')
+              .replace(/丁基橡胶\s*[–-]\s*IIR[：:]?/, 'Butyl rubber – IIR:')
+              .replace(/丁腈橡胶\s*[–-]\s*NBR[：:]?/, 'Nitrile rubber – NBR:');
+            const defaultValEn = sanitizeDegreeAndPunctuation(translateChemicalTerm(valCn));
             items.push({
               rowIndex: r.rowIndex,
               role: 'SUB_LABEL',
               seq: null,
-              labelCn: ppeKv[1],
+              labelCn: lblCn,
+              cleanKey: lblCn.replace(/[：:\s]/g, ''),
               valueCn: valCn,
-              labelEn: resolveEn(ppeKv[1], translateChemicalTerm(ppeKv[1]), `S8:R${r.rowIndex}:L`),
-              valueEn: resolveEn(valCn, sanitizeDegreeAndPunctuation(translateChemicalTerm(valCn)), `S8:R${r.rowIndex}:V`),
+              labelEn: resolveEn(lblCn, defaultLblEn, `S8:R${r.rowIndex}:L`),
+              valueEn: resolveEn(valCn, defaultValEn, `S8:R${r.rowIndex}:V`),
               boldLabel: true,
               boldValue: false,
               indentDxa: 420,
-              placement: { gridType: '1_COL_MERGED', colSpan: 2, targetCol: '0..1 (通栏合并)' }
+              placement: { gridType: '2_COL_KV', colSpan: 1, targetCols: { label: 0, value: 1 } }
             });
             continue;
           }
@@ -1373,6 +1387,16 @@ export function buildStructuredContext2(context1, options = {}) {
           for (const pair of kvPairs) {
             const seqInfo = parseSeqLabel(pair.rawLbl);
             let cleanValCn = sanitizeDegreeAndPunctuation(pair.rawVal);
+            // @FIX_TAG(2026-11-23/context-governor/FIX-CN-PROSE-PUNCT): 中文长句正文多行/句末缺句号自动闭合，避免换行无标点
+            if ([4, 5, 6, 7, 10, 12, 13].includes(s) && cleanValCn) {
+              cleanValCn = cleanValCn
+                .split('\n')
+                .map(seg => {
+                  const st = seg.trim();
+                  return (/[\u4e00-\u9fa5]{6,}$/.test(st) && !/[。！？.!?:：]$/.test(st)) ? `${st}。` : st;
+                })
+                .join('\n');
+            }
             if (s === 1 && /中文名称|产品中文名称/i.test(seqInfo.cleanKey) && cleanValCn && modelCode && !cleanValCn.toUpperCase().includes(modelCode.toUpperCase())) {
               cleanValCn = `${cleanValCn} ${modelCode}`;
             }

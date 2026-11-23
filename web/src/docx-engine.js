@@ -3781,6 +3781,11 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
         const jc = doc.createElementNS(W_NS, 'w:jc');
         jc.setAttributeNS(W_NS, 'w:val', 'left');
         pPr.appendChild(jc);
+      } else {
+        // @FIX_TAG(2026-11-23/docx-engine/FIX-JC-LEFT): 通用通栏行显式注入 jc=left，杜绝继承样式表 both 两端对齐导致的词间大空白
+        const jc = doc.createElementNS(W_NS, 'w:jc');
+        jc.setAttributeNS(W_NS, 'w:val', 'left');
+        pPr.appendChild(jc);
       }
 
       const spacing = doc.createElementNS(W_NS, 'w:spacing');

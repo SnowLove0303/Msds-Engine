@@ -1470,6 +1470,26 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
             firstP.appendChild(seqRun);
             firstP.appendChild(bodyRun);
             formattedFirstP = firstP;
+
+            // @FIX_TAG(2026-11-23/template-editor/FIX-EN-MULTIP-INDENT): 模板标签格若拆成多段 <w:p> (如 EN 5.1/5.2/5.3/6.1/12.2)，续行段落强制左缩进对齐正文首字 (420/560 dxa)，绝不挂在序号下
+            for (let pi = 1; pi < ps.length; pi++) {
+              const contP = ps[pi];
+              let cpPr = contP.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
+              if (!cpPr) {
+                cpPr = doc.createElementNS(W_NS, 'w:pPr');
+                contP.insertBefore(cpPr, contP.firstChild);
+              }
+              let cInd = cpPr.getElementsByTagNameNS(W_NS, 'ind')?.[0];
+              if (!cInd) {
+                cInd = doc.createElementNS(W_NS, 'w:ind');
+                cpPr.appendChild(cInd);
+              }
+              cInd.setAttributeNS(W_NS, 'w:left', String(targetTabDxa));
+              ['hanging', 'firstLine', 'leftChars', 'hangingChars', 'firstLineChars'].forEach(attr => {
+                if (cInd.hasAttributeNS(W_NS, attr)) cInd.removeAttributeNS(W_NS, attr);
+                if (cInd.hasAttribute(`w:${attr}`)) cInd.removeAttribute(`w:${attr}`);
+              });
+            }
           } else if (firstP && (
             (isLabelCol && secNum !== 3)
             || (secNum === 8 && cells.length === 1 && /^(?:手部防护|氟化橡胶|丁基橡胶|丁腈橡胶|Hand protection|Fluoroelastomer|Butyl rubber|Nitrile rubber)/i.test(rawCellText))
@@ -1498,8 +1518,22 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
         const psAll = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
         const targetSz = (cIdx === 0) ? profile.labelFontSize : profile.valueFontSize;
         for (const p of psAll) {
-          const pPr = p.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
-          const pRPr = pPr?.getElementsByTagNameNS(W_NS, 'rPr')?.[0];
+          let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
+          if (!pPr) {
+            pPr = doc.createElementNS(W_NS, 'w:pPr');
+            p.insertBefore(pPr, p.firstChild);
+          }
+          // @FIX_TAG(2026-11-23/template-editor/FIX-NO-JUSTIFY-BOTH): 全篇表体段落禁用 both/distribute 两端对齐，未显式居中者统一注入 jc=left
+          let jcEl = pPr.getElementsByTagNameNS(W_NS, 'jc')?.[0];
+          const curJc = jcEl ? (jcEl.getAttributeNS(W_NS, 'val') || jcEl.getAttribute('w:val')) : null;
+          if (!curJc || curJc === 'both' || curJc === 'distribute') {
+            if (!jcEl) {
+              jcEl = doc.createElementNS(W_NS, 'w:jc');
+              pPr.appendChild(jcEl);
+            }
+            jcEl.setAttributeNS(W_NS, 'w:val', 'left');
+          }
+          const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')?.[0];
           if (pRPr) {
             const pSzs = Array.from(pRPr.getElementsByTagNameNS(W_NS, 'sz'));
             for (const psNode of pSzs) psNode.setAttributeNS(W_NS, 'w:val', String(targetSz));
