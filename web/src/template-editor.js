@@ -524,7 +524,7 @@ export async function restoreSectionInSession(session, { sectionNumber }) {
 /**
  * 原子写入单元格值 (Write Cell Value)
  */
-export function writeCellValueToSession(session, { sectionNumber, rowIndex, cellIndex, text }) {
+export function writeCellValueToSession(session, { sectionNumber, rowIndex, cellIndex, text, bold = false }) {
   const record = (session.engine.records || []).find(r => r.sectionNumber === sectionNumber);
   if (!record) throw new Error(`Section ${sectionNumber} not found in session document`);
 
@@ -540,7 +540,7 @@ export function writeCellValueToSession(session, { sectionNumber, rowIndex, cell
   }
 
   writeCellValue(cell, text, {
-    bold: false,
+    bold: Boolean(bold),
     fontSize: session.isEnglish ? '19' : '24',
     fontFamily: session.isEnglish ? 'Arial' : '宋体'
   });
@@ -627,9 +627,15 @@ export function applyCompanyPreset(session, presetKey) {
   if (!preset) return { success: false, reason: `Unknown preset: ${presetKey}` };
 
   const isEn = session.isEnglish || session.templateKey?.includes('EN') || session.templateKey?.includes('en');
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const todayStr = isEn ? `${yyyy}-${mm}-${dd}` : `${yyyy}年${mm}月${dd}日`;
   const result = bindEntityPresetToDocument(session.engine, preset, {
     isEnglish: isEn,
-    modelCode: session.modelCode
+    modelCode: session.modelCode,
+    revisionDate: todayStr
   });
 
   stampDocumentIdentity(session.engine, { companyName: result.companyName, shortName: result.shortName });
@@ -1007,6 +1013,12 @@ export function applyAdaptiveRuler(session, secNum) {
       if (ind) {
         ind.setAttributeNS(W_NS, 'w:left', targetIndent);
         ind.setAttributeNS(W_NS, 'w:hanging', targetIndent);
+        ind.removeAttributeNS(W_NS, 'leftChars');
+        ind.removeAttribute('w:leftChars');
+        ind.removeAttributeNS(W_NS, 'hangingChars');
+        ind.removeAttribute('w:hangingChars');
+        ind.removeAttributeNS(W_NS, 'firstLineChars');
+        ind.removeAttribute('w:firstLineChars');
       }
 
       const tabsNodes = Array.from(pPr.getElementsByTagNameNS(W_NS, 'tabs'));
@@ -1312,6 +1324,34 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
       }
     }
 
+    // Section 2 采用专属 5 级大纲树状层级缩进，禁止执行序号重排与 420/560 悬挂缩进覆写
+    if (secNum === 2) continue;
+
+    // 若章节内序号因语义锚点匹配+末尾追加而出现乱序/跳号，则自动重排为连续序号 (如 9.1..9.11)
+    const seqRows = [];
+    for (let rIdx = 1; rIdx < record.rows.length; rIdx++) {
+      const c0 = record.rows[rIdx]?.cells?.[0];
+      const t = (c0?.text || '').trim();
+      const sm = t.match(/^(\d+)\.(\d+)/);
+      if (sm && Number(sm[1]) === secNum) seqRows.push({ rIdx, c0, sub: Number(sm[2]), rawSeq: `${sm[1]}.${sm[2]}` });
+    }
+    const isSeqOrdered = seqRows.every((sr, idx) => sr.sub === idx + 1);
+    if (seqRows.length > 0 && !isSeqOrdered) {
+      seqRows.forEach((sr, idx) => {
+        const expectedSeq = `${secNum}.${idx + 1}`;
+        if (sr.rawSeq !== expectedSeq && sr.c0?.node) {
+          const tNodes = Array.from(sr.c0.node.getElementsByTagNameNS(W_NS, 't'));
+          for (const tn of tNodes) {
+            if (tn.textContent && tn.textContent.includes(sr.rawSeq)) {
+              tn.textContent = tn.textContent.replace(sr.rawSeq, expectedSeq);
+              sr.c0.text = sr.c0.text.replace(sr.rawSeq, expectedSeq);
+              break;
+            }
+          }
+        }
+      });
+    }
+
     // 探测本章节最大编号位数 (Tier A: 420 dxa, Tier B: 560 dxa)
     let has4DigitSeq = false;
     for (let rIdx = 1; rIdx < record.rows.length; rIdx++) {
@@ -1328,9 +1368,37 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
       const row = record.rows[rIdx];
       const cells = row.cells || [];
 
+      // 2-col KV 行：清理从模板继承的过高固定行高（如 S11 11.2 继承模板 3 行高 1169 dxa），确保单行自适应紧凑
+      if (cells.length === 2 && row.node) {
+        const valTxt = (cells[1]?.text || '').trim();
+        if (!valTxt.includes('\n') && valTxt.length < 60) {
+          const trPr = row.node.getElementsByTagNameNS(W_NS, 'trPr')?.[0];
+          const trHeight = trPr?.getElementsByTagNameNS(W_NS, 'trHeight')?.[0];
+          if (trHeight && Number(trHeight.getAttributeNS(W_NS, 'val') || trHeight.getAttribute('w:val') || 0) > 450) {
+            trPr.removeChild(trHeight);
+          }
+        }
+      }
+
       for (let cIdx = 0; cIdx < cells.length; cIdx++) {
         const cell = cells[cIdx];
         if (!cell?.node) continue;
+
+        // 2-col KV 行双列统一垂直居中 (解决 S11 值格居上、S13 处理方法垂直居中规范)
+        if (cells.length === 2) {
+          let tcPr = cell.node.getElementsByTagNameNS(W_NS, 'tcPr')?.[0];
+          if (!tcPr) {
+            tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+            cell.node.insertBefore(tcPr, cell.node.firstChild);
+          }
+          let vAlignEl = tcPr.getElementsByTagNameNS(W_NS, 'vAlign')?.[0];
+          if (!vAlignEl) {
+            vAlignEl = doc.createElementNS(W_NS, 'w:vAlign');
+            tcPr.appendChild(vAlignEl);
+          }
+          vAlignEl.setAttributeNS(W_NS, 'w:val', 'center');
+        }
+
         if (secNum === 9 && cIdx === 0) continue;
 
         const isLabelCol = (cIdx === 0 && cells.length >= 2);
@@ -1350,7 +1418,7 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
           const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
           const firstP = ps[0];
           const pText = (firstP?.textContent || '').replace(/\u00A0/g, ' ').trim();
-          const seqMatch = pText.match(/^(\d+\.\d+)[\s\t]+(.+)$/);
+          const seqMatch = pText.match(/^(\d+\.\d+)[\s\t]*(.+)$/);
           if (firstP && seqMatch) {
             const seqStr = seqMatch[1];
             const labelBody = seqMatch[2].trim();
@@ -1369,7 +1437,10 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
             }
             indEl.setAttributeNS(W_NS, 'w:left', String(targetTabDxa));
             indEl.setAttributeNS(W_NS, 'w:hanging', String(targetTabDxa));
-            if (indEl.hasAttributeNS(W_NS, 'firstLine')) indEl.removeAttributeNS(W_NS, 'firstLine');
+            ['firstLine', 'leftChars', 'hangingChars', 'firstLineChars'].forEach(attr => {
+              if (indEl.hasAttributeNS(W_NS, attr)) indEl.removeAttributeNS(W_NS, attr);
+              if (indEl.hasAttribute(`w:${attr}`)) indEl.removeAttribute(`w:${attr}`);
+            });
 
             const oldRuns = Array.from(firstP.getElementsByTagNameNS(W_NS, 'r'));
             oldRuns.forEach(r => firstP.removeChild(r));
@@ -1399,10 +1470,12 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
             firstP.appendChild(seqRun);
             firstP.appendChild(bodyRun);
             formattedFirstP = firstP;
-          }
-
-          // 英文 Section 8 Recommendation: 420 dxa 左缩进对齐
-          if (isEn && secNum === 8 && /^Recommendation\s*:/i.test(rawCellText) && firstP) {
+          } else if (firstP && (
+            (isLabelCol && secNum !== 3)
+            || (secNum === 8 && cells.length === 1 && /^(?:手部防护|氟化橡胶|丁基橡胶|丁腈橡胶|Hand protection|Fluoroelastomer|Butyl rubber|Nitrile rubber)/i.test(rawCellText))
+          )) {
+            // 通用未编号标签（覆盖 S1 中文名称/化学品分类/供应商信息、S8 防护子标签/手套明细、S13 处理方法等）：
+            // 统一注入同基线 w:left (420/560 dxa)，物理清除 hanging/firstLine/*Chars 锯齿，实现首字与带序号标签 100% 垂直齐平
             let pPr = firstP.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
             if (!pPr) {
               pPr = doc.createElementNS(W_NS, 'w:pPr');
@@ -1413,7 +1486,11 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
               indEl = doc.createElementNS(W_NS, 'w:ind');
               pPr.appendChild(indEl);
             }
-            indEl.setAttributeNS(W_NS, 'w:left', String(profile.tabStops.tierA));
+            indEl.setAttributeNS(W_NS, 'w:left', String(targetTabDxa));
+            ['hanging', 'firstLine', 'leftChars', 'hangingChars', 'firstLineChars'].forEach(attr => {
+              if (indEl.hasAttributeNS(W_NS, attr)) indEl.removeAttributeNS(W_NS, attr);
+              if (indEl.hasAttribute(`w:${attr}`)) indEl.removeAttribute(`w:${attr}`);
+            });
           }
         }
 

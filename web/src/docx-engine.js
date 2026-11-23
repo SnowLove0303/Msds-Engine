@@ -2626,6 +2626,36 @@ export function writeCellValue(cell, value, roleStyle = null) {
   const clean = valStr.replace(/\r\n?/g, '\n').replace(/\n\s*\n\s*\n+/g, '\n\n').trim();
   replaceCellValueContent(cell, clean, roleStyle);
   refreshCellText(cell);
+
+  // 底层 OOXML 保障：2列及以上 KV 单元格写入值时自动注入垂直居中，且单行短值清除模板继承的过高固定行高 (>450 dxa)
+  try {
+    const doc = cell?.node?.ownerDocument;
+    const trNode = cell?.node?.parentNode;
+    if (doc && trNode && trNode.nodeName === 'w:tr') {
+      const tcs = Array.from(trNode.getElementsByTagNameNS(W_NS, 'tc'));
+      if (tcs.length >= 2) {
+        let tcPr = cell.node.getElementsByTagNameNS(W_NS, 'tcPr')?.[0];
+        if (!tcPr) {
+          tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+          cell.node.insertBefore(tcPr, cell.node.firstChild);
+        }
+        let vAlignEl = tcPr.getElementsByTagNameNS(W_NS, 'vAlign')?.[0];
+        if (!vAlignEl) {
+          vAlignEl = doc.createElementNS(W_NS, 'w:vAlign');
+          tcPr.appendChild(vAlignEl);
+        }
+        vAlignEl.setAttributeNS(W_NS, 'w:val', 'center');
+
+        if (clean && !clean.includes('\n') && clean.length < 60) {
+          const trPr = trNode.getElementsByTagNameNS(W_NS, 'trPr')?.[0];
+          const trHeight = trPr?.getElementsByTagNameNS(W_NS, 'trHeight')?.[0];
+          if (trHeight && Number(trHeight.getAttributeNS(W_NS, 'val') || trHeight.getAttribute('w:val') || 0) > 450) {
+            trPr.removeChild(trHeight);
+          }
+        }
+      }
+    }
+  } catch (e) {}
 }
 
 export function writeCellLabel(cell, value, allowLabelEdit = false, roleStyle = null) {
@@ -3771,13 +3801,13 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
 
       // Section 2 专属缩进几何状态机 (完全对齐父子层级统一规范：父级顶格、一级标题文本与二级子标签及直接值首字绝对垂直对齐、二级值文本向右层级缩进)
       if (options.isSection2) {
-        // 关键防御：严格识别父级节标题行 (2.1 GHS危险性类别、2.2 GHS标签要素、2.3 危险性说明、2.4 防范说明、2.5 其他危害等)，节标题绝不应用正文缩进！
-        const isParentHeader = /^(?:2\.\d+|GHS危险性类别|物质或混合物的分类|Classification of the substance or mixture|GHS\s*标签要素|Label elements|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危险|其他危害|Other\s*Hazards?)/i.test(trimmed);
+        // 关键防御：严格识别父级节标题行 (2.0 紧急情况概述、2.1 物质或混合物的分类、2.2 标签要素、2.3 其他危险等)，节标题绝不应用正文缩进！
+        const isParentHeader = /^(?:2\.\d+\s*(?:紧急情况概述|Emergency overview|物质或混合物的分类|Classification of the substance or mixture|标签要素|Label elements|GHS\s*标签要素|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危险|其他危害|Other\s*Hazards?)|物质或混合物的分类|Classification of the substance or mixture|GHS\s*标签要素|Label elements|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危险|其他危害|Other\s*Hazards?)/i.test(trimmed);
         if (isParentHeader) {
           currentS2Level = 1;
         } else {
-          // 子标签统一集合：GHS象形图、信号词、必须列在标签上的有害成份、需要注意的物质、预防措施、事故响应、安全存储、安全储存、废弃处置 (中英文)
-          const isSubLabel = /^(?:(?:GHS\s*)?(?:象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components which must be listed on the label)|(?:需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal)[：:])/i.test(trimmed);
+          // 子标签统一集合：GHS危险性类别、GHS象形图/GHS-象形图、信号词、必须列在标签上的有害成份、需要注意的物质、预防措施、事故响应、安全存储、安全储存、废弃处置 (中英文)
+          const isSubLabel = /^(?:(?:GHS[-\s]*)?(?:危险性类别|Hazard categories|Hazard classification|象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components (?:which must |to )?be listed on the label)|(?:需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal)[：:]?)/i.test(trimmed);
 
           if (isSubLabel) {
             currentS2Level = 2;
@@ -3806,7 +3836,7 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
       let runSpecs = [];
       if (options.isSection2) {
         // 关键防御：优先匹配键值对行与节标题行，确保 2.1 GHS危险性类别、2.2 GHS标签要素、2.3 危险性说明、2.4 防范说明、2.5 其他危害等加粗，值常规体
-        const kvMatch = pText.match(/^(\s*(?:(?:2\.\d+\s*)?(?:GHS危险性类别|GHS hazard classification|物质或混合物的分类|Classification of the substance or mixture)|羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification|(?:2\.\d+\s*)?(?:GHS\s*)?标签要素|Label elements|(?:2\.\d+\s*)?GHS Label Elements|象形图|GHS\s*象形图|GHS pictograms|警告词|信号词|Signal word|(?:必须列在标签上的有害成[份分]|Hazardous components which must be listed on the label)|(?:2\.\d+\s*)?(?:危险性说明|Hazard statements?(?:\s*\([a-zA-Z0-9]+\))?)|(?:2\.\d+\s*)?(?:防范说明|Precautionary statements?(?:\s*\([a-zA-Z0-9]+\))?)|物理化学危险|Physical and chemical hazards|健康危害|Health hazards|环境危害|Environmental hazards|(?:2\.\d+\s*)?(?:其他危害|其他危险)|(?:2\.\d+\s*)?Other\s*Hazards?))([:：]?)\s*(.*)$/i);
+        const kvMatch = pText.match(/^(\s*(?:(?:2\.\d+\s*)?(?:紧急情况概述|Emergency overview|GHS[-\s]*危险性类别|GHS hazard classification|物质或混合物的分类|Classification of the substance or mixture)|羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification|(?:2\.\d+\s*)?(?:GHS\s*)?标签要素|Label elements|(?:2\.\d+\s*)?GHS Label Elements|象形图|GHS[-\s]*象形图|GHS pictograms|警告词|信号词|Signal word|(?:必须列在标签上的有害成[份分]|Hazardous components (?:which must |to )?be listed on the label)|(?:2\.\d+\s*)?(?:危险性说明|Hazard statements?(?:\s*\([a-zA-Z0-9]+\))?)|(?:2\.\d+\s*)?(?:防范说明|Precautionary statements?(?:\s*\([a-zA-Z0-9]+\))?)|物理化学危险|Physical and chemical hazards|健康危害|Health hazards|环境危害|Environmental hazards|(?:2\.\d+\s*)?(?:其他危害|其他危险)|(?:2\.\d+\s*)?Other\s*Hazards?))([:：]?)\s*(.*)$/i);
         if (kvMatch) {
           const label = kvMatch[1];
           const colon = kvMatch[2] || '';

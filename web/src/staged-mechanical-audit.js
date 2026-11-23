@@ -462,6 +462,79 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
     });
   }
 
+  // 8. 双列 KV 行左侧标签非空校验 (防止插入新行漏写 cell 0 标签导致无主值行)
+  for (const [spKey, entry] of Object.entries(loaded)) {
+    const eng = entry?.engine;
+    if (!eng) continue;
+    const emptyLabelHits = [];
+    for (const rec of (eng.records || [])) {
+      const s = rec.sectionNumber;
+      if (!s || s === 2 || s === 3 || s === 16) continue;
+      for (let rIdx = 1; rIdx < (rec.rows || []).length; rIdx++) {
+        const cells = rec.rows[rIdx]?.cells || [];
+        if (cells.length === 2) {
+          const c0 = (cells[0]?.text || '').trim();
+          const c1 = (cells[1]?.text || '').trim();
+          if (!c0 && c1) {
+            emptyLabelHits.push(`S${s}:R${rIdx}(val=${c1.slice(0, 16)})`);
+          }
+        }
+      }
+    }
+    check(emptyLabelHits.length === 0, {
+      severity: 'CRITICAL',
+      ruleId: 'P5_KV_LABEL_NON_EMPTY',
+      sectionRef: spKey,
+      title: `${spKey}: 双列 KV 行左侧标签非空校验`,
+      measuredDetail: emptyLabelHits.length === 0 ? '0 处无主值行' : emptyLabelHits.slice(0, 5).join(', ')
+    });
+
+    // 9. 双列 KV 未编号标签垂直齐平校验 & 垂直居中校验 (防止 S1/S8/S13 未编号标签带 hanging/firstLine 锯齿及 S11/S13 居上错位)
+    const indentHits = [];
+    const valignHits = [];
+    for (const rec of (eng.records || [])) {
+      const s = rec.sectionNumber;
+      if (!s || s === 2 || s === 3 || s === 16) continue;
+      for (let rIdx = 1; rIdx < (rec.rows || []).length; rIdx++) {
+        const cells = rec.rows[rIdx]?.cells || [];
+        if (cells.length !== 2) continue;
+        const c0 = cells[0];
+        const c1 = cells[1];
+        const t0 = (c0?.text || '').trim();
+        if (c0?.node && t0 && !/^\d+\.\d+/.test(t0)) {
+          const ind = c0.node.getElementsByTagName('w:ind')?.[0];
+          const hanging = ind?.getAttribute('w:hanging');
+          const firstLine = ind?.getAttribute('w:firstLine');
+          if (hanging || firstLine) {
+            indentHits.push(`S${s}:R${rIdx}(H=${hanging || 0},F=${firstLine || 0})`);
+          }
+        }
+        [c0, c1].forEach((c, ci) => {
+          if (c?.node) {
+            const va = c.node.getElementsByTagName('w:vAlign')?.[0]?.getAttribute('w:val');
+            if (va !== 'center') {
+              valignHits.push(`S${s}:R${rIdx}:C${ci}(vAlign=${va || 'default'})`);
+            }
+          }
+        });
+      }
+    }
+    check(indentHits.length === 0, {
+      severity: 'FAIL',
+      ruleId: 'P5_LABEL_INDENT_ALIGN',
+      sectionRef: spKey,
+      title: `${spKey}: 未编号 KV 标签首字垂直齐平校验 (无 hanging/firstLine 锯齿)`,
+      measuredDetail: indentHits.length === 0 ? '0 处缩进锯齿' : indentHits.slice(0, 5).join(', ')
+    });
+    check(valignHits.length === 0, {
+      severity: 'FAIL',
+      ruleId: 'P5_KV_VALIGN_CENTER',
+      sectionRef: spKey,
+      title: `${spKey}: 双列 KV 单元格垂直居中校验 (vAlign=center)`,
+      measuredDetail: valignHits.length === 0 ? '100% 垂直居中' : valignHits.slice(0, 5).join(', ')
+    });
+  }
+
   return summarize();
 }
 

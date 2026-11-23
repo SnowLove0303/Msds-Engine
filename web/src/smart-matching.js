@@ -3079,9 +3079,9 @@ export function cleanSlateTemplateRecord(tRecord, sectionNumber, editorEngine) {
     // 5. Section 2 与 Section 9: 由专有剪枝与写值流程处理，不在此预清空 (Section 8 必须参与预清空)
     if (s === 2 || s === 9) continue;
     // Section 11: 保留顶部产品说明语，避免被清空误删
-    if (s === 11 && /无可用的毒理学研究/i.test(rowText)) continue;
+    if (s === 11 && /无可用的毒理学研究|No toxicological studies/i.test(rowText)) continue;
     // Section 12: 保留顶部生态说明语，避免被清空误删 (PU-202B 审阅批注 8, 9)
-    if (s === 12 && /无可用的生态毒理学研究/i.test(rowText)) continue;
+    if (s === 12 && /无可用的生态毒理学研究|No ecotoxicological studies/i.test(rowText)) continue;
 
     for (const cell of row.cells) {
       if (!cell.editable || cell.kind === 'label-only') continue;

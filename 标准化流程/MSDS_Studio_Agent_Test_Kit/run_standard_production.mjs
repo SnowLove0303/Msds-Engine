@@ -426,7 +426,7 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
       if (op.op === 'clearTemplate') clearTemplateValues(session);
       else if (op.op === 'clearSectionValues') clearSectionValuesInSession(session, { sectionNumber: op.sectionNumber });
       else if (op.op === 'applyPreset') applyCompanyPreset(session, op.presetKey);
-      else if (op.op === 'writeCell') writeCellValueToSession(session, { sectionNumber: op.sectionNumber, rowIndex: op.rowIndex, cellIndex: op.cellIndex, text: op.text || '' });
+      else if (op.op === 'writeCell') writeCellValueToSession(session, { sectionNumber: op.sectionNumber, rowIndex: op.rowIndex, cellIndex: op.cellIndex, text: op.text || '', bold: Boolean(op.bold) });
       else if (op.op === 'writeFullWidth') writeFullWidthSection(session, { sectionNumber: op.sectionNumber, content: op.content || op.text || '', options: op.options || {} });
       else if (op.op === 'formatLaserTabs') formatSection9LaserTabs(session);
       else if (op.op === 'deleteRow') deleteRowFromSession(session, { sectionNumber: op.sectionNumber, rowIndex: op.rowIndex });

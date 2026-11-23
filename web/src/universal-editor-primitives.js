@@ -983,7 +983,12 @@ export function bindEntityPresetToDocument(engineOrSession, preset, options = {}
     }
   }
 
-  // 3. 更新页脚与页眉元数据
+  // 3. 更新页脚与页眉元数据（默认自动注入当天修订日期，避免沿用模板历史日期）
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const effectiveRevisionDate = options.revisionDate || (isEn ? `${yyyy}-${mm}-${dd}` : `${yyyy}年${mm}月${dd}日`);
   try {
     updateHeaderFooterData(engine, {
       model: options.modelCode,
@@ -991,7 +996,7 @@ export function bindEntityPresetToDocument(engineOrSession, preset, options = {}
       title: isEn ? 'MATERIAL SAFETY DATA SHEET' : '物料安全数据表',
       version: 'V1.0',
       docCode: options.modelCode ? `${options.modelCode}-MSDS` : undefined,
-      revisionDate: options.revisionDate,
+      revisionDate: effectiveRevisionDate,
       language: isEn ? 'EN' : 'CN',
       entity: shortName,
       shortName
@@ -1002,10 +1007,10 @@ export function bindEntityPresetToDocument(engineOrSession, preset, options = {}
     const hfUpdates = {
       company: companyName,
       shortName,
-      entity: shortName
+      entity: shortName,
+      revisionDate: effectiveRevisionDate
     };
     if (options.modelCode) hfUpdates.model = options.modelCode;
-    if (options.revisionDate) hfUpdates.revisionDate = options.revisionDate;
     if (typeof engine.updateHeaderFooterData === 'function') {
       engine.updateHeaderFooterData(hfUpdates);
     } else if (engine.headerFooterData) {

@@ -1101,7 +1101,7 @@ export function buildStructuredContext2(context1, options = {}) {
           const c0 = r.cells?.[0]?.text?.trim() || '';
           const c1 = r.cells?.[r.cells.length - 1]?.text?.trim() || '';
           const seqInfo = parseSeqLabel(c0);
-          const isSingle = (r.cells || []).length === 1 || (!c0 && c1);
+          const isSingle = (r.cells || []).length === 1 || (!c0 && c1) || (Boolean(c0) && !c1 && !seqInfo.isSeq);
           if (isSingle) {
             const txt = c0 || c1;
             items.push({
@@ -1153,6 +1153,10 @@ export function buildStructuredContext2(context1, options = {}) {
         '生态毒性': 'Ecotoxicity', '持久性和降解性': 'Persistence and degradability', '其他不利的影响': 'Other adverse effects',
         '处理方法': 'Disposal methods', '公路和铁路运输': 'Road and rail transport', '海上运输': 'Maritime transport',
         '空运': 'Air transport', '用户特殊注意事项': 'Special precautions for user',
+        '联合国编号': 'UN Number', '联合国运输名称': 'UN Proper Shipping Name',
+        '水溶性': 'Water solubility', '粘度/25℃': 'Viscosity / 25°C', '自燃温度': 'Auto-ignition temperature',
+        '闪点（闭口）': 'Flash point (closed cup)', '离子性': 'Ionicity', '分解温度': 'Decomposition temperature',
+        '爆炸特性': 'Explosive properties', '粉尘爆炸级别': 'Dust explosion class', '急性毒性': 'Acute toxicity',
         '其它的规定': 'Other provisions', '其它规定': 'Other provisions', '符合下列法规要求': 'Complies with the following regulations'
       };
       const translateLineEn = (cnStr) => {
@@ -1208,6 +1212,8 @@ export function buildStructuredContext2(context1, options = {}) {
           });
           continue;
         }
+        if (!c0 && !c1 && (r.cells || []).every(c => !(c.text || '').trim())) continue;
+        if (r._consumedByPrev) continue;
         const cellCount = (r.cells || []).length;
         if (s === 8 && cellCount >= 3) {
           const cellsCn = (r.cells || []).map(c => (c.text || '').trim());
@@ -1224,6 +1230,50 @@ export function buildStructuredContext2(context1, options = {}) {
           continue;
         }
         if (cellCount === 1) {
+          // S8 扁平化 OEL 4列表格文本块通用结构化解析
+          if (s === 8 && /工作场所.*控制参数/.test(c0) && /物质[\r\n]+依据[\r\n]+类型[\r\n]+数值/.test(c0)) {
+            const oelLines = c0.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+            const hdrIdx = oelLines.findIndex(x => x === '物质');
+            if (hdrIdx >= 0 && oelLines[hdrIdx + 1] === '依据' && oelLines[hdrIdx + 2] === '类型' && oelLines[hdrIdx + 3] === '数值') {
+              if (hdrIdx > 0) {
+                const titleCn = oelLines.slice(0, hdrIdx).join(' ');
+                items.push({
+                  rowIndex: r.rowIndex,
+                  role: 'SUB_LABEL',
+                  seq: null,
+                  labelCn: titleCn,
+                  valueCn: '',
+                  labelEn: resolveEn(titleCn, 'Workplace component control parameters', `S8:R${r.rowIndex}:T`),
+                  valueEn: '',
+                  boldLabel: true,
+                  boldValue: false,
+                  indentDxa: 0,
+                  placement: { gridType: '1_COL_MERGED', colSpan: 2, targetCol: '0..1 (通栏合并)' }
+                });
+              }
+              const hdrCells = oelLines.slice(hdrIdx, hdrIdx + 4);
+              items.push({
+                rowIndex: r.rowIndex,
+                role: 'TABLE_HEADER',
+                bold: true,
+                cellsCn: hdrCells,
+                cellsEn: ['Substance', 'Basis', 'Type', 'Value'],
+                placement: { gridType: 'MULTI_COL_TABLE', colSpan: 1, targetCols: [0, 1, 2, 3] }
+              });
+              for (let k = hdrIdx + 4; k + 3 < oelLines.length; k += 4) {
+                const rowCells = oelLines.slice(k, k + 4);
+                items.push({
+                  rowIndex: r.rowIndex,
+                  role: 'OEL_ROW',
+                  bold: false,
+                  cellsCn: rowCells,
+                  cellsEn: rowCells.map((cell, ci) => resolveEn(cell, translateLineEn(cell), `S8:R${r.rowIndex}:C${ci}`)),
+                  placement: { gridType: 'MULTI_COL_TABLE', colSpan: 1, targetCols: [0, 1, 2, 3] }
+                });
+              }
+              continue;
+            }
+          }
           const seqInfo = parseSeqLabel(c0);
           const ppeKv = s === 8 && c0.match(/^((?:氟化橡胶|丁基橡胶|丁腈橡胶)[^：:]*[：:])\s*(.*)$/);
           if (ppeKv) {
@@ -1243,16 +1293,44 @@ export function buildStructuredContext2(context1, options = {}) {
             });
             continue;
           }
-          const isBoldLabel = /^(?:其它的规定|其它规定|符合下列法规要求|暴露控制|手部防护|处理方法)[：:]?$/i.test(c0);
+          const isBoldLabel = /^(?:其它的规定|其它规定|符合下列法规要求|暴露控制|控制参数|手部防护|处理方法)[：:]?$/i.test(seqInfo.label);
+          if (s === 8 && /控制参数/.test(seqInfo.cleanKey)) {
+            const nextRow = rows.find(nr => nr.rowIndex === r.rowIndex + 1);
+            const nextText = (nextRow?.cells || []).map(c => (c.text || '').trim()).filter(Boolean).join(' ');
+            if (nextRow && (nextRow.cells || []).length === 1 && /不含有职业接触限值|无数据/i.test(nextText)) {
+              const valCn = sanitizeDegreeAndPunctuation(nextText);
+              const lblEnBase = STANDARD_LABEL_EN[seqInfo.cleanKey] || translateChemicalTerm(seqInfo.label.replace(/[：:]/g, ''));
+              const defaultLblEn = seqInfo.seq ? `${seqInfo.seq} ${lblEnBase}:` : `${lblEnBase}:`;
+              items.push({
+                rowIndex: r.rowIndex,
+                role: seqInfo.isSeq ? 'SEQ_LABEL' : 'SUB_LABEL',
+                seq: seqInfo.seq,
+                labelCn: seqInfo.label,
+                cleanKey: seqInfo.cleanKey,
+                valueCn: valCn,
+                labelEn: resolveEn(seqInfo.label, defaultLblEn, `S8:R${r.rowIndex}:L`),
+                valueEn: resolveEn(valCn, translateLineEn(valCn), `S8:R${r.rowIndex}:V`),
+                boldLabel: true,
+                boldValue: false,
+                indentDxa: seqInfo.indentDxa,
+                placement: { gridType: '2_COL_KV', colSpan: 1, targetCols: { label: 0, value: 1 } }
+              });
+              nextRow._consumedByPrev = true;
+              continue;
+            }
+          }
           const isRegItem = s === 15 && /^(?:危险化学品|GB)/i.test(c0);
           const valCn = isBoldLabel || seqInfo.isSeq ? '' : sanitizeDegreeAndPunctuation(c0);
           const resolvedEnText = resolveEn(c0, translateLineEn(c0), `S${s}:R${r.rowIndex}`);
+          const lblEnBase = STANDARD_LABEL_EN[seqInfo.cleanKey] || translateChemicalTerm(seqInfo.label.replace(/[：:]/g, ''));
+          const defaultLblEn = seqInfo.seq ? `${seqInfo.seq} ${lblEnBase}:` : `${lblEnBase}:`;
           items.push({
             rowIndex: r.rowIndex,
             role: seqInfo.isSeq ? 'SEQ_LABEL' : (isBoldLabel ? 'SUB_LABEL' : (isRegItem ? 'REGULATION_ITEM' : 'EXPLANATION')),
             seq: seqInfo.seq,
             labelCn: isBoldLabel || seqInfo.isSeq ? seqInfo.label : '—',
-            labelEn: isBoldLabel || seqInfo.isSeq ? resolvedEnText : '—',
+            cleanKey: seqInfo.cleanKey,
+            labelEn: isBoldLabel || seqInfo.isSeq ? resolveEn(seqInfo.label, defaultLblEn, `S${s}:R${r.rowIndex}:L`) : '—',
             valueCn: valCn,
             valueEn: isBoldLabel || seqInfo.isSeq ? '' : resolvedEnText,
             textCn: c0,
@@ -1264,6 +1342,13 @@ export function buildStructuredContext2(context1, options = {}) {
           });
         } else if (!c0 && c1) {
           const valCn = sanitizeDegreeAndPunctuation(c1);
+          const prevItem = items[items.length - 1];
+          if (s !== 8 && s !== 13 && s !== 15 && prevItem && prevItem.role === 'SEQ_LABEL' && prevItem.placement?.gridType === '2_COL_KV') {
+            const valEnPart = resolveEn(valCn, translateLineEn(valCn), `S${s}:R${r.rowIndex}`);
+            prevItem.valueCn = prevItem.valueCn ? `${prevItem.valueCn}\n${valCn}` : valCn;
+            prevItem.valueEn = prevItem.valueEn ? `${prevItem.valueEn}\n${valEnPart}` : valEnPart;
+            continue;
+          }
           items.push({
             rowIndex: r.rowIndex,
             role: 'EXPLANATION',
@@ -1278,36 +1363,45 @@ export function buildStructuredContext2(context1, options = {}) {
             placement: { gridType: '1_COL_MERGED', colSpan: 2, targetCol: '0..1 (通栏合并)' }
           });
         } else {
-          const seqInfo = parseSeqLabel(c0);
-          let cleanValCn = sanitizeDegreeAndPunctuation(c1);
-          if (s === 1 && /中文名称|产品中文名称/i.test(seqInfo.cleanKey) && cleanValCn && modelCode && !cleanValCn.toUpperCase().includes(modelCode.toUpperCase())) {
-            cleanValCn = `${cleanValCn} ${modelCode}`;
+          // 通用多行打包 KV 拆分：如源文单行内同时打包了多个序号标签与对应换行值 (如 S9 "9.5水溶性：\n9.6粘度/25℃：" -> "可混溶的\n＜500 mPa·s")
+          const c0Lines = c0.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+          const c1Lines = c1.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+          const kvPairs = (c0Lines.length > 1 && c0Lines.every(l => /^\d+\.\d+/.test(l)) && c0Lines.length === c1Lines.length)
+            ? c0Lines.map((l, idx) => ({ rawLbl: l, rawVal: c1Lines[idx] }))
+            : [{ rawLbl: c0, rawVal: c1 }];
+
+          for (const pair of kvPairs) {
+            const seqInfo = parseSeqLabel(pair.rawLbl);
+            let cleanValCn = sanitizeDegreeAndPunctuation(pair.rawVal);
+            if (s === 1 && /中文名称|产品中文名称/i.test(seqInfo.cleanKey) && cleanValCn && modelCode && !cleanValCn.toUpperCase().includes(modelCode.toUpperCase())) {
+              cleanValCn = `${cleanValCn} ${modelCode}`;
+            }
+            const condMatch = cleanValCn.match(/^(.*?)\s*[（(]([^()（）]+)[）)]\s*$/);
+            const lblEnBase = STANDARD_LABEL_EN[seqInfo.cleanKey] || translateChemicalTerm(seqInfo.label.replace(/[：:]/g, ''));
+            const defaultLblEn = seqInfo.seq ? `${seqInfo.seq} ${lblEnBase}:` : `${lblEnBase}:`;
+            let defaultValEn = translateLineEn(cleanValCn);
+            if (s === 1 && /中文名称|产品中文名称/i.test(seqInfo.cleanKey) && modelCode && !defaultValEn.toUpperCase().includes(modelCode.toUpperCase())) {
+              const baseCn = cleanValCn.replace(new RegExp(`\\s*${modelCode.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i'), '').trim();
+              const baseEn = /水溶性.*丙烯酸树脂/.test(baseCn) ? 'Water-soluble acrylic resin' : translateLineEn(baseCn);
+              defaultValEn = `${baseEn} ${modelCode}`.trim();
+            }
+            items.push({
+              rowIndex: r.rowIndex,
+              role: seqInfo.isSeq ? 'SEQ_LABEL' : 'SUB_LABEL',
+              seq: seqInfo.seq,
+              labelCn: seqInfo.label,
+              cleanKey: seqInfo.cleanKey,
+              valueCn: cleanValCn,
+              valuePure: condMatch ? condMatch[1].trim() : cleanValCn,
+              conditionCn: condMatch ? condMatch[2].trim() : null,
+              labelEn: resolveEn(seqInfo.label, defaultLblEn, `S${s}:R${r.rowIndex}:L`),
+              valueEn: resolveEn(cleanValCn, defaultValEn, `S${s}:R${r.rowIndex}:V`),
+              boldLabel: true,
+              boldValue: false,
+              indentDxa: seqInfo.indentDxa,
+              placement: { gridType: '2_COL_KV', colSpan: 1, targetCols: { label: 0, value: 1 } }
+            });
           }
-          const condMatch = cleanValCn.match(/^(.*?)\s*[（(]([^()（）]+)[）)]\s*$/);
-          const lblEnBase = STANDARD_LABEL_EN[seqInfo.cleanKey] || translateChemicalTerm(seqInfo.label.replace(/[：:]/g, ''));
-          const defaultLblEn = seqInfo.seq ? `${seqInfo.seq} ${lblEnBase}:` : `${lblEnBase}:`;
-          let defaultValEn = translateLineEn(cleanValCn);
-          if (s === 1 && /中文名称|产品中文名称/i.test(seqInfo.cleanKey) && modelCode && !defaultValEn.toUpperCase().includes(modelCode.toUpperCase())) {
-            const baseCn = cleanValCn.replace(new RegExp(`\\s*${modelCode.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i'), '').trim();
-            const baseEn = /水溶性.*丙烯酸树脂/.test(baseCn) ? 'Water-soluble acrylic resin' : translateLineEn(baseCn);
-            defaultValEn = `${baseEn} ${modelCode}`.trim();
-          }
-          items.push({
-            rowIndex: r.rowIndex,
-            role: seqInfo.isSeq ? 'SEQ_LABEL' : 'SUB_LABEL',
-            seq: seqInfo.seq,
-            labelCn: seqInfo.label,
-            cleanKey: seqInfo.cleanKey,
-            valueCn: cleanValCn,
-            valuePure: condMatch ? condMatch[1].trim() : cleanValCn,
-            conditionCn: condMatch ? condMatch[2].trim() : null,
-            labelEn: resolveEn(seqInfo.label, defaultLblEn, `S${s}:R${r.rowIndex}:L`),
-            valueEn: resolveEn(cleanValCn, defaultValEn, `S${s}:R${r.rowIndex}:V`),
-            boldLabel: true,
-            boldValue: false,
-            indentDxa: seqInfo.indentDxa,
-            placement: { gridType: '2_COL_KV', colSpan: 1, targetCols: { label: 0, value: 1 } }
-          });
         }
       }
       if (s === 9) {

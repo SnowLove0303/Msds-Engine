@@ -11,6 +11,8 @@
 function normAnchor(text) {
   return String(text || '')
     .replace(/^\s*\d+(?:\.\d+)*\.?\s*/, '')
+    .replace(/阀值/g, '阈值')
+    .replace(/其它/g, '其他')
     .replace(/[：:\s\-_()（）/]/g, '')
     .toLowerCase();
 }
@@ -173,7 +175,7 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
     const deletedRowSet = new Set();
     const usedTplRows = new Set();
     if (tplMultiRows.length > 0 || gridData.length > 0) {
-      const tplGridHdr = tplMultiRows.find(r => /化学品|Chemical|CAS|物质|TWA|STEL|OEL|限值/i.test((r.cells || []).map(c => c.text).join(' ')));
+      const tplGridHdr = tplMultiRows.find(r => /化学品|Chemical|CAS|物质|Substance|Basis|TWA|STEL|OEL|限值/i.test((r.cells || []).map(c => c.text).join(' ')));
       const tplGridData = tplMultiRows.filter(r => !tplGridHdr || r.rowIndex > tplGridHdr.rowIndex);
 
       // 若模板在表头前有预设题头行 (如 Row 2: 成分)，将其与 C2 题头精准匹配
@@ -266,15 +268,12 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
         continue;
       }
 
-      const itemSeq = item.seq || extractSeq(item.labelCn);
       const itemAnchor = normAnchor(item.cleanKey || item.labelCn);
       const itemAnchorEn = normAnchor(item.labelEn);
       let matched = null;
 
-      if (itemSeq) {
-        matched = tplRegularRows.find(r => !usedTplRows.has(r.rowIndex) && extractSeq(r.cells?.[0]?.text) === itemSeq);
-      }
-      if (!matched && itemAnchor) {
+      // 语义锚点优先匹配，禁止仅凭序号盲目覆盖不同语义的模板行
+      if (itemAnchor) {
         matched = tplRegularRows.find(r => !usedTplRows.has(r.rowIndex) && normAnchor(r.cells?.[0]?.text) === itemAnchor);
       }
       if (!matched && itemAnchorEn) {
@@ -319,30 +318,38 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
       }
     }
 
-    // 倒序交由编辑器执行安全剪枝 (保护父级分类题头)
-    const rowsToDelete = Array.from(deletedRowSet).sort((a, b) => b - a);
-    if (rowsToDelete.length > 0) {
-      pushOp({ op: 'pruneSafely', sectionNumber: s, rowIndices: rowsToDelete });
-      secDeletes += rowsToDelete.length;
-    }
-
-    // 追加未匹配到的新 Context 2 行
-    const survivingCount = tplRows.length - rowsToDelete.length + secInserts;
-    let appendCursor = Math.max(0, survivingCount - 1);
+    // 先在剪枝前从有效双列模板行克隆追加未匹配的新 Context 2 行（避免全删后无双列模板可克隆或误克隆单列行）
+    const twoColTplRow = tplRegularRows.find(r => r.cellsCount === 2 && extractSeq(r.cells?.[0]?.text))
+      || tplRegularRows.find(r => r.cellsCount === 2)
+      || tplRegularRows[0];
+    let appendCursor = Math.max(0, tplRows.length - 1);
     for (const item of unmatchedRegular) {
-      const cloneBase = Math.max(1, appendCursor);
+      const cloneBase = twoColTplRow ? twoColTplRow.rowIndex : Math.max(1, appendCursor);
       pushOp({ op: 'insertRowAfter', sectionNumber: s, rowIndex: appendCursor, cloneFromRowIndex: cloneBase });
       secInserts++;
       appendCursor++;
-      const { value, text } = getItemTexts(item, lang);
+      const { label, value, text } = getItemTexts(item, lang);
       if (item.placement?.gridType === '1_COL_MERGED' || item.role === 'FULL_WIDTH_STRUCTURED') {
         pushOp({ op: 'morphToFullWidth', sectionNumber: s, rowIndex: appendCursor, content: text });
         secMerges++;
         secWrites++;
       } else {
+        const seqNormLabel = String(label || '').replace(/^(\d+\.\d+)\s*(.+)$/, '$1\t$2');
+        const formattedLabel = item.seq && !/^\d+\.\d+/.test(seqNormLabel) ? `${item.seq}\t${seqNormLabel}` : seqNormLabel;
+        if (formattedLabel) {
+          pushOp({ op: 'writeCell', sectionNumber: s, rowIndex: appendCursor, cellIndex: 0, text: formattedLabel, bold: true });
+          secWrites++;
+        }
         pushOp({ op: 'writeCell', sectionNumber: s, rowIndex: appendCursor, cellIndex: 1, text: value });
         secWrites++;
       }
+    }
+
+    // 倒序交由编辑器执行安全剪枝 (保护父级分类题头；rowsToDelete 索引均在原模板范围内，不影响末尾新追加行)
+    const rowsToDelete = Array.from(deletedRowSet).sort((a, b) => b - a);
+    if (rowsToDelete.length > 0) {
+      pushOp({ op: 'pruneSafely', sectionNumber: s, rowIndices: rowsToDelete });
+      secDeletes += rowsToDelete.length;
     }
 
     if (s === 9) {
