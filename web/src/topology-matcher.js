@@ -294,7 +294,17 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
         if (!isPresetProtected) {
           const { value, text } = getItemTexts(item, lang);
           if (item.placement?.gridType === '1_COL_MERGED' || item.role === 'EXPLANATION' || matched.cellsCount === 1) {
-            pushOp({ op: 'morphToFullWidth', sectionNumber: s, rowIndex: matched.rowIndex, content: text });
+            pushOp({
+              op: 'morphToFullWidth',
+              sectionNumber: s,
+              rowIndex: matched.rowIndex,
+              content: text,
+              options: {
+                bold: Boolean(item.boldLabel && !(item.valueCn || item.valueEn)),
+                boldSubheaders: Boolean(item.boldLabel && (item.valueCn || item.valueEn)),
+                indentDxa: item.indentDxa || 0
+              }
+            });
             secMerges++;
             secWrites++;
           } else {
@@ -330,7 +340,17 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
       appendCursor++;
       const { label, value, text } = getItemTexts(item, lang);
       if (item.placement?.gridType === '1_COL_MERGED' || item.role === 'FULL_WIDTH_STRUCTURED') {
-        pushOp({ op: 'morphToFullWidth', sectionNumber: s, rowIndex: appendCursor, content: text });
+        pushOp({
+          op: 'morphToFullWidth',
+          sectionNumber: s,
+          rowIndex: appendCursor,
+          content: text,
+          options: {
+            bold: Boolean(item.boldLabel && !(item.valueCn || item.valueEn)),
+            boldSubheaders: Boolean(item.boldLabel && (item.valueCn || item.valueEn)),
+            indentDxa: item.indentDxa || 0
+          }
+        });
         secMerges++;
         secWrites++;
       } else {

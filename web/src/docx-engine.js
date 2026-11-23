@@ -3828,6 +3828,10 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
         const ind = doc.createElementNS(W_NS, 'w:ind');
         ind.setAttributeNS(W_NS, 'w:left', String(options.leftIndentTwips));
         pPr.appendChild(ind);
+      } else if (options.indentDxa) {
+        const ind = doc.createElementNS(W_NS, 'w:ind');
+        ind.setAttributeNS(W_NS, 'w:left', String(options.indentDxa));
+        pPr.appendChild(ind);
       }
 
       pNode.appendChild(pPr);
@@ -3947,6 +3951,8 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
           if (genKvMatch[2]) {
             runSpecs.push({ text: sep + genKvMatch[2], bold: false });
           }
+        } else if (options.bold) {
+          runSpecs = [{ text: pText, bold: true }];
         } else {
           const isBold = options.isEnglish
             ? /^(?:GHS hazard classification|Label elements|GHS pictograms|Signal word|Hazard statements|Precautionary statements|Prevention|Response|Storage|Disposal|Physical and chemical hazards|Health hazards|Environmental hazards)[:：]/i.test(trimmed)

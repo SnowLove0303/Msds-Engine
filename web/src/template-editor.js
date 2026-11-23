@@ -1508,11 +1508,15 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
           }
           if (p === formattedFirstP) continue;
           const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+          const isValueCol = (cIdx >= 1 && cells.length === 2);
+          const roleBold = (isLabelCol && secNum !== 3) || mustBoldCell || mustBoldSingleCol
+            ? true
+            : (isValueCol ? false : undefined);
           for (const r of runs) {
             setRunStyleNodes(doc, r, {
               fontFamily: profile.fontFamily,
               fontSize: targetSz,
-              bold: (mustBoldCell || mustBoldSingleCol) ? true : undefined
+              bold: roleBold
             });
           }
         }
