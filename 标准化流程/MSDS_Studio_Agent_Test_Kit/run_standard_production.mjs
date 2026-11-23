@@ -65,6 +65,13 @@ const {
   parseAuditOutput,
   closeUserExecDb
 } = await import('../../web/src/user-exec-db.js');
+const {
+  auditPhase1Context1,
+  auditPhase2Context2,
+  auditPhase4TopologyOps,
+  auditPhase5DocxFiles,
+  auditPhase6PdfFiles
+} = await import('../../web/src/staged-mechanical-audit.js');
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -81,6 +88,7 @@ function parseArgs() {
     enableContentMapping: false,
     allowDirty: false,
     skipAudit: false,
+    legacyAudit: false,
     help: false
   };
 
@@ -98,6 +106,7 @@ function parseArgs() {
     else if (arg === '--enableContentMapping') options.enableContentMapping = true;
     else if (arg === '--allowDirty') options.allowDirty = true;
     else if (arg === '--skipAudit') options.skipAudit = true;
+    else if (arg === '--legacyAudit') options.legacyAudit = true;
     else if (!options.source && !arg.startsWith('--')) options.source = arg.replace(/^["']|["']$/g, '');
   }
 
@@ -133,6 +142,35 @@ function runAuditAndRecord(auditorName, scriptPath, args, runId) {
     });
   }
   return { ok, status: res.status, findingsCount: findings.length };
+}
+
+function enforceMechanicalGate(stageName, auditResult, skipBlock = false) {
+  if (!auditResult) return;
+  const s = auditResult.summary || {};
+  console.log(`    🛡️ [前置机械审计 ${stageName}] 通过: ${s.passed} | CRITICAL: ${s.critical} | FAIL: ${s.fail} | WARNING: ${s.warning}`);
+  if (execTracker.runId && Array.isArray(auditResult.findings) && auditResult.findings.length > 0) {
+    recordAuditFindings(execTracker.runId, auditResult.findings);
+  }
+  for (const f of auditResult.findings || []) {
+    console.error(`       [${f.severity}] (${f.ruleId}) ${f.title} -> ${f.measuredDetail}`);
+  }
+  if (!auditResult.ok && !skipBlock) {
+    if (execTracker.runId) {
+      recordWorkflowError({
+        runId: execTracker.runId,
+        phase: stageName,
+        errorCode: `MECH_${stageName}_BLOCKED`,
+        message: `${stageName} mechanical gate blocked (critical=${s.critical}, fail=${s.fail})`
+      });
+      finishExecutionRun(execTracker.runId, {
+        status: 'AUDIT_BLOCKED',
+        durationMs: Date.now() - execTracker.startedAt,
+        summary: { blockedBy: stageName, ...s }
+      });
+      closeUserExecDb();
+    }
+    process.exit(1);
+  }
 }
 
 async function main() {
@@ -248,6 +286,7 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
   fs.writeFileSync(ctx1MdPath, serializeFactsToMarkdown(context1), 'utf8');
   updateRunPhase(execTracker.runId, execTracker.phase, { context1Path: ctx1MdPath });
   console.log(`    ✓ 成功解析 16 章节原始事实 (${Date.now() - t1} ms) -> ${ctx1MdPath}`);
+  enforceMechanicalGate('PHASE_1', await auditPhase1Context1({ sourcePath, context1 }), options.skipAudit);
   if (options.stopAfter === 'context1') {
     finishExecutionRun(execTracker.runId, { status: 'SUCCESS', durationMs: Date.now() - execTracker.startedAt, summary: { stoppedAfter: 'context1' } });
     closeUserExecDb();
@@ -349,6 +388,7 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
 
   updateRunPhase(execTracker.runId, execTracker.phase, { context2Path: ctx2MdPath });
   console.log(`    ✓ 事实标准化完成，危化定性: ${pipelineFacts.isHazardous ? '危险品' : '非危险化学品'} (${Date.now() - t2} ms)`);
+  enforceMechanicalGate('PHASE_2_3', auditPhase2Context2({ context2: structuredCtx2 }), options.skipAudit);
   if (options.stopAfter === 'context2') {
     finishExecutionRun(execTracker.runId, { status: 'SUCCESS', durationMs: Date.now() - execTracker.startedAt, summary: { stoppedAfter: 'context2' } });
     closeUserExecDb();
@@ -379,6 +419,7 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
       presetKey: tgt.presetKey,
       enableContentMapping: options.enableContentMapping
     });
+    enforceMechanicalGate(`PHASE_4_${tgt.templateKey}`, auditPhase4TopologyOps({ operations: compiled.operations, presetKey: tgt.presetKey }), options.skipAudit);
     const session = await createWorkSession(tgt.templateKey);
     session.modelCode = modelCode;
     for (const op of compiled.operations) {
@@ -420,30 +461,19 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
   }
   } // end if (options.phase !== 'audit')
 
-  // Phase 7: 两阶双轨全要素法医级深度主审计 + Agent 介入审计速查包生成
+  // Phase 7: 两阶双轨审计（统一分阶段纯确定性机械审计 + 增强版 Agent 内容审计速查包）
   if (!options.skipAudit) {
     execTracker.phase = 'PHASE_7_AUDIT';
     updateRunPhase(execTracker.runId, execTracker.phase);
-    console.log(`\n>>> [Phase 7/7] 执行两阶双轨审计（机械审计 + 同步生成 Agent 介入审计速查包）...`);
+    console.log(`\n>>> [Phase 7/7] 执行两阶双轨审计（纯确定性机械审计 + 增强版 Agent 内容审计速查包）...`);
     const t4 = Date.now();
 
-    // 7.0 六类角色与拓扑样式强化机械审计 (标题/序号/标签/值/说明行/页眉页脚)
-    console.log(`    • 执行六类角色与拓扑样式强化审计 (audit_topology_roles.mjs)...`);
-    const rolesRes = runAuditAndRecord(
-      'TOPOLOGY_ROLES',
-      path.resolve(REPO_ROOT, 'web/scripts/audit_topology_roles.mjs'),
-      [`--targetDir=${targetDir}`, `--model=${modelCode}`, `--source=${sourcePath}`],
-      execTracker.runId
-    );
-    if (!rolesRes.ok) {
-      console.error(`      ❌ 角色与拓扑样式机械审计失败，发布阻断！`);
-      finishExecutionRun(execTracker.runId, { status: 'AUDIT_BLOCKED', durationMs: Date.now() - execTracker.startedAt, summary: { blockedBy: 'TOPOLOGY_ROLES' } });
-      closeUserExecDb();
-      process.exit(1);
-    }
+    // 7.1 统一分阶段机械审计: Phase 5 (4 DOCX 排版/拓扑/数学) + Phase 6 (4 PDF 物理渲染)
+    enforceMechanicalGate('PHASE_5_DOCX', await auditPhase5DocxFiles({ targetDir, modelCode }));
+    enforceMechanicalGate('PHASE_6_PDF', auditPhase6PdfFiles({ targetDir, modelCode }));
 
-    // 7.0b 同步生成 Agent 介入审计速查包 (免通读 330KB Pipeline 源码)
-    console.log(`    • 同步生成 Agent 介入审计速查包 (generate_agent_audit_brief.mjs)...`);
+    // 7.2 同步生成增强版 Agent 内容审计速查包 (含 Preset 声明 + S2/S3/S14 逻辑摘要 + 16 节对照)
+    console.log(`    • 同步生成增强版 Agent 内容审计速查包 (generate_agent_audit_brief.mjs)...`);
     const briefCmd = `node "${path.resolve(REPO_ROOT, 'web/scripts/generate_agent_audit_brief.mjs')}" --targetDir="${targetDir}" --model=${modelCode} --source="${sourcePath}"`;
     execSync(briefCmd, { stdio: 'inherit' });
     const briefPath = path.join(targetDir, `${modelCode}_agent_audit_brief.md`);
@@ -451,37 +481,32 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
       updateRunPhase(execTracker.runId, execTracker.phase, { auditBriefPath: briefPath });
     }
 
-    // 7.1 双极双层法医级全景深度审计 (165项)
-    console.log(`    • 执行双极双层法医深度审计 (audit_bipolar_bilayer.mjs)...`);
-    const bilayerRes = runAuditAndRecord(
-      'BIPOLAR_BILAYER',
-      path.resolve(REPO_ROOT, 'web/scripts/audit_bipolar_bilayer.mjs'),
-      [targetDir, modelCode],
-      execTracker.runId
-    );
-    if (!bilayerRes.ok) {
-      console.error(`      ❌ 双极双层审计失败，发布阻断！`);
-      finishExecutionRun(execTracker.runId, { status: 'AUDIT_BLOCKED', durationMs: Date.now() - execTracker.startedAt, summary: { blockedBy: 'BIPOLAR_BILAYER' } });
-      closeUserExecDb();
-      process.exit(1);
+    // 7.3 可选历史兼容审计 (--legacyAudit)
+    if (options.legacyAudit) {
+      console.log(`    • [LEGACY] 执行兼容旧版 165/170 项审计套件...`);
+      const bilayerRes = runAuditAndRecord(
+        'BIPOLAR_BILAYER',
+        path.resolve(REPO_ROOT, 'web/scripts/audit_bipolar_bilayer.mjs'),
+        [targetDir, modelCode],
+        execTracker.runId
+      );
+      if (!bilayerRes.ok) {
+        finishExecutionRun(execTracker.runId, { status: 'AUDIT_BLOCKED', durationMs: Date.now() - execTracker.startedAt, summary: { blockedBy: 'BIPOLAR_BILAYER' } });
+        closeUserExecDb();
+        process.exit(1);
+      }
+      const masterRes = runAuditAndRecord(
+        'MASTER_AUDIT',
+        path.resolve(REPO_ROOT, 'web/scripts/run_master_msds_audit.mjs'),
+        [`--model=${modelCode}`, `--targetDir=${targetDir}`, `--source=${sourcePath}`],
+        execTracker.runId
+      );
+      if (!masterRes.ok) {
+        finishExecutionRun(execTracker.runId, { status: 'AUDIT_BLOCKED', durationMs: Date.now() - execTracker.startedAt, summary: { blockedBy: 'MASTER_AUDIT' } });
+        closeUserExecDb();
+        process.exit(1);
+      }
     }
-    console.log(`      ✅ 双极双层法医审计 100% 满分通过！`);
-
-    // 7.2 集中式中央主审计套件 (170项)
-    console.log(`    • 执行集中式中央主审计套件 (run_master_msds_audit.mjs)...`);
-    const masterRes = runAuditAndRecord(
-      'MASTER_AUDIT',
-      path.resolve(REPO_ROOT, 'web/scripts/run_master_msds_audit.mjs'),
-      [`--model=${modelCode}`, `--targetDir=${targetDir}`, `--source=${sourcePath}`],
-      execTracker.runId
-    );
-    if (!masterRes.ok) {
-      console.error(`      ❌ 中央主审计失败，发布阻断！`);
-      finishExecutionRun(execTracker.runId, { status: 'AUDIT_BLOCKED', durationMs: Date.now() - execTracker.startedAt, summary: { blockedBy: 'MASTER_AUDIT' } });
-      closeUserExecDb();
-      process.exit(1);
-    }
-    console.log(`      ✅ 中央主审计 100% 满分通过 (🏆 AUDIT_PASSED)！`);
 
     console.log(`    ✓ 全部审计套件通过 (${Date.now() - t4} ms)`);
   }

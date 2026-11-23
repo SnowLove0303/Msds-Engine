@@ -68,10 +68,12 @@ export async function generateAgentAuditBrief({ targetDir, modelCode, sourcePath
 
   const srcDoc = sourcePath && fs.existsSync(sourcePath) ? await loadDocx(fs.readFileSync(sourcePath), path.basename(sourcePath)) : null;
   const cnDoc = fs.existsSync(cnGzPath) ? await loadDocx(fs.readFileSync(cnGzPath), path.basename(cnGzPath)) : null;
+  const cnGcDoc = fs.existsSync(cnGcPath) ? await loadDocx(fs.readFileSync(cnGcPath), path.basename(cnGcPath)) : null;
   const enDoc = fs.existsSync(enGzPath) ? await loadDocx(fs.readFileSync(enGzPath), path.basename(enGzPath)) : null;
 
   const srcMap = summarizeRecords(srcDoc?.records);
   const cnMap = summarizeRecords(cnDoc?.records);
+  const cnGcMap = summarizeRecords(cnGcDoc?.records);
   const enMap = summarizeRecords(enDoc?.records);
 
   const hfCnGz = await extractHeaderFooterText(cnGzPath);
@@ -81,11 +83,22 @@ export async function generateAgentAuditBrief({ targetDir, modelCode, sourcePath
 
   const esc = (v) => String(v || '—').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').slice(0, 140);
 
+  const extractS13Supplier = (docObj) => {
+    const s1 = (docObj?.records || []).find(r => r.sectionNumber === 1);
+    if (!s1) return '*(缺失)*';
+    return (s1.rows || [])
+      .filter(r => /供应商|地址|电话|传真|应急|Supplier|Tel|Fax/i.test(r.cells?.[0]?.text || ''))
+      .map(r => `${(r.cells?.[0]?.text || '').trim()} ${(r.cells?.[1]?.text || '').trim()}`.trim())
+      .join(' / ') || '*(无)*';
+  };
+  const supplierGz = extractS13Supplier(cnDoc);
+  const supplierGc = extractS13Supplier(cnGcDoc);
+
   const lines = [
     `# ${modelCode} Agent 介入审计速查包 (免通读 Pipeline 源码)`,
     '',
     `> **生成时间**：${new Date().toISOString()}`,
-    `> **审计定位**：本文件专为 **Agent 非机械介入审计** 服务，已浓缩全局规范、局部规范与 \`pipeline-engine.js\` 核心约束，并提供 16 章节“源文件 vs CN 产出 vs EN 产出”逐节对照快照。`,
+    `> **审计定位**：本文件专为 **Agent 非机械介入审计（纯语义/内容核销）** 服务，已浓缩核心业务契约、Preset 接管声明、跨章节危化逻辑摘要及 16 章节逐节对照快照。`,
     '',
     '## 一、 Pipeline + 全局/局部规范终审速查契约 (1 分钟核销清单)',
     '',
@@ -102,7 +115,18 @@ export async function generateAgentAuditBrief({ targetDir, modelCode, sourcePath
     `- **EN Guanzhi**：${esc(hfEnGz)}`,
     `- **EN Guocai**：${esc(hfEnGc)}`,
     '',
-    '## 三、 16 章节源文件 vs 中文产出 vs 英文产出对照快照',
+    '## 三、 Preset 覆盖槽位声明清单 (合法接管，非篡改源文)',
+    '',
+    `- **冠志版 S1.3 供应商槽位**：${esc(supplierGz)}`,
+    `- **国彩版 S1.3 供应商槽位**：${esc(supplierGc)}`,
+    '',
+    '## 四、 跨章节危化逻辑一致性摘要 (S2 vs S3 vs S14)',
+    '',
+    `- **S2 危险性概述 (CN)**：${esc(cnMap.get(2)?.preview)}`,
+    `- **S3 成分/组成 (CN)**：${esc(cnMap.get(3)?.preview)}`,
+    `- **S14 运输信息 (CN)**：${esc(cnMap.get(14)?.preview)}`,
+    '',
+    '## 五、 16 章节源文件 vs 中文产出 vs 英文产出对照快照',
     '',
     '| 节 | 源行数 | CN行数 | EN行数 | 源文件摘要 (Ground Truth) | 中文产出摘要 (CN) | 英文产出摘要 (EN) |',
     '| :---: | :---: | :---: | :---: | :--- | :--- | :--- |'
@@ -116,10 +140,10 @@ export async function generateAgentAuditBrief({ targetDir, modelCode, sourcePath
   }
 
   lines.push('');
-  lines.push('## 四、 Agent 介入审计结论核销栏');
+  lines.push('## 六、 Agent 介入审计结论核销栏');
   lines.push('- [ ] **源事实继承与零虚增**：核验 S1~S16 内容均忠实源自源文件，无外生捏造或遗漏。');
   lines.push('- [ ] **双语语义与专业术语**：核验 EN 版逐句语义地道准确、无直译错译或条件丢失。');
-  lines.push('- [ ] **双主体与排版视觉**：核验冠志/国彩完全隔离，无错位、空行或乱码。');
+  lines.push('- [ ] **跨章节逻辑自洽与双主体**：核验 S2/S3/S14 危化逻辑一致，冠志/国彩 Preset 合法隔离。');
 
   const outPath = path.join(targetDir, `${modelCode}_agent_audit_brief.md`);
   fs.writeFileSync(outPath, lines.join('\n') + '\n', 'utf8');
