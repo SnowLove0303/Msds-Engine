@@ -6339,6 +6339,7 @@ function formatPrecautionaryValueCell(cell, W_NS) {
     }
   }
 }
+// @ANTIGRAVITY_INVARIANT_LOCK_END
 
 // @ANTIGRAVITY_INVARIANT_LOCK_START: 值格 100% 纯左对齐与自然词距公理，根治 Word 两端对齐造成的字词拉大间距
 function formatValueCell(cell, W_NS) {
@@ -6372,6 +6373,7 @@ function formatValueCell(cell, W_NS) {
     }
   }
 }
+// @ANTIGRAVITY_INVARIANT_LOCK_END
 
 function formatRowAsSectionHeader(row, W_NS) {
   const ps = Array.from(row.getElementsByTagNameNS(W_NS, 'p'));

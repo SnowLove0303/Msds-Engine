@@ -1965,6 +1965,7 @@ export function runSmartMatching(inspectorRecords) {
             }
           }
         }
+        // @ANTIGRAVITY_INVARIANT_LOCK_END
 
         // Section 11 专属：单单元格多端点聚合毒理大段落解构 (Decouple Section 11 Toxicology Blocks)
         if (s === 11 && !cell1) {
