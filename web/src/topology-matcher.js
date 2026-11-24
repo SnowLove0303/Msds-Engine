@@ -18,7 +18,8 @@ function normAnchor(text) {
     .toLowerCase()
     .replace(/complywith/g, 'complieswith')
     .replace(/regulatoryrequirements?/g, 'regulations')
-    .replace(/workplacecomponentcontrolparameters|controlparametersforworkplacecomponents/g, 'workplaceoeltitle');
+    .replace(/workplacecomponentcontrolparameters|controlparametersforworkplacecomponents/g, 'workplaceoeltitle')
+    .replace(/suitablematerialforprotectivegloves/g, 'suitableglovematerial');
 }
 
 function extractSeq(text) {
