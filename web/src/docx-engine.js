@@ -3553,7 +3553,8 @@ export function applySemanticCellFormat(cell, semanticType, content, isEnglish =
 
 export function renumberRecord(record) {
   const section = record?.sectionNumber;
-  if (!section || record.kind !== 'table') return [];
+  // @FIX_TAG(2026-11-24/docx-engine/FIX-S2-NO-RENUMBER): Section 2 为通栏大纲，2.0 紧急情况概述为法定前缀，deleteRow 后禁止重排为 2.1
+  if (!section || section === 2 || record.kind !== 'table') return [];
   let next = 0;
   const seenNodes = new Set();
   const changes = [];
