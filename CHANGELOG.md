@@ -1,5 +1,11 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-24 S11 原文顺序保真与 vMerge 异构行隔离 (S11-SOURCE-ORDER-LOCK)]
+1. **拓扑匹配器 (`web/src/topology-matcher.js`, `FIX-BILINGUAL-CANONICAL-ORDER`)**：
+   - 将 S11 纳入 `Context 2`（源文件基准）顺序依次覆写策略（与 S6、S9 一致），解决 S11 沿用模板顺序导致 `急性毒性` / `主要皮肤刺激性` / `主要粘膜刺激性` / `致敏性` / `致突变性` 与原文顺序不一致的问题。
+   - 双列 KV 槽位匹配增加 `cellsCount === 2 && extractSeq(c0)` 护栏，安全跳过 S11 模板中的 `11.1` / `11.7` 纵向合并（`vMerge`）续行并剪枝，消除 `Cell 1 not found` 与 `P5_TAB_PURITY` 误写。
+2. **验证与同步**：`npm run lint`（0 违规）、`MSDS_Studio_7Phase_Workflow_Kit.zip` 已重打包；5 个 OS 型号 40 份交付物全部 `SUCCESS`（`PHASE_5_DOCX` 75/75、`PHASE_6_PDF` 12/12），全 16 章节原文顺序（除既定 S2/S8/S13 规范结构外）与中英文 S2–S16 逐行 100% 对齐。
+
 ## [2026-11-23 中英文 S2~S16 逐行结构与行序 1:1 对称闭环 (BILINGUAL-ROW-PARITY-LOCK)]
 1. **拓扑匹配器中文基准对齐 (`web/src/topology-matcher.js`)**：
    - **`FIX-S3-SEQ32`**：中文模板 S3 `R2`（`3.2成分`）的 `3.2` 位于隐式编号中，前置 `deleteRow` 重建表记录后会丢失；改为显式写入 `3.2\t成分`，与英文 `3.2\tIngredients` 1:1 对称。

@@ -263,16 +263,20 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
       secWrites++;
     }
 
-    // @FIX_TAG(2026-11-23/topology-matcher/FIX-BILINGUAL-CANONICAL-ORDER): S6 与 S9 模板在中英文间存在固有行序差异，按 Context 2(中文基准)顺序依次覆写双语槽位，确保 CN/EN 逐行 1:1 对齐
-    if (s === 6 || s === 9) {
-      effectiveRegularItems.forEach((item, idx) => {
+    // @FIX_TAG(2026-11-23/topology-matcher/FIX-BILINGUAL-CANONICAL-ORDER): S6、S9 与 S11 按 Context 2(中文源文件基准)顺序依次覆写双语槽位；双列 KV 仅匹配 cellsCount===2 模板行（跳过 S11 的 1列/3列异构行），确保与原文顺序及 CN/EN 逐行 1:1 对齐
+    if (s === 6 || s === 9 || s === 11) {
+      effectiveRegularItems.forEach((item) => {
         const { label, value, text } = getItemTexts(item, lang);
         const cleanLabelNoSeq = item.seq ? label.replace(/^\d+\.\d+[\s\t]*/, '') : label;
         const seqPrefixLabel = item.seq ? `${item.seq}\t${cleanLabelNoSeq}` : label;
-        if (idx < tplRegularRows.length) {
-          const targetRow = tplRegularRows[idx];
+        const isMergedItem = item.placement?.gridType === '1_COL_MERGED' || item.role === 'EXPLANATION';
+        const targetRow = isMergedItem
+          ? (tplRegularRows.find(r => !usedTplRows.has(r.rowIndex) && r.cellsCount === 1) || tplRegularRows.find(r => !usedTplRows.has(r.rowIndex)))
+          : (tplRegularRows.find(r => !usedTplRows.has(r.rowIndex) && r.cellsCount === 2 && extractSeq(r.cells?.[0]?.text))
+            || (s !== 11 ? tplRegularRows.find(r => !usedTplRows.has(r.rowIndex) && r.cellsCount === 2) : null));
+        if (targetRow) {
           usedTplRows.add(targetRow.rowIndex);
-          if (item.placement?.gridType === '1_COL_MERGED' || item.role === 'EXPLANATION' || targetRow.cellsCount === 1) {
+          if (isMergedItem) {
             const mergedContent = ((item.role === 'SUB_LABEL' || item.role === 'SEQ_LABEL') && item.seq && !(item.valueCn || item.valueEn))
               ? seqPrefixLabel
               : text;
