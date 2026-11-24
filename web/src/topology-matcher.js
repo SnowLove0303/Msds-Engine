@@ -249,7 +249,7 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
     if (hasOelAnchor) {
       const expItem = regularItems.find(it => /暴露控制|Exposure\s*controls?/i.test(it.cleanKey || it.labelCn || it.labelEn || ''));
       const ctrlItem = regularItems.find(it => /控制参数|Control\s*parameters?/i.test(it.cleanKey || it.labelCn || it.labelEn || ''));
-      const wpItem = regularItems.find(it => /工作场所.*控制参数|Workplace\s+component\s+control\s+parameters/i.test(it.labelCn || it.labelEn || ''));
+      const wpItem = regularItems.find(it => /工作场所.*控制参数|Workplace\s+component\s+control\s+parameters/i.test(it.textCn || it.textEn || it.labelCn || it.labelEn || ''));
       if (expItem) expItem.seq = '8.1';
       if (ctrlItem) {
         ctrlItem.seq = '8.2';

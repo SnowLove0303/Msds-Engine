@@ -1344,13 +1344,15 @@ export function buildStructuredContext2(context1, options = {}) {
                 const titleCn = oelLines.slice(0, hdrIdx).join(' ');
                 items.push({
                   rowIndex: r.rowIndex,
-                  role: 'SUB_LABEL',
+                  role: 'EXPLANATION',
                   seq: null,
-                  labelCn: titleCn,
-                  valueCn: '',
-                  labelEn: resolveEn(titleCn, 'Workplace component control parameters', `S8:R${r.rowIndex}:T`),
-                  valueEn: '',
-                  boldLabel: true,
+                  labelCn: '—',
+                  valueCn: titleCn,
+                  textCn: titleCn,
+                  labelEn: '—',
+                  valueEn: resolveEn(titleCn, 'Workplace component control parameters', `S8:R${r.rowIndex}:T`),
+                  textEn: resolveEn(titleCn, 'Workplace component control parameters', `S8:R${r.rowIndex}:T`),
+                  boldLabel: false,
                   boldValue: false,
                   indentDxa: 0,
                   placement: { gridType: '1_COL_MERGED', colSpan: 2, targetCol: '0..1 (通栏合并)' }

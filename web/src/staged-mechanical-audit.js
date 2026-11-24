@@ -710,10 +710,11 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
       measuredDetail: s2Unbolded.length === 0 ? 'Section 2 全部节标题/标签已加粗' : s2Unbolded.join(', ')
     });
 
-    // @FIX_TAG(2026-11-24/staged-mechanical-audit/FIX-S2-INDENT-HIERARCHY): 16. Section 2 三级缩进几何一致校验 (父标题=0, 子标签=480/317, 子标签下值=840/677)
+    // @FIX_TAG(2026-11-24/staged-mechanical-audit/FIX-S2-INDENT-HIERARCHY): 16. Section 2 四级缩进几何一致校验 (父标题=0, 子标签=480/317, 子标签的子标签=840/677, 深层P码=1200/1037)
     const isEnDoc = spKey.startsWith('EN_');
     const expBase = isEnDoc ? 317 : 480;
     const expSubVal = isEnDoc ? 677 : 840;
+    const expDeepVal = isEnDoc ? 1037 : 1200;
     const s2IndentBad = [];
     let s2Lvl = 1;
     for (const p of s2Ps) {
@@ -722,15 +723,20 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
       const pInd = p.getElementsByTagName('w:ind')?.[0];
       const leftVal = Number(pInd?.getAttribute('w:left') || 0);
       const isParent = /^(?:2\.\d+\s*(?:紧急情况概述|Emergency\s+overview|物质或混合物的?分类|Classification\s+of\s+the\s+substance\s+or\s+mixture|标签要素|Label\s+elements|危险性说明|危害性说明|Hazard\s+statements?|防范说明|Precautionary\s+statements?|其他危险|其他危害|Other\s+hazards)|物质或混合物的?分类|Classification\s+of\s+the\s+substance\s+or\s+mixture)[：:]?$/i.test(pt);
-      const isSub = /^(?:(?:GHS[-\s]*)?(?:危险性?类别|危险性?分类|分类|Hazard\s*categories|Hazard\s*classification|象形图|pictograms?)|信号词|警告词|Signal\s*word|必须列在标签上的有害成[份分]|Hazardous\s+components\s+(?:which\s+must\s+|to\s+)?be\s+listed\s+on\s+the\s+label|危险性说明|危害性说明|Hazard\s*statements?|防范说明|Precautionary\s*statements?|预防措施|事故响应|安全储存|安全存储|废弃处置|Prevention|Response|Storage|Disposal)(?:[：:]|$)/i.test(pt);
+      const isSubSub = /^(?:预防措施|事故响应|安全储存|安全存储|废弃处置|Prevention|Response|Storage|Disposal)(?:[：:]|$)/i.test(pt);
+      const isSub = !isSubSub && /^(?:(?:GHS[-\s]*)?(?:危险性?类别|危险性?分类|分类|Hazard\s*categories|Hazard\s*classification|象形图|pictograms?)|信号词|警告词|Signal\s*word|必须列在标签上的有害成[份分]|Hazardous\s+components\s+(?:which\s+must\s+|to\s+)?be\s+listed\s+on\s+the\s+label|危险性说明|危害性说明|Hazard\s*statements?|防范说明|Precautionary\s*statements?)(?:[：:]|$)/i.test(pt);
       if (isParent) {
         s2Lvl = 1;
         if (leftVal !== 0) s2IndentBad.push(`Parent(${pt.slice(0, 15)},left=${leftVal})`);
+      } else if (isSubSub) {
+        s2Lvl = 3;
+        if (leftVal !== expSubVal) s2IndentBad.push(`SubSubLabel(${pt.slice(0, 15)},left=${leftVal}!=${expSubVal})`);
       } else if (isSub) {
         s2Lvl = 2;
         if (leftVal !== expBase) s2IndentBad.push(`SubLabel(${pt.slice(0, 15)},left=${leftVal}!=${expBase})`);
-      } else if (s2Lvl === 2 && !/^\[(?:象形图|Pictogram)\]/i.test(pt)) {
-        if (leftVal !== expSubVal) s2IndentBad.push(`SubVal(${pt.slice(0, 15)},left=${leftVal}!=${expSubVal})`);
+      } else if (!/^\[(?:象形图|Pictogram)\]/i.test(pt)) {
+        const expected = s2Lvl === 3 ? expDeepVal : (s2Lvl === 2 ? expSubVal : expBase);
+        if (leftVal !== expected) s2IndentBad.push(`Val(lvl=${s2Lvl},${pt.slice(0, 15)},left=${leftVal}!=${expected})`);
       }
     }
     check(s2IndentBad.length === 0, {

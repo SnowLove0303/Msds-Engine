@@ -1453,11 +1453,41 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
         if (secNum === 9 && cIdx === 0) continue;
 
         const c0TextTrim = (cells[0]?.text || '').trim();
-        const isS8OelDataRow = secNum === 8 && cells.length >= 3 && !/^(?:物质|Substance|工作场所|Workplace|8\.\d|控制参数|Control\s*parameters|暴露控制|Exposure)/i.test(c0TextTrim);
-        const isLabelCol = (cIdx === 0 && cells.length >= 2 && !isS8OelDataRow);
-        if (isS8OelDataRow && cIdx === 0) {
+        const isS8OelExplanationRow = secNum === 8 && /^(?:工作场所.*控制参数|Workplace\s+component\s+control\s+parameters)/i.test(c0TextTrim);
+        const isS8OelHeaderRow = secNum === 8 && cells.length >= 3 && /^(?:物质|Substance)$/i.test(c0TextTrim);
+        const isS8OelDataRow = secNum === 8 && cells.length >= 3 && !isS8OelExplanationRow && !isS8OelHeaderRow && !/^(?:8\.\d|控制参数|Control\s*parameters|暴露控制|Exposure)/i.test(c0TextTrim);
+        const isLabelCol = (cIdx === 0 && cells.length >= 2 && !isS8OelDataRow && !isS8OelExplanationRow);
+        if (isS8OelExplanationRow || (isS8OelDataRow && cIdx === 0)) {
           Array.from(cell.node.getElementsByTagNameNS(W_NS, 'b')).forEach(b => b.parentNode?.removeChild(b));
           Array.from(cell.node.getElementsByTagNameNS(W_NS, 'bCs')).forEach(b => b.parentNode?.removeChild(b));
+        }
+        // S8 OEL 表头与数据行全格垂直+水平居中；工作场所组分控制参数说明行左对齐+垂直居中
+        if (isS8OelHeaderRow || isS8OelDataRow || isS8OelExplanationRow) {
+          let tcPr = cell.node.getElementsByTagNameNS(W_NS, 'tcPr')?.[0];
+          if (!tcPr) {
+            tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+            cell.node.insertBefore(tcPr, cell.node.firstChild);
+          }
+          let vAlignEl = tcPr.getElementsByTagNameNS(W_NS, 'vAlign')?.[0];
+          if (!vAlignEl) {
+            vAlignEl = doc.createElementNS(W_NS, 'w:vAlign');
+            tcPr.appendChild(vAlignEl);
+          }
+          vAlignEl.setAttributeNS(W_NS, 'w:val', 'center');
+          const targetJc = isS8OelExplanationRow ? 'left' : 'center';
+          for (const pNode of Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'))) {
+            let pPr = pNode.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
+            if (!pPr) {
+              pPr = doc.createElementNS(W_NS, 'w:pPr');
+              pNode.insertBefore(pPr, pNode.firstChild);
+            }
+            let jcEl = pPr.getElementsByTagNameNS(W_NS, 'jc')?.[0];
+            if (!jcEl) {
+              jcEl = doc.createElementNS(W_NS, 'w:jc');
+              pPr.appendChild(jcEl);
+            }
+            jcEl.setAttributeNS(W_NS, 'w:val', targetJc);
+          }
         }
         const rawCellText = (cell.text || '').trim();
 

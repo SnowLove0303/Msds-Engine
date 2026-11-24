@@ -3746,6 +3746,7 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
     let currentS2Level = 1;
     const s2BaseIndent = options.isEnglish ? '317' : '480';
     const s2SubValueIndent = options.isEnglish ? '677' : '840';
+    const s2DeepValueIndent = options.isEnglish ? '1037' : '1200';
     for (let pIdx = 0; pIdx < rawParagraphs.length; pIdx++) {
       const pItem = rawParagraphs[pIdx];
       if (pItem && typeof pItem === 'object' && pItem.isDrawing) {
@@ -3816,23 +3817,32 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
         if (isParentHeader) {
           currentS2Level = 1;
         } else {
-          // 子标签统一集合：GHS危险性类别、GHS分类、GHS象形图/GHS-象形图、信号词、必须列在标签上的有害成份、需要注意的物质、无序号危害性说明/防范说明、预防措施、事故响应、安全存储、安全储存、废弃处置 (中英文)
-          const isSubLabel = lineMeta?.role === 'SUB_LABEL_KV'
+          // 防范说明下属二级子标签的子标签（预防措施、事故响应、安全储存、废弃处置）：缩进与二级值对齐 (840/677)，其下 P 码再深一层缩进 (1200/1037)
+          const isSubSubLabel = /^(?:预防措施|事故响应|安全储存|安全存储|废弃处置|Prevention|Response|Storage|Disposal)(?:[：:]|$)/i.test(trimmed);
+          // 子标签统一集合：GHS危险性类别、GHS分类、GHS象形图/GHS-象形图、信号词、必须列在标签上的有害成份、需要注意的物质、无序号危害性说明/防范说明、物理化学/健康/环境危害 (中英文)
+          const isSubLabel = !isSubSubLabel && (lineMeta?.role === 'SUB_LABEL_KV'
             || lineMeta?.role === 'SUB_LABEL'
-            || /^(?:(?:GHS[-\s]*)?(?:危险性?类别|危险性?分类|分类|Hazard categories|Hazard classification|象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components (?:which must |to )?be listed on the label)|(?:需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:危险性说明|危害性说明|Hazard\s*statements?|防范说明|Precautionary\s*statements?|预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal)(?:[：:]|$))/i.test(trimmed);
+            || /^(?:(?:GHS[-\s]*)?(?:危险性?类别|危险性?分类|分类|Hazard categories|Hazard classification|象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components (?:which must |to )?be listed on the label)|(?:需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:危险性说明|危害性说明|Hazard\s*statements?|防范说明|Precautionary\s*statements?)(?:[：:]|$))/i.test(trimmed));
 
-          if (isSubLabel) {
+          if (isSubSubLabel) {
+            currentS2Level = 3;
+            const ind = doc.createElementNS(W_NS, 'w:ind');
+            ind.setAttributeNS(W_NS, 'w:left', s2SubValueIndent);
+            pPr.appendChild(ind);
+          } else if (isSubLabel) {
             currentS2Level = 2;
-            // 所有子标签：统一缩进 s2BaseIndent (中文 440 twips / 英文 360 twips)，首字绝对垂直对齐！
+            // 所有一级子标签：统一缩进 s2BaseIndent (中文 480 twips / 英文 317 twips)，首字绝对垂直对齐！
             const ind = doc.createElementNS(W_NS, 'w:ind');
             ind.setAttributeNS(W_NS, 'w:left', s2BaseIndent);
             pPr.appendChild(ind);
           } else {
             // 正文值行：根据当前层级决定缩进
-            // 若在二级子标签下（P代码、象形图值、信号词值等），应用 s2SubValueIndent (中文 800 twips / 英文 720 twips) 靠右缩进；
-            // 若在一级直接条目下（2.1 分类描述、H代码、非危不属于危险物说明、2.5 其他危害值等），应用 s2BaseIndent，与上方一级标签文本首字绝对垂直对齐！
+            // level 3 (预防措施/事故响应/安全储存/废弃处置下 P 码) -> s2DeepValueIndent (1200 / 1037)
+            // level 2 (一般子标签下 H 码/分类值/象形图值等) -> s2SubValueIndent (840 / 677)
+            // level 1 (父标题直接值) -> s2BaseIndent (480 / 317)
             const ind = doc.createElementNS(W_NS, 'w:ind');
-            ind.setAttributeNS(W_NS, 'w:left', currentS2Level === 2 ? s2SubValueIndent : s2BaseIndent);
+            const targetLeft = currentS2Level === 3 ? s2DeepValueIndent : (currentS2Level === 2 ? s2SubValueIndent : s2BaseIndent);
+            ind.setAttributeNS(W_NS, 'w:left', targetLeft);
             pPr.appendChild(ind);
           }
         }
