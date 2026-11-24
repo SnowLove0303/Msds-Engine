@@ -1,5 +1,10 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-24 S14 `14.4` 同义锚点归一与双语序号对称门禁扩展 (`FIX-S14-USER-PRECAUTIONS`)]
+1. **拓扑匹配器 (`web/src/topology-matcher.js`)**：在 `normAnchor` 补齐 `specialprecautionsforuser → userprecautions` 同义归一，解决 `OS-8503DMM` S14 `R4` 精炼英文标签后漏写 `14.4` 序号的问题。
+2. **机械审计 (`web/src/staged-mechanical-audit.js`)**：将 S14 纳入 `P5_BILINGUAL_SEQ_SYMMETRY` 硬门禁，永久阻断 S14 中英文子序号不对称。
+3. **独立 XML 逐行复验**：全 5 个 OS 型号（40 份交付物）`Stage1_missing = 0`，S2–S16 中英文逐行结构、列数、子序号、数值及零未译中文 100% 对称。
+
 ## [2026-11-24 英文 KV 标签专业术语精炼 (`STANDARD_LABEL_EN` / `FIX-CONCISE-EN-LABELS`)]
 1. **词典/术语层精炼 (`web/src/context-governor.js`, `FIX-CONCISE-EN-LABELS`)**：
    - 在不改动任何模板与拓扑的前提下，将 14 个超长高频英文 KV 标签精炼为 GHS / ISO 11014 标准简明专业术语（如 `Containment & clean-up methods`、`Firefighting precautions & PPE`、`Suitable glove material`、`Safe handling precautions`、`Safe storage conditions`、`Hazardous decomposition`、`Hazardous reactions`、`User precautions` 等），大幅减少双列 KV 折行。

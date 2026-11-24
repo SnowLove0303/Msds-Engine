@@ -19,7 +19,8 @@ function normAnchor(text) {
     .replace(/complywith/g, 'complieswith')
     .replace(/regulatoryrequirements?/g, 'regulations')
     .replace(/workplacecomponentcontrolparameters|controlparametersforworkplacecomponents/g, 'workplaceoeltitle')
-    .replace(/suitablematerialforprotectivegloves/g, 'suitableglovematerial');
+    .replace(/suitablematerialforprotectivegloves/g, 'suitableglovematerial')
+    .replace(/specialprecautionsforuser/g, 'userprecautions');
 }
 
 function extractSeq(text) {

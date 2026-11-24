@@ -611,7 +611,7 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
     const enEng = loaded[enKey]?.engine;
     if (!cnEng || !enEng) continue;
     const seqMismatches = [];
-    for (const s of [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15]) {
+    for (const s of [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]) {
       const getSeqs = (eng) => {
         const rec = (eng.records || []).find(r => r.sectionNumber === s);
         if (!rec) return [];
