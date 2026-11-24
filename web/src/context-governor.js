@@ -466,7 +466,7 @@ export function governContext(context1, overrides = {}) {
   const sec2Raw = raw.sections?.['2'] || raw.sections?.[2] || ''
   const sec2Text = typeof sec2Raw === 'string' ? sec2Raw : JSON.stringify(sec2Raw)
   const isNonHazardous = !raw.ghs?.isHazardous ||
-    /不属于危险品|非危险品|不属于危害|未分类为危险|Not classified as hazardous/i.test(sec2Text) ||
+    /不属于危险[品物]|非危险[品物]|不属于危害|未分类为危险|Not classified as hazardous/i.test(sec2Text) ||
     Boolean(raw.isNonHazardousComposite)
 
   // 运输分类独立判定 (非危化品或未归入危运)
@@ -859,7 +859,11 @@ export function buildStructuredContext2(context1, options = {}) {
     .replace(/＞/g, '>')
     .replace(/\(\s*e\.\s*g\.,/gi, '(e.g.,')
     .replace(/Propylene glycol methyl ether acetate\b/gi, 'Propylene glycol monomethyl ether acetate (PMA)')
+    .replace(/(\d)\s*mPa\.\s*s\b/gi, '$1 mPa·s')
+    .replace(/mPa\.\s*s\b/gi, 'mPa·s')
     .replace(/([a-z][.!?])([A-Za-z])/g, '$1 $2')
+    .replace(/(\d)\s*mPa\.\s*s\b/gi, '$1 mPa·s')
+    .replace(/mPa\.\s*s\b/gi, 'mPa·s')
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
 
@@ -1007,7 +1011,15 @@ export function buildStructuredContext2(context1, options = {}) {
       }
       s2Lines.length = 0;
       s2Lines.push(...dedupedS2Lines);
-      const hasLabelParent = s2Lines.some(l => /^(?:2\.\d+\s*)?(?:GHS\s*)?标签要素[：:]?$/i.test(l));
+      // 非危险化学品严格执行 INV-ZERO-EXOGENOUS：剔除空置的 2.2 标签要素 / GHS象形图 / 信号词行
+      if (!governed.cn.isHazardous) {
+        for (let i = s2Lines.length - 1; i >= 0; i--) {
+          if (/^(?:2\.\d+\s*)?(?:(?:GHS\s*)?标签要素|GHS[-\s]*象形图|危险象形标记|信号词|警告词|必须列在标签上的有害成[份分])(?:[：:]\s*(?:无|None)?)?$/i.test(s2Lines[i])) {
+            s2Lines.splice(i, 1);
+          }
+        }
+      }
+      const hasLabelParent = !governed.cn.isHazardous || s2Lines.some(l => /^(?:2\.\d+\s*)?(?:GHS\s*)?标签要素[：:]?$/i.test(l));
       if (!hasLabelParent) {
         const firstLabelChildIdx = s2Lines.findIndex(l => /^(?:GHS[-\s]*象形图|危险象形标记|警告词|信号词|必须列在标签上的有害成[份分])[：:]/i.test(l));
         if (firstLabelChildIdx >= 0) {

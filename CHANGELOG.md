@@ -1,5 +1,11 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-24 2-2 水性羟基丙烯酸乳液 PA 14 型号全量产出与非危/粘度通用修复]
+1. **非危品判定与 S2 零外生闭环 (`web/src/context-governor.js`)**：`isNonHazardous` 兼容 `不属于危险物` / `非危险物` 表述；在 `buildStructuredContext2` 的 `S2` 阶段对非危品强制剔除空置的 `2.2 标签要素` / `GHS象形图：` / `信号词：`（`INV-ZERO-EXOGENOUS`）。
+2. **粘度单位排版自愈 (`web/src/context-governor.js`)**：`healEnSpacing` 通用修复数字紧邻 `mPa.s`（如 `＜500mPa.s`）时的空格与中圆点规范，统一输出 `<500 mPa·s`。
+3. **审计正则同步 (`web/src/staged-mechanical-audit.js`)**：`P5_S2_INDENT_HIERARCHY` 补齐英文 `GHS Classification:` 与 `Hydroxy acrylic polymer GHS classification` 识别。
+4. **验证**：`npm run lint`（0 违规）；14 个 PA 型号（`PA-4000` ~ `PA-4835`）机械审计 **140/140** 全绿，Agent 逐行源文件-CN-EN 审计 `models_with_issues=0`，交付目录纯净 16 文件（8 MSDS + 8 TDS）。
+
 ## [2026-11-24 Context 2 必须列在标签上的有害成分空置自动补全“无/None”]
 1. **Context 2 治理 (`web/src/context-governor.js`)**：当源文仅提出 `必须列在标签上的有害成分` 而后无具体成分内容时，自动补全为 `必须列在标签上的有害成分：无`（EN：`Hazardous components to be listed on the label: None`）。
 2. **机械审计下沉 (`web/src/staged-mechanical-audit.js`, `P5_S2_HAZARDOUS_COMP_NO_EMPTY`)**：禁止 S2 出现空置的 `必须列在标签上的有害成分` 标签。
