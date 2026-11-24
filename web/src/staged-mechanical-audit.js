@@ -673,19 +673,22 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
     });
   }
 
-  // @FIX_TAG(2026-11-24/staged-mechanical-audit/FIX-S2-NO-RENUMBER): 14. Section 2 "2.0 紧急情况概述 / 2.0 Emergency overview" 防误重排为 2.1 校验
+  // @FIX_TAG(2026-11-24/staged-mechanical-audit/FIX-S2-NO-RENUMBER): 14. Section 2 序号统一从 .1 开始且防双 2.1 校验
   for (const [spKey, entry] of Object.entries(loaded)) {
     const eng = entry?.engine;
     if (!eng) continue;
     const s2Rec = (eng.records || []).find(r => r.sectionNumber === 2);
     const s2Text = (s2Rec?.rows || []).slice(1).map(r => (r.cells || []).map(c => c.text || '').join('\n')).join('\n');
-    const bad20 = /^2\.1\s*(?:紧急情况概述|Emergency\s+overview)/im.test(s2Text);
-    check(!bad20, {
+    const has20 = /^\s*2\.0\b/m.test(s2Text);
+    const hasOverview21 = /^\s*2\.1\s*(?:紧急情况概述|Emergency\s+overview)/im.test(s2Text);
+    const seq21Count = (s2Text.match(/^\s*2\.1\b/gm) || []).length;
+    const badS2Seq = has20 || (hasOverview21 && seq21Count > 1);
+    check(!badS2Seq, {
       severity: 'CRITICAL',
       ruleId: 'P5_S2_NO_DUPLICATE_SEQ',
       sectionRef: `${spKey}:S2`,
-      title: `${spKey}: Section 2 "2.0 紧急情况概述" 防误重排为 2.1 校验`,
-      measuredDetail: bad20 ? '检测到 "2.1 紧急情况概述 / Emergency overview" 编号错乱' : '2.0/2.1/2.2/2.3 编号正常'
+      title: `${spKey}: Section 2 序号统一从 .1 开始且防重复校验`,
+      measuredDetail: badS2Seq ? `检测到异常序号 (has20=${has20}, seq21Count=${seq21Count})` : '2.1/2.2/2.3/2.4 序号规范无重复'
     });
   }
 

@@ -1488,6 +1488,28 @@ export function buildStructuredContext2(context1, options = {}) {
         }
       }
     }
+    // @FIX_TAG(2026-11-24/context-governor/FIX-S2-START-AT-21): Section 2 序号统一从 .1 开始（若含 2.0 紧急情况概述，则顺延重排为 2.1, 2.2, 2.3, 2.4...）
+    if (s === 2) {
+      for (const item of annotatedSections[2]?.items || []) {
+        if (item.role !== 'FULL_WIDTH_STRUCTURED' || !Array.isArray(item.lines)) continue;
+        const has20 = item.lines.some(sub => /^2\.0\b/.test(String(sub.textCn || '').trim()));
+        if (!has20) continue;
+        let nextSub = 1;
+        for (const sub of item.lines) {
+          const cnTrim = String(sub.textCn || '').trim();
+          if (/^2\.\d+\b/.test(cnTrim)) {
+            const newSeq = `2.${nextSub++}`;
+            sub.textCn = cnTrim.replace(/^2\.\d+\b/, newSeq);
+            if (sub.labelCn && /^2\.\d+\b/.test(sub.labelCn.trim())) {
+              sub.labelCn = sub.labelCn.trim().replace(/^2\.\d+\b/, newSeq);
+            }
+            if (sub.textEn && /^2\.\d+\b/.test(sub.textEn.trim())) {
+              sub.textEn = sub.textEn.trim().replace(/^2\.\d+\b/, newSeq);
+            }
+          }
+        }
+      }
+    }
   }
 
   // 全量英文完整性审计：任何英文输出槽位残留中文字符均标记为待 Agent 逐句翻译项

@@ -1,5 +1,12 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-24 Section 2 序号统一从 .1 开始规范治理与门禁闭环 (S2-START-AT-21)]
+1. **上下文治理 (`web/src/context-governor.js`, `FIX-S2-START-AT-21`)**：
+   - 当 Section 2 含 `2.0 紧急情况概述` 时，在 `Context 2` 归一化阶段同步将中英文 `2.0/2.1/2.2/2.3` 顺延重排为 `2.1/2.2/2.3/2.4`，确保序号统一从 `.1` 开始且双语 1:1 对称。
+2. **机械审计 (`web/src/staged-mechanical-audit.js`, `P5_S2_NO_DUPLICATE_SEQ`)**：
+   - 升级 `P5_S2_NO_DUPLICATE_SEQ` 硬门禁，同时拦截任何 `2.0` 残留及双 `2.1` 重复。
+3. **验证与同步**：`npm run lint`（0 违规）、`MSDS_Studio_7Phase_Workflow_Kit.zip` 已重打包；全 5 个 OS 型号 40 份交付物全部 `SUCCESS`（`PHASE_5_DOCX` 79/79、`PHASE_6_PDF` 12/12，0 报错）。
+
 ## [2026-11-24 Section 2 "2.0 紧急情况概述" 编号防误重排修复与门禁下沉 (S2-NO-RENUMBER)]
 1. **编辑引擎 (`web/src/template-editor.js`, `FIX-S2-NO-RENUMBER`)**：
    - `applyAdaptiveRuler` 豁免 Section 2 的 KV 行序重排逻辑，避免将 `2.0 紧急情况概述` / `2.0 Emergency overview` 误重排为 `2.1` 而导致出现双 `2.1`。
