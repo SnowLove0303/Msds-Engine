@@ -1,5 +1,12 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-24 Section 2 "2.0 紧急情况概述" 编号防误重排修复与门禁下沉 (S2-NO-RENUMBER)]
+1. **编辑引擎 (`web/src/template-editor.js`, `FIX-S2-NO-RENUMBER`)**：
+   - `applyAdaptiveRuler` 豁免 Section 2 的 KV 行序重排逻辑，避免将 `2.0 紧急情况概述` / `2.0 Emergency overview` 误重排为 `2.1` 而导致出现双 `2.1`。
+2. **机械审计 (`web/src/staged-mechanical-audit.js`, `P5_S2_NO_DUPLICATE_SEQ`)**：
+   - 新增 `P5_S2_NO_DUPLICATE_SEQ` 硬门禁，拦截任何 `2.1 紧急情况概述` / `2.1 Emergency overview` 编号错乱。
+3. **验证与同步**：`npm run lint`（0 违规）、`MSDS_Studio_7Phase_Workflow_Kit.zip` 已重打包；`OS-8030` / `OS-8501` / `OS-8503` / `OS-8503DMM` 全部 `SUCCESS`（`PHASE_5_DOCX` 79/79、`PHASE_6_PDF` 12/12）；`OS-8000` 4 份 DOCX 已验证通过。
+
 ## [2026-11-24 S11 原文顺序保真与 vMerge 异构行隔离 (S11-SOURCE-ORDER-LOCK)]
 1. **拓扑匹配器 (`web/src/topology-matcher.js`, `FIX-BILINGUAL-CANONICAL-ORDER`)**：
    - 将 S11 纳入 `Context 2`（源文件基准）顺序依次覆写策略（与 S6、S9 一致），解决 S11 沿用模板顺序导致 `急性毒性` / `主要皮肤刺激性` / `主要粘膜刺激性` / `致敏性` / `致突变性` 与原文顺序不一致的问题。

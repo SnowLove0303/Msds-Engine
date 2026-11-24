@@ -1355,8 +1355,9 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
       const sm = t.match(/^(\d+)\.(\d+)/);
       if (sm && Number(sm[1]) === secNum) seqRows.push({ rIdx, c0, sub: Number(sm[2]), rawSeq: `${sm[1]}.${sm[2]}` });
     }
+    // @FIX_TAG(2026-11-24/template-editor/FIX-S2-NO-RENUMBER): Section 2 为通栏大纲结构，保留 2.0 紧急情况概述，禁止按 KV 行序重排为 2.1 导致双 2.1
     const isSeqOrdered = seqRows.every((sr, idx) => sr.sub === idx + 1);
-    if (seqRows.length > 0 && !isSeqOrdered) {
+    if (secNum !== 2 && seqRows.length > 0 && !isSeqOrdered) {
       seqRows.forEach((sr, idx) => {
         const expectedSeq = `${secNum}.${idx + 1}`;
         if (sr.rawSeq !== expectedSeq && sr.c0?.node) {
