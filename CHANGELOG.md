@@ -1,5 +1,9 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-24 Section 2 缺失父级标签自动补全 (`FIX-S2-COMPLETE-PARENTS`)]
+1. **上下文治理 (`web/src/context-governor.js`)**：当原文 Section 2 缺失父级序号（如仅写 `物质或混合物分类` 或直接写 `GHS象形图：`）时，自动补全 `2.1 物质或混合物的分类` 与 `2.2 标签要素`，并将子标签统一归纳于对应父级之下（`L=480/317`），二级值统一缩进（`L=840/677`）。
+2. **验证与同步**：`npm run lint`（0 违规）、`MSDS_Studio_7Phase_Workflow_Kit.zip` 已重打包；`OS-8501` 全流程 `SUCCESS`（`run_1795493530425_s74a38`，`PHASE_5_DOCX` **87/87**、`PHASE_6_PDF` **12/12**，0 报错）。
+
 ## [2026-11-24 Section 2 三级缩进几何状态机与角色驱动闭环 (`FIX-S2-INDENT-HIERARCHY`)]
 1. **角色分类与排版贯通 (`web/src/context-governor.js`, `web/src/docx-engine.js`)**：
    - `classifyS2Line` 与 `renderFullWidthRow` 统一将 `物质或混合物分类`/`物质或混合物的分类`/`紧急情况概述` 归为 `PARENT_HEADER`（`left=0, bold=true`），将 `GHS分类`/`GHS Classification`/`GHS-象形图` 归为 `SUB_LABEL_KV`（`left=480/317, bold=true`），并优先消费 `Context 2` `lineMeta.role` 驱动二级值统一缩进 `840/677`，彻底消除 `OS-8501` 值缩进不一致的问题。

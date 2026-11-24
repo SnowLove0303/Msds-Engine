@@ -931,6 +931,22 @@ export function buildStructuredContext2(context1, options = {}) {
         });
       }
 
+      // @FIX_TAG(2026-11-24/context-governor/FIX-S2-COMPLETE-PARENTS): 若原文缺失 2.1/2.2 父级标签（如仅写"物质或混合物分类"或直接写"GHS象形图："），自动补全父级序号与"2.2 标签要素"，并将子标签归纳于其下
+      const hasClassSeq = s2Lines.some(l => /^2\.\d+\s*物质或混合物的?分类/i.test(l));
+      for (let i = 0; i < s2Lines.length; i++) {
+        if (!hasClassSeq && /^物质或混合物的?分类[：:]?$/i.test(s2Lines[i])) {
+          s2Lines[i] = '2.1 物质或混合物的分类';
+          break;
+        }
+      }
+      const hasLabelParent = s2Lines.some(l => /^(?:2\.\d+\s*)?(?:GHS\s*)?标签要素[：:]?$/i.test(l));
+      if (!hasLabelParent) {
+        const firstLabelChildIdx = s2Lines.findIndex(l => /^(?:GHS[-\s]*象形图|危险象形标记|警告词|信号词|必须列在标签上的有害成[份分])[：:]/i.test(l));
+        if (firstLabelChildIdx >= 0) {
+          s2Lines.splice(firstLabelChildIdx, 0, '2.2 标签要素');
+        }
+      }
+
       const classifyS2Line = (line) => {
         const l = line.trim();
         // @FIX_TAG(2026-11-24/context-governor/FIX-S2-ROLE-CLASSIFY): 统一将 2.X 节标题及"物质或混合物分类/紧急情况概述"归为 PARENT_HEADER，将"GHS分类/GHS-象形图"归为 SUB_LABEL_KV
