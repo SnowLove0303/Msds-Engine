@@ -248,7 +248,11 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '无': 'None',
   'P280戴防护手套/穿防护服/戴防护眼镜/戴防护面罩。': 'P280 Wear protective gloves/protective clothing/eye protection/face protection.',
   'P403+P233 在通风良好处储存。保持容器密闭。': 'P403+P233 Store in a well-ventilated place. Keep container tightly closed.',
-  'P501将本品或其容器送至有资质的废物处理厂处置。': 'P501 Dispose of contents/container to a qualified waste disposal facility.'
+  'P501将本品或其容器送至有资质的废物处理厂处置。': 'P501 Dispose of contents/container to a qualified waste disposal facility.',
+  '否': 'No',
+  '参见6-8节': 'See sections 6-8',
+  '具可燃性': 'Flammable',
+  '具可燃性。温度不可高于+35℃，温度不可低于-10℃。\n远离食物、酸和碱。': 'Flammable. Temperature must not exceed +35°C and must not be below -10°C.\nKeep away from food, acids and alkalis.'
 })
 
 // 联合国危险货物正式运输名称中英标准目录
@@ -992,11 +996,11 @@ export function buildStructuredContext2(context1, options = {}) {
 
       const classifyS2Line = (line) => {
         const l = line.trim();
-        // @FIX_TAG(2026-11-24/context-governor/FIX-S2-ROLE-CLASSIFY): 统一将 2.X 节标题及"物质或混合物分类/紧急情况概述"归为 PARENT_HEADER，将"GHS分类/GHS-象形图"归为 SUB_LABEL_KV
-        if (/^(?:2\.\d+\s*(?:紧急情况概述|物质或混合物的?分类|GHS\s*危险性类别|GHS\s*标签要素|标签要素|危险性说明|危害性说明|防范说明|其他危害|其他危险)|物质或混合物的?分类|GHS\s*标签要素|危险性说明|危害性说明|防范说明|其他危害|其他危险)[：:]?$/i.test(l)) {
+        // @FIX_TAG(2026-11-24/context-governor/FIX-S2-ROLE-CLASSIFY): 统一将 2.X 节标题及"物质或混合物分类/紧急情况概述"归为 PARENT_HEADER，将无序号的"危害性说明/防范说明/GHS分类/GHS-象形图"归为 SUB_LABEL_KV
+        if (/^(?:2\.\d+\s*(?:紧急情况概述|物质或混合物的?分类|GHS\s*危险性类别|GHS\s*标签要素|标签要素|危险性说明|危害性说明|防范说明|其他危害|其他危险)|物质或混合物的?分类|GHS\s*标签要素|其他危害|其他危险)[：:]?$/i.test(l)) {
           return { subRole: 'PARENT_HEADER', boldLabel: true, indentDxa: 0 };
         }
-        if (/^(?:危险象形标记|GHS[-\s]*象形图|GHS\s*危险性类别|警告词|信号词|必须列在标签上的有害成分|请注意以下物质|GHS[-\s]*分类|预防措施|事故响应|安全储存|安全存储|废弃处置|物理化学危险|健康危害|环境危害|[^：\n]*聚合物GHS危险性分类)[：:]/i.test(l)) {
+        if (/^(?:危险象形标记|GHS[-\s]*象形图|GHS\s*危险性类别|警告词|信号词|必须列在标签上的有害成分|请注意以下物质|GHS[-\s]*分类|危险性说明|危害性说明|防范说明|预防措施|事故响应|安全储存|安全存储|废弃处置|物理化学危险|健康危害|环境危害|[^：\n]*聚合物GHS危险性分类)(?:[：:]|$)/i.test(l)) {
           return { subRole: 'SUB_LABEL_KV', boldLabel: true, boldValue: false, indentDxa: 480 };
         }
         return { subRole: 'VALUE_LINE', boldLabel: false, boldValue: false, indentDxa: 480 };
@@ -1213,6 +1217,9 @@ export function buildStructuredContext2(context1, options = {}) {
         '物质或混合物的特殊危害': 'Special hazards of mixture', '消防预防措施和保护设备': 'Firefighting precautions & PPE',
         '个人预防措施、应急程序': 'Personal precautions & emergency procedures', '环境保护措施': 'Environmental precautions', '污染物收集和清除的方法': 'Containment & clean-up methods',
         '安全操作防范': 'Safe handling precautions', '安全储存条件': 'Safe storage conditions',
+        '运输危险级别': 'Transport hazard class(es)', '包装类型': 'Packing group', '环境危险': 'Environmental hazards',
+        '特殊防范措施': 'Special precautions for user', '附加信息': 'Additional information',
+        '按《MARPOL73/78》公约附则II和IBC规则': 'Transport in bulk according to Annex II of MARPOL73/78 and the IBC Code',
         '控制参数': 'Control parameters', '暴露控制': 'Exposure controls', '呼吸系统防护': 'Respiratory protection',
         '手部防护': 'Hand protection', '防护手套的合适材料': 'Suitable glove material', '建议': 'Recommendation',
         '眼睛防护': 'Eye protection', '身体防护': 'Body protection', '工程控制': 'Engineering controls',
@@ -1438,16 +1445,33 @@ export function buildStructuredContext2(context1, options = {}) {
             placement: { gridType: '1_COL_MERGED', colSpan: 2, targetCol: '0..1 (通栏合并)' }
           });
         } else {
-          // @FIX_TAG(2026-11-23/context-governor/FIX-SPACE-PACKED-KV): 通用多行打包 KV 拆分：兼容右值被压成单行空格分隔（如 "无数据 65℃"）
+          // @FIX_TAG(2026-11-23/context-governor/FIX-SPACE-PACKED-KV): 通用多行打包 KV 拆分：兼容右值被压成单行空格分隔（如 "无数据 65℃"）及含无序号子标签（如 S14 附加信息：）的多行打包格
           const c0Lines = c0.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
           let c1Lines = c1.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
-          if (c0Lines.length > 1 && c0Lines.every(l => /^\d+\.\d+/.test(l)) && c1Lines.length === 1) {
+          const seqC0Count = c0Lines.filter(l => /^\d+\.\d+/.test(l)).length;
+          if (c0Lines.length > 1 && seqC0Count === c0Lines.length && c1Lines.length === 1) {
             const spaceTokens = c1Lines[0].match(/无数据|不适用|\S+/g) || [];
             if (spaceTokens.length === c0Lines.length) c1Lines = spaceTokens;
           }
-          const kvPairs = (c0Lines.length > 1 && c0Lines.every(l => /^\d+\.\d+/.test(l)) && c0Lines.length === c1Lines.length)
-            ? c0Lines.map((l, idx) => ({ rawLbl: l, rawVal: c1Lines[idx] }))
-            : [{ rawLbl: c0, rawVal: c1 }];
+          let kvPairs = [{ rawLbl: c0, rawVal: c1 }];
+          if (c0Lines.length > 1 && seqC0Count >= 2) {
+            if (c0Lines.length === c1Lines.length) {
+              kvPairs = c0Lines.map((l, idx) => ({ rawLbl: l, rawVal: c1Lines[idx] }));
+            } else if (c1Lines.length > c0Lines.length) {
+              // 若某无序号说明标签（如"附加信息："）对应多行右值，将其前后固定序号行首尾对齐后合并中间多行右值
+              const extraIdx = c0Lines.findIndex(l => !/^\d+\.\d+/.test(l) && /[：:]$/.test(l));
+              if (extraIdx > 0) {
+                const tailCount = c0Lines.length - 1 - extraIdx;
+                const headVals = c1Lines.slice(0, extraIdx);
+                const midVal = c1Lines.slice(extraIdx, c1Lines.length - tailCount).join('\n');
+                const tailVals = tailCount > 0 ? c1Lines.slice(c1Lines.length - tailCount) : [];
+                const alignedVals = [...headVals, midVal, ...tailVals];
+                if (alignedVals.length === c0Lines.length) {
+                  kvPairs = c0Lines.map((l, idx) => ({ rawLbl: l, rawVal: alignedVals[idx] }));
+                }
+              }
+            }
+          }
 
           for (const pair of kvPairs) {
             const seqInfo = parseSeqLabel(pair.rawLbl);

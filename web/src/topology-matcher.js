@@ -185,13 +185,14 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
       const tplGridHdr = tplMultiRows.find(r => /化学品|Chemical|CAS|物质|Substance|Basis|TWA|STEL|OEL|限值/i.test((r.cells || []).map(c => c.text).join(' ')));
       const tplGridData = tplMultiRows.filter(r => !tplGridHdr || r.rowIndex > tplGridHdr.rowIndex);
 
-      // 若模板在表头前有预设题头行 (如 Row 2: 成分)，将其与 C2 题头精准匹配
-      const tplPreHdr = tplMultiRows.find(r => tplGridHdr && r.rowIndex < tplGridHdr.rowIndex);
-      if (tplPreHdr && preGridHeaderItem) {
-        usedTplRows.add(tplPreHdr.rowIndex);
-        // 保留模板底模规范加粗题头（3.2成分 / 3.2 Ingredients），绝不强写标签格破坏样式与触发保护
-      } else if (tplPreHdr && !preGridHeaderItem) {
-        deletedRowSet.add(tplPreHdr.rowIndex);
+      // 若模板在表头前有预设题头行 (如 S3 Row 2: 成分, 或 S8 8.2/工作场所组分控制参数)，将其与 C2 题头精准匹配或交由有序重建
+      const tplPreHdrs = tplMultiRows.filter(r => tplGridHdr && r.rowIndex < tplGridHdr.rowIndex);
+      for (const tplPreHdr of tplPreHdrs) {
+        if (s === 3 && preGridHeaderItem && !usedTplRows.has(tplPreHdr.rowIndex)) {
+          usedTplRows.add(tplPreHdr.rowIndex);
+        } else {
+          deletedRowSet.add(tplPreHdr.rowIndex);
+        }
       }
 
       if (gridData.length === 0 && tplMultiRows.length > 0) {
@@ -241,15 +242,30 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
     const unmatchedRegular = [];
     let lastMatchedRowIdx = 0;
 
-    // @FIX_TAG(2026-11-24/topology-matcher/FIX-S8-OEL-HEADER): 若 S8 存在多列 OEL 数据，确保"控制参数"紧邻放置于 OEL 表格之前而非表尾悬空，并与"暴露控制"保持 8.1 -> 8.2 顺序一致
-    const firstMultiRowIdx = tplMultiRows.length > 0 ? tplMultiRows[0].rowIndex : -1;
-    if (s === 8 && gridData.length > 0 && firstMultiRowIdx > 0) {
+    // @FIX_TAG(2026-11-24/topology-matcher/FIX-S8-OEL-HEADER): 若 S8 存在多列 OEL 数据，确保"8.2 控制参数"父标签置顶于"工作场所组分控制参数"说明行之前、并一起紧邻位于 OEL 表头之前
+    const tplGridHdrRow = tplMultiRows.find(r => /物质|Substance|Basis|TWA|STEL|OEL|限值/i.test((r.cells || []).map(c => c.text).join(' ')));
+    const s8OelAnchorIdx = tplGridHdrRow ? tplGridHdrRow.rowIndex : (tplMultiRows.length > 0 ? tplMultiRows[0].rowIndex : -1);
+    const hasOelAnchor = s === 8 && gridData.length > 0 && s8OelAnchorIdx > 0;
+    if (hasOelAnchor) {
       const expItem = regularItems.find(it => /暴露控制|Exposure\s*controls?/i.test(it.cleanKey || it.labelCn || it.labelEn || ''));
       const ctrlItem = regularItems.find(it => /控制参数|Control\s*parameters?/i.test(it.cleanKey || it.labelCn || it.labelEn || ''));
+      const wpItem = regularItems.find(it => /工作场所.*控制参数|Workplace\s+component\s+control\s+parameters/i.test(it.labelCn || it.labelEn || ''));
       if (expItem) expItem.seq = '8.1';
       if (ctrlItem) {
         ctrlItem.seq = '8.2';
         ctrlItem._forceInsertBeforeMulti = true;
+      }
+      if (wpItem) {
+        wpItem._forceInsertBeforeMulti = true;
+      }
+      // 保证 regularItems 中 ctrlItem 严格排在 wpItem 之前
+      if (ctrlItem && wpItem) {
+        const ci = regularItems.indexOf(ctrlItem);
+        const wi = regularItems.indexOf(wpItem);
+        if (ci > wi && wi >= 0) {
+          regularItems.splice(ci, 1);
+          regularItems.splice(wi, 0, ctrlItem);
+        }
       }
     }
 
@@ -352,8 +368,8 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
         matched = tplRegularRows.find(r => !usedTplRows.has(r.rowIndex) && (r.cellsCount === 1 || !r.cells?.[0]?.text));
       }
 
-      if (item._forceInsertBeforeMulti && firstMultiRowIdx > 0) {
-        unmatchedRegular.push({ item, insertAfterRowIndex: firstMultiRowIdx - 1 });
+      if (item._forceInsertBeforeMulti && hasOelAnchor) {
+        unmatchedRegular.push({ item, insertAfterRowIndex: s8OelAnchorIdx - 1 });
         continue;
       }
       if (matched) {

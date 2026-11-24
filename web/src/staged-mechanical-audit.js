@@ -721,8 +721,8 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
       if (!pt) continue;
       const pInd = p.getElementsByTagName('w:ind')?.[0];
       const leftVal = Number(pInd?.getAttribute('w:left') || 0);
-      const isParent = /^(?:2\.\d+\s*(?:紧急情况概述|Emergency\s+overview|物质或混合物的?分类|Classification\s+of\s+the\s+substance\s+or\s+mixture|标签要素|Label\s+elements|危险性说明|危害性说明|Hazard\s+statements?|防范说明|Precautionary\s+statements?|其他危险|其他危害|Other\s+hazards)|物质或混合物的?分类|Classification\s+of\s+the\s+substance\s+or\s+mixture|危险性说明|危害性说明|Hazard\s+statements?|防范说明|Precautionary\s+statements?)[：:]?$/i.test(pt);
-      const isSub = /^(?:(?:GHS[-\s]*)?(?:危险性?类别|危险性?分类|分类|Hazard\s*categories|Hazard\s*classification|象形图|pictograms?)|信号词|警告词|Signal\s*word|必须列在标签上的有害成[份分]|Hazardous\s+components\s+(?:which\s+must\s+|to\s+)?be\s+listed\s+on\s+the\s+label)/i.test(pt);
+      const isParent = /^(?:2\.\d+\s*(?:紧急情况概述|Emergency\s+overview|物质或混合物的?分类|Classification\s+of\s+the\s+substance\s+or\s+mixture|标签要素|Label\s+elements|危险性说明|危害性说明|Hazard\s+statements?|防范说明|Precautionary\s+statements?|其他危险|其他危害|Other\s+hazards)|物质或混合物的?分类|Classification\s+of\s+the\s+substance\s+or\s+mixture)[：:]?$/i.test(pt);
+      const isSub = /^(?:(?:GHS[-\s]*)?(?:危险性?类别|危险性?分类|分类|Hazard\s*categories|Hazard\s*classification|象形图|pictograms?)|信号词|警告词|Signal\s*word|必须列在标签上的有害成[份分]|Hazardous\s+components\s+(?:which\s+must\s+|to\s+)?be\s+listed\s+on\s+the\s+label|危险性说明|危害性说明|Hazard\s*statements?|防范说明|Precautionary\s*statements?)(?:[：:]|$)/i.test(pt);
       if (isParent) {
         s2Lvl = 1;
         if (leftVal !== 0) s2IndentBad.push(`Parent(${pt.slice(0, 15)},left=${leftVal})`);
@@ -740,6 +740,39 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
       title: `${spKey}: Section 2 三级缩进层级一致校验`,
       measuredDetail: s2IndentBad.length === 0 ? 'Section 2 父标题/子标签/值缩进 100% 统一' : s2IndentBad.slice(0, 5).join(', ')
     });
+
+    // 17. Section 8 控制参数父标签必须位于工作场所组分控制参数说明行之前
+    const s8Rec = eng.records.find(r => r.sectionNumber === 8);
+    if (s8Rec) {
+      const s8Rows = s8Rec.rows || [];
+      const ctrlIdx = s8Rows.findIndex(r => /^(?:\d+\.\d+[\s\t]*)?(?:控制参数|Control\s*parameters)/i.test((r.cells?.[0]?.text || '').trim()));
+      const wpIdx = s8Rows.findIndex(r => /工作场所组分控制参数|Workplace\s+component\s+control\s+parameters/i.test((r.cells?.[0]?.text || '').trim()));
+      const s8OrderOk = !(ctrlIdx >= 0 && wpIdx >= 0 && ctrlIdx > wpIdx);
+      check(s8OrderOk, {
+        severity: 'FAIL',
+        ruleId: 'P5_S8_CONTROL_BEFORE_OEL',
+        sectionRef: `${spKey}:S8`,
+        title: `${spKey}: Section 8 控制参数父标签置顶于组分控制参数之前`,
+        measuredDetail: s8OrderOk ? `ctrlRow=${ctrlIdx}, workplaceRow=${wpIdx}` : `控制参数(R${ctrlIdx})错误排在工作场所组分控制参数(R${wpIdx})之后`
+      });
+    }
+
+    // 18. Section 14 严禁将多个 14.x 子项挤在同一行打包单元格
+    const s14Rec = eng.records.find(r => r.sectionNumber === 14);
+    if (s14Rec) {
+      const packedS14 = (s14Rec.rows || []).filter(r => {
+        const c0t = (r.cells?.[0]?.text || '').trim();
+        const matches = c0t.match(/14\.\d+/g) || [];
+        return new Set(matches).size >= 2;
+      });
+      check(packedS14.length === 0, {
+        severity: 'FAIL',
+        ruleId: 'P5_S14_NO_PACKED_MULTI_SEQ',
+        sectionRef: `${spKey}:S14`,
+        title: `${spKey}: Section 14 子项独立成行校验`,
+        measuredDetail: packedS14.length === 0 ? 'Section 14 全部 14.x 子项已独立成行' : `发现 ${packedS14.length} 行仍挤入多个 14.x 子项`
+      });
+    }
   }
 
   return summarize();

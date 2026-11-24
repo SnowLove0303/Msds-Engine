@@ -3799,7 +3799,7 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
       }
       // Section 2 模块间保留一个空行间隔公理 (before="160"=8pt)：在各主要节标题（2.2、2.3、2.4、2.5）起始段落前注入
       if (options.isSection2) {
-        if (/^(?:2\.[2-9]|(?:2\.\d+\s*)?(?:(?:GHS\s*)?标签要素|Label elements|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危害|其他危险|Other\s*Hazards?))/i.test(trimmed)) {
+        if (/^(?:2\.[2-9]|2\.\d+\s*(?:(?:GHS\s*)?标签要素|Label elements|GHS Label Elements|危险性说明|危害性说明|Hazard statements?|防范说明|Precautionary statements?|其他危害|其他危险|Other\s*Hazards?))/i.test(trimmed)) {
           spacing.setAttributeNS(W_NS, 'w:before', '160');
         }
       }
@@ -3810,16 +3810,16 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
         ? options.lineMetas.find(m => String(m.textCn || '').trim() === trimmed || String(m.textEn || '').trim() === trimmed)
         : null;
       if (options.isSection2) {
-        // @FIX_TAG(2026-11-24/docx-engine/FIX-S2-INDENT-HIERARCHY): 优先消费 Context 2 的 lineMeta.role (PARENT_HEADER/SUB_LABEL_KV)，并补全"物质或混合物分类"与"GHS分类/GHS Classification"对齐层级缩进状态机
+        // @FIX_TAG(2026-11-24/docx-engine/FIX-S2-INDENT-HIERARCHY): 优先消费 Context 2 的 lineMeta.role (PARENT_HEADER/SUB_LABEL_KV)，将 2.X 与"物质或混合物分类"归为父标签，无序号的"危害性说明/防范说明"归为子标签
         const isParentHeader = lineMeta?.role === 'PARENT_HEADER'
-          || /^(?:2\.\d+\s*(?:紧急情况概述|Emergency overview|物质或混合物的?分类|Classification of the substance or mixture|标签要素|Label elements|GHS\s*标签要素|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危险|其他危害|Other\s*Hazards?)|物质或混合物的?分类|Classification of the substance or mixture|GHS\s*标签要素|Label elements|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危险|其他危害|Other\s*Hazards?)/i.test(trimmed);
+          || (!lineMeta && /^(?:2\.\d+\s*(?:紧急情况概述|Emergency overview|物质或混合物的?分类|Classification of the substance or mixture|标签要素|Label elements|GHS\s*标签要素|GHS Label Elements|危险性说明|危害性说明|Hazard statements?|防范说明|Precautionary statements?|其他危险|其他危害|Other\s*Hazards?)|物质或混合物的?分类|Classification of the substance or mixture|GHS\s*标签要素|其他危险|其他危害|Other\s*Hazards?)/i.test(trimmed));
         if (isParentHeader) {
           currentS2Level = 1;
         } else {
-          // 子标签统一集合：GHS危险性类别、GHS分类、GHS象形图/GHS-象形图、信号词、必须列在标签上的有害成份、需要注意的物质、预防措施、事故响应、安全存储、安全储存、废弃处置 (中英文)
+          // 子标签统一集合：GHS危险性类别、GHS分类、GHS象形图/GHS-象形图、信号词、必须列在标签上的有害成份、需要注意的物质、无序号危害性说明/防范说明、预防措施、事故响应、安全存储、安全储存、废弃处置 (中英文)
           const isSubLabel = lineMeta?.role === 'SUB_LABEL_KV'
             || lineMeta?.role === 'SUB_LABEL'
-            || /^(?:(?:GHS[-\s]*)?(?:危险性?类别|危险性?分类|分类|Hazard categories|Hazard classification|象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components (?:which must |to )?be listed on the label)|(?:需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal)[：:]?)/i.test(trimmed);
+            || /^(?:(?:GHS[-\s]*)?(?:危险性?类别|危险性?分类|分类|Hazard categories|Hazard classification|象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components (?:which must |to )?be listed on the label)|(?:需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:危险性说明|危害性说明|Hazard\s*statements?|防范说明|Precautionary\s*statements?|预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal)(?:[：:]|$))/i.test(trimmed);
 
           if (isSubLabel) {
             currentS2Level = 2;
