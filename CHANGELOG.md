@@ -1,5 +1,10 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-24 16 节标题序号防漏与 S10.2/S13/S16 零漏译忠实翻译闭环]
+1. **16 节标题序号全量补全 (`web/src/template-editor.js`, `web/src/staged-mechanical-audit.js`)**：在 `applyTopologyTypographyLock` 中自动排查 `1..16` 节标题序号，若模板/源文档缺失（如 EN S1 `Identification`）则保留原标题内容并补全为 `1. Identification`；下沉 `P5_SECTION_HEADER_NUMBERS` 机械门禁防复发。
+2. **零漏译忠实翻译修复 (`web/src/context-governor.js`, `web/src/translation-memory.json`, `web/src/staged-mechanical-audit.js`)**：补全 `警告→Warning` / `危险→Danger`、`10.2 Hazardous decomposition products:`、S13 `national standards` / `May be disposed of...` / `Containers should be recycled...`、S16 `in any other process, unless otherwise specified in the text.`；下沉 `P5_TRANSLATION_FIDELITY` 硬门禁。
+3. **验证**：`npm run lint`（0 违规）；`OS-8503` 与 `OS-8503DMM` 全阶段机械审计 **136/136** 全绿，已逐行实测核验。
+
 ## [2026-11-24 英文拓扑取消 Product Chinese name 并将全称写入 Product name 及页眉页脚型号闭环]
 1. **英文 S1 拓扑 (`web/src/topology-matcher.js`, `web/src/staged-mechanical-audit.js`)**：英文版统一取消 `Product Chinese name:` 行，自动将完整英文品名写入 `1.1 Product name:`（如 `Carbodiimide crosslinker OS-8503` / `Carbodiimide crosslinker OS-8503DMM`）；同步下沉 `P5_EN_NO_PRODUCT_CHINESE_NAME` 并调整 `P5_BILINGUAL_ROW_SYMMETRY` 兼容 S1 双语行数差。
 2. **页眉页脚型号防串模 (`web/src/topology-matcher.js`, `web/src/template-editor.js`, `web/src/mcp-server.js`, `web/src/staged-mechanical-audit.js`)**：打通 `applyPreset` 透传 `modelCode` 至 `applyCompanyPreset`，彻底消除页眉/页脚中模板残留的 `PEA-4139`；下沉 `P5_HF_MODEL_MATCH` 硬门禁。

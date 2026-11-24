@@ -825,6 +825,42 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
       title: `${spKey}: 页眉页脚型号与防串模校验`,
       measuredDetail: (hasModelInHf && !hasStalePea) ? `页眉页脚已准确绑定 ${modelCode}` : `页眉页脚型号异常 (hasModel=${hasModelInHf}, stalePEA=${hasStalePea})`
     });
+
+    // 20. 16 章节标题序号完整性校验 (防止类似 S1 "Identification" 漏号复发)
+    const missingSecNums = [];
+    for (let s = 1; s <= 16; s++) {
+      const hTxt = (eng.records.find(r => r.sectionNumber === s)?.rows?.[0]?.cells?.[0]?.text || '').trim();
+      if (hTxt && !new RegExp(`^${s}\\s*[.．、]`).test(hTxt)) {
+        missingSecNums.push(`S${s}(${hTxt.slice(0, 20)})`);
+      }
+    }
+    check(missingSecNums.length === 0, {
+      severity: 'FAIL',
+      ruleId: 'P5_SECTION_HEADER_NUMBERS',
+      sectionRef: `${spKey}:S1~S16`,
+      title: `${spKey}: 16 章节标题序号完整性校验`,
+      measuredDetail: missingSecNums.length === 0 ? '16/16 章节标题均带完整序号' : `缺失序号: ${missingSecNums.join(', ')}`
+    });
+
+    // 21. 关键细节防漏译校验 (TR-02 S10.2 products / TR-03 S13 national standards / TR-04 S13 may / TR-06 S16 other process)
+    if (isEnDoc) {
+      const enFullText = eng.records.flatMap(r => (r.rows || []).flatMap(rw => (rw.cells || []).map(c => c.text || ''))).join('\n');
+      const transFails = [];
+      if (/10\.2\s*Hazardous decomposition[:：\s]*$/im.test(enFullText)) transFails.push('S10.2缺products');
+      if (loaded.CN_Guanzhi) {
+        const cnFullText = loaded.CN_Guanzhi.engine.records.flatMap(r => (r.rows || []).flatMap(rw => (rw.cells || []).map(c => c.text || ''))).join('\n');
+        if (/国标/.test(cnFullText) && !/national standards/i.test(enFullText)) transFails.push('S13漏译national standards');
+        if (/可根据化学工业/.test(cnFullText) && !/\bMay be disposed of\b/i.test(enFullText)) transFails.push('S13漏译may');
+        if (/其它制程/.test(cnFullText) && (!/other process/i.test(enFullText) || !/otherwise specified/i.test(enFullText))) transFails.push('S16漏译other/otherwise');
+      }
+      check(transFails.length === 0, {
+        severity: 'FAIL',
+        ruleId: 'P5_TRANSLATION_FIDELITY',
+        sectionRef: `${spKey}:TRANS`,
+        title: `${spKey}: 关键细节零漏译防复发校验`,
+        measuredDetail: transFails.length === 0 ? 'S10.2/S13/S16 全部细节完整忠实翻译' : transFails.join(', ')
+      });
+    }
     const s14Rec = eng.records.find(r => r.sectionNumber === 14);
     if (s14Rec) {
       const packedS14 = (s14Rec.rows || []).filter(r => {

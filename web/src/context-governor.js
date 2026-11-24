@@ -260,7 +260,9 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '安全储存': 'Storage',
   '安全储存：': 'Storage:',
   '废弃处置': 'Disposal',
-  '废弃处置：': 'Disposal:'
+  '废弃处置：': 'Disposal:',
+  '警告': 'Warning',
+  '危险': 'Danger'
 })
 
 // 联合国危险货物正式运输名称中英标准目录
@@ -1254,7 +1256,7 @@ export function buildStructuredContext2(context1, options = {}) {
         '控制参数': 'Control parameters', '暴露控制': 'Exposure controls', '呼吸系统防护': 'Respiratory protection',
         '手部防护': 'Hand protection', '防护手套的合适材料': 'Suitable glove material', '建议': 'Recommendation',
         '眼睛防护': 'Eye protection', '身体防护': 'Body protection', '工程控制': 'Engineering controls',
-        '化学稳定性': 'Chemical stability', '危险分解产物': 'Hazardous decomposition', '可能的危害反应': 'Hazardous reactions',
+        '化学稳定性': 'Chemical stability', '危险分解产物': 'Hazardous decomposition products', '可能的危害反应': 'Hazardous reactions',
         '生态毒性': 'Ecotoxicity', '持久性和降解性': 'Persistence & degradability', '其他不利的影响': 'Other adverse effects',
         '处理方法': 'Disposal methods', '公路和铁路运输': 'Road and rail transport', '海上运输': 'Maritime transport',
         '空运': 'Air transport', '用户特殊注意事项': 'User precautions',

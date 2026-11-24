@@ -1367,6 +1367,21 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
     const secNum = record.sectionNumber;
     if (!Array.isArray(record.rows)) continue;
 
+    // 0. 排查并补全 16 个 Section 标题序号 (保留源文件/模板继承的标题文本，绝不改写为长标题)
+    if (secNum >= 1 && secNum <= 16 && record.rows[0]?.cells?.length > 0) {
+      for (const hCell of record.rows[0].cells) {
+        const hTxt = (hCell.text || '').trim();
+        if (hTxt && !new RegExp(`^${secNum}\\s*[.．、]`).test(hTxt)) {
+          const tNodes = Array.from(hCell.node?.getElementsByTagNameNS(W_NS, 't') || []);
+          const firstNonEmpty = tNodes.find(tn => (tn.textContent || '').trim().length > 0);
+          if (firstNonEmpty) {
+            firstNonEmpty.textContent = `${secNum}. ${firstNonEmpty.textContent.trimStart()}`;
+          }
+          hCell.text = `${secNum}. ${hTxt}`;
+        }
+      }
+    }
+
     // 终态安全清理：在所有写入与追加结束后，剔除无任何文本内容的纯空幽灵行
     for (let rIdx = record.rows.length - 1; rIdx >= 1; rIdx--) {
       const rowText = (record.rows[rIdx]?.cells || []).map(c => (c.text || '').trim()).join('');
