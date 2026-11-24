@@ -1,5 +1,12 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-24 Section 2 三级缩进几何状态机与角色驱动闭环 (`FIX-S2-INDENT-HIERARCHY`)]
+1. **角色分类与排版贯通 (`web/src/context-governor.js`, `web/src/docx-engine.js`)**：
+   - `classifyS2Line` 与 `renderFullWidthRow` 统一将 `物质或混合物分类`/`物质或混合物的分类`/`紧急情况概述` 归为 `PARENT_HEADER`（`left=0, bold=true`），将 `GHS分类`/`GHS Classification`/`GHS-象形图` 归为 `SUB_LABEL_KV`（`left=480/317, bold=true`），并优先消费 `Context 2` `lineMeta.role` 驱动二级值统一缩进 `840/677`，彻底消除 `OS-8501` 值缩进不一致的问题。
+2. **机械审计下沉 (`web/src/staged-mechanical-audit.js`, `P5_S2_INDENT_HIERARCHY`)**：
+   - 新增 Section 2 父标题/子标签/二级值三级缩进层级硬门禁。
+3. **验证与同步**：`npm run lint`（0 违规）、`MSDS_Studio_7Phase_Workflow_Kit.zip` 已重打包；全 5 个 OS 型号重跑中/通过。
+
 ## [2026-11-24 S14 `14.4` 同义锚点归一与双语序号对称门禁扩展 (`FIX-S14-USER-PRECAUTIONS`)]
 1. **拓扑匹配器 (`web/src/topology-matcher.js`)**：在 `normAnchor` 补齐 `specialprecautionsforuser → userprecautions` 同义归一，解决 `OS-8503DMM` S14 `R4` 精炼英文标签后漏写 `14.4` 序号的问题。
 2. **机械审计 (`web/src/staged-mechanical-audit.js`)**：将 S14 纳入 `P5_BILINGUAL_SEQ_SYMMETRY` 硬门禁，永久阻断 S14 中英文子序号不对称。

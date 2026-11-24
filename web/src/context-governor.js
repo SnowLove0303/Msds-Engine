@@ -933,10 +933,11 @@ export function buildStructuredContext2(context1, options = {}) {
 
       const classifyS2Line = (line) => {
         const l = line.trim();
-        if (/^(?:2\.\d+\s*)?(?:GHS\s*危险性类别|GHS\s*标签要素|危险性说明|危害性说明|防范说明|其他危害|其他危险)[：:]?/i.test(l)) {
+        // @FIX_TAG(2026-11-24/context-governor/FIX-S2-ROLE-CLASSIFY): 统一将 2.X 节标题及"物质或混合物分类/紧急情况概述"归为 PARENT_HEADER，将"GHS分类/GHS-象形图"归为 SUB_LABEL_KV
+        if (/^(?:2\.\d+\s*)?(?:紧急情况概述|物质或混合物的?分类|GHS\s*危险性类别|GHS\s*标签要素|标签要素|危险性说明|危害性说明|防范说明|其他危害|其他危险)[：:]?/i.test(l)) {
           return { subRole: 'PARENT_HEADER', boldLabel: true, indentDxa: 0 };
         }
-        if (/^(?:危险象形标记|GHS\s*象形图|警告词|信号词|必须列在标签上的有害成分|请注意以下物质|GHS分类|预防措施|事故响应|安全储存|安全存储|废弃处置|物理化学危险|健康危害|环境危害|[^：\n]*聚合物GHS危险性分类)[：:]/i.test(l)) {
+        if (/^(?:危险象形标记|GHS[-\s]*象形图|警告词|信号词|必须列在标签上的有害成分|请注意以下物质|GHS[-\s]*分类|预防措施|事故响应|安全储存|安全存储|废弃处置|物理化学危险|健康危害|环境危害|[^：\n]*聚合物GHS危险性分类)[：:]/i.test(l)) {
           return { subRole: 'SUB_LABEL_KV', boldLabel: true, boldValue: false, indentDxa: 480 };
         }
         return { subRole: 'VALUE_LINE', boldLabel: false, boldValue: false, indentDxa: 480 };

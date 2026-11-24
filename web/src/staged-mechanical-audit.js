@@ -709,6 +709,37 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
       title: `${spKey}: Section 2 标签角色自动加粗校验`,
       measuredDetail: s2Unbolded.length === 0 ? 'Section 2 全部节标题/标签已加粗' : s2Unbolded.join(', ')
     });
+
+    // @FIX_TAG(2026-11-24/staged-mechanical-audit/FIX-S2-INDENT-HIERARCHY): 16. Section 2 三级缩进几何一致校验 (父标题=0, 子标签=480/317, 子标签下值=840/677)
+    const isEnDoc = spKey.startsWith('EN_');
+    const expBase = isEnDoc ? 317 : 480;
+    const expSubVal = isEnDoc ? 677 : 840;
+    const s2IndentBad = [];
+    let s2Lvl = 1;
+    for (const p of s2Ps) {
+      const pt = (p.textContent || '').trim();
+      if (!pt) continue;
+      const pInd = p.getElementsByTagName('w:ind')?.[0];
+      const leftVal = Number(pInd?.getAttribute('w:left') || 0);
+      const isParent = /^(?:2\.\d+\s*(?:紧急情况概述|Emergency\s+overview|物质或混合物的?分类|Classification\s+of\s+the\s+substance\s+or\s+mixture|标签要素|Label\s+elements|危险性说明|Hazard\s+statements?|防范说明|Precautionary\s+statements?|其他危险|其他危害|Other\s+hazards)|物质或混合物的?分类|Classification\s+of\s+the\s+substance\s+or\s+mixture)/i.test(pt);
+      const isSub = /^(?:(?:GHS[-\s]*)?(?:危险性?类别|危险性?分类|分类|Hazard\s*categories|Hazard\s*classification|象形图|pictograms?)|信号词|警告词|Signal\s*word)/i.test(pt);
+      if (isParent) {
+        s2Lvl = 1;
+        if (leftVal !== 0) s2IndentBad.push(`Parent(${pt.slice(0, 15)},left=${leftVal})`);
+      } else if (isSub) {
+        s2Lvl = 2;
+        if (leftVal !== expBase) s2IndentBad.push(`SubLabel(${pt.slice(0, 15)},left=${leftVal}!=${expBase})`);
+      } else if (s2Lvl === 2 && !/^\[(?:象形图|Pictogram)\]/i.test(pt)) {
+        if (leftVal !== expSubVal) s2IndentBad.push(`SubVal(${pt.slice(0, 15)},left=${leftVal}!=${expSubVal})`);
+      }
+    }
+    check(s2IndentBad.length === 0, {
+      severity: 'FAIL',
+      ruleId: 'P5_S2_INDENT_HIERARCHY',
+      sectionRef: `${spKey}:S2`,
+      title: `${spKey}: Section 2 三级缩进层级一致校验`,
+      measuredDetail: s2IndentBad.length === 0 ? 'Section 2 父标题/子标签/值缩进 100% 统一' : s2IndentBad.slice(0, 5).join(', ')
+    });
   }
 
   return summarize();

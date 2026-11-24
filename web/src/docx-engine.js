@@ -3806,14 +3806,20 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
       pPr.appendChild(spacing);
 
       // Section 2 专属缩进几何状态机 (完全对齐父子层级统一规范：父级顶格、一级标题文本与二级子标签及直接值首字绝对垂直对齐、二级值文本向右层级缩进)
+      const lineMeta = (options.isSection2 && Array.isArray(options.lineMetas))
+        ? options.lineMetas.find(m => String(m.textCn || '').trim() === trimmed || String(m.textEn || '').trim() === trimmed)
+        : null;
       if (options.isSection2) {
-        // 关键防御：严格识别父级节标题行 (2.0 紧急情况概述、2.1 物质或混合物的分类、2.2 标签要素、2.3 其他危险等)，节标题绝不应用正文缩进！
-        const isParentHeader = /^(?:2\.\d+\s*(?:紧急情况概述|Emergency overview|物质或混合物的分类|Classification of the substance or mixture|标签要素|Label elements|GHS\s*标签要素|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危险|其他危害|Other\s*Hazards?)|物质或混合物的分类|Classification of the substance or mixture|GHS\s*标签要素|Label elements|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危险|其他危害|Other\s*Hazards?)/i.test(trimmed);
+        // @FIX_TAG(2026-11-24/docx-engine/FIX-S2-INDENT-HIERARCHY): 优先消费 Context 2 的 lineMeta.role (PARENT_HEADER/SUB_LABEL_KV)，并补全"物质或混合物分类"与"GHS分类/GHS Classification"对齐层级缩进状态机
+        const isParentHeader = lineMeta?.role === 'PARENT_HEADER'
+          || /^(?:2\.\d+\s*(?:紧急情况概述|Emergency overview|物质或混合物的?分类|Classification of the substance or mixture|标签要素|Label elements|GHS\s*标签要素|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危险|其他危害|Other\s*Hazards?)|物质或混合物的?分类|Classification of the substance or mixture|GHS\s*标签要素|Label elements|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危险|其他危害|Other\s*Hazards?)/i.test(trimmed);
         if (isParentHeader) {
           currentS2Level = 1;
         } else {
-          // 子标签统一集合：GHS危险性类别、GHS象形图/GHS-象形图、信号词、必须列在标签上的有害成份、需要注意的物质、预防措施、事故响应、安全存储、安全储存、废弃处置 (中英文)
-          const isSubLabel = /^(?:(?:GHS[-\s]*)?(?:危险性类别|Hazard categories|Hazard classification|象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components (?:which must |to )?be listed on the label)|(?:需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal)[：:]?)/i.test(trimmed);
+          // 子标签统一集合：GHS危险性类别、GHS分类、GHS象形图/GHS-象形图、信号词、必须列在标签上的有害成份、需要注意的物质、预防措施、事故响应、安全存储、安全储存、废弃处置 (中英文)
+          const isSubLabel = lineMeta?.role === 'SUB_LABEL_KV'
+            || lineMeta?.role === 'SUB_LABEL'
+            || /^(?:(?:GHS[-\s]*)?(?:危险性?类别|危险性?分类|分类|Hazard categories|Hazard classification|象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components (?:which must |to )?be listed on the label)|(?:需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal)[：:]?)/i.test(trimmed);
 
           if (isSubLabel) {
             currentS2Level = 2;
@@ -3845,11 +3851,8 @@ export function renderFullWidthRow(record, rowIndex, content, options = {}) {
       // Section 2 细粒度加粗状态机 (精准分离标签加粗与常规体正文)
       let runSpecs = [];
       if (options.isSection2) {
-        // @FIX_TAG(2026-11-24/docx-engine/FIX-S2-ROLE-TYPO): 统一 (?:2.\d+\s*)? 包裹中英文节标题，并补全 GHS Hazard Categories；同时优先消费 Context 2 透传的 lineMetas[idx].boldLabel 角色分类
-        const lineMeta = Array.isArray(options.lineMetas)
-          ? options.lineMetas.find(m => String(m.textCn || '').trim() === trimmed || String(m.textEn || '').trim() === trimmed)
-          : null;
-        const kvMatch = pText.match(/^(\s*(?:(?:2\.\d+\s*)?(?:紧急情况概述|Emergency overview|GHS[-\s]*危险性类别|GHS[-\s]*hazard\s*(?:classification|categories)|物质或混合物的分类|Classification of the substance or mixture|(?:GHS\s*)?标签要素|(?:GHS\s*)?Label elements)|羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification|象形图|GHS[-\s]*象形图|GHS pictograms|警告词|信号词|Signal word|(?:必须列在标签上的有害成[份分]|Hazardous components (?:which must |to )?be listed on the label)|(?:2\.\d+\s*)?(?:危险性说明|Hazard statements?(?:\s*\([a-zA-Z0-9]+\))?)|(?:2\.\d+\s*)?(?:防范说明|Precautionary statements?(?:\s*\([a-zA-Z0-9]+\))?)|物理化学危险|Physical and chemical hazards|健康危害|Health hazards|环境危害|Environmental hazards|(?:2\.\d+\s*)?(?:其他危害|其他危险|Other\s*Hazards?)))([:：]?)\s*(.*)$/i);
+        // @FIX_TAG(2026-11-24/docx-engine/FIX-S2-ROLE-TYPO): 统一 (?:2.\d+\s*)? 包裹中英文节标题，并补全 GHS Hazard Categories / 物质或混合物分类 / GHS分类；同时优先消费 Context 2 透传的 lineMeta.boldLabel 角色分类
+        const kvMatch = pText.match(/^(\s*(?:(?:2\.\d+\s*)?(?:紧急情况概述|Emergency overview|GHS[-\s]*(?:危险性类别|分类)|GHS[-\s]*hazard\s*(?:classification|categories)|GHS\s*classification|物质或混合物的?分类|Classification of the substance or mixture|(?:GHS\s*)?标签要素|(?:GHS\s*)?Label elements)|羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification|象形图|GHS[-\s]*象形图|GHS pictograms|警告词|信号词|Signal word|(?:必须列在标签上的有害成[份分]|Hazardous components (?:which must |to )?be listed on the label)|(?:2\.\d+\s*)?(?:危险性说明|Hazard statements?(?:\s*\([a-zA-Z0-9]+\))?)|(?:2\.\d+\s*)?(?:防范说明|Precautionary statements?(?:\s*\([a-zA-Z0-9]+\))?)|物理化学危险|Physical and chemical hazards|健康危害|Health hazards|环境危害|Environmental hazards|(?:2\.\d+\s*)?(?:其他危害|其他危险|Other\s*Hazards?)))([:：]?)\s*(.*)$/i);
         if (kvMatch) {
           const label = kvMatch[1];
           const colon = kvMatch[2] || '';
