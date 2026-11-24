@@ -103,7 +103,7 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
   operations.push({ op: 'clearTemplate' });
 
   if (options.presetKey) {
-    operations.push({ op: 'applyPreset', presetKey: options.presetKey });
+    operations.push({ op: 'applyPreset', presetKey: options.presetKey, modelCode: context2.modelCode || null });
   }
 
   const PRESET_LOCKED_ANCHORS = new Set([
@@ -271,6 +271,21 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
 
     // Section 13 专有拓扑聚合：根据标准 disposition: same_cell 规范，废弃法规说明行统一聚合至首行单列槽位，确保双列处理方法行保持在 Section 13 末行 (INV-S13-TOPOLOGY)
     let effectiveRegularItems = regularItems;
+    // 英文拓扑统一取消 Product Chinese name:，并将完整英文品名写入 1.1 Product name:
+    if (s === 1 && lang === 'en') {
+      const prodCnItem = effectiveRegularItems.find(it => /^(?:中文名称|产品中文名称|ProductChinesename)$/i.test((it.cleanKey || it.labelCn || it.labelEn || '').replace(/[：:\s]/g, '')));
+      const prodNameItem = effectiveRegularItems.find(it => /^(?:产品名称|Productname)$/i.test((it.cleanKey || it.labelCn || it.labelEn || '').replace(/[：:\s]/g, '')));
+      if (prodCnItem && prodNameItem) {
+        const fullEn = String(prodCnItem.valueEn || prodCnItem.textEn || '').trim();
+        const shortEn = String(prodNameItem.valueEn || prodNameItem.textEn || '').trim();
+        if (fullEn) {
+          prodNameItem.valueEn = (shortEn && !fullEn.toUpperCase().includes(shortEn.toUpperCase()))
+            ? `${fullEn} ${shortEn}`
+            : fullEn;
+        }
+      }
+      effectiveRegularItems = effectiveRegularItems.filter(it => it !== prodCnItem);
+    }
     if (s === 13) {
       const explanations = regularItems.filter(i => i.role === 'EXPLANATION');
       const methods = regularItems.filter(i => i.role !== 'EXPLANATION');
@@ -519,7 +534,7 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
 
   // 终态 Preset 独占覆写保障 + 拓扑驱动的编辑器全局几何硬锁
   if (options.presetKey) {
-    operations.push({ op: 'applyPreset', presetKey: options.presetKey });
+    operations.push({ op: 'applyPreset', presetKey: options.presetKey, modelCode: context2.modelCode || null });
   }
   operations.push({
     op: 'applyTopologyLock',

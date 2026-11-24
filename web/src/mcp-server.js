@@ -695,7 +695,7 @@ async function handleToolCall(name, args) {
         } else if (op.op === 'restoreSection') {
           await restoreSectionInSession(session, { sectionNumber: op.sectionNumber });
         } else if (op.op === 'applyPreset') {
-          applyCompanyPreset(session, op.presetKey);
+          applyCompanyPreset(session, op.presetKey, { modelCode: op.modelCode });
         } else if (op.op === 'writeCell') {
           writeCellValueToSession(session, {
             sectionNumber: op.sectionNumber,

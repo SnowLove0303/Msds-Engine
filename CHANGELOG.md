@@ -1,5 +1,10 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-24 英文拓扑取消 Product Chinese name 并将全称写入 Product name 及页眉页脚型号闭环]
+1. **英文 S1 拓扑 (`web/src/topology-matcher.js`, `web/src/staged-mechanical-audit.js`)**：英文版统一取消 `Product Chinese name:` 行，自动将完整英文品名写入 `1.1 Product name:`（如 `Carbodiimide crosslinker OS-8503` / `Carbodiimide crosslinker OS-8503DMM`）；同步下沉 `P5_EN_NO_PRODUCT_CHINESE_NAME` 并调整 `P5_BILINGUAL_ROW_SYMMETRY` 兼容 S1 双语行数差。
+2. **页眉页脚型号防串模 (`web/src/topology-matcher.js`, `web/src/template-editor.js`, `web/src/mcp-server.js`, `web/src/staged-mechanical-audit.js`)**：打通 `applyPreset` 透传 `modelCode` 至 `applyCompanyPreset`，彻底消除页眉/页脚中模板残留的 `PEA-4139`；下沉 `P5_HF_MODEL_MATCH` 硬门禁。
+3. **验证**：`npm run lint`（0 违规）；`OS-8503` 与 `OS-8503DMM` 全阶段机械审计 **130/130** 全绿。
+
 ## [2026-11-24 S2 四级子标签缩进与 S8 说明行/OEL 居中排版闭环]
 1. **Section 2 四级几何缩进 (`web/src/docx-engine.js`, `web/src/staged-mechanical-audit.js`)**：将 `预防措施`/`事故响应`/`安全储存`/`废弃处置`（及 EN `Prevention`/`Response`/`Storage`/`Disposal`）归为 `防范说明` 下属子标签的子标签（缩进 `840/677`、加粗），其下 P 码再深一级缩进（`1200/1037`）；同步升级 `P5_S2_INDENT_HIERARCHY` 四级门禁。
 2. **Section 8 说明行与 OEL 居中 (`web/src/context-governor.js`, `web/src/topology-matcher.js`, `web/src/template-editor.js`)**：`工作场所组分控制参数` 规范为非加粗左对齐说明行（`EXPLANATION`），`物质/依据/类型/数值` 与 OEL 数据行全格垂直+水平居中（`vAlign="center"` + `jc="center"`）。

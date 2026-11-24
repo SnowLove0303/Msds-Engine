@@ -649,7 +649,8 @@ export function formatSection9LaserTabs(session) {
 /**
  * 注入企业预设覆盖 (Apply Company Preset)
  */
-export function applyCompanyPreset(session, presetKey) {
+export function applyCompanyPreset(session, presetKey, options = {}) {
+  if (options.modelCode) session.modelCode = options.modelCode;
   let preset = null;
   if (typeof presetKey === 'object' && presetKey !== null) {
     preset = presetKey;

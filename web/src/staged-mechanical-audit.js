@@ -449,9 +449,13 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
   if (loaded.CN_Guanzhi && loaded.EN_Guanzhi) {
     const diffs = [];
     for (let s = 1; s <= 16; s++) {
-      const cnLen = loaded.CN_Guanzhi.engine.records.find(r => r.sectionNumber === s)?.rows?.length || 0;
-      const enLen = loaded.EN_Guanzhi.engine.records.find(r => r.sectionNumber === s)?.rows?.length || 0;
-      if (cnLen !== enLen) diffs.push(`S${s}(CN=${cnLen},EN=${enLen})`);
+      const cnRec = loaded.CN_Guanzhi.engine.records.find(r => r.sectionNumber === s);
+      const enRec = loaded.EN_Guanzhi.engine.records.find(r => r.sectionNumber === s);
+      const cnLen = cnRec?.rows?.length || 0;
+      const enLen = enRec?.rows?.length || 0;
+      const cnHasProdCnName = s === 1 && Boolean(cnRec?.rows?.some(r => /^(?:产品)?中文名称[：:]?$/i.test((r.cells?.[0]?.text || '').trim())));
+      const expectedEnLen = cnHasProdCnName ? cnLen - 1 : cnLen;
+      if (expectedEnLen !== enLen) diffs.push(`S${s}(CN=${cnLen},EN=${enLen})`);
     }
     check(diffs.length === 0, {
       severity: 'CRITICAL',
@@ -796,7 +800,31 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
       });
     }
 
-    // 18. Section 14 严禁将多个 14.x 子项挤在同一行打包单元格
+    if (isEnDoc) {
+      const s1Rec = eng.records.find(r => r.sectionNumber === 1);
+      const hasProdCnName = Boolean(s1Rec?.rows?.some(r => /Product\s*Chinese\s*name/i.test((r.cells?.[0]?.text || '').trim())));
+      check(!hasProdCnName, {
+        severity: 'FAIL',
+        ruleId: 'P5_EN_NO_PRODUCT_CHINESE_NAME',
+        sectionRef: `${spKey}:S1`,
+        title: `${spKey}: 英文拓扑取消 Product Chinese name 校验`,
+        measuredDetail: hasProdCnName ? 'EN S1 仍残留 Product Chinese name 行' : 'EN S1 已取消 Product Chinese name'
+      });
+    }
+
+    // 19. 页眉页脚型号匹配校验 (严禁残留模板默认 PEA-4139)
+    const hdrText = (eng.headerFooterRecords || [])
+      .map(r => (r.rows || []).flatMap(rw => (rw.cells || []).map(c => c.text || '')).join(' '))
+      .join(' ') || JSON.stringify(eng.headerFooterData || {});
+    const hasModelInHf = modelCode ? hdrText.toUpperCase().includes(modelCode.toUpperCase()) : true;
+    const hasStalePea = modelCode && modelCode.toUpperCase() !== 'PEA-4139' && /PEA-4139/i.test(hdrText);
+    check(hasModelInHf && !hasStalePea, {
+      severity: 'FAIL',
+      ruleId: 'P5_HF_MODEL_MATCH',
+      sectionRef: `${spKey}:HF`,
+      title: `${spKey}: 页眉页脚型号与防串模校验`,
+      measuredDetail: (hasModelInHf && !hasStalePea) ? `页眉页脚已准确绑定 ${modelCode}` : `页眉页脚型号异常 (hasModel=${hasModelInHf}, stalePEA=${hasStalePea})`
+    });
     const s14Rec = eng.records.find(r => r.sectionNumber === 14);
     if (s14Rec) {
       const packedS14 = (s14Rec.rows || []).filter(r => {
