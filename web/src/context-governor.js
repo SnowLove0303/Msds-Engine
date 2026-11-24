@@ -245,7 +245,10 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '无数据': 'No data available',
   '未测定': 'Not determined',
   '无意义': 'Not applicable',
-  '无': 'None'
+  '无': 'None',
+  'P280戴防护手套/穿防护服/戴防护眼镜/戴防护面罩。': 'P280 Wear protective gloves/protective clothing/eye protection/face protection.',
+  'P403+P233 在通风良好处储存。保持容器密闭。': 'P403+P233 Store in a well-ventilated place. Keep container tightly closed.',
+  'P501将本品或其容器送至有资质的废物处理厂处置。': 'P501 Dispose of contents/container to a qualified waste disposal facility.'
 })
 
 // 联合国危险货物正式运输名称中英标准目录
@@ -834,8 +837,13 @@ export function buildStructuredContext2(context1, options = {}) {
   const tm = loadTranslationMemory();
   const rawTrans = options?.translations && typeof options.translations === 'object' ? options.translations : {};
   const transByKey = rawTrans.byKey && typeof rawTrans.byKey === 'object' ? rawTrans.byKey : {};
-  // @FIX_TAG(2026-11-23/context-governor/FIX-PUNCT-SPACE): 英文标点后粘连自愈与多余空格压缩
+  // @FIX_TAG(2026-11-23/context-governor/FIX-PUNCT-SPACE): 英文标点后粘连自愈、全角符号半角化与多余空格压缩
   const healEnSpacing = (str) => String(str ?? '')
+    .replace(/℃/g, '°C')
+    .replace(/＜/g, '<')
+    .replace(/＞/g, '>')
+    .replace(/\(\s*e\.\s*g\.,/gi, '(e.g.,')
+    .replace(/Propylene glycol methyl ether acetate\b/gi, 'Propylene glycol monomethyl ether acetate (PMA)')
     .replace(/([a-z][.!?])([A-Za-z])/g, '$1 $2')
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
@@ -909,13 +917,30 @@ export function buildStructuredContext2(context1, options = {}) {
       const polymerNote = (context1.componentsNotes || []).find(n => /聚合物.*分类|不适用/i.test(n));
       const saltNotes = (context1.componentsNotes || []).filter(n => n !== polymerNote);
 
-      const s2Lines = [];
+      const rawS2Lines = [];
       for (const r of rows) {
         if (r.rowIndex === 0) continue;
         for (const c of (r.cells || [])) {
           if (c.text) {
-            c.text.split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(l => s2Lines.push(l));
+            c.text.split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(l => rawS2Lines.push(l));
           }
+        }
+      }
+
+      // 通用清洗：拆解粘连标签行、修正已知 GHS 标准短语错字，并去除重复父级标题
+      const s2Lines = [];
+      const normalizeS2RawLine = (line) => line
+        .replace(/宇防护服/g, '穿防护服')
+        .replace(/P403\+\.P233/g, 'P403+P233')
+        .replace(/废物外理厂/g, '废物处理厂');
+      for (const rawLine of rawS2Lines) {
+        const l = normalizeS2RawLine(rawLine);
+        const jamMatch = l.match(/^(?:GHS-?象形图\s+)?(必须列在标签上的有害成[份分])[：:\s]+(危害性?说明[：:]?)$/i);
+        if (jamMatch) {
+          s2Lines.push(`${jamMatch[1]}：`);
+          s2Lines.push(jamMatch[2]);
+        } else {
+          s2Lines.push(l);
         }
       }
 
@@ -931,7 +956,7 @@ export function buildStructuredContext2(context1, options = {}) {
         });
       }
 
-      // @FIX_TAG(2026-11-24/context-governor/FIX-S2-COMPLETE-PARENTS): 若原文缺失 2.1/2.2 父级标签（如仅写"物质或混合物分类"或直接写"GHS象形图："），自动补全父级序号与"2.2 标签要素"，并将子标签归纳于其下
+      // @FIX_TAG(2026-11-24/context-governor/FIX-S2-COMPLETE-PARENTS): 若原文缺失 2.1/2.2 父级标签（如仅写"物质或混合物分类"或直接写"GHS象形图："），自动补全父级序号与"2.2 标签要素"，并将子标签归纳于其下；同时去除连续/重复的父级标题
       const hasClassSeq = s2Lines.some(l => /^2\.\d+\s*物质或混合物的?分类/i.test(l));
       for (let i = 0; i < s2Lines.length; i++) {
         if (!hasClassSeq && /^物质或混合物的?分类[：:]?$/i.test(s2Lines[i])) {
@@ -939,6 +964,24 @@ export function buildStructuredContext2(context1, options = {}) {
           break;
         }
       }
+      const seenS2Headers = new Set();
+      for (let i = s2Lines.length - 1; i >= 0; i--) {
+        if (hasClassSeq && /^物质或混合物的?分类[：:]?$/i.test(s2Lines[i])) {
+          s2Lines.splice(i, 1);
+        }
+      }
+      const dedupedS2Lines = [];
+      for (const l of s2Lines) {
+        const hdrKey = l.replace(/[：:\s]/g, '');
+        const isRepeatableHdr = /^(?:2\.\d+)?(?:物质或混合物的?分类|紧急情况概述|GHS?标签要素|标签要素|危害性说明|危险性说明|防范说明)$/i.test(hdrKey);
+        if (isRepeatableHdr) {
+          if (seenS2Headers.has(hdrKey)) continue;
+          seenS2Headers.add(hdrKey);
+        }
+        dedupedS2Lines.push(l);
+      }
+      s2Lines.length = 0;
+      s2Lines.push(...dedupedS2Lines);
       const hasLabelParent = s2Lines.some(l => /^(?:2\.\d+\s*)?(?:GHS\s*)?标签要素[：:]?$/i.test(l));
       if (!hasLabelParent) {
         const firstLabelChildIdx = s2Lines.findIndex(l => /^(?:GHS[-\s]*象形图|危险象形标记|警告词|信号词|必须列在标签上的有害成[份分])[：:]/i.test(l));
@@ -1648,6 +1691,7 @@ export function buildStructuredContext2(context1, options = {}) {
     generatedAt: new Date().toISOString(),
     stage: 'CONTEXT_2_STRUCTURED_GOVERNED',
     isHazardous: governed.cn.isHazardous,
+    sourceFile: context1.sourceFile || context1.sourcePath || options?.sourceFile || null,
     governedModel: governed,
     sections: annotatedSections,
     editorOps,

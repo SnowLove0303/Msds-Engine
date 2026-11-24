@@ -103,7 +103,7 @@ const COMPANY_PRESETS = {
     fax: '86-20-32214789'
   },
   Guocai_en: {
-    name: 'Yingde Guocai New Material Co., Ltd.',
+    name: 'Yingde Guocai Fine Chemical Co., Ltd.',
     shortName: 'Guocai',
     address: 'Kaidi Industrial Park, Genggukeng, Taiping Village, Baisha Town, Yingde City, Guangdong Province',
     tel: '86-763-2811205',
@@ -576,8 +576,38 @@ export function writeFullWidthSection(session, { sectionNumber, content, options
   const record = (session.engine.records || []).find(r => r.sectionNumber === sectionNumber);
   if (!record) throw new Error(`Section ${sectionNumber} not found in session document`);
 
-  renderFullWidthRow(record, 1, content, {
+  let effectiveContent = content;
+  if (options.isSection2 && session.sourceEngine && typeof content === 'string' && /\[(?:象形图|Pictogram)\]/i.test(content)) {
+    const srcSec2 = (session.sourceEngine.records || []).find(r => r.sectionNumber === 2);
+    const drawingNodes = [];
+    if (srcSec2) {
+      for (const row of (srcSec2.rows || [])) {
+        for (const cell of (row.cells || [])) {
+          for (const p of (cell.paragraphs || [])) {
+            const pNode = p.node;
+            if (pNode && typeof pNode.getElementsByTagNameNS === 'function') {
+              const found = Array.from(pNode.getElementsByTagNameNS('*', 'drawing') || []);
+              drawingNodes.push(...found);
+            }
+          }
+        }
+      }
+    }
+    if (drawingNodes.length > 0) {
+      let replaced = false;
+      effectiveContent = content.split(/\r?\n/).map((line) => {
+        if (!replaced && /^\[(?:象形图|Pictogram)\]$/i.test(line.trim())) {
+          replaced = true;
+          return { isDrawing: true, srcEngine: session.sourceEngine, drawingNodes };
+        }
+        return line;
+      });
+    }
+  }
+
+  renderFullWidthRow(record, 1, effectiveContent, {
     isEnglish: session.isEnglish,
+    targetEngine: session.engine,
     ...options
   });
 

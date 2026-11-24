@@ -1,5 +1,11 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-24 通用拓扑游标插入、S2 象形图迁移/去重、EN 半角净化与国彩预设统一]
+1. **拓扑匹配器 (`web/src/topology-matcher.js`)**：将未匹配常规行由统一表尾追加改为按前驱已匹配行游标（`insertAfterRowIndex`）降序紧邻插入，彻底解决 EN S1 `Product Chinese name:` 错位问题；新增 S8 含 OEL 表格时 `8.1 暴露控制` → `8.2 控制参数`（紧邻置顶于 OEL 表前）通用排序逻辑，消除表尾悬空 `8.2`；守卫 S2 正则防止 `必须列在标签上的有害成分` 与 `危害性说明` 粘连。
+2. **上下文治理 (`web/src/context-governor.js`)**：新增 S2 连续/重复父级标题通用去重、粘连行拆解与标准 GHS 短语错字清洗（`穿防护服`、`P403+P233`、`废物处理厂`）；增强 `healEnSpacing` 全角转半角（`℃→°C`、`＜→<`、`＞→>`、`(e. g.,→(e.g.,`）及 PMA 名称统一；透传 `sourceFile`。
+3. **S2 源象形图迁移与国彩预设统一 (`web/src/mcp-server.js`, `web/src/template-editor.js`, `web/src/docx-engine.js`, `web/src/editor-writer.js`, `web/src/smart-matching.js`)**：打通 `writeFullWidth` `options` 与 `session.sourceEngine` 源图迁移，将源 DOCX `word/media/` GHS 象形图真图嵌入 S2 通栏；全系统统一国彩主体名称为 `英德市国彩精细化工有限公司` / `Yingde Guocai Fine Chemical Co., Ltd.`。
+4. **验证**：`npm run lint`（0 违规 + `lint:audit` 全通过）；`OS-8503` 重跑 `PHASE_1/2_3/5_DOCX/6_PDF` **108/108** 全绿（0 fail / 0 warn），已清理目录中间文件并核验中英文 DOCX 与真实象形图。
+
 ## [2026-11-24 Section 2 缺失父级标签自动补全 (`FIX-S2-COMPLETE-PARENTS`)]
 1. **上下文治理 (`web/src/context-governor.js`)**：当原文 Section 2 缺失父级序号（如仅写 `物质或混合物分类` 或直接写 `GHS象形图：`）时，自动补全 `2.1 物质或混合物的分类` 与 `2.2 标签要素`，并将子标签统一归纳于对应父级之下（`L=480/317`），二级值统一缩进（`L=840/677`）。
 2. **验证与同步**：`npm run lint`（0 违规）、`MSDS_Studio_7Phase_Workflow_Kit.zip` 已重打包；`OS-8501` 全流程 `SUCCESS`（`run_1795493530425_s74a38`，`PHASE_5_DOCX` **87/87**、`PHASE_6_PDF` **12/12**，0 报错）。

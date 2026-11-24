@@ -136,8 +136,8 @@ export async function writeDeliverableViaEditor({
   applyCompanyPreset(session, effectivePreset);
 
   const companyName = isEnglish
-    ? (effectivePreset.includes('GUOCAI') ? 'Yingde Guocai New Material Co., Ltd.' : 'Guangzhou Guanzhi New Material Technology Co., Ltd.')
-    : (effectivePreset.includes('GUOCAI') ? '英德市国彩新材料有限公司' : '广州冠志新材料科技有限公司');
+    ? (effectivePreset.includes('GUOCAI') ? 'Yingde Guocai Fine Chemical Co., Ltd.' : 'Guangzhou Guanzhi New Material Technology Co., Ltd.')
+    : (effectivePreset.includes('GUOCAI') ? '英德市国彩精细化工有限公司' : '广州冠志新材料科技有限公司');
 
   updateHeaderFooterData(session.engine, {
     model: contextData.modelCode,

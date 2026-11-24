@@ -138,13 +138,13 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
       const fwItem = c2Items.find(i => i.role === 'FULL_WIDTH_STRUCTURED');
       let content = fwItem ? getItemTexts(fwItem, lang).text : c2Items.map(i => getItemTexts(i, lang).text).filter(Boolean).join('\n');
       if (lang === 'zh') {
-        content = content.replace(/^(?:GHS-?象形图\s+)?必须列在标签上的有害成[份分][：:\s]*(.+)$/gm, '必须列在标签上的有害成分：$1');
+        content = content.replace(/^(?:GHS-?象形图\s+)?必须列在标签上的有害成[份分][：:\s]*(?!危害性?说明)(.+)$/gm, '必须列在标签上的有害成分：$1');
       } else {
-        content = content.replace(/^(?:GHS\s*Pictograms\s*\/\s*)?Hazardous components to be listed on the label[：:\s]+(.+)$/gmi, 'Hazardous components to be listed on the label: $1');
+        content = content.replace(/^(?:GHS\s*Pictograms\s*\/\s*)?Hazardous components to be listed on the label[：:\s]+(?!Hazard\s*statements)(.+)$/gmi, 'Hazardous components to be listed on the label: $1');
       }
       if (tplRows.length >= 2) {
         // @FIX_TAG(2026-11-24/topology-matcher/FIX-S2-ROLE-TYPO): 透传 Context 2 的 lineMetas (subRole/boldLabel/indentDxa)，由拓扑渲染层按角色自动赋予标签格式
-        pushOp({ op: 'writeFullWidth', sectionNumber: s, content, options: { isSection2: true, lineMetas: fwItem?.lines || [] } });
+        pushOp({ op: 'writeFullWidth', sectionNumber: s, content, options: { isSection2: true, lineMetas: fwItem?.lines || [], sourceDocxPath: context2?.sourceFile || null } });
         secMerges++;
         secWrites++;
         for (let r = tplRows.length - 1; r >= 2; r--) {
@@ -239,6 +239,19 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
       usedTplRows.add(r);
     }
     const unmatchedRegular = [];
+    let lastMatchedRowIdx = 0;
+
+    // @FIX_TAG(2026-11-24/topology-matcher/FIX-S8-OEL-HEADER): 若 S8 存在多列 OEL 数据，确保"控制参数"紧邻放置于 OEL 表格之前而非表尾悬空，并与"暴露控制"保持 8.1 -> 8.2 顺序一致
+    const firstMultiRowIdx = tplMultiRows.length > 0 ? tplMultiRows[0].rowIndex : -1;
+    if (s === 8 && gridData.length > 0 && firstMultiRowIdx > 0) {
+      const expItem = regularItems.find(it => /暴露控制|Exposure\s*controls?/i.test(it.cleanKey || it.labelCn || it.labelEn || ''));
+      const ctrlItem = regularItems.find(it => /控制参数|Control\s*parameters?/i.test(it.cleanKey || it.labelCn || it.labelEn || ''));
+      if (expItem) expItem.seq = '8.1';
+      if (ctrlItem) {
+        ctrlItem.seq = '8.2';
+        ctrlItem._forceInsertBeforeMulti = true;
+      }
+    }
 
     // Section 13 专有拓扑聚合：根据标准 disposition: same_cell 规范，废弃法规说明行统一聚合至首行单列槽位，确保双列处理方法行保持在 Section 13 末行 (INV-S13-TOPOLOGY)
     let effectiveRegularItems = regularItems;
@@ -339,8 +352,13 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
         matched = tplRegularRows.find(r => !usedTplRows.has(r.rowIndex) && (r.cellsCount === 1 || !r.cells?.[0]?.text));
       }
 
+      if (item._forceInsertBeforeMulti && firstMultiRowIdx > 0) {
+        unmatchedRegular.push({ item, insertAfterRowIndex: firstMultiRowIdx - 1 });
+        continue;
+      }
       if (matched) {
         usedTplRows.add(matched.rowIndex);
+        lastMatchedRowIdx = matched.rowIndex;
         const tplRowAnchor = normAnchor(matched.cells?.[0]?.text);
         const isPresetProtected = Boolean(options.presetKey) && (
           PRESET_LOCKED_ANCHORS.has(itemAnchor) ||
@@ -383,7 +401,7 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
           }
         }
       } else {
-        unmatchedRegular.push(item);
+        unmatchedRegular.push({ item, insertAfterRowIndex: lastMatchedRowIdx });
       }
     }
     }
@@ -395,52 +413,66 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
       }
     }
 
-    // 先在剪枝前从有效双列模板行克隆追加未匹配的新 Context 2 行（避免全删后无双列模板可克隆或误克隆单列行）
+    // 先在剪枝前从有效双列模板行克隆，按 insertAfterRowIndex 降序紧邻插入未匹配的新 Context 2 行（同锚点保持原有相对顺序）
     const twoColTplRow = tplRegularRows.find(r => r.cellsCount === 2 && extractSeq(r.cells?.[0]?.text))
       || tplRegularRows.find(r => r.cellsCount === 2)
       || tplRegularRows[0];
-    let appendCursor = Math.max(0, tplRows.length - 1);
-    for (const item of unmatchedRegular) {
-      const cloneBase = twoColTplRow ? twoColTplRow.rowIndex : Math.max(1, appendCursor);
-      pushOp({ op: 'insertRowAfter', sectionNumber: s, rowIndex: appendCursor, cloneFromRowIndex: cloneBase });
-      secInserts++;
-      appendCursor++;
-      const { label, value, text } = getItemTexts(item, lang);
-      if (item.placement?.gridType === '1_COL_MERGED' || item.role === 'FULL_WIDTH_STRUCTURED') {
-        // @FIX_TAG(2026-11-23/topology-matcher/FIX-UNMATCHED-SEQ): 未匹配追加的 1_COL_MERGED 带序号标题行(如 S8 8.1/8.2 控制参数)同样强制规范 "X.Y\tLabel" 与加粗，确保 CN/EN 1:1 对称
-        const rawSeqSource = label || text;
-        const cleanSeqSource = item.seq ? String(rawSeqSource || '').replace(/^\d+\.\d+[\s\t]*/, '') : rawSeqSource;
-        const seqPrefixContent = item.seq ? `${item.seq}\t${cleanSeqSource}` : text;
-        const mergedContent = ((item.role === 'SUB_LABEL' || item.role === 'SEQ_LABEL') && item.seq)
-          ? seqPrefixContent
-          : text;
-        pushOp({
-          op: 'morphToFullWidth',
-          sectionNumber: s,
-          rowIndex: appendCursor,
-          content: mergedContent,
-          options: {
-            bold: Boolean((item.boldLabel && !(item.valueCn || item.valueEn)) || item.role === 'SEQ_LABEL'),
-            boldSubheaders: Boolean(item.boldLabel && (item.valueCn || item.valueEn) && item.role !== 'SEQ_LABEL'),
-            indentDxa: item.indentDxa || 0
+    const unmatchedGroups = new Map();
+    for (const entry of unmatchedRegular) {
+      const wrapped = entry && entry.item ? entry : { item: entry, insertAfterRowIndex: Math.max(0, tplRows.length - 1) };
+      const anchorIdx = wrapped.insertAfterRowIndex;
+      if (!unmatchedGroups.has(anchorIdx)) unmatchedGroups.set(anchorIdx, []);
+      unmatchedGroups.get(anchorIdx).push(wrapped.item);
+    }
+    const sortedAnchorIdxs = Array.from(unmatchedGroups.keys()).sort((a, b) => b - a);
+    const insertedAtAnchors = [];
+    for (const anchorIdx of sortedAnchorIdxs) {
+      const groupItems = unmatchedGroups.get(anchorIdx);
+      let insertCursor = anchorIdx;
+      for (const item of groupItems) {
+        const cloneBase = twoColTplRow ? twoColTplRow.rowIndex : Math.max(1, insertCursor);
+        pushOp({ op: 'insertRowAfter', sectionNumber: s, rowIndex: insertCursor, cloneFromRowIndex: cloneBase });
+        secInserts++;
+        insertCursor++;
+        insertedAtAnchors.push(anchorIdx);
+        const { label, value, text } = getItemTexts(item, lang);
+        if (item.placement?.gridType === '1_COL_MERGED' || item.role === 'FULL_WIDTH_STRUCTURED') {
+          const rawSeqSource = label || text;
+          const cleanSeqSource = item.seq ? String(rawSeqSource || '').replace(/^\d+\.\d+[\s\t]*/, '') : rawSeqSource;
+          const seqPrefixContent = item.seq ? `${item.seq}\t${cleanSeqSource}` : text;
+          const mergedContent = ((item.role === 'SUB_LABEL' || item.role === 'SEQ_LABEL') && item.seq)
+            ? seqPrefixContent
+            : text;
+          pushOp({
+            op: 'morphToFullWidth',
+            sectionNumber: s,
+            rowIndex: insertCursor,
+            content: mergedContent,
+            options: {
+              bold: Boolean((item.boldLabel && !(item.valueCn || item.valueEn)) || item.role === 'SEQ_LABEL'),
+              boldSubheaders: Boolean(item.boldLabel && (item.valueCn || item.valueEn) && item.role !== 'SEQ_LABEL'),
+              indentDxa: item.indentDxa || 0
+            }
+          });
+          secMerges++;
+          secWrites++;
+        } else {
+          const seqNormLabel = String(label || '').replace(/^(\d+\.\d+)\s*(.+)$/, '$1\t$2');
+          const formattedLabel = item.seq && !/^\d+\.\d+/.test(seqNormLabel) ? `${item.seq}\t${seqNormLabel}` : seqNormLabel;
+          if (formattedLabel) {
+            pushOp({ op: 'writeCell', sectionNumber: s, rowIndex: insertCursor, cellIndex: 0, text: formattedLabel, bold: true });
+            secWrites++;
           }
-        });
-        secMerges++;
-        secWrites++;
-      } else {
-        const seqNormLabel = String(label || '').replace(/^(\d+\.\d+)\s*(.+)$/, '$1\t$2');
-        const formattedLabel = item.seq && !/^\d+\.\d+/.test(seqNormLabel) ? `${item.seq}\t${seqNormLabel}` : seqNormLabel;
-        if (formattedLabel) {
-          pushOp({ op: 'writeCell', sectionNumber: s, rowIndex: appendCursor, cellIndex: 0, text: formattedLabel, bold: true });
+          pushOp({ op: 'writeCell', sectionNumber: s, rowIndex: insertCursor, cellIndex: 1, text: value });
           secWrites++;
         }
-        pushOp({ op: 'writeCell', sectionNumber: s, rowIndex: appendCursor, cellIndex: 1, text: value });
-        secWrites++;
       }
     }
 
-    // 倒序交由编辑器执行安全剪枝 (保护父级分类题头；rowsToDelete 索引均在原模板范围内，不影响末尾新追加行)
-    const rowsToDelete = Array.from(deletedRowSet).sort((a, b) => b - a);
+    // 倒序交由编辑器执行安全剪枝 (根据前面锚点插入的偏移量同步修正 rowsToDelete，避免误删)
+    const rowsToDelete = Array.from(deletedRowSet)
+      .map(delIdx => delIdx + insertedAtAnchors.filter(a => a < delIdx).length)
+      .sort((a, b) => b - a);
     if (rowsToDelete.length > 0) {
       pushOp({ op: 'pruneSafely', sectionNumber: s, rowIndices: rowsToDelete });
       secDeletes += rowsToDelete.length;

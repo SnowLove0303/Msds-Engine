@@ -934,7 +934,7 @@ export function extractHeaderFooterData(engine) {
               }
               if (!data.companyExplicit && /有限公司|Co\.,\s*Ltd|Company|Technology/i.test(cText)) {
                 if (/国彩|Guocai/i.test(cText)) {
-                  data.company = /Guocai/i.test(cText) ? 'Yingde Guocai New Material Co., Ltd.' : '英德市国彩新材料有限公司';
+                  data.company = /Guocai/i.test(cText) ? 'Yingde Guocai Fine Chemical Co., Ltd.' : '英德市国彩精细化工有限公司';
                   data.entity = '国彩';
                   data.companyExplicit = true;
                 } else if (/冠志|Guanzhi/i.test(cText)) {
@@ -965,7 +965,7 @@ export function extractHeaderFooterData(engine) {
     }
     const allSec1 = sec1.rows?.flatMap((r) => r.cells.map((c) => c.text || '')).join(' ') || '';
     if (/国彩|Guocai/i.test(allSec1)) {
-      data.company = /Guocai/i.test(allSec1) ? 'Yingde Guocai New Material Co., Ltd.' : '英德市国彩新材料有限公司';
+      data.company = /Guocai/i.test(allSec1) ? 'Yingde Guocai Fine Chemical Co., Ltd.' : '英德市国彩精细化工有限公司';
       data.entity = '国彩';
     }
   }
@@ -4675,7 +4675,7 @@ export const SYSTEM_DEFAULT_PRESETS = [
     isBuiltin: true,
     enabledForExport: true,
     headerFooterOverrides: {
-      company: '英德市国彩新材料有限公司',
+      company: '英德市国彩精细化工有限公司',
       title: '物料安全数据表',
       version: 'V1.0',
       customFileNamePattern: '{model} msds_CN 国彩.docx',
@@ -4699,7 +4699,7 @@ export const SYSTEM_DEFAULT_PRESETS = [
     isBuiltin: true,
     enabledForExport: true,
     headerFooterOverrides: {
-      company: 'Yingde Guocai New Material Co., Ltd.',
+      company: 'Yingde Guocai Fine Chemical Co., Ltd.',
       title: 'MATERIAL SAFETY DATA SHEET',
       version: 'V1.0',
       customFileNamePattern: '{model} msds_EN 国彩.docx',

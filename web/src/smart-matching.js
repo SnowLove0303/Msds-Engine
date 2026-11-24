@@ -2904,7 +2904,7 @@ export function runSmartMatching(inspectorRecords) {
       if (r.kind === 'table' && r.rows?.[0]?.cells) {
         const c0 = r.rows[0].cells[0]?.text?.trim() || '';
         if (/国彩|Guocai/i.test(c0)) {
-          hfCompany = /Guocai/i.test(c0) ? 'Yingde Guocai New Material Co., Ltd.' : '英德市国彩新材料有限公司';
+          hfCompany = /Guocai/i.test(c0) ? 'Yingde Guocai Fine Chemical Co., Ltd.' : '英德市国彩精细化工有限公司';
         } else if (/冠志|Guanzhi/i.test(c0)) {
           hfCompany = /Guanzhi/i.test(c0) ? 'Guangzhou Guanzhi New Material Technology Co., Ltd.' : '广州冠志新材料科技有限公司';
         }
@@ -2934,7 +2934,7 @@ export function runSmartMatching(inspectorRecords) {
       const supItem = s1Rows.find((r) => r.key === 'supplier_name' && r.value)?.value;
       if (supItem) {
         if (/国彩|Guocai/i.test(supItem)) {
-          hfCompany = /Guocai/i.test(supItem) ? 'Yingde Guocai New Material Co., Ltd.' : '英德市国彩新材料有限公司';
+          hfCompany = /Guocai/i.test(supItem) ? 'Yingde Guocai Fine Chemical Co., Ltd.' : '英德市国彩精细化工有限公司';
         } else if (/冠志|Guanzhi/i.test(supItem)) {
           hfCompany = /Guanzhi/i.test(supItem) ? 'Guangzhou Guanzhi New Material Technology Co., Ltd.' : '广州冠志新材料科技有限公司';
         } else {
@@ -2959,7 +2959,7 @@ export function runSmartMatching(inspectorRecords) {
     title: hfTitle || (isEn ? 'MATERIAL SAFETY DATA SHEET' : '物料安全数据表'),
     version: hfVersion || 'V1.0',
     model: cleanModel,
-    company: hfCompany || (isGuocai ? '英德市国彩新材料有限公司' : '广州冠志新材料科技有限公司'),
+    company: hfCompany || (isGuocai ? '英德市国彩精细化工有限公司' : '广州冠志新材料科技有限公司'),
     docCode: `${cleanModel}-MSDS`,
     revisionDate: hfDate,
     language: lang,

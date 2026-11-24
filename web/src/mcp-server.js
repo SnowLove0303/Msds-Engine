@@ -13,6 +13,7 @@ console.error = (...args) => process.stderr.write(args.map(a => typeof a === 'ob
 import { recognizeSourceDocx, serializeFactsToMarkdown } from './recognition-engine.js';
 import { buildStructuredContext2, serializeContext2ToMarkdown, saveTranslationsToMemory } from './context-governor.js';
 import { compileTopologyOps, formatTopologyPlanMarkdown } from './topology-matcher.js';
+import { loadDocx } from './docx-engine.js';
 import {
   createWorkSession,
   saveSession,
@@ -676,6 +677,12 @@ async function handleToolCall(name, args) {
 
   if (name === 'msds_execute_editor_ops') {
     const session = await createWorkSession(args.templateKey);
+    const srcOpPath = args.sourceDocxPath || (args.operations || []).find(o => o.options?.sourceDocxPath)?.options?.sourceDocxPath;
+    if (srcOpPath && fs.existsSync(srcOpPath)) {
+      try {
+        session.sourceEngine = await loadDocx(fs.readFileSync(srcOpPath), path.basename(srcOpPath));
+      } catch {}
+    }
     const initialCheckpointId = `tx_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     await createCheckpoint(session, initialCheckpointId);
 
@@ -707,7 +714,8 @@ async function handleToolCall(name, args) {
         } else if (op.op === 'writeFullWidth') {
           writeFullWidthSection(session, {
             sectionNumber: op.sectionNumber,
-            content: op.content || op.text || ''
+            content: op.content || op.text || '',
+            options: op.options || {}
           });
         } else if (op.op === 'formatLaserTabs') {
           formatSection9LaserTabs(session);
