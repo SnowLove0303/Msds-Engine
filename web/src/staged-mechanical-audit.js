@@ -766,6 +766,16 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
       measuredDetail: missingPSubs.length === 0 ? 'S2 P2xx/P3xx/P4xx/P5xx 子标签完整' : `缺失子标签: ${missingPSubs.join(', ')}`
     });
 
+    // 16c. Section 2 "必须列在标签上的有害成分" 不得裸露空置 (无具体成分时应补全为 "：无" / ": None")
+    const bareHazComp = s2TextAll.some(t => /^(?:必须列在标签上的有害成[份分]|Hazardous\s+components\s+(?:which\s+must\s+|to\s+)?be\s+listed\s+on\s+the\s+label)[：:]?$/i.test(t));
+    check(!bareHazComp, {
+      severity: 'FAIL',
+      ruleId: 'P5_S2_HAZARDOUS_COMP_NO_EMPTY',
+      sectionRef: `${spKey}:S2`,
+      title: `${spKey}: 必须列在标签上的有害成分非空兜底校验`,
+      measuredDetail: bareHazComp ? '存在空置的 必须列在标签上的有害成分 标签（应补全：无 / None）' : '必须列在标签上的有害成分已含具体值或“无/None”'
+    });
+
     // 17. Section 8 控制参数父标签必须位于工作场所组分控制参数说明行之前
     const s8Rec = eng.records.find(r => r.sectionNumber === 8);
     if (s8Rec) {

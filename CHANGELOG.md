@@ -1,5 +1,10 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-24 Context 2 必须列在标签上的有害成分空置自动补全“无/None”]
+1. **Context 2 治理 (`web/src/context-governor.js`)**：当源文仅提出 `必须列在标签上的有害成分` 而后无具体成分内容时，自动补全为 `必须列在标签上的有害成分：无`（EN：`Hazardous components to be listed on the label: None`）。
+2. **机械审计下沉 (`web/src/staged-mechanical-audit.js`, `P5_S2_HAZARDOUS_COMP_NO_EMPTY`)**：禁止 S2 出现空置的 `必须列在标签上的有害成分` 标签。
+3. **验证**：`npm run lint`（0 违规）；`OS-8503` 与 `OS-8503DMM` 全阶段机械审计 **140/140** 全绿。
+
 ## [2026-11-24 16 节标题序号防漏与 S10.2/S13/S16 零漏译忠实翻译闭环]
 1. **16 节标题序号全量补全 (`web/src/template-editor.js`, `web/src/staged-mechanical-audit.js`)**：在 `applyTopologyTypographyLock` 中自动排查 `1..16` 节标题序号，若模板/源文档缺失（如 EN S1 `Identification`）则保留原标题内容并补全为 `1. Identification`；下沉 `P5_SECTION_HEADER_NUMBERS` 机械门禁防复发。
 2. **零漏译忠实翻译修复 (`web/src/context-governor.js`, `web/src/translation-memory.json`, `web/src/staged-mechanical-audit.js`)**：补全 `警告→Warning` / `危险→Danger`、`10.2 Hazardous decomposition products:`、S13 `national standards` / `May be disposed of...` / `Containers should be recycled...`、S16 `in any other process, unless otherwise specified in the text.`；下沉 `P5_TRANSLATION_FIDELITY` 硬门禁。

@@ -262,7 +262,8 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '废弃处置': 'Disposal',
   '废弃处置：': 'Disposal:',
   '警告': 'Warning',
-  '危险': 'Danger'
+  '危险': 'Danger',
+  '必须列在标签上的有害成分：无': 'Hazardous components to be listed on the label: None'
 })
 
 // 联合国危险货物正式运输名称中英标准目录
@@ -955,6 +956,16 @@ export function buildStructuredContext2(context1, options = {}) {
           s2Lines.push(jamMatch[2]);
         } else {
           s2Lines.push(l);
+        }
+      }
+      // 若源文仅提出"必须列在标签上的有害成分"且后面紧邻其他标签（无具体成分内容），自动补全为"必须列在标签上的有害成分：无"
+      for (let i = 0; i < s2Lines.length; i++) {
+        if (/^必须列在标签上的有害成[份分][：:]?$/i.test(s2Lines[i])) {
+          const nextL = (s2Lines[i + 1] || '').trim();
+          const nextIsSectionOrLabel = !nextL || /^(?:2\.\d+|危害性?说明|危险性?说明|防范说明|预防措施|事故响应|安全储存|安全存储|废弃处置|GHS|信号词|警告词|其他危[害险])/i.test(nextL);
+          if (nextIsSectionOrLabel) {
+            s2Lines[i] = '必须列在标签上的有害成分：无';
+          }
         }
       }
 
