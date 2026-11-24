@@ -141,7 +141,8 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
         content = content.replace(/^(?:GHS\s*Pictograms\s*\/\s*)?Hazardous components to be listed on the label[：:\s]+(.+)$/gmi, 'Hazardous components to be listed on the label: $1');
       }
       if (tplRows.length >= 2) {
-        pushOp({ op: 'writeFullWidth', sectionNumber: s, content, options: { isSection2: true } });
+        // @FIX_TAG(2026-11-24/topology-matcher/FIX-S2-ROLE-TYPO): 透传 Context 2 的 lineMetas (subRole/boldLabel/indentDxa)，由拓扑渲染层按角色自动赋予标签格式
+        pushOp({ op: 'writeFullWidth', sectionNumber: s, content, options: { isSection2: true, lineMetas: fwItem?.lines || [] } });
         secMerges++;
         secWrites++;
         for (let r = tplRows.length - 1; r >= 2; r--) {

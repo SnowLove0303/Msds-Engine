@@ -1,5 +1,13 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-24 Section 2 角色驱动排版自动赋格与加粗对称门禁 (S2-ROLE-TYPO-LOCK)]
+1. **角色驱动排版贯通 (`web/src/topology-matcher.js`, `web/src/docx-engine.js`, `FIX-S2-ROLE-TYPO`)**：
+   - `topology-matcher.js` 向 `writeFullWidth` 透传 `Context 2` 的 `lineMetas`（含 `subRole` / `boldLabel` / `indentDxa`）。
+   - `docx-engine.js` 的 `renderFullWidthRow` 优先按文本匹配 `lineMeta.boldLabel` 角色分类自动赋予标签加粗格式，并修复 `kvMatch` 中 `(?:2\.\d+\s*)?` 未包裹 `Label elements` 与遗漏 `GHS Hazard Categories` 的问题。
+2. **机械审计 (`web/src/staged-mechanical-audit.js`, `P5_S2_LABEL_BOLD_SYMMETRY`)**：
+   - 新增 Section 2 节标题与子标签角色加粗一致性硬门禁。
+3. **验证与同步**：`npm run lint`（0 违规）、`MSDS_Studio_7Phase_Workflow_Kit.zip` 已重打包；`OS-8030` / `OS-8501` / `OS-8503` / `OS-8503DMM` 全部 `SUCCESS`（`PHASE_5_DOCX` 83/83、`PHASE_6_PDF` 12/12）；`OS-8000` 4 份 DOCX 已验证通过。
+
 ## [2026-11-24 Section 2 序号统一从 .1 开始规范治理与门禁闭环 (S2-START-AT-21)]
 1. **上下文治理 (`web/src/context-governor.js`, `FIX-S2-START-AT-21`)**：
    - 当 Section 2 含 `2.0 紧急情况概述` 时，在 `Context 2` 归一化阶段同步将中英文 `2.0/2.1/2.2/2.3` 顺延重排为 `2.1/2.2/2.3/2.4`，确保序号统一从 `.1` 开始且双语 1:1 对称。

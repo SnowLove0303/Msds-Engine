@@ -690,6 +690,25 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
       title: `${spKey}: Section 2 序号统一从 .1 开始且防重复校验`,
       measuredDetail: badS2Seq ? `检测到异常序号 (has20=${has20}, seq21Count=${seq21Count})` : '2.1/2.2/2.3/2.4 序号规范无重复'
     });
+
+    // @FIX_TAG(2026-11-24/staged-mechanical-audit/FIX-S2-LABEL-BOLD): 15. Section 2 节标题与子标签加粗一致性校验
+    const s2Unbolded = [];
+    const s2Ps = s2Rec?.rows?.[1]?.cells?.[0]?.node ? Array.from(s2Rec.rows[1].cells[0].node.getElementsByTagName('w:p')) : [];
+    for (const p of s2Ps) {
+      const pt = (p.textContent || '').trim();
+      if (/^(?:2\.\d+\s*(?:紧急情况概述|Emergency\s+overview|物质或混合物的分类|Classification\s+of\s+the\s+substance\s+or\s+mixture|标签要素|Label\s+elements|其他危险|其他危害|Other\s+hazards)|GHS[-\s]*危险性类别|GHS\s+Hazard\s+(?:Categories|classification)|GHS[-\s]*象形图|GHS\s+Pictograms)/i.test(pt)) {
+        const firstRun = p.getElementsByTagName('w:r')?.[0];
+        const hasBold = firstRun && firstRun.getElementsByTagName('w:b').length > 0;
+        if (!hasBold) s2Unbolded.push(pt.slice(0, 35));
+      }
+    }
+    check(s2Unbolded.length === 0, {
+      severity: 'FAIL',
+      ruleId: 'P5_S2_LABEL_BOLD_SYMMETRY',
+      sectionRef: `${spKey}:S2`,
+      title: `${spKey}: Section 2 标签角色自动加粗校验`,
+      measuredDetail: s2Unbolded.length === 0 ? 'Section 2 全部节标题/标签已加粗' : s2Unbolded.join(', ')
+    });
   }
 
   return summarize();
