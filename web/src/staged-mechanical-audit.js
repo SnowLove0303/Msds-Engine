@@ -721,8 +721,8 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
       if (!pt) continue;
       const pInd = p.getElementsByTagName('w:ind')?.[0];
       const leftVal = Number(pInd?.getAttribute('w:left') || 0);
-      const isParent = /^(?:2\.\d+\s*(?:紧急情况概述|Emergency\s+overview|物质或混合物的?分类|Classification\s+of\s+the\s+substance\s+or\s+mixture|标签要素|Label\s+elements|危险性说明|Hazard\s+statements?|防范说明|Precautionary\s+statements?|其他危险|其他危害|Other\s+hazards)|物质或混合物的?分类|Classification\s+of\s+the\s+substance\s+or\s+mixture)/i.test(pt);
-      const isSub = /^(?:(?:GHS[-\s]*)?(?:危险性?类别|危险性?分类|分类|Hazard\s*categories|Hazard\s*classification|象形图|pictograms?)|信号词|警告词|Signal\s*word)/i.test(pt);
+      const isParent = /^(?:2\.\d+\s*(?:紧急情况概述|Emergency\s+overview|物质或混合物的?分类|Classification\s+of\s+the\s+substance\s+or\s+mixture|标签要素|Label\s+elements|危险性说明|危害性说明|Hazard\s+statements?|防范说明|Precautionary\s+statements?|其他危险|其他危害|Other\s+hazards)|物质或混合物的?分类|Classification\s+of\s+the\s+substance\s+or\s+mixture|危险性说明|危害性说明|Hazard\s+statements?|防范说明|Precautionary\s+statements?)[：:]?$/i.test(pt);
+      const isSub = /^(?:(?:GHS[-\s]*)?(?:危险性?类别|危险性?分类|分类|Hazard\s*categories|Hazard\s*classification|象形图|pictograms?)|信号词|警告词|Signal\s*word|必须列在标签上的有害成[份分]|Hazardous\s+components\s+(?:which\s+must\s+|to\s+)?be\s+listed\s+on\s+the\s+label)/i.test(pt);
       if (isParent) {
         s2Lvl = 1;
         if (leftVal !== 0) s2IndentBad.push(`Parent(${pt.slice(0, 15)},left=${leftVal})`);
