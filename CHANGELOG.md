@@ -1,5 +1,10 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-24 英文 KV 标签专业术语精炼 (`STANDARD_LABEL_EN` / `FIX-CONCISE-EN-LABELS`)]
+1. **词典/术语层精炼 (`web/src/context-governor.js`, `FIX-CONCISE-EN-LABELS`)**：
+   - 在不改动任何模板与拓扑的前提下，将 14 个超长高频英文 KV 标签精炼为 GHS / ISO 11014 标准简明专业术语（如 `Containment & clean-up methods`、`Firefighting precautions & PPE`、`Suitable glove material`、`Safe handling precautions`、`Safe storage conditions`、`Hazardous decomposition`、`Hazardous reactions`、`User precautions` 等），大幅减少双列 KV 折行。
+2. **验证与同步**：`npm run lint`（0 违规）、`MSDS_Studio_7Phase_Workflow_Kit.zip` 已重打包；全 5 个 OS 型号 40 份交付物（含 `OS-8000` 完整 8 格式）全部 `SUCCESS`（`PHASE_5_DOCX` 83/83、`PHASE_6_PDF` 12/12，0 报错）。
+
 ## [2026-11-24 Section 2 角色驱动排版自动赋格与加粗对称门禁 (S2-ROLE-TYPO-LOCK)]
 1. **角色驱动排版贯通 (`web/src/topology-matcher.js`, `web/src/docx-engine.js`, `FIX-S2-ROLE-TYPO`)**：
    - `topology-matcher.js` 向 `writeFullWidth` 透传 `Context 2` 的 `lineMetas`（含 `subRole` / `boldLabel` / `indentDxa`）。

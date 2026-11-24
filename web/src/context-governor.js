@@ -1143,22 +1143,23 @@ export function buildStructuredContext2(context1, options = {}) {
       }
     } else {
       // 其余标准章节 (S1, S4~S10, S12~S16): 精确纠正 Context 1 的误分类
+      // @FIX_TAG(2026-11-24/context-governor/FIX-CONCISE-EN-LABELS): 精炼超长标准英文标签为 GHS/ISO 11014 简明专业术语，减少双列 KV 折行而不改动模板与拓扑
       const STANDARD_LABEL_EN = {
         '产品名称': 'Product name', '中文名称': 'Product Chinese name', '化学品分类': 'Chemical category',
-        '产品使用建议和使用限制': 'Product use suggestions and restrictions', '供应商信息': 'Supplier information',
+        '产品使用建议和使用限制': 'Recommended use & restrictions', '供应商信息': 'Supplier information',
         '供应商名称': 'Name of supplier', '供应商地址': 'Supplier address', '电话': 'Tel', '传真': 'Fax',
         '一般措施': 'General measures', '误服': 'Ingestion', '接触眼睛': 'Eye contact', '接触皮肤': 'Skin contact', '吸入': 'Inhalation',
-        '合适的灭火剂': 'Suitable extinguishing agents', '不合适的灭火剂': 'Unsuitable extinguishing agents',
-        '物质或混合物的特殊危害': 'Special hazards of substances or mixtures', '消防预防措施和保护设备': 'Firefighting precautions and protective equipment',
-        '个人预防措施、应急程序': 'Personal precautions, protective equipment and emergency procedures', '环境保护措施': 'Environmental precautions', '污染物收集和清除的方法': 'Methods and material for containment and cleaning up',
-        '安全操作防范': 'Precautions for safe handling', '安全储存条件': 'Conditions for safe storage',
+        '合适的灭火剂': 'Suitable extinguishing media', '不合适的灭火剂': 'Unsuitable extinguishing media',
+        '物质或混合物的特殊危害': 'Special hazards of mixture', '消防预防措施和保护设备': 'Firefighting precautions & PPE',
+        '个人预防措施、应急程序': 'Personal precautions & emergency procedures', '环境保护措施': 'Environmental precautions', '污染物收集和清除的方法': 'Containment & clean-up methods',
+        '安全操作防范': 'Safe handling precautions', '安全储存条件': 'Safe storage conditions',
         '控制参数': 'Control parameters', '暴露控制': 'Exposure controls', '呼吸系统防护': 'Respiratory protection',
-        '手部防护': 'Hand protection', '防护手套的合适材料': 'Suitable material for protective gloves', '建议': 'Recommendation',
+        '手部防护': 'Hand protection', '防护手套的合适材料': 'Suitable glove material', '建议': 'Recommendation',
         '眼睛防护': 'Eye protection', '身体防护': 'Body protection', '工程控制': 'Engineering controls',
-        '化学稳定性': 'Chemical stability', '危险分解产物': 'Hazardous decomposition products', '可能的危害反应': 'Possibility of hazardous reactions',
-        '生态毒性': 'Ecotoxicity', '持久性和降解性': 'Persistence and degradability', '其他不利的影响': 'Other adverse effects',
+        '化学稳定性': 'Chemical stability', '危险分解产物': 'Hazardous decomposition', '可能的危害反应': 'Hazardous reactions',
+        '生态毒性': 'Ecotoxicity', '持久性和降解性': 'Persistence & degradability', '其他不利的影响': 'Other adverse effects',
         '处理方法': 'Disposal methods', '公路和铁路运输': 'Road and rail transport', '海上运输': 'Maritime transport',
-        '空运': 'Air transport', '用户特殊注意事项': 'Special precautions for user',
+        '空运': 'Air transport', '用户特殊注意事项': 'User precautions',
         '联合国编号': 'UN Number', '联合国运输名称': 'UN Proper Shipping Name',
         '水溶性': 'Water solubility', '粘度/25℃': 'Viscosity / 25°C', '自燃温度': 'Auto-ignition temperature',
         '闪点（闭口）': 'Flash point (closed cup)', '离子性': 'Ionicity', '分解温度': 'Decomposition temperature',
