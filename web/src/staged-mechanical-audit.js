@@ -722,7 +722,7 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
       const pInd = p.getElementsByTagName('w:ind')?.[0];
       const leftVal = Number(pInd?.getAttribute('w:left') || 0);
       const isParent = /^(?:2\.\d+\s*(?:紧急情况概述|Emergency\s+overview|物质或混合物的?分类|Classification\s+of\s+the\s+substance\s+or\s+mixture|标签要素|Label\s+elements|危险性说明|危害性说明|Hazard\s+statements?|防范说明|Precautionary\s+statements?|其他危险|其他危害|Other\s+hazards)|物质或混合物的?分类|Classification\s+of\s+the\s+substance\s+or\s+mixture)[：:]?$/i.test(pt);
-      const isSub = /^(?:(?:GHS[-\s]*)?(?:危险性?类别|危险性?分类|分类|Hazard\s*categories|Hazard\s*classification|象形图|pictograms?)|信号词|警告词|Signal\s*word|必须列在标签上的有害成[份分]|Hazardous\s+components\s+(?:which\s+must\s+|to\s+)?be\s+listed\s+on\s+the\s+label|危险性说明|危害性说明|Hazard\s*statements?|防范说明|Precautionary\s*statements?)(?:[：:]|$)/i.test(pt);
+      const isSub = /^(?:(?:GHS[-\s]*)?(?:危险性?类别|危险性?分类|分类|Hazard\s*categories|Hazard\s*classification|象形图|pictograms?)|信号词|警告词|Signal\s*word|必须列在标签上的有害成[份分]|Hazardous\s+components\s+(?:which\s+must\s+|to\s+)?be\s+listed\s+on\s+the\s+label|危险性说明|危害性说明|Hazard\s*statements?|防范说明|Precautionary\s*statements?|预防措施|事故响应|安全储存|安全存储|废弃处置|Prevention|Response|Storage|Disposal)(?:[：:]|$)/i.test(pt);
       if (isParent) {
         s2Lvl = 1;
         if (leftVal !== 0) s2IndentBad.push(`Parent(${pt.slice(0, 15)},left=${leftVal})`);
@@ -741,6 +741,21 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
       measuredDetail: s2IndentBad.length === 0 ? 'Section 2 父标题/子标签/值缩进 100% 统一' : s2IndentBad.slice(0, 5).join(', ')
     });
 
+    // 16b. Section 2 P 码四大子标签完整性校验 (存在 P2/P3/P4/P5 时必须具备 预防措施/事故响应/安全储存/废弃处置)
+    const s2TextAll = s2Ps.map(p => (p.textContent || '').trim());
+    const missingPSubs = [];
+    if (s2TextAll.some(t => /^P2\d+/i.test(t)) && !s2TextAll.some(t => /^(?:预防措施|Prevention)[：:]?$/i.test(t))) missingPSubs.push('预防措施/Prevention');
+    if (s2TextAll.some(t => /^P3\d+/i.test(t)) && !s2TextAll.some(t => /^(?:事故响应|Response)[：:]?$/i.test(t))) missingPSubs.push('事故响应/Response');
+    if (s2TextAll.some(t => /^P4\d+/i.test(t)) && !s2TextAll.some(t => /^(?:安全储存|安全存储|Storage)[：:]?$/i.test(t))) missingPSubs.push('安全储存/Storage');
+    if (s2TextAll.some(t => /^P5\d+/i.test(t)) && !s2TextAll.some(t => /^(?:废弃处置|Disposal)[：:]?$/i.test(t))) missingPSubs.push('废弃处置/Disposal');
+    check(missingPSubs.length === 0, {
+      severity: 'FAIL',
+      ruleId: 'P5_S2_P_SUBLABELS',
+      sectionRef: `${spKey}:S2`,
+      title: `${spKey}: Section 2 P 码四大子标签完整性校验`,
+      measuredDetail: missingPSubs.length === 0 ? 'S2 P2xx/P3xx/P4xx/P5xx 子标签完整' : `缺失子标签: ${missingPSubs.join(', ')}`
+    });
+
     // 17. Section 8 控制参数父标签必须位于工作场所组分控制参数说明行之前
     const s8Rec = eng.records.find(r => r.sectionNumber === 8);
     if (s8Rec) {
@@ -754,6 +769,24 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
         sectionRef: `${spKey}:S8`,
         title: `${spKey}: Section 8 控制参数父标签置顶于组分控制参数之前`,
         measuredDetail: s8OrderOk ? `ctrlRow=${ctrlIdx}, workplaceRow=${wpIdx}` : `控制参数(R${ctrlIdx})错误排在工作场所组分控制参数(R${wpIdx})之后`
+      });
+
+      // 17b. Section 8 OEL 数据行 (物质名如丙二醇甲醚醋酸酯) 为值格，严禁加粗
+      const oelHdrIdx = s8Rows.findIndex(r => /^(?:物质|Substance)$/i.test((r.cells?.[0]?.text || '').trim()));
+      const boldOelRows = oelHdrIdx >= 0
+        ? s8Rows.slice(oelHdrIdx + 1).filter(r => {
+            const c0 = r.cells?.[0];
+            if (!c0 || !(c0.text || '').trim()) return false;
+            const r0 = c0.node?.getElementsByTagName('w:r')?.[0];
+            return Boolean(r0 && r0.getElementsByTagName('w:b').length > 0);
+          })
+        : [];
+      check(boldOelRows.length === 0, {
+        severity: 'FAIL',
+        ruleId: 'P5_S8_OEL_VALUE_UNBOLDED',
+        sectionRef: `${spKey}:S8`,
+        title: `${spKey}: Section 8 OEL 组分值行非加粗校验`,
+        measuredDetail: boldOelRows.length === 0 ? 'S8 OEL 数据行首列为常规非加粗值样式' : `发现 ${boldOelRows.length} 行 OEL 数据行首列仍加粗`
       });
     }
 

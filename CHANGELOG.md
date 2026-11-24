@@ -1,5 +1,10 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-24 S2 P 码四大子标签自动补全与 S8 OEL 值行非加粗闭环]
+1. **Section 2 P 码四大子标签 (`web/src/context-governor.js`, `web/src/staged-mechanical-audit.js`)**：继承 `pipeline-engine` 规范，若 S2 存在 `P2xx`/`P3xx`/`P4xx`/`P5xx` 但缺失对应子标签，自动注入 `预防措施：` (`Prevention:`) / `事故响应：` (`Response:`) / `安全储存：` (`Storage:`) / `废弃处置：` (`Disposal:`) 并归为二级加粗子标签；下沉 `P5_S2_P_SUBLABELS` 机械门禁。
+2. **Section 8 OEL 组分值行非加粗 (`web/src/template-editor.js`, `web/src/staged-mechanical-audit.js`)**：排除 S8 多列 OEL 数据行（如 `丙二醇甲醚醋酸酯`）被误判为加粗标签列，下沉 `P5_S8_OEL_VALUE_UNBOLDED` 硬门禁。
+3. **验证**：`npm run lint`（0 违规 + `lint:audit` 全通过）；`OS-8503` 与 `OS-8503DMM` 全阶段机械审计 **124/124** 全绿（0 fail / 0 warn），完成源文件-产出物逐行对照审计。
+
 ## [2026-11-24 S2 子标签归位、S8 控制参数置顶与 S14 打包行自动拆分及审计下沉]
 1. **Section 2 子标签归位 (`web/src/context-governor.js`, `web/src/docx-engine.js`, `web/src/staged-mechanical-audit.js`)**：将无 `2.X` 序号的 `危害性说明` / `防范说明:`（及 EN 等价项）统一归为 `2.2 标签要素` 下属 `SUB_LABEL_KV`（缩进 `480/317`、加粗），其下 H/P 码自动缩进为二级值（`840/677`）。
 2. **Section 8 控制参数置顶 (`web/src/topology-matcher.js`, `web/src/staged-mechanical-audit.js`)**：确保 `8.2 控制参数：`（`8.2 Control parameters:`）父标签严格置顶于 `工作场所组分控制参数`（`Workplace component control parameters`）说明行及 OEL 数据表之前，下沉 `P5_S8_CONTROL_BEFORE_OEL` 硬门禁。

@@ -252,7 +252,15 @@ export const CHEMICAL_TRANSLATION_DICT = Object.freeze({
   '否': 'No',
   '参见6-8节': 'See sections 6-8',
   '具可燃性': 'Flammable',
-  '具可燃性。温度不可高于+35℃，温度不可低于-10℃。\n远离食物、酸和碱。': 'Flammable. Temperature must not exceed +35°C and must not be below -10°C.\nKeep away from food, acids and alkalis.'
+  '具可燃性。温度不可高于+35℃，温度不可低于-10℃。\n远离食物、酸和碱。': 'Flammable. Temperature must not exceed +35°C and must not be below -10°C.\nKeep away from food, acids and alkalis.',
+  '预防措施': 'Prevention',
+  '预防措施：': 'Prevention:',
+  '事故响应': 'Response',
+  '事故响应：': 'Response:',
+  '安全储存': 'Storage',
+  '安全储存：': 'Storage:',
+  '废弃处置': 'Disposal',
+  '废弃处置：': 'Disposal:'
 })
 
 // 联合国危险货物正式运输名称中英标准目录
@@ -992,6 +1000,29 @@ export function buildStructuredContext2(context1, options = {}) {
         if (firstLabelChildIdx >= 0) {
           s2Lines.splice(firstLabelChildIdx, 0, '2.2 标签要素');
         }
+      }
+
+      // @FIX_TAG(2026-11-24/context-governor/FIX-S2-P-SUBLABELS): 继承 pipeline-engine 规范，若 S2 存在 P2xx/P3xx/P4xx/P5xx 但缺失对应中文子标签，自动注入 预防措施：/事故响应：/安全储存：/废弃处置：
+      const hasAnyPSubLabel = s2Lines.some(l => /^(?:预防措施|事故响应|安全储存|安全存储|废弃处置)[：:]?$/i.test(l));
+      if (!hasAnyPSubLabel) {
+        const pGroups = [
+          { re: /^P2\d+/i, label: '预防措施：' },
+          { re: /^P3\d+/i, label: '事故响应：' },
+          { re: /^P4\d+/i, label: '安全储存：' },
+          { re: /^P5\d+/i, label: '废弃处置：' }
+        ];
+        const insertedGroups = new Set();
+        const expandedS2 = [];
+        for (const l of s2Lines) {
+          const matchedGroup = pGroups.find(g => g.re.test(l));
+          if (matchedGroup && !insertedGroups.has(matchedGroup.label)) {
+            insertedGroups.add(matchedGroup.label);
+            expandedS2.push(matchedGroup.label);
+          }
+          expandedS2.push(l);
+        }
+        s2Lines.length = 0;
+        s2Lines.push(...expandedS2);
       }
 
       const classifyS2Line = (line) => {

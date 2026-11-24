@@ -1452,7 +1452,13 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
 
         if (secNum === 9 && cIdx === 0) continue;
 
-        const isLabelCol = (cIdx === 0 && cells.length >= 2);
+        const c0TextTrim = (cells[0]?.text || '').trim();
+        const isS8OelDataRow = secNum === 8 && cells.length >= 3 && !/^(?:物质|Substance|工作场所|Workplace|8\.\d|控制参数|Control\s*parameters|暴露控制|Exposure)/i.test(c0TextTrim);
+        const isLabelCol = (cIdx === 0 && cells.length >= 2 && !isS8OelDataRow);
+        if (isS8OelDataRow && cIdx === 0) {
+          Array.from(cell.node.getElementsByTagNameNS(W_NS, 'b')).forEach(b => b.parentNode?.removeChild(b));
+          Array.from(cell.node.getElementsByTagNameNS(W_NS, 'bCs')).forEach(b => b.parentNode?.removeChild(b));
+        }
         const rawCellText = (cell.text || '').trim();
 
         // A. 结构性子题头强制加粗判定
