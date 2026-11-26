@@ -1222,16 +1222,62 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode, sourcePath = 
       for (const [k, c] of m.entries()) { if (c > mx) { mx = c; best = k; } }
       return best;
     };
+    const headerSzCounts = new Map();
+    for (const rec of eng.records) {
+      if (!rec.sectionNumber || rec.sectionNumber < 1 || rec.sectionNumber > 16) continue;
+      const hCell = rec.rows?.[0]?.cells?.[0];
+      if (!hCell?.node) continue;
+      for (const r of Array.from(hCell.node.getElementsByTagName('w:r'))) {
+        if (!(r.textContent || '').trim()) continue;
+        const sz = r.getElementsByTagName('w:sz')[0]?.getAttribute('w:val');
+        if (sz) headerSzCounts.set(sz, (headerSzCounts.get(sz) || 0) + 1);
+      }
+    }
+    const expHeaderSz = templateProfile?.typographyProfile?.headerFontSize || pickAuditMode(headerSzCounts, '24');
     const expSeqSz = templateProfile?.typographyProfile?.seqFontSize || pickAuditMode(seqSzCounts, isEnDoc ? '19' : '21');
     const expTextSz = templateProfile?.typographyProfile?.valueFontSize || pickAuditMode(valSzCounts, isEnDoc ? '19' : '24');
+    const expFont = templateProfile?.typographyProfile?.fontFamily || (isEnDoc ? 'Arial' : '宋体');
+    const expSeqFont = templateProfile?.typographyProfile?.seqFontFamily || (isEnDoc ? 'Arial' : 'Times New Roman');
+    const checkRunFont = (rPr, expectedFont, isCnAsciiAllowed = false, preferAscii = false) => {
+      if (!rPr || !expectedFont) return true;
+      const rf = rPr.getElementsByTagName('w:rFonts')[0];
+      if (!rf) return true;
+      const fVal = (isEnDoc || preferAscii)
+        ? (rf.getAttribute('w:ascii') || rf.getAttribute('w:hAnsi') || '')
+        : (rf.getAttribute('w:eastAsia') || rf.getAttribute('w:ascii') || '');
+      if (!fVal) return true;
+      if (fVal === expectedFont) return true;
+      if (!isEnDoc && isCnAsciiAllowed && (fVal === 'Times New Roman' || fVal === '宋体')) return true;
+      return false;
+    };
+
     const roleFormatBad = [];
     for (const rec of eng.records) {
-      if (!rec.sectionNumber || rec.sectionNumber < 1 || rec.sectionNumber > 16 || [2, 9].includes(rec.sectionNumber)) continue;
+      if (!rec.sectionNumber || rec.sectionNumber < 1 || rec.sectionNumber > 16) continue;
+      // 18c-1. 16 个 Section 大标题 (rIdx === 0) 字号与加粗均一性校验
+      const hdrCells = rec.rows?.[0]?.cells || [];
+      for (const hCell of hdrCells) {
+        if (!hCell?.node) continue;
+        for (const r of Array.from(hCell.node.getElementsByTagName('w:r'))) {
+          const rTxt = (r.textContent || '').trim();
+          if (!rTxt) continue;
+          const rPr = r.getElementsByTagName('w:rPr')[0];
+          const szVal = rPr?.getElementsByTagName('w:sz')[0]?.getAttribute('w:val');
+          const isBold = Boolean(rPr?.getElementsByTagName('w:b')[0]);
+          if ((szVal && szVal !== expHeaderSz) || !isBold) {
+            roleFormatBad.push(`S${rec.sectionNumber}R0(SECTION_HEADER:${rTxt.slice(0, 12)},sz=${szVal}!=${expHeaderSz},b=${isBold})`);
+          }
+        }
+      }
+
+      // 18c-2. 正文全章节（含 S2/S9/S3/S8 多列表及 1 列说明行）角色文本格式参数校验
       for (let rIdx = 1; rIdx < (rec.rows || []).length; rIdx++) {
         const row = rec.rows[rIdx];
         const cells = row.cells || [];
-        if (rec.sectionNumber === 3 && cells.length >= 3) continue;
-        if (rec.sectionNumber === 8 && cells.length >= 3) continue;
+        const isMultiGridRow = (rec.sectionNumber === 3 || rec.sectionNumber === 8) && cells.length >= 3;
+        const c0Trim = (cells[0]?.text || '').trim();
+        const isS3ParentRow = rec.sectionNumber === 3 && /^(?:3\.2[\s\t]*)?(?:成分|组分|Ingredients)/i.test(c0Trim);
+        const isMultiGridHdr = isMultiGridRow && (isS3ParentRow || /^(?:化学品名称|Chemical\s*name|物质|Substance)/i.test(c0Trim));
         for (let cIdx = 0; cIdx < cells.length; cIdx++) {
           const cell = cells[cIdx];
           if (!cell?.node) continue;
@@ -1248,17 +1294,52 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode, sourcePath = 
               const isBold = Boolean(rPr?.getElementsByTagName('w:b')[0]);
               const isSeqRun = cIdx === 0 && /^\d+\.\d+$/.test(rTxt) && r.getElementsByTagName('w:tab').length > 0;
               const isAllowedBoldExp = /^(?:其它的规定|其它规定|Other\s*provisions|符合下列法规|Complies\s*with\s*the\s*following)/i.test(pTxt);
-              if (isSeqRun) {
-                if (szVal !== expSeqSz || !isBold) {
+              const isS8SubHdr = rec.sectionNumber === 8 && cells.length === 1 && (/^\d+\.\d+/.test(pTxt) || /^(?:暴露控制|Exposure\s*controls?|控制参数|Control\s*parameters|手部防护|Hand\s*protection)[：:]?$/i.test(pTxt));
+              const isS9Label = rec.sectionNumber === 9 && cIdx === 0;
+
+              if (rec.sectionNumber === 2) {
+                if (szVal && szVal !== expTextSz) {
+                  roleFormatBad.push(`S2R${rIdx}(S2_TEXT:${rTxt.slice(0, 10)},sz=${szVal}!=${expTextSz})`);
+                }
+                if (!checkRunFont(rPr, expFont, true)) {
+                  roleFormatBad.push(`S2R${rIdx}(S2_FONT:${rTxt.slice(0, 10)})`);
+                }
+              } else if (isMultiGridRow) {
+                if (isSeqRun) {
+                  if (szVal !== expSeqSz || !isBold || !checkRunFont(rPr, expSeqFont, false, true)) {
+                    roleFormatBad.push(`S${rec.sectionNumber}R${rIdx}(GRID_SEQ:${rTxt},sz=${szVal}!=${expSeqSz},b=${isBold})`);
+                  }
+                } else {
+                  if (szVal && szVal !== expTextSz) {
+                    roleFormatBad.push(`S${rec.sectionNumber}R${rIdx}(GRID:${rTxt.slice(0, 10)},sz=${szVal}!=${expTextSz})`);
+                  }
+                  if (rec.sectionNumber === 8 && !isMultiGridHdr && isBold) {
+                    roleFormatBad.push(`S8R${rIdx}(GRID_DATA_BOLD:${rTxt.slice(0, 10)})`);
+                  }
+                }
+              } else if (isSeqRun) {
+                if (szVal !== expSeqSz || !isBold || !checkRunFont(rPr, expSeqFont, false, true)) {
                   roleFormatBad.push(`S${rec.sectionNumber}R${rIdx}(SEQ_NUM:${rTxt},sz=${szVal}!=${expSeqSz},b=${isBold})`);
                 }
+              } else if (isS9Label) {
+                if ((szVal && szVal !== expTextSz) || !isBold) {
+                  roleFormatBad.push(`S9R${rIdx}(S9_LABEL:${rTxt.slice(0, 10)},sz=${szVal}!=${expTextSz},b=${isBold})`);
+                }
               } else if (cIdx >= 1 && cells.length === 2) {
-                if (szVal !== expTextSz || isBold) {
+                if (szVal !== expTextSz || isBold || !checkRunFont(rPr, expFont, true)) {
                   roleFormatBad.push(`S${rec.sectionNumber}R${rIdx}(VALUE:${rTxt.slice(0, 10)},sz=${szVal}!=${expTextSz},b=${isBold})`);
                 }
               } else if (cIdx === 0 && cells.length === 2 && !isAllowedBoldExp) {
-                if (szVal !== expTextSz || !isBold) {
+                if (szVal !== expTextSz || !isBold || !checkRunFont(rPr, expFont, true)) {
                   roleFormatBad.push(`S${rec.sectionNumber}R${rIdx}(LABEL:${rTxt.slice(0, 10)},sz=${szVal}!=${expTextSz},b=${isBold})`);
+                }
+              } else if (isAllowedBoldExp || isS8SubHdr) {
+                if ((szVal && szVal !== expTextSz) || !isBold || !checkRunFont(rPr, expFont, true)) {
+                  roleFormatBad.push(`S${rec.sectionNumber}R${rIdx}(BOLD_EXP:${rTxt.slice(0, 10)},sz=${szVal}!=${expTextSz},b=${isBold})`);
+                }
+              } else if (cells.length === 1) {
+                if ((szVal && szVal !== expTextSz) || isBold || !checkRunFont(rPr, expFont, true)) {
+                  roleFormatBad.push(`S${rec.sectionNumber}R${rIdx}(EXPLANATION:${rTxt.slice(0, 10)},sz=${szVal}!=${expTextSz},b=${isBold})`);
                 }
               }
             }
@@ -1270,8 +1351,8 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode, sourcePath = 
       severity: 'FAIL',
       ruleId: 'P5_GLOBAL_ROLE_TYPOGRAPHY',
       sectionRef: `${spKey}:Roles`,
-      title: `${spKey}: 全局角色分类与真实 XML 文本格式深度校验`,
-      measuredDetail: roleFormatBad.length === 0 ? '全篇序号/标签/值角色 XML 字号与字重 100% 合规' : roleFormatBad.slice(0, 6).join(', ')
+      title: `${spKey}: 全 16 节全角色（标题/序号/标签/值/说明行）XML 格式参数深度校验`,
+      measuredDetail: roleFormatBad.length === 0 ? '全 16 节标题/序号/标签/值/说明行字号、字重与字体 100% 合规' : roleFormatBad.slice(0, 8).join(', ')
     });
 
     if (isEnDoc) {
