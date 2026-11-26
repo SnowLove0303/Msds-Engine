@@ -49,6 +49,8 @@ MSDS-Engine/
 ├─ ARCHITECTURE.md       # 系统全局拓扑、模块单向依赖与跨端契约
 ├─ docs/                 # 跨领域端侧规范 (FRONTEND.md, BACKEND.md)
 ├─ openspec/             # OpenSpec 规范驱动资产 (specs/ 与 changes/)
+├─ 体系交接文档/
+│  └─ MSDS_Studio_Agent_Test_Kit/  # 【持续维护体系核心节点】AI Agent 唯一标准入口、企业预设注册表 (company_presets.json) 与同步 Skill 镜像
 ├─ web/                  # 核心 Web 工作台与 Node.js 服务工程
 │  ├─ src/               # 核心引擎源码 (docx-engine, smart-matching, pipeline-engine)
 │  ├─ public/templates/  # 官方基准母版库 (只读锁定)

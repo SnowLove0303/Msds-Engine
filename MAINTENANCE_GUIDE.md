@@ -80,11 +80,23 @@
 
 ---
 
-## 六、 Agent 执行层联动核查铁律（每次修改必检）
+## 六、 Agent 执行层与 `MSDS_Studio_Agent_Test_Kit` 持续维护体系 Graph 联动铁律
 
-任何底层/治理/拓扑/审计修复完成后，**必须**同步检查 Agent 执行层，确保任意 Agent 按标准调用即可直接获得正确产出：
+`体系交接文档/MSDS_Studio_Agent_Test_Kit/` 是本系统的**唯一 Agent 标准操作入口、企业多主体预设真源与体系交接资料包**，正式纳入持续维护依赖图（Maintenance Graph）：
 
-1. **待译字典与记忆库 (`web/src/translation-memory.json`)**：新增结构化拆分槽位时，补充标准双语术语至 TM，避免 `Gate 3A->3B` 无谓中断。
-2. **介入审计速查包 (`web/scripts/generate_agent_audit_brief.mjs`)**：确保 Agent 审计时可直接核销 CN vs EN（除 S1 外）行序、序号与拓扑对称性。
-3. **分发调用包 (`web/scripts/pack_workflow_kit.mjs`)**：每次修改引擎/审计/流水线代码后，必须重跑 `node web/scripts/pack_workflow_kit.mjs` 刷新 `MSDS_Studio_7Phase_Workflow_Kit.zip`。
-4. **7 阶段真机回归**：使用 `run_standard_production.mjs` 跑通全流程并确认 `user_exec_logs.db` 状态为 `SUCCESS`。
+```text
+[全局 SKILL.md] ◄──100%同步──► [Test_Kit/skill/SKILL.md & README_FOR_AGENT.md]
+                                         │
+[Test_Kit/presets/company_presets.json] ─┼─► [staged-mechanical-audit.js] (动态主体隔离)
+                                         │
+[Test_Kit/run_standard_production.mjs] ──┼─► [production-orchestrator.js] (两段式 Context 2 门禁)
+[Test_Kit/run_three_task_audit_prep.mjs] ┴─► [generate_context3_report.mjs] (三层对照采集)
+```
+
+任何底层/治理/拓扑/审计/预设修复完成后，**必须**同步核查并联动更新 `MSDS_Studio_Agent_Test_Kit`：
+
+1. **待译字典与记忆库 (`web/src/translation-memory.json`)**：新增结构化拆分槽位时，补充标准双语术语至 TM。
+2. **唯一生产与三任务审计入口 (`run_standard_production.mjs` / `run_three_task_audit_prep.mjs`)**：任何生产门禁（如 `--prepareOnly` / `--approveContext2`）或三层对照字段变更，必须同步更新两支 Runner 及其 `README_FOR_AGENT.md`。
+3. **企业预设注册表 (`presets/company_presets.json`)**：新增或调整企业主体信息时，以此文件为唯一外置真源，同步驱动渲染与动态主体隔离审计。
+4. **Skill 双端 100% 同步 (`skill/SKILL.md` ↔ 全局 `SKILL.md`)**：每次规程演进必须双端同步，严禁只改全局而遗漏交接资料包。
+5. **两段式真机回归**：使用 `run_standard_production.mjs`（`--prepareOnly` → Agent 校对 → `--approveContext2`）跑通全流程并确认全绿。

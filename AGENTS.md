@@ -68,3 +68,5 @@
   - 权威来源: `ARCHITECTURE.md`
 - 工程维护指南、现象→模块路由、防复发闭环与 `@FIX_TAG` 标识规范
   - 权威来源: `MAINTENANCE_GUIDE.md`
+- AI Agent 唯一标准入口、体系交接资料包与企业预设注册表（纳入持续维护体系 Graph）
+  - 权威来源: `体系交接文档/MSDS_Studio_Agent_Test_Kit/`（含 `run_standard_production.mjs`、`run_three_task_audit_prep.mjs`、`presets/company_presets.json`、`skill/SKILL.md`、`README_FOR_AGENT.md`）
