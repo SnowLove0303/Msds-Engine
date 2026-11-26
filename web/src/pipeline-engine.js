@@ -795,7 +795,7 @@ export function buildEnglishFacts(modelCode, facts = {}, baseCnEngine = null) {
     'sec4.general_advice': 'Remove all contaminated clothing immediately.',
     'sec4.ingestion': ingestionEn,
     'sec4.eye_contact': eyeEn,
-    'sec4.skin_contact': 'Wash immediately with plenty of soap and water. If skin reaction occurs, seek medical advice.',
+    'sec4.skin_contact': 'Wash immediately with soap and plenty of water. If skin reaction occurs, seek medical advice.',
     'sec4.inhalation': 'If respiratory irritation occurs, seek medical advice.',
 
     // Section 5
