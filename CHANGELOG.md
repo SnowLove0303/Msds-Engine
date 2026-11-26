@@ -1,5 +1,18 @@
 # MSDS Engine 变更与演进日志 (CHANGELOG)
 
+## [2026-11-26 架构三大升级、HPU 全系列 6 型号全绿验收与仓库整洁化]
+1. **单拓扑 IR + Template Auto-Profiler 模板自发现 (`web/src/template-editor.js`, `web/src/topology-matcher.js`, `web/src/staged-mechanical-audit.js`)**：
+   - 新增 `detectTemplateProfile`，从任意 `.docx` 模板自动统计众数表宽（`5000..15000 dxa`）、两栏众数网格与各角色字阶；渲染与机械审计共用同一份 `TemplateProfile`；实测 `9000 dxa` 模拟换模板 16/16 全表自适应。
+   - 收口 `topology-matcher.js` S3 `3.2\t成分`/`Ingredients` 语言分叉；统一保留 `11.6` 中英文空行分隔与 `CO₂`/`g/cm³`/`LD₅₀` 上下标、Section 标题 `keepNext`/`cantSplit` 与 EN 页脚单行排版。
+2. **Section 11 父子级规则与 Hybrid Context 2 事实指纹锁 (`web/src/context-governor.js`)**：
+   - 新增 `normalizeParentChildLabel`，将 `急性毒性`、`生殖毒性`、`STOT 评估` 多子项统一转为 `父（子）：`，保留 `亚急性，亚慢性和延迟毒性` 无冒号；接入 `semanticOverrides` 与 CAS/数值事实指纹守恒锁（`factFingerprintOk`）。
+   - 修复 `多元醇` 短词截胡（`多元醇分散体` → `Polyol dispersion`、`含聚碳酸酯结构的多元醇聚合物` → `Polycarbonate-containing polyol polymer`）及 `4.4`/`6.1`/`11.7` 英文翻译。
+3. **两段式 Agent Context 2 校对门禁 (`web/src/production-orchestrator.js`, `Test_Kit/run_standard_production.mjs`, `SKILL.md`)**：
+   - 强制拆分 `--prepareOnly` → Agent 逐行校对译文 → `--approveContext2 --translations=<json>`（SHA-256 `translationsDigest` 存证），未传 `--approveContext2` 直接硬阻断（`[CONTEXT2_AGENT_APPROVAL_REQUIRED]`）。
+4. **全 16 节全角色机械审计与审计流程规范化 (`web/src/staged-mechanical-audit.js`, `web/scripts/run_master_msds_audit.mjs`, `SKILL.md`)**：
+   - `P5_GLOBAL_ROLE_TYPOGRAPHY` 扩展至全 16 节全角色（标题、序号、标签、值、说明行、`S2`/`S9`/`S3`/`S8` 与 `w:rFonts`）；`run_master_msds_audit.mjs` S9.1 改为依据源文特征双向核销；固化“严禁抽检、单型号 4 份独立 `.md`、任务 1 原生源文三层对照、Section 标题固定继承模板”。
+5. **验收与仓库整理**：`HPU-7651`、`7660`、`7700`、`7710`、`7711A`、`7790` 共 6 型号（48 份交付物）全部通过生产（`174/174`、`112/112`、`171/171`）与三任务 24 `.md` 复审 `PASS` 并同步 Notion；清理根目录与 `web/src/` 零散脚本至 `scratch/legacy_debug/`，排除 `msds_repo.db*` 与产出目录后推送 GitHub。
+
 ## [2026-11-24 2-2 水性羟基丙烯酸乳液 PA 14 型号全量产出与非危/粘度通用修复]
 1. **非危品判定与 S2 零外生闭环 (`web/src/context-governor.js`)**：`isNonHazardous` 兼容 `不属于危险物` / `非危险物` 表述；在 `buildStructuredContext2` 的 `S2` 阶段对非危品强制剔除空置的 `2.2 标签要素` / `GHS象形图：` / `信号词：`（`INV-ZERO-EXOGENOUS`）。
 2. **粘度单位排版自愈 (`web/src/context-governor.js`)**：`healEnSpacing` 通用修复数字紧邻 `mPa.s`（如 `＜500mPa.s`）时的空格与中圆点规范，统一输出 `<500 mPa·s`。

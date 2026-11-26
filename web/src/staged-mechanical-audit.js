@@ -29,11 +29,41 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
+function resolveOriginHint(ruleId = '') {
+  if (/^P1_/.test(ruleId)) return 'Context 1 识别层 (recognition-engine.js)';
+  if (/^P2_|^P3_|TRANSLATION|PUNCTUATION|S2_|S11_NO_TOX|S11_EN_STUDY|CN_NAME_MODEL|ZERO_DIRTY/.test(ruleId)) {
+    return 'Context 2 治理层 (context-governor.js)';
+  }
+  if (/^P4_|BILINGUAL_ROW|S8_CANONICAL|S8_CONTROL_BEFORE|S8_2COL|S11_DUAL|S11_2COL|S13_|S14_|EN_NO_PRODUCT/.test(ruleId)) {
+    return 'Topology 匹配层 (topology-matcher.js)';
+  }
+  if (/^P6_|HF_MODEL|HF_PAGE|PDF/.test(ruleId)) return 'PDF/页眉页脚渲染层 (pdf-converter.js / template-editor.js)';
+  return 'TemplateEditor 渲染层 (template-editor.js)';
+}
+
+function loadCompanyPresetsRegistry(customPresets = null) {
+  if (customPresets && typeof customPresets === 'object') return customPresets;
+  const candidatePaths = [
+    path.resolve(__dirname, '../../体系交接文档/MSDS_Studio_Agent_Test_Kit/presets/company_presets.json'),
+    path.resolve(__dirname, '../presets/company_presets.json')
+  ];
+  for (const p of candidatePaths) {
+    if (fs.existsSync(p)) {
+      try {
+        return JSON.parse(fs.readFileSync(p, 'utf8'));
+      } catch {
+        // ignore parse fallback
+      }
+    }
+  }
+  return {};
+}
+
 function makeCollector(stage) {
   const findings = [];
   let passed = 0;
 
-  const check = (cond, { auditor = `MECH_${stage}`, severity = 'FAIL', ruleId = '', sectionRef = '', title = '', measuredDetail = '' }) => {
+  const check = (cond, { auditor = `MECH_${stage}`, severity = 'FAIL', ruleId = '', sectionRef = '', title = '', measuredDetail = '', originHint = null }) => {
     if (cond) {
       passed++;
       return true;
@@ -44,6 +74,7 @@ function makeCollector(stage) {
       ruleId,
       sectionRef,
       title,
+      originHint: originHint || resolveOriginHint(ruleId),
       measuredDetail: measuredDetail || title
     });
     return false;
@@ -250,13 +281,19 @@ export function auditPhase4TopologyOps({ operations = [], presetKey = null }) {
 /**
  * Phase 5 机械审计: 4 份 DOCX 底层 XML 排版几何、边框、CAS、双语对称与双主体隔离
  */
-export async function auditPhase5DocxFiles({ targetDir, modelCode, sourcePath = null, templateProfile = null }) {
+export async function auditPhase5DocxFiles({ targetDir, modelCode, sourcePath = null, templateProfile = null, companyPresets = null }) {
   const { check, summarize } = makeCollector('PHASE_5_DOCX');
+  const presetsRegistry = loadCompanyPresetsRegistry(companyPresets);
 
   let sourceHasS2PictogramValue = false;
+  let sourceCasList = [];
   if (sourcePath && fs.existsSync(sourcePath)) {
     try {
       const srcEngine = await loadDocx(fs.readFileSync(sourcePath), path.basename(sourcePath));
+      const srcAllText = (srcEngine.records || [])
+        .map(rec => (rec.rows || []).map(r => (r.cells || []).map(c => c.text || '').join(' ')).join('\n'))
+        .join('\n');
+      sourceCasList = [...new Set(srcAllText.match(/\b\d{2,7}-\d{2}-\d\b/g) || [])];
       const srcS2 = (srcEngine.records || []).find(r => r.sectionNumber === 2);
       if (srcS2) {
         const srcS2Lines = (srcS2.rows || [])
@@ -329,14 +366,51 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode, sourcePath = 
       measuredDetail: `hfFiles=${hfKeys.length}, hasPAGE=${/PAGE/i.test(hfText)}`
     });
 
-    const forbiddenRe = sp.company === 'guanzhi' ? /国彩|Guocai|0763/i : /冠志|Guanzhi|020-8256/i;
-    const leakInDoc = forbiddenRe.test(docXmlStr) || forbiddenRe.test(hfText);
-    check(!leakInDoc, {
+    const plainDocText = (engine.records || [])
+      .map(rec => (rec.rows || []).map(r => (r.cells || []).map(c => c.text || '').join(' ')).join('\n'))
+      .join('\n');
+    const plainAllText = `${plainDocText}\n${hfText}`;
+    const missingCas = sourceCasList.filter(cas => !plainAllText.includes(cas));
+    if (sourceCasList.length > 0) {
+      check(missingCas.length === 0, {
+        severity: 'CRITICAL',
+        ruleId: 'P5_SOURCE_CAS_CONSERVATION',
+        sectionRef: `${sp.key}:S3`,
+        title: `${sp.key}: 源文 CAS 号 100% 守恒校验`,
+        originHint: 'Context 2 治理层 (context-governor.js)',
+        measuredDetail: missingCas.length === 0 ? `源文 ${sourceCasList.length} 个 CAS 号全部守恒` : `缺失源文 CAS: ${missingCas.join(', ')}`
+      });
+    }
+
+    const activePresetKey = `${sp.company === 'guanzhi' ? 'Guanzhi' : 'Guocai'}_${sp.lang === 'en' ? 'en' : 'zh'}`;
+    const activePreset = presetsRegistry[activePresetKey] || null;
+    const otherPresets = Object.entries(presetsRegistry)
+      .filter(([k]) => !k.toLowerCase().startsWith(sp.company))
+      .map(([, v]) => v)
+      .filter(Boolean);
+    const dynamicForbiddenTerms = [];
+    for (const op of otherPresets) {
+      if (op.name) dynamicForbiddenTerms.push(op.name);
+      if (op.shortName) dynamicForbiddenTerms.push(op.shortName);
+      if (op.tel) {
+        dynamicForbiddenTerms.push(op.tel);
+      }
+    }
+    const leakHits = dynamicForbiddenTerms.length > 0
+      ? dynamicForbiddenTerms.filter(term => plainAllText.toLowerCase().includes(String(term).toLowerCase()))
+      : ((sp.company === 'guanzhi' ? /国彩|Guocai|0763/i : /冠志|Guanzhi|020-8256/i).test(plainAllText) ? ['legacy_leak'] : []);
+    const leakInDoc = leakHits.length > 0;
+    const hasOwnBrand = !activePreset || [activePreset.name, activePreset.shortName, activePreset.tel]
+      .filter(Boolean)
+      .some(t => plainAllText.toLowerCase().includes(String(t).toLowerCase()));
+    check(!leakInDoc && hasOwnBrand, {
       severity: 'CRITICAL',
       ruleId: 'P5_ENTITY_ISOLATION',
       sectionRef: sp.key,
-      title: `${sp.key}: 双主体企业信息物理隔离校验`,
-      measuredDetail: leakInDoc ? '检测到跨企业实体词串流' : '双主体严格隔离'
+      title: `${sp.key}: 动态企业预设主体隔离校验`,
+      measuredDetail: leakInDoc
+        ? `检测到跨主体串流词: ${[...new Set(leakHits)].join(', ')}`
+        : (!hasOwnBrand ? `缺失本主体标识: ${activePreset?.shortName || activePreset?.name}` : '动态企业预设严格隔离且本主体信息完整')
     });
 
     // 3. 全局 XML 确定性门禁: 零 numPr, 零非法 <w:tabs>, 值格零 <w:tab/>
