@@ -84,7 +84,7 @@ const COMPANY_PRESETS = {
   Guanzhi_zh: {
     name: '广州冠志新材料科技有限公司',
     shortName: '冠志',
-    address: '广州市萝岗区科学城掬泉路3号广州国际企业孵化器A区1106室',
+    address: '广州市黄埔区科学城掬泉路3号广州国际企业孵化器A区1106室',
     tel: '86-20-82567990',
     fax: '86-20-32214789'
   },
@@ -98,7 +98,7 @@ const COMPANY_PRESETS = {
   Guanzhi_en: {
     name: 'Guangzhou Guanzhi New Material Technology Co., Ltd.',
     shortName: 'Guanzhi',
-    address: 'Room 1106, Area A, Guangzhou International Enterprise Incubator, No. 3 Juquan Road, Science City, Luogang District, Guangzhou',
+    address: 'Room 1106, Area A, Guangzhou International Enterprise Incubator, No. 3 Juquan Road, Science City, Huangpu District, Guangzhou',
     tel: '86-20-82567990',
     fax: '86-20-32214789'
   },
@@ -156,6 +156,151 @@ export async function registerCustomTemplate(docxPathOrBuffer, meta = {}) {
 }
 
 /**
+ * 模板自发现剖析器 (Template Auto-Profiler)
+ * 从任意加载的 .docx 模板真实 XML 中动态提取几何与角色字阶画像，避免硬编码导致换模板崩溃。
+ */
+export function detectTemplateProfile(engine, isEnTpl = false) {
+  const pickMode = (countsMap, fallback) => {
+    let best = fallback;
+    let maxC = 0;
+    for (const [k, c] of countsMap.entries()) {
+      if (c > maxC) {
+        maxC = c;
+        best = k;
+      }
+    }
+    return best;
+  };
+
+  // 1. 探测主表宽众数 (5000..15000 dxa 合法区间过滤异常脏表)
+  const tblWidthCounts = new Map();
+  const twoColCounts = new Map();
+  const seqSzCounts = new Map();
+  const seqFontCounts = new Map();
+  const labelSzCounts = new Map();
+  const labelFontCounts = new Map();
+  const valueSzCounts = new Map();
+  const valueFontCounts = new Map();
+  const tabTierACounts = new Map();
+  const tabTierBCounts = new Map();
+
+  const CJK_FONT_RE = /宋体|SimSun|微软雅黑|Microsoft YaHei|黑体|SimHei|楷体|仿宋/i;
+  for (const record of engine?.records || []) {
+    const secNum = record.sectionNumber;
+    if (!secNum || secNum < 1 || secNum > 16) continue;
+    const tblNode = record.tableNode || record.node || record.rows?.[0]?.node?.parentNode;
+    if (tblNode) {
+      const tblWEl = tblNode.getElementsByTagNameNS(W_NS, 'tblPr')?.[0]?.getElementsByTagNameNS(W_NS, 'tblW')?.[0];
+      const tblW = Number(tblWEl?.getAttributeNS(W_NS, 'w') || tblWEl?.getAttribute('w:w') || 0);
+      if (tblW >= 5000 && tblW <= 15000) {
+        tblWidthCounts.set(tblW, (tblWidthCounts.get(tblW) || 0) + 1);
+      }
+      const gcs = Array.from(tblNode.getElementsByTagNameNS(W_NS, 'gridCol'));
+      if (gcs.length > 0) {
+        const widths = gcs.map(c => Number(c.getAttributeNS(W_NS, 'w') || c.getAttribute('w:w') || 0));
+        const gSum = widths.reduce((a, b) => a + b, 0);
+        if (gSum >= 5000 && gSum <= 15000) {
+          tblWidthCounts.set(gSum, (tblWidthCounts.get(gSum) || 0) + 1);
+        }
+        if (widths.length === 2 && widths[0] >= 1000 && widths[1] >= 1000 && gSum >= 5000 && gSum <= 15000) {
+          const key = `${widths[0]}:${widths[1]}`;
+          twoColCounts.set(key, (twoColCounts.get(key) || 0) + 1);
+        }
+      }
+    }
+
+    for (const row of (record.rows || []).slice(1)) {
+      const cells = row.cells || [];
+      const c0 = cells[0];
+      if (c0?.node) {
+        const ps = Array.from(c0.node.getElementsByTagNameNS(W_NS, 'p'));
+        for (const p of ps) {
+          const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+          for (const r of runs) {
+            const rTxt = (r.textContent || '').trim();
+            if (!rTxt) continue;
+            const rPr = r.getElementsByTagNameNS(W_NS, 'rPr')?.[0];
+            const sz = rPr?.getElementsByTagNameNS(W_NS, 'sz')?.[0]?.getAttributeNS(W_NS, 'val')
+              || rPr?.getElementsByTagNameNS(W_NS, 'sz')?.[0]?.getAttribute('w:val');
+            const rFonts = rPr?.getElementsByTagNameNS(W_NS, 'rFonts')?.[0];
+            const asciiFont = rFonts?.getAttributeNS(W_NS, 'ascii') || rFonts?.getAttribute('w:ascii');
+            const eaFont = rFonts?.getAttributeNS(W_NS, 'eastAsia') || rFonts?.getAttribute('w:eastAsia');
+            const hasTab = r.getElementsByTagNameNS(W_NS, 'tab').length > 0;
+            const isDirtyEnCjkRun = isEnTpl && CJK_FONT_RE.test(asciiFont || '');
+            if (isDirtyEnCjkRun) continue;
+            const isValidEnSz = !isEnTpl || (sz && sz !== '24') || Boolean(asciiFont && !CJK_FONT_RE.test(asciiFont) && sz !== '24');
+            if (/^\d+\.\d+$/.test(rTxt) && hasTab) {
+              if (sz && isValidEnSz) seqSzCounts.set(sz, (seqSzCounts.get(sz) || 0) + 1);
+              if (asciiFont && (!isEnTpl || !CJK_FONT_RE.test(asciiFont))) seqFontCounts.set(asciiFont, (seqFontCounts.get(asciiFont) || 0) + 1);
+            } else if (cells.length === 2) {
+              if (sz && isValidEnSz) labelSzCounts.set(sz, (labelSzCounts.get(sz) || 0) + 1);
+              const f = isEnTpl ? (asciiFont && !CJK_FONT_RE.test(asciiFont) ? asciiFont : null) : (eaFont || asciiFont);
+              if (f) labelFontCounts.set(f, (labelFontCounts.get(f) || 0) + 1);
+            }
+          }
+        }
+      }
+
+      const valCell = cells[1];
+      if (valCell?.node) {
+        const runs = Array.from(valCell.node.getElementsByTagNameNS(W_NS, 'r'));
+        for (const r of runs) {
+          if (!(r.textContent || '').trim()) continue;
+          const rPr = r.getElementsByTagNameNS(W_NS, 'rPr')?.[0];
+          const sz = rPr?.getElementsByTagNameNS(W_NS, 'sz')?.[0]?.getAttributeNS(W_NS, 'val')
+            || rPr?.getElementsByTagNameNS(W_NS, 'sz')?.[0]?.getAttribute('w:val');
+          const rFonts = rPr?.getElementsByTagNameNS(W_NS, 'rFonts')?.[0];
+          const asciiFont = rFonts?.getAttributeNS(W_NS, 'ascii') || rFonts?.getAttribute('w:ascii');
+          const eaFont = rFonts?.getAttributeNS(W_NS, 'eastAsia') || rFonts?.getAttribute('w:eastAsia');
+          const isDirtyEnCjkRun = isEnTpl && CJK_FONT_RE.test(asciiFont || '');
+          if (isDirtyEnCjkRun) continue;
+          if (sz && (!isEnTpl || sz !== '24')) valueSzCounts.set(sz, (valueSzCounts.get(sz) || 0) + 1);
+          const f = isEnTpl ? (asciiFont && !CJK_FONT_RE.test(asciiFont) ? asciiFont : null) : (eaFont || asciiFont);
+          if (f) valueFontCounts.set(f, (valueFontCounts.get(f) || 0) + 1);
+        }
+      }
+    }
+  }
+
+  const standardTableWidthDxa = Number(pickMode(tblWidthCounts, 9781)) || 9781;
+  const twoColStr = pickMode(twoColCounts, `${Math.round(standardTableWidthDxa * 0.3598)}:${standardTableWidthDxa - Math.round(standardTableWidthDxa * 0.3598)}`);
+  const [rawC0, rawC1] = twoColStr.split(':').map(Number);
+  let col0 = rawC0 || 3519;
+  let col1 = rawC1 || (standardTableWidthDxa - col0);
+  if (col0 + col1 !== standardTableWidthDxa) {
+    if (col0 >= standardTableWidthDxa - 1000) col0 = Math.round(standardTableWidthDxa * 0.3598);
+    col1 = standardTableWidthDxa - col0;
+  }
+
+  const geometryProfile = {
+    standardTableWidthDxa,
+    standardTwoColGridDxa: [col0, col1]
+  };
+
+  const detectedValSz = isEnTpl ? '19' : pickMode(valueSzCounts, '24');
+  const detectedLabelSz = isEnTpl ? detectedValSz : pickMode(labelSzCounts, detectedValSz);
+  const detectedSeqSz = isEnTpl ? detectedValSz : pickMode(seqSzCounts, '21');
+  const detectedFont = isEnTpl
+    ? (valueFontCounts.size > 0 && !valueFontCounts.has('Times New Roman') ? pickMode(valueFontCounts, 'Arial') : 'Arial')
+    : pickMode(valueFontCounts, pickMode(labelFontCounts, '宋体'));
+  const detectedSeqFont = isEnTpl ? detectedFont : pickMode(seqFontCounts, 'Times New Roman');
+  const tierA = 420;
+  const tierB = 560;
+
+  const typographyProfile = {
+    isEnglish: isEnTpl,
+    fontFamily: detectedFont,
+    seqFontFamily: detectedSeqFont,
+    labelFontSize: detectedLabelSz,
+    seqFontSize: detectedSeqSz,
+    valueFontSize: detectedValSz,
+    tabStops: { tierA, tierB }
+  };
+
+  return { geometryProfile, typographyProfile };
+}
+
+/**
  * 检索模板拓扑结构元数据 (Inspect Template Schema)
  */
 export async function inspectTemplateSchema(templateKey = 'CN_Guanzhi') {
@@ -174,16 +319,44 @@ export async function inspectTemplateSchema(templateKey = 'CN_Guanzhi') {
     const gridCols = tblNode ? Array.from(tblNode.getElementsByTagNameNS(W_NS, 'gridCol')) : [];
     const gridWidths = gridCols.map(c => Number(c.getAttributeNS(W_NS, 'w') || c.getAttribute('w:w') || 0));
 
-    const rowsInfo = (record.rows || []).map((row, rIdx) => ({
-      rowIndex: rIdx,
-      cellsCount: row.cells.length,
-      cells: row.cells.map((cell, cIdx) => ({
-        cellIndex: cIdx,
-        text: (cell.text || '').trim(),
-        isLabel: cIdx === 0,
-        gridSpan: Number(cell.node?.getAttributeNS?.(W_NS, 'gridSpan') || cell.node?.getAttribute?.('w:gridSpan') || '1')
-      }))
-    }));
+    const rowsInfo = (record.rows || []).map((row, rIdx) => {
+      const cells = row.cells.map((cell, cIdx) => {
+        const pNode = cell.node?.getElementsByTagNameNS?.(W_NS, 'p')?.[0];
+        const pPr = pNode?.getElementsByTagNameNS?.(W_NS, 'pPr')?.[0];
+        const jcEl = pPr?.getElementsByTagNameNS?.(W_NS, 'jc')?.[0];
+        const indEl = pPr?.getElementsByTagNameNS?.(W_NS, 'ind')?.[0];
+        const tcPr = cell.node?.getElementsByTagNameNS?.(W_NS, 'tcPr')?.[0];
+        const vAlignEl = tcPr?.getElementsByTagNameNS?.(W_NS, 'vAlign')?.[0];
+        const jc = jcEl ? (jcEl.getAttributeNS(W_NS, 'val') || jcEl.getAttribute('w:val') || null) : null;
+        const vAlign = vAlignEl ? (vAlignEl.getAttributeNS(W_NS, 'val') || vAlignEl.getAttribute('w:val') || null) : null;
+        const hasIndent = Boolean(indEl && indEl.attributes && indEl.attributes.length > 0);
+        return {
+          cellIndex: cIdx,
+          text: (cell.text || '').trim(),
+          isLabel: cIdx === 0,
+          gridSpan: Number(cell.node?.getAttributeNS?.(W_NS, 'gridSpan') || cell.node?.getAttribute?.('w:gridSpan') || '1'),
+          jc,
+          vAlign,
+          hasIndent
+        };
+      });
+      const c0Txt = cells[0]?.text || '';
+      let alignmentPolicy = 'KV_TWO_COL';
+      if (rIdx === 0) {
+        alignmentPolicy = 'SECTION_TITLE';
+      } else if (cells.length >= 3 && (secNum === 3 || secNum === 8 || cells.some(c => c.jc === 'center'))) {
+        alignmentPolicy = 'MULTI_COL_CENTER';
+      } else if (cells.length === 1) {
+        alignmentPolicy = 'FULL_WIDTH_LEFT';
+      }
+      return {
+        rowIndex: rIdx,
+        cellsCount: row.cells.length,
+        alignmentPolicy,
+        zeroIndentRequired: alignmentPolicy === 'MULTI_COL_CENTER',
+        cells
+      };
+    });
 
     sectionsSchema[secNum] = {
       sectionNumber: secNum,
@@ -196,43 +369,16 @@ export async function inspectTemplateSchema(templateKey = 'CN_Guanzhi') {
   }
 
   const isEnTpl = tplInfo.language === 'en';
-  const detectedValueSz = (() => {
-    const counts = new Map();
-    for (const record of engine.records || []) {
-      for (const row of (record.rows || []).slice(1)) {
-        const valCell = row.cells?.[1];
-        if (!valCell?.node) continue;
-        const szNodes = Array.from(valCell.node.getElementsByTagNameNS(W_NS, 'sz'));
-        for (const sn of szNodes) {
-          const v = sn.getAttributeNS(W_NS, 'val') || sn.getAttribute('w:val');
-          if (v) counts.set(v, (counts.get(v) || 0) + 1);
-        }
-      }
-    }
-    let best = isEnTpl ? '19' : '24';
-    let maxC = 0;
-    for (const [v, c] of counts.entries()) {
-      if (c > maxC) { maxC = c; best = v; }
-    }
-    return best;
-  })();
-
-  const typographyProfile = {
-    isEnglish: isEnTpl,
-    fontFamily: isEnTpl ? 'Arial' : '宋体',
-    seqFontFamily: isEnTpl ? 'Arial' : 'Times New Roman',
-    labelFontSize: isEnTpl ? '19' : '24',
-    seqFontSize: isEnTpl ? '19' : '21',
-    valueFontSize: isEnTpl ? '19' : (detectedValueSz || '24'),
-    tabStops: { tierA: 420, tierB: 560 }
-  };
+  const { geometryProfile, typographyProfile } = detectTemplateProfile(engine, isEnTpl);
 
   return {
     templateKey: tplInfo.key,
     name: tplInfo.name,
     language: tplInfo.language,
     company: tplInfo.company,
+    geometryProfile,
     typographyProfile,
+    templateProfile: { geometryProfile, typographyProfile },
     sections: sectionsSchema,
     availableChannels: [
       'createWorkSession',
@@ -313,6 +459,7 @@ export async function createWorkSession(templateKeyOrOptions = 'CN_Guanzhi', wor
     workingPath: workingFile,
     workingDir: dir,
     engine,
+    templateProfile: detectTemplateProfile(engine, tplInfo.language === 'en'),
     modelCode,
     modifiedSections: new Set(),
     checkpoints: new Map()
@@ -1214,8 +1361,47 @@ export function rollback(session, name = 'default') {
 }
 
 /**
+ * 安全写入 WordprocessingML 属性，防止 xmldom 下混用 setAttribute 与 setAttributeNS 导致重复属性
+ */
+function setWAttr(el, localName, val) {
+  if (!el) return;
+  if (el.hasAttribute(`w:${localName}`)) el.removeAttribute(`w:${localName}`);
+  if (el.hasAttributeNS(W_NS, localName)) el.removeAttributeNS(W_NS, localName);
+  el.setAttributeNS(W_NS, `w:${localName}`, String(val));
+}
+
+/**
+ * 清除段落 w:ind 缩进节点（用于居中单元格消除母版遗留偏心缩进）
+ */
+function clearParagraphIndent(pPr) {
+  if (!pPr) return;
+  const oldInds = Array.from(pPr.getElementsByTagNameNS(W_NS, 'ind'));
+  for (const indEl of oldInds) {
+    pPr.removeChild(indEl);
+  }
+}
+
+/**
+ * 锁定单元格垂直居中 (vAlign=center)
+ */
+function setCellVerticalCenter(cellNode, doc) {
+  if (!cellNode) return;
+  let tcPr = cellNode.getElementsByTagNameNS(W_NS, 'tcPr')?.[0];
+  if (!tcPr) {
+    tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+    cellNode.insertBefore(tcPr, cellNode.firstChild);
+  }
+  let vAlignEl = tcPr.getElementsByTagNameNS(W_NS, 'vAlign')?.[0];
+  if (!vAlignEl) {
+    vAlignEl = doc.createElementNS(W_NS, 'w:vAlign');
+    tcPr.appendChild(vAlignEl);
+  }
+  vAlignEl.setAttributeNS(W_NS, 'w:val', 'center');
+}
+
+/**
  * Section 3 成分网格居中对齐强化 (Format Section 3 Grid Center)
- * 审计规范要求：S3 表头行及组分数据行（r >= 3）所有单元格必须居中对齐 (jc=center)
+ * 审计规范要求：S3 表头行及组分数据行（r >= 3）所有单元格必须居中对齐 (jc=center, vAlign=center) 且零 w:ind 干扰
  */
 export function formatSection3GridCenter(session) {
   const record = (session.engine.records || []).find(r => r.sectionNumber === 3);
@@ -1223,9 +1409,12 @@ export function formatSection3GridCenter(session) {
 
   for (let rIdx = 3; rIdx < record.rows.length; rIdx++) {
     const row = record.rows[rIdx];
+    const rowTxt = (row.cells || []).map(c => c.text || '').join(' ').trim();
+    if (/^(?:3\.2[\s\t]*)?(?:成分|Ingredients)(?:\b|$)/i.test(rowTxt)) continue;
     for (const cell of (row.cells || [])) {
       if (!cell?.node) continue;
       const doc = cell.node.ownerDocument || session.engine.documentXml;
+      setCellVerticalCenter(cell.node, doc);
       const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
       for (const p of ps) {
         let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
@@ -1233,6 +1422,7 @@ export function formatSection3GridCenter(session) {
           pPr = doc.createElementNS(W_NS, 'w:pPr');
           p.insertBefore(pPr, p.firstChild);
         }
+        clearParagraphIndent(pPr);
         let jc = pPr.getElementsByTagNameNS(W_NS, 'jc')?.[0];
         if (!jc) {
           jc = doc.createElementNS(W_NS, 'w:jc');
@@ -1307,6 +1497,10 @@ function setRunStyleNodes(doc, runNode, { fontFamily, fontSize, bold } = {}) {
       rFonts = doc.createElementNS(W_NS, 'w:rFonts');
       rPr.appendChild(rFonts);
     }
+    ['ascii', 'hAnsi', 'eastAsia', 'cs'].forEach(a => {
+      if (rFonts.hasAttribute(`w:${a}`)) rFonts.removeAttribute(`w:${a}`);
+      if (rFonts.hasAttributeNS(W_NS, a)) rFonts.removeAttributeNS(W_NS, a);
+    });
     rFonts.setAttributeNS(W_NS, 'w:ascii', fontFamily);
     rFonts.setAttributeNS(W_NS, 'w:hAnsi', fontFamily);
     rFonts.setAttributeNS(W_NS, 'w:eastAsia', fontFamily);
@@ -1318,6 +1512,7 @@ function setRunStyleNodes(doc, runNode, { fontFamily, fontSize, bold } = {}) {
       sz = doc.createElementNS(W_NS, 'w:sz');
       rPr.appendChild(sz);
     }
+    if (sz.hasAttribute('w:val')) sz.removeAttribute('w:val');
     sz.setAttributeNS(W_NS, 'w:val', String(fontSize));
 
     let szCs = rPr.getElementsByTagNameNS(W_NS, 'szCs')?.[0];
@@ -1325,30 +1520,62 @@ function setRunStyleNodes(doc, runNode, { fontFamily, fontSize, bold } = {}) {
       szCs = doc.createElementNS(W_NS, 'w:szCs');
       rPr.appendChild(szCs);
     }
+    if (szCs.hasAttribute('w:val')) szCs.removeAttribute('w:val');
     szCs.setAttributeNS(W_NS, 'w:val', String(fontSize));
   }
   if (bold === true) {
     if (!rPr.getElementsByTagNameNS(W_NS, 'b')?.[0]) {
       rPr.appendChild(doc.createElementNS(W_NS, 'w:b'));
     }
+  } else if (bold === false) {
+    Array.from(rPr.getElementsByTagNameNS(W_NS, 'b')).forEach(n => rPr.removeChild(n));
+    Array.from(rPr.getElementsByTagNameNS(W_NS, 'bCs')).forEach(n => rPr.removeChild(n));
   }
 }
+
+export const GLOBAL_ROLE_STYLE_TOKENS = {
+  STANDARD_TABLE_WIDTH_DXA: 9781,
+  STANDARD_TWO_COL_GRID_DXA: [3519, 6262],
+  getProfile(isEn = false, typographyProfile = null) {
+    return {
+      isEnglish: isEn,
+      fontFamily: typographyProfile?.fontFamily || (isEn ? 'Arial' : '宋体'),
+      seqFontFamily: typographyProfile?.seqFontFamily || (isEn ? 'Arial' : 'Times New Roman'),
+      labelFontSize: typographyProfile?.labelFontSize || (isEn ? '19' : '24'),
+      seqFontSize: typographyProfile?.seqFontSize || (isEn ? '19' : '21'),
+      valueFontSize: typographyProfile?.valueFontSize || (isEn ? '19' : '24'),
+      tabStops: typographyProfile?.tabStops || { tierA: 420, tierB: 560 }
+    };
+  },
+  getRoleSpec(role, profile) {
+    switch (role) {
+      case 'SEQ_NUM':
+        return { fontFamily: profile.seqFontFamily, fontSize: profile.seqFontSize, bold: true, jc: 'left' };
+      case 'LABEL':
+        return { fontFamily: profile.fontFamily, fontSize: profile.labelFontSize, bold: true, jc: 'left' };
+      case 'BOLD_EXPLANATION':
+        return { fontFamily: profile.fontFamily, fontSize: profile.labelFontSize, bold: true, jc: 'left' };
+      case 'EXPLANATION':
+        return { fontFamily: profile.fontFamily, fontSize: profile.valueFontSize, bold: false, jc: 'left' };
+      case 'VALUE':
+      default:
+        return { fontFamily: profile.fontFamily, fontSize: profile.valueFontSize, bold: false, jc: 'left' };
+    }
+  }
+};
 
 /**
  * 拓扑驱动的编辑器全局几何与字体硬锁 (Apply Topology Typography Lock - REQ-TOPO-LOCK-01~02)
  * 严格以当前模板提取的 typographyProfile 为唯一准绳，统一字号、字体、子题头加粗、单 <w:tab/> 与 420/560 dxa 标尺。
  */
 export function applyTopologyTypographyLock(session, typographyProfile = null) {
-  const isEn = Boolean(typographyProfile?.isEnglish ?? session.isEnglish);
-  const profile = {
-    isEnglish: isEn,
-    fontFamily: typographyProfile?.fontFamily || (isEn ? 'Arial' : '宋体'),
-    seqFontFamily: typographyProfile?.seqFontFamily || (isEn ? 'Arial' : 'Times New Roman'),
-    labelFontSize: typographyProfile?.labelFontSize || (isEn ? '19' : '24'),
-    seqFontSize: typographyProfile?.seqFontSize || (isEn ? '19' : '21'),
-    valueFontSize: typographyProfile?.valueFontSize || (isEn ? '19' : '24'),
-    tabStops: typographyProfile?.tabStops || { tierA: 420, tierB: 560 }
-  };
+  const activeTypo = typographyProfile || session.templateProfile?.typographyProfile || null;
+  const geom = session.templateProfile?.geometryProfile || {};
+  const stdWidthDxa = geom.standardTableWidthDxa || GLOBAL_ROLE_STYLE_TOKENS.STANDARD_TABLE_WIDTH_DXA;
+  const stdTwoColDxa = geom.standardTwoColGridDxa || GLOBAL_ROLE_STYLE_TOKENS.STANDARD_TWO_COL_GRID_DXA;
+
+  const isEn = Boolean(activeTypo?.isEnglish ?? session.isEnglish);
+  const profile = GLOBAL_ROLE_STYLE_TOKENS.getProfile(isEn, activeTypo);
 
   const doc = session.engine.documentXml;
   if (!doc) return { success: false };
@@ -1367,7 +1594,126 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
     const secNum = record.sectionNumber;
     if (!Array.isArray(record.rows)) continue;
 
-    // 0. 排查并补全 16 个 Section 标题序号 (保留源文件/模板继承的标题文本，绝不改写为长标题)
+    const tblNode = record.tableNode || record.node || record.rows?.[0]?.node?.parentNode;
+
+    // Section 11 模板残留 3 列行（c0 为空占位格/vMerge）物理清理：直接从 XML <w:tr> 移除空 c0，确保 100% 归位为标准 2 列 KV
+    if (secNum === 11 && tblNode) {
+      const trNodes = Array.from(tblNode.getElementsByTagNameNS(W_NS, 'tr'));
+      for (let rIdx = 1; rIdx < trNodes.length; rIdx++) {
+        const tr = trNodes[rIdx];
+        const tcs = Array.from(tr.childNodes).filter(n => n.nodeType === 1 && n.localName === 'tc');
+        if (tcs.length === 3 && !(tcs[0].textContent || '').trim()) {
+          tr.removeChild(tcs[0]);
+          const row = record.rows[rIdx];
+          if (row?.cells?.length === 3 && !(row.cells[0]?.text || '').trim()) {
+            row.cells.splice(0, 1);
+          }
+        }
+      }
+    }
+
+    // @ANTIGRAVITY_INVARIANT_LOCK_START: 统一 16 个 Section 表格总宽度为 stdWidthDxa（消除 Section 8 等异类表宽），Section 11 纯 2 列/通栏结构重建标准 2 列 tblGrid
+    if (tblNode) {
+      let tblPr = tblNode.getElementsByTagNameNS(W_NS, 'tblPr')?.[0];
+      if (!tblPr) {
+        tblPr = doc.createElementNS(W_NS, 'w:tblPr');
+        tblNode.insertBefore(tblPr, tblNode.firstChild);
+      }
+      let tblW = tblPr.getElementsByTagNameNS(W_NS, 'tblW')?.[0];
+      if (!tblW) {
+        tblW = doc.createElementNS(W_NS, 'w:tblW');
+        tblPr.appendChild(tblW);
+      }
+      setWAttr(tblW, 'w', stdWidthDxa);
+      setWAttr(tblW, 'type', 'dxa');
+
+      // 统一所有章节 tblGrid 总宽为 stdWidthDxa（消除 Table 8 9860 dxa 等异类列网格，保留首列标签宽度）
+      if (secNum !== 11) {
+        const tblGridAll = tblNode.getElementsByTagNameNS(W_NS, 'tblGrid')?.[0];
+        if (tblGridAll) {
+          const gcs = Array.from(tblGridAll.getElementsByTagNameNS(W_NS, 'gridCol'));
+          const gcWidths = gcs.map(gc => Number(gc.getAttributeNS(W_NS, 'w') || gc.getAttribute('w:w') || 0));
+          const gcSum = gcWidths.reduce((a, b) => a + b, 0);
+          if (gcs.length > 0 && gcSum > 0 && gcSum !== stdWidthDxa) {
+            const diff = stdWidthDxa - gcSum;
+            const lastIdx = gcs.length - 1;
+            const newLastW = Math.max(400, gcWidths[lastIdx] + diff);
+            setWAttr(gcs[lastIdx], 'w', newLastW);
+            for (const r of record.rows) {
+              const rCells = r.cells || [];
+              if (rCells.length === 1 && rCells[0]?.node) {
+                const tcW = rCells[0].node.getElementsByTagNameNS(W_NS, 'tcPr')?.[0]?.getElementsByTagNameNS(W_NS, 'tcW')?.[0];
+                if (tcW) setWAttr(tcW, 'w', stdWidthDxa);
+              } else if (rCells.length >= 2) {
+                const tcWs = rCells.map(c => Number(c?.node?.getElementsByTagNameNS(W_NS, 'tcPr')?.[0]?.getElementsByTagNameNS(W_NS, 'tcW')?.[0]?.getAttributeNS(W_NS, 'w') || c?.node?.getElementsByTagNameNS(W_NS, 'tcPr')?.[0]?.getElementsByTagNameNS(W_NS, 'tcW')?.[0]?.getAttribute('w:w') || 0));
+                const rSum = tcWs.reduce((a, b) => a + b, 0);
+                if (rSum > 0 && rSum !== stdWidthDxa) {
+                  const lastCellTcW = rCells[rCells.length - 1]?.node?.getElementsByTagNameNS(W_NS, 'tcPr')?.[0]?.getElementsByTagNameNS(W_NS, 'tcW')?.[0];
+                  if (lastCellTcW) {
+                    setWAttr(lastCellTcW, 'w', Math.max(400, tcWs[tcWs.length - 1] + (stdWidthDxa - rSum)));
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (secNum === 11 && record.rows.slice(1).every(r => (r.cells || []).length <= 2)) {
+        const tblGrid = tblNode.getElementsByTagNameNS(W_NS, 'tblGrid')?.[0];
+        if (tblGrid) {
+          Array.from(tblGrid.getElementsByTagNameNS(W_NS, 'gridCol')).forEach(gc => tblGrid.removeChild(gc));
+          for (const colW of stdTwoColDxa) {
+            const gc = doc.createElementNS(W_NS, 'w:gridCol');
+            setWAttr(gc, 'w', colW);
+            tblGrid.appendChild(gc);
+          }
+        }
+        for (const r of record.rows) {
+          const rCells = r.cells || [];
+          if (rCells.length === 1 && rCells[0]?.node) {
+            let tcPr = rCells[0].node.getElementsByTagNameNS(W_NS, 'tcPr')?.[0];
+            if (!tcPr) {
+              tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+              rCells[0].node.insertBefore(tcPr, rCells[0].node.firstChild);
+            }
+            let gs = tcPr.getElementsByTagNameNS(W_NS, 'gridSpan')?.[0];
+            if (!gs) {
+              gs = doc.createElementNS(W_NS, 'w:gridSpan');
+              tcPr.appendChild(gs);
+            }
+            setWAttr(gs, 'val', 2);
+            let tcW = tcPr.getElementsByTagNameNS(W_NS, 'tcW')?.[0];
+            if (!tcW) {
+              tcW = doc.createElementNS(W_NS, 'w:tcW');
+              tcPr.appendChild(tcW);
+            }
+            setWAttr(tcW, 'w', stdWidthDxa);
+            setWAttr(tcW, 'type', 'dxa');
+          } else if (rCells.length === 2) {
+            rCells.forEach((c, idx) => {
+              if (!c?.node) return;
+              let tcPr = c.node.getElementsByTagNameNS(W_NS, 'tcPr')?.[0];
+              if (!tcPr) {
+                tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+                c.node.insertBefore(tcPr, c.node.firstChild);
+              }
+              Array.from(tcPr.getElementsByTagNameNS(W_NS, 'gridSpan')).forEach(g => tcPr.removeChild(g));
+              let tcW = tcPr.getElementsByTagNameNS(W_NS, 'tcW')?.[0];
+              if (!tcW) {
+                tcW = doc.createElementNS(W_NS, 'w:tcW');
+                tcPr.appendChild(tcW);
+              }
+              setWAttr(tcW, 'w', stdTwoColDxa[idx]);
+              setWAttr(tcW, 'type', 'dxa');
+            });
+          }
+        }
+      }
+    }
+    // @ANTIGRAVITY_INVARIANT_LOCK_END
+
+    // 0. 排查并补全 16 个 Section 标题序号 + 页眉/短说明防跨页撕裂 (keepNext / cantSplit)
     if (secNum >= 1 && secNum <= 16 && record.rows[0]?.cells?.length > 0) {
       for (const hCell of record.rows[0].cells) {
         const hTxt = (hCell.text || '').trim();
@@ -1379,13 +1725,33 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
           }
           hCell.text = `${secNum}. ${hTxt}`;
         }
+        for (const hp of Array.from(hCell.node?.getElementsByTagNameNS(W_NS, 'p') || [])) {
+          let hpPr = hp.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
+          if (!hpPr) {
+            hpPr = doc.createElementNS(W_NS, 'w:pPr');
+            hp.insertBefore(hpPr, hp.firstChild);
+          }
+          if (!hpPr.getElementsByTagNameNS(W_NS, 'keepNext')?.[0]) {
+            hpPr.appendChild(doc.createElementNS(W_NS, 'w:keepNext'));
+          }
+        }
+      }
+      if (record.rows[0]?.node) {
+        let hTrPr = record.rows[0].node.getElementsByTagNameNS(W_NS, 'trPr')?.[0];
+        if (!hTrPr) {
+          hTrPr = doc.createElementNS(W_NS, 'w:trPr');
+          record.rows[0].node.insertBefore(hTrPr, record.rows[0].node.firstChild);
+        }
+        if (!hTrPr.getElementsByTagNameNS(W_NS, 'cantSplit')?.[0]) {
+          hTrPr.appendChild(doc.createElementNS(W_NS, 'w:cantSplit'));
+        }
       }
     }
 
     // 终态安全清理：在所有写入与追加结束后，剔除无任何文本内容的纯空幽灵行
     for (let rIdx = record.rows.length - 1; rIdx >= 1; rIdx--) {
       const rowText = (record.rows[rIdx]?.cells || []).map(c => (c.text || '').trim()).join('');
-      if (!rowText) {
+      if (!rowText && record.rows.length > 2) {
         deleteDocxRow(session.engine, record, rIdx);
       }
     }
@@ -1503,6 +1869,9 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
               pPr.appendChild(jcEl);
             }
             jcEl.setAttributeNS(W_NS, 'w:val', targetJc);
+            if (targetJc === 'center') {
+              clearParagraphIndent(pPr);
+            }
           }
         }
         const rawCellText = (cell.text || '').trim();
@@ -1515,9 +1884,9 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
           /^(?:其它的规定|其它规定|Other\s*provisions|符合下列法规|Complies\s*with\s*the\s*following|8\.1\b|控制参数|Control\s*parameters|暴露控制|Exposure\s*controls|手部防护|Hand\s*protection)/i.test(rawCellText)
         );
 
-        // B. 编号标签单 <w:tab/> 间隔与 420/560 dxa 悬挂缩进规范化 (跳过 Section 9 已有激光垂线专职处理)
+        // B. 编号标签单 <w:tab/> 间隔与 420/560 dxa 悬挂缩进规范化 (跳过 Section 9 已有激光垂线专职处理；覆盖 1-col 与 2-col 编号标签如 S8 8.1/8.2)
         let formattedFirstP = null;
-        if (cIdx === 0 && secNum !== 9) {
+        if (cIdx === 0 && secNum !== 9 && !isS8OelDataRow && !isS8OelExplanationRow) {
           const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
           const firstP = ps[0];
           const pText = (firstP?.textContent || '').replace(/\u00A0/g, ' ').trim();
@@ -1538,12 +1907,15 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
               indEl = doc.createElementNS(W_NS, 'w:ind');
               pPr.appendChild(indEl);
             }
-            indEl.setAttributeNS(W_NS, 'w:left', String(targetTabDxa));
-            indEl.setAttributeNS(W_NS, 'w:hanging', String(targetTabDxa));
+            setWAttr(indEl, 'left', targetTabDxa);
+            setWAttr(indEl, 'hanging', targetTabDxa);
             ['firstLine', 'leftChars', 'hangingChars', 'firstLineChars'].forEach(attr => {
               if (indEl.hasAttributeNS(W_NS, attr)) indEl.removeAttributeNS(W_NS, attr);
               if (indEl.hasAttribute(`w:${attr}`)) indEl.removeAttribute(`w:${attr}`);
             });
+
+            const seqStyle = GLOBAL_ROLE_STYLE_TOKENS.getRoleSpec('SEQ_NUM', profile);
+            const lblStyle = GLOBAL_ROLE_STYLE_TOKENS.getRoleSpec('LABEL', profile);
 
             const oldRuns = Array.from(firstP.getElementsByTagNameNS(W_NS, 'r'));
             oldRuns.forEach(r => firstP.removeChild(r));
@@ -1553,22 +1925,14 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
             seqT.textContent = seqStr;
             seqRun.appendChild(seqT);
             seqRun.appendChild(doc.createElementNS(W_NS, 'w:tab'));
-            setRunStyleNodes(doc, seqRun, {
-              fontFamily: profile.seqFontFamily,
-              fontSize: profile.seqFontSize,
-              bold: true
-            });
+            setRunStyleNodes(doc, seqRun, seqStyle);
 
             const bodyRun = doc.createElementNS(W_NS, 'w:r');
             const bodyT = doc.createElementNS(W_NS, 'w:t');
             bodyT.setAttribute('xml:space', 'preserve');
             bodyT.textContent = labelBody;
             bodyRun.appendChild(bodyT);
-            setRunStyleNodes(doc, bodyRun, {
-              fontFamily: profile.fontFamily,
-              fontSize: profile.labelFontSize,
-              bold: true
-            });
+            setRunStyleNodes(doc, bodyRun, lblStyle);
 
             firstP.appendChild(seqRun);
             firstP.appendChild(bodyRun);
@@ -1587,7 +1951,7 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
                 cInd = doc.createElementNS(W_NS, 'w:ind');
                 cpPr.appendChild(cInd);
               }
-              cInd.setAttributeNS(W_NS, 'w:left', String(targetTabDxa));
+              setWAttr(cInd, 'left', targetTabDxa);
               ['hanging', 'firstLine', 'leftChars', 'hangingChars', 'firstLineChars'].forEach(attr => {
                 if (cInd.hasAttributeNS(W_NS, attr)) cInd.removeAttributeNS(W_NS, attr);
                 if (cInd.hasAttribute(`w:${attr}`)) cInd.removeAttribute(`w:${attr}`);
@@ -1595,7 +1959,7 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
             }
           } else if (firstP && (
             (isLabelCol && secNum !== 3)
-            || (secNum === 8 && cells.length === 1 && /^(?:手部防护|氟化橡胶|丁基橡胶|丁腈橡胶|Hand protection|Fluoroelastomer|Butyl rubber|Nitrile rubber)/i.test(rawCellText))
+            || (secNum === 8 && cells.length === 1 && !isS8OelExplanationRow && !/^\d+\.\d+/.test(rawCellText) && (/[：:]$/.test(rawCellText) || /^(?:手部防护|呼吸系统防护|眼睛防护|身体防护|建议|氟化橡胶|丁基橡胶|丁腈橡胶|Hand protection|Respiratory protection|Eye protection|Body protection|Recommendation|Fluoroelastomer|Butyl rubber|Nitrile rubber)/i.test(rawCellText)))
           )) {
             // 通用未编号标签（覆盖 S1 中文名称/化学品分类/供应商信息、S8 防护子标签/手套明细、S13 处理方法等）：
             // 统一注入同基线 w:left (420/560 dxa)，物理清除 hanging/firstLine/*Chars 锯齿，实现首字与带序号标签 100% 垂直齐平
@@ -1609,7 +1973,7 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
               indEl = doc.createElementNS(W_NS, 'w:ind');
               pPr.appendChild(indEl);
             }
-            indEl.setAttributeNS(W_NS, 'w:left', String(targetTabDxa));
+            setWAttr(indEl, 'left', targetTabDxa);
             ['hanging', 'firstLine', 'leftChars', 'hangingChars', 'firstLineChars'].forEach(attr => {
               if (indEl.hasAttributeNS(W_NS, attr)) indEl.removeAttributeNS(W_NS, attr);
               if (indEl.hasAttribute(`w:${attr}`)) indEl.removeAttribute(`w:${attr}`);
@@ -1626,16 +1990,27 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
             pPr = doc.createElementNS(W_NS, 'w:pPr');
             p.insertBefore(pPr, p.firstChild);
           }
-          // @FIX_TAG(2026-11-23/template-editor/FIX-NO-JUSTIFY-BOTH): 全篇表体段落禁用 both/distribute 两端对齐，未显式居中者统一注入 jc=left（保留 S3 3列成分表居中对齐）
-          if (!(secNum === 3 && cells.length >= 3)) {
-            let jcEl = pPr.getElementsByTagNameNS(W_NS, 'jc')?.[0];
-            const curJc = jcEl ? (jcEl.getAttributeNS(W_NS, 'val') || jcEl.getAttribute('w:val')) : null;
-            if (!curJc || curJc === 'both' || curJc === 'distribute') {
+          // @FIX_TAG(2026-11-23/template-editor/FIX-NO-JUSTIFY-BOTH): 全篇表体段落禁用 both/distribute 两端对齐，未显式居中者统一注入 jc=left（保留 S3 3列成分表与 S8 OEL 表居中对齐，并清除居中格残留 w:ind）
+          let jcEl = pPr.getElementsByTagNameNS(W_NS, 'jc')?.[0];
+          const curJc = jcEl ? (jcEl.getAttributeNS(W_NS, 'val') || jcEl.getAttribute('w:val')) : null;
+          const isS3ParentRow = secNum === 3 && /^(?:3\.2[\s\t]*)?(?:成分|Ingredients)(?:\b|$)/i.test(rawCellText);
+          if (secNum === 3 && cells.length >= 3 && !isS3ParentRow) {
+            setCellVerticalCenter(cell.node, doc);
+            if (!jcEl) {
+              jcEl = doc.createElementNS(W_NS, 'w:jc');
+              pPr.appendChild(jcEl);
+            }
+            setWAttr(jcEl, 'val', 'center');
+            clearParagraphIndent(pPr);
+          } else {
+            if (isS3ParentRow || !curJc || curJc === 'both' || curJc === 'distribute') {
               if (!jcEl) {
                 jcEl = doc.createElementNS(W_NS, 'w:jc');
                 pPr.appendChild(jcEl);
               }
-              jcEl.setAttributeNS(W_NS, 'w:val', 'left');
+              setWAttr(jcEl, 'val', 'left');
+            } else if (curJc === 'center') {
+              clearParagraphIndent(pPr);
             }
           }
           const pRPr = pPr.getElementsByTagNameNS(W_NS, 'rPr')?.[0];
@@ -1658,10 +2033,79 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
               bold: roleBold
             });
           }
+          // 通用化学分子式上下标富文本渲染 (CO2, H2O, NO2, SO2, cm3 等，确保中英文双语一致)
+          const pRunsNow = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+          for (const rNode of pRunsNow) {
+            const rPrNode = rNode.getElementsByTagNameNS(W_NS, 'rPr')?.[0];
+            if (rPrNode?.getElementsByTagNameNS(W_NS, 'vertAlign')?.[0]) continue;
+            const tNodes = Array.from(rNode.getElementsByTagNameNS(W_NS, 't'));
+            if (tNodes.length !== 1) continue;
+            const rawT = tNodes[0].textContent || '';
+            const chemRe = /\b(CO|H|NO|SO)(2)\b|\b(H)(2)(O)\b|\b(LD|LC)(50)\b|(cm|m)(³)|\b(cm|m)(3)\b/g;
+            if (!chemRe.test(rawT)) continue;
+            chemRe.lastIndex = 0;
+            const parts = [];
+            let cursor = 0;
+            let m;
+            while ((m = chemRe.exec(rawT)) !== null) {
+              if (m.index > cursor) parts.push({ txt: rawT.slice(cursor, m.index), va: null });
+              if (m[1]) {
+                parts.push({ txt: m[1], va: null }, { txt: m[2], va: 'subscript' });
+              } else if (m[3]) {
+                parts.push({ txt: m[3], va: null }, { txt: m[4], va: 'subscript' }, { txt: m[5], va: null });
+              } else if (m[6]) {
+                parts.push({ txt: m[6], va: null }, { txt: m[7], va: 'subscript' });
+              } else if (m[8]) {
+                parts.push({ txt: m[8], va: null }, { txt: '3', va: 'superscript' });
+              } else if (m[10]) {
+                parts.push({ txt: m[10], va: null }, { txt: m[11], va: 'superscript' });
+              }
+              cursor = m.index + m[0].length;
+            }
+            if (cursor < rawT.length) parts.push({ txt: rawT.slice(cursor), va: null });
+            if (parts.length > 1) {
+              for (const part of parts) {
+                const cloneR = doc.createElementNS(W_NS, 'w:r');
+                const cloneT = doc.createElementNS(W_NS, 'w:t');
+                cloneT.setAttribute('xml:space', 'preserve');
+                cloneT.textContent = part.txt;
+                cloneR.appendChild(cloneT);
+                setRunStyleNodes(doc, cloneR, {
+                  fontFamily: profile.fontFamily,
+                  fontSize: targetSz,
+                  bold: roleBold
+                });
+                if (part.va) {
+                  let crPr = cloneR.getElementsByTagNameNS(W_NS, 'rPr')?.[0];
+                  if (!crPr) {
+                    crPr = doc.createElementNS(W_NS, 'w:rPr');
+                    cloneR.insertBefore(crPr, cloneR.firstChild);
+                  }
+                  const vaEl = doc.createElementNS(W_NS, 'w:vertAlign');
+                  vaEl.setAttributeNS(W_NS, 'w:val', part.va);
+                  crPr.appendChild(vaEl);
+                }
+                p.insertBefore(cloneR, rNode);
+              }
+              p.removeChild(rNode);
+            }
+          }
         }
       }
     }
     session.modifiedSections.add(secNum);
+  }
+
+  // 英文版页脚防超宽折行：将 4984/4984 均分网格调整为 7100/2868 dxa，左格字号统一为 sz=18 (9pt)，确保公司全称+型号单行不折行
+  if (isEn && session.engine?.supportingXml) {
+    for (const [partName, xmlText] of Object.entries(session.engine.supportingXml)) {
+      if (!/^word\/footer\d+\.xml$/.test(partName) || !xmlText || !xmlText.includes('4984')) continue;
+      let ftrXml = xmlText
+        .replace(/<w:gridCol\s+w:w="4984"\s*\/>\s*<w:gridCol\s+w:w="4984"\s*\/>/g, '<w:gridCol w:w="7100"/><w:gridCol w:w="2868"/>')
+        .replace(/(<w:tr\b[\s\S]*?<w:tc\b[\s\S]*?<w:tcW\s+w:w=")4984("[\s\S]*?<\/w:tc>\s*<w:tc\b[\s\S]*?<w:tcW\s+w:w=")4984(")/g, '$17100$22868$3')
+        .replace(/(<w:sz(?:Cs)?\s+w:val=")21(")/g, '$118$2');
+      session.engine.supportingXml[partName] = ftrXml;
+    }
   }
 
   return { success: true, profile };

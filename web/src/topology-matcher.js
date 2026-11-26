@@ -242,20 +242,20 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
     const unmatchedRegular = [];
     let lastMatchedRowIdx = 0;
 
-    // @FIX_TAG(2026-11-24/topology-matcher/FIX-S8-OEL-HEADER): 若 S8 存在多列 OEL 数据，确保"8.2 控制参数"父标签置顶于"工作场所组分控制参数"说明行之前、并一起紧邻位于 OEL 表头之前
+    // @FIX_TAG(2026-11-24/topology-matcher/FIX-S8-CANONICAL): 全场景强制 S8 规范序号 (8.1 暴露控制 -> 8.2 控制参数)，存在多列 OEL 时确保 8.2 紧邻置于 OEL 表头之前
     const tplGridHdrRow = tplMultiRows.find(r => /物质|Substance|Basis|TWA|STEL|OEL|限值/i.test((r.cells || []).map(c => c.text).join(' ')));
     const s8OelAnchorIdx = tplGridHdrRow ? tplGridHdrRow.rowIndex : (tplMultiRows.length > 0 ? tplMultiRows[0].rowIndex : -1);
     const hasOelAnchor = s === 8 && gridData.length > 0 && s8OelAnchorIdx > 0;
-    if (hasOelAnchor) {
+    if (s === 8) {
       const expItem = regularItems.find(it => /暴露控制|Exposure\s*controls?/i.test(it.cleanKey || it.labelCn || it.labelEn || ''));
       const ctrlItem = regularItems.find(it => /控制参数|Control\s*parameters?/i.test(it.cleanKey || it.labelCn || it.labelEn || ''));
       const wpItem = regularItems.find(it => /工作场所.*控制参数|Workplace\s+component\s+control\s+parameters/i.test(it.textCn || it.textEn || it.labelCn || it.labelEn || ''));
       if (expItem) expItem.seq = '8.1';
       if (ctrlItem) {
         ctrlItem.seq = '8.2';
-        ctrlItem._forceInsertBeforeMulti = true;
+        if (hasOelAnchor) ctrlItem._forceInsertBeforeMulti = true;
       }
-      if (wpItem) {
+      if (wpItem && hasOelAnchor) {
         wpItem._forceInsertBeforeMulti = true;
       }
       // 保证 regularItems 中 ctrlItem 严格排在 wpItem 之前
@@ -271,7 +271,7 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
 
     // Section 13 专有拓扑聚合：根据标准 disposition: same_cell 规范，废弃法规说明行统一聚合至首行单列槽位，确保双列处理方法行保持在 Section 13 末行 (INV-S13-TOPOLOGY)
     let effectiveRegularItems = regularItems;
-    // 英文拓扑统一取消 Product Chinese name:，并将完整英文品名写入 1.1 Product name:
+    // @ANTIGRAVITY_INVARIANT_LOCK_START: Section 1 中英文结构差异局部规范（中文保留 1.1 产品名称 + 中文名称 2 行；英文取消 Product Chinese name 并将完整英文品名与型号合并写入 1.1 Product name）
     if (s === 1 && lang === 'en') {
       const prodCnItem = effectiveRegularItems.find(it => /^(?:中文名称|产品中文名称|ProductChinesename)$/i.test((it.cleanKey || it.labelCn || it.labelEn || '').replace(/[：:\s]/g, '')));
       const prodNameItem = effectiveRegularItems.find(it => /^(?:产品名称|Productname)$/i.test((it.cleanKey || it.labelCn || it.labelEn || '').replace(/[：:\s]/g, '')));
@@ -286,6 +286,7 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
       }
       effectiveRegularItems = effectiveRegularItems.filter(it => it !== prodCnItem);
     }
+    // @ANTIGRAVITY_INVARIANT_LOCK_END
     if (s === 13) {
       const explanations = regularItems.filter(i => i.role === 'EXPLANATION');
       const methods = regularItems.filter(i => i.role !== 'EXPLANATION');
@@ -304,25 +305,39 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
       }
     }
 
-    // @FIX_TAG(2026-11-23/topology-matcher/FIX-S3-SEQ32): 中文模板 S3 R2 "3.2成分" 的 3.2 位于隐式编号中，deleteRow 重建后会丢失；强制显式写入 "3.2\t成分" 确保与 EN "3.2\tIngredients" 1:1 对称
-    if (s === 3 && lang === 'zh' && tplRows[2] && /^(?:3\.2\s*)?成分$/.test((tplRows[2].cells?.[0]?.text || '').trim())) {
-      pushOp({ op: 'writeCell', sectionNumber: 3, rowIndex: 2, cellIndex: 0, text: '3.2\t成分', bold: true });
-      secWrites++;
+    // @FIX_TAG(2026-11-26/topology-matcher/UNIFY-S3-SEQ32): 统一由语义角色匹配 S3 "3.2\t成分" / "3.2\tIngredients"，消除硬编码行号 tplRows[2] 与语言分叉
+    if (s === 3 && preGridHeaderItem) {
+      const s3SubHdrRow = tplRows.find(r => r.rowIndex >= 1 && /^(?:3\.2[\s\t]*)?(?:成分|组分|Ingredients)/i.test((r.cells?.[0]?.text || '').trim()));
+      if (s3SubHdrRow) {
+        const subHdrText = lang === 'en' ? '3.2\tIngredients' : '3.2\t成分';
+        pushOp({ op: 'writeCell', sectionNumber: 3, rowIndex: s3SubHdrRow.rowIndex, cellIndex: 0, text: subHdrText, bold: true });
+        secWrites++;
+      }
     }
 
     // @FIX_TAG(2026-11-23/topology-matcher/FIX-BILINGUAL-CANONICAL-ORDER): S6、S9 与 S11 按 Context 2(中文源文件基准)顺序依次覆写双语槽位；双列 KV 仅匹配 cellsCount===2 模板行（跳过 S11 的 1列/3列异构行），确保与原文顺序及 CN/EN 逐行 1:1 对齐
-    if (s === 6 || s === 9 || s === 11) {
+    if (s === 11 && effectiveRegularItems.some(it => it.placement?.gridType === '2_COL_KV')) {
+      // Section 11 2-Col KV 严格按源文顺序依次落位，禁止跨异构模板行乱序匹配
+      let tplCursor = 0;
       effectiveRegularItems.forEach((item) => {
         const { label, value, text } = getItemTexts(item, lang);
         const cleanLabelNoSeq = item.seq ? label.replace(/^\d+\.\d+[\s\t]*/, '') : label;
         const seqPrefixLabel = item.seq ? `${item.seq}\t${cleanLabelNoSeq}` : label;
         const isMergedItem = item.placement?.gridType === '1_COL_MERGED' || item.role === 'EXPLANATION';
-        const targetRow = isMergedItem
-          ? (tplRegularRows.find(r => !usedTplRows.has(r.rowIndex) && r.cellsCount === 1) || tplRegularRows.find(r => !usedTplRows.has(r.rowIndex)))
-          : (tplRegularRows.find(r => !usedTplRows.has(r.rowIndex) && r.cellsCount === 2 && extractSeq(r.cells?.[0]?.text))
-            || (s !== 11 ? tplRegularRows.find(r => !usedTplRows.has(r.rowIndex) && r.cellsCount === 2) : null));
+        let targetRow = null;
+        if (isMergedItem && tplCursor < tplRegularRows.length) {
+          targetRow = tplRegularRows[tplCursor++];
+        } else if (!isMergedItem) {
+          while (tplCursor < tplRegularRows.length && tplRegularRows[tplCursor].cellsCount !== 2) {
+            tplCursor++;
+          }
+          if (tplCursor < tplRegularRows.length) {
+            targetRow = tplRegularRows[tplCursor++];
+          }
+        }
         if (targetRow) {
           usedTplRows.add(targetRow.rowIndex);
+          lastMatchedRowIdx = targetRow.rowIndex;
           if (isMergedItem) {
             const mergedContent = ((item.role === 'SUB_LABEL' || item.role === 'SEQ_LABEL') && item.seq && !(item.valueCn || item.valueEn))
               ? seqPrefixLabel
@@ -333,8 +348,51 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
               rowIndex: targetRow.rowIndex,
               content: mergedContent,
               options: {
-                bold: Boolean((item.boldLabel && !(item.valueCn || item.valueEn)) || item.role === 'SEQ_LABEL'),
-                boldSubheaders: Boolean(item.boldLabel && (item.valueCn || item.valueEn) && item.role !== 'SEQ_LABEL'),
+                bold: Boolean((item.boldLabel && !(item.valueCn || item.valueEn)) || item.role === 'SEQ_LABEL' || /^11\.\d+/.test(mergedContent)),
+                boldSubheaders: false,
+                indentDxa: 0
+              }
+            });
+            secMerges++;
+            secWrites++;
+          } else {
+            if (seqPrefixLabel) {
+              pushOp({ op: 'writeCell', sectionNumber: s, rowIndex: targetRow.rowIndex, cellIndex: 0, text: seqPrefixLabel, bold: true });
+              secWrites++;
+            }
+            pushOp({ op: 'writeCell', sectionNumber: s, rowIndex: targetRow.rowIndex, cellIndex: 1, text: value });
+            secWrites++;
+          }
+        } else {
+          unmatchedRegular.push({ item, insertAfterRowIndex: lastMatchedRowIdx });
+        }
+      });
+    } else if (s === 6 || s === 9 || s === 11) {
+      effectiveRegularItems.forEach((item) => {
+        const { label, value, text } = getItemTexts(item, lang);
+        const cleanLabelNoSeq = item.seq ? label.replace(/^\d+\.\d+[\s\t]*/, '') : label;
+        const seqPrefixLabel = item.seq ? `${item.seq}\t${cleanLabelNoSeq}` : label;
+        const isMergedItem = item.placement?.gridType === '1_COL_MERGED' || item.role === 'EXPLANATION';
+        const targetRow = isMergedItem
+          ? (tplRegularRows.find(r => !usedTplRows.has(r.rowIndex) && r.cellsCount === 1) || tplRegularRows.find(r => !usedTplRows.has(r.rowIndex)))
+          : (tplRegularRows.find(r => !usedTplRows.has(r.rowIndex) && r.cellsCount === 2 && extractSeq(r.cells?.[0]?.text))
+            || tplRegularRows.find(r => !usedTplRows.has(r.rowIndex) && r.cellsCount === 2));
+        if (targetRow) {
+          usedTplRows.add(targetRow.rowIndex);
+          lastMatchedRowIdx = targetRow.rowIndex;
+          if (isMergedItem) {
+            const mergedContent = ((item.role === 'SUB_LABEL' || item.role === 'SEQ_LABEL') && item.seq && !(item.valueCn || item.valueEn))
+              ? seqPrefixLabel
+              : text;
+            pushOp({
+              op: 'morphToFullWidth',
+              sectionNumber: s,
+              rowIndex: targetRow.rowIndex,
+              content: mergedContent,
+              options: {
+                isSection11: s === 11 && item.role === 'FULL_WIDTH_STRUCTURED',
+                bold: !(s === 11 && item.role === 'FULL_WIDTH_STRUCTURED') && Boolean((item.boldLabel && !(item.valueCn || item.valueEn)) || item.role === 'SEQ_LABEL'),
+                boldSubheaders: !(s === 11 && item.role === 'FULL_WIDTH_STRUCTURED') && Boolean(item.boldLabel && (item.valueCn || item.valueEn) && item.role !== 'SEQ_LABEL'),
                 indentDxa: item.indentDxa || 0
               }
             });
@@ -349,7 +407,7 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
             secWrites++;
           }
         } else {
-          unmatchedRegular.push(item);
+          unmatchedRegular.push({ item, insertAfterRowIndex: lastMatchedRowIdx });
         }
       });
     } else {
@@ -363,7 +421,7 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
           secMerges++;
           secWrites++;
         } else {
-          unmatchedRegular.push(item);
+          unmatchedRegular.push({ item, insertAfterRowIndex: lastMatchedRowIdx });
         }
         continue;
       }
@@ -372,12 +430,13 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
       const itemAnchorEn = normAnchor(item.labelEn);
       let matched = null;
 
-      // 语义锚点优先匹配，禁止仅凭序号盲目覆盖不同语义的模板行
+      const wantsTwoCol = item.placement?.gridType === '2_COL_KV';
+      // 语义锚点优先匹配，禁止仅凭序号盲目覆盖不同语义的模板行；若期望 2_COL_KV 则仅匹配 cellsCount === 2 的双列行
       if (itemAnchor) {
-        matched = tplRegularRows.find(r => !usedTplRows.has(r.rowIndex) && normAnchor(r.cells?.[0]?.text) === itemAnchor);
+        matched = tplRegularRows.find(r => !usedTplRows.has(r.rowIndex) && (!wantsTwoCol || r.cellsCount === 2) && normAnchor(r.cells?.[0]?.text) === itemAnchor);
       }
       if (!matched && itemAnchorEn) {
-        matched = tplRegularRows.find(r => !usedTplRows.has(r.rowIndex) && normAnchor(r.cells?.[0]?.text) === itemAnchorEn);
+        matched = tplRegularRows.find(r => !usedTplRows.has(r.rowIndex) && (!wantsTwoCol || r.cellsCount === 2) && normAnchor(r.cells?.[0]?.text) === itemAnchorEn);
       }
       if (!matched && (item.role === 'EXPLANATION' || item.role === 'REGULATION_ITEM')) {
         matched = tplRegularRows.find(r => !usedTplRows.has(r.rowIndex) && (r.cellsCount === 1 || !r.cells?.[0]?.text));

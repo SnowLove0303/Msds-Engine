@@ -129,14 +129,16 @@ export function auditPhase2Context2({ context2 }) {
 
   const hasCjkRe = /[\u4e00-\u9fff]/;
   const badSymbolRe = /[≧≦]/;
-  const badUnitSpaceRe = /\d+(?:\.\d+)?(?:mm|min|cm|mg|kg|hPa)\b/i;
+  const badUnitSpaceRe = /\d+(?:\.\d+)?(?:g\/cm3|g\/cm³|mm|min|cm|mg|kg|hPa|mPa·s)\b/i;
   const badEnColonRe = /[A-Za-z0-9)\]]\s*：/;
+  const badEgSpaceRe = /\(\s*e\.\s+g\.,/i;
   const badCnTrailingDotRe = /\b(?:mm|min|cm|mg|kg|hPa)\.(?=\s|$|；|;)/i;
 
   let cjkLeaks = [];
   let badSymbols = [];
   let badUnits = [];
   let badEnColons = [];
+  let badEgSpaces = [];
   let badTrailingDots = [];
 
   for (let s = 1; s <= 16; s++) {
@@ -155,6 +157,7 @@ export function auditPhase2Context2({ context2 }) {
       for (const t of enFields) {
         if (hasCjkRe.test(t)) cjkLeaks.push(`S${s}: ${t.slice(0, 30)}`);
         if (badEnColonRe.test(t)) badEnColons.push(`S${s}: ${t.slice(0, 30)}`);
+        if (badEgSpaceRe.test(t)) badEgSpaces.push(`S${s}: ${t.slice(0, 30)}`);
       }
       for (const t of [...cnFields, ...enFields]) {
         if (badSymbolRe.test(t)) badSymbols.push(`S${s}: ${t.slice(0, 30)}`);
@@ -193,6 +196,13 @@ export function auditPhase2Context2({ context2 }) {
     sectionRef: 'Context2',
     title: 'Context 2 数值与计量单位空格隔离校验',
     measuredDetail: badUnits.length === 0 ? '空格规范' : `发现 ${badUnits.length} 处: ${badUnits.slice(0, 3).join('; ')}`
+  });
+  check(badEgSpaces.length === 0, {
+    severity: 'FAIL',
+    ruleId: 'P2_EN_EG_SPACING',
+    sectionRef: 'Context2',
+    title: 'Context 2 英文缩写 (e.g.,) 空格规范校验',
+    measuredDetail: badEgSpaces.length === 0 ? '缩写空格规范' : `发现 ${badEgSpaces.length} 处: ${badEgSpaces.slice(0, 3).join('; ')}`
   });
   check(badTrailingDots.length === 0, {
     severity: 'FAIL',
@@ -240,8 +250,35 @@ export function auditPhase4TopologyOps({ operations = [], presetKey = null }) {
 /**
  * Phase 5 机械审计: 4 份 DOCX 底层 XML 排版几何、边框、CAS、双语对称与双主体隔离
  */
-export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
+export async function auditPhase5DocxFiles({ targetDir, modelCode, sourcePath = null, templateProfile = null }) {
   const { check, summarize } = makeCollector('PHASE_5_DOCX');
+
+  let sourceHasS2PictogramValue = false;
+  if (sourcePath && fs.existsSync(sourcePath)) {
+    try {
+      const srcEngine = await loadDocx(fs.readFileSync(sourcePath), path.basename(sourcePath));
+      const srcS2 = (srcEngine.records || []).find(r => r.sectionNumber === 2);
+      if (srcS2) {
+        const srcS2Lines = (srcS2.rows || [])
+          .flatMap(r => (r.cells || []).map(c => c.text || ''))
+          .flatMap(t => t.split(/\r?\n/))
+          .map(l => l.trim())
+          .filter(Boolean);
+        for (let i = 0; i < srcS2Lines.length; i++) {
+          if (/^GHS[-\s]*象形图[：:]/i.test(srcS2Lines[i])) {
+            const inlineVal = srcS2Lines[i].replace(/^GHS[-\s]*象形图[：:]\s*/i, '').trim();
+            const nextVal = (i + 1 < srcS2Lines.length) ? srcS2Lines[i + 1] : '';
+            if (inlineVal || (nextVal && !/^(?:2\.\d|信号词|警告词|危险性|防范|GHS)/i.test(nextVal))) {
+              sourceHasS2PictogramValue = true;
+              break;
+            }
+          }
+        }
+      }
+    } catch {
+      // 源文预检失败不阻断其余 Phase 5 校验
+    }
+  }
 
   const specs = [
     { key: 'CN_Guanzhi', lang: 'zh', company: 'guanzhi', file: `${modelCode} msds_CN 冠志.docx` },
@@ -369,14 +406,20 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
     if (s3) {
       let casErrors = 0;
       let nonCenterS3 = 0;
+      let s3CenteredIndentHits = [];
       const tbl3 = tbls[2];
       if (tbl3) {
         const trs3 = Array.from(tbl3.getElementsByTagName('w:tr'));
         for (let r = 3; r < trs3.length; r++) {
           const tcs = Array.from(trs3[r].getElementsByTagName('w:tc'));
-          for (const tc of tcs) {
+          for (let c = 0; c < tcs.length; c++) {
+            const tc = tcs[c];
             const jc = tc.getElementsByTagName('w:jc')[0]?.getAttribute('w:val');
             if (jc !== 'center') nonCenterS3++;
+            const indEl = tc.getElementsByTagName('w:ind')[0];
+            if (indEl && indEl.attributes && indEl.attributes.length > 0) {
+              s3CenteredIndentHits.push(`R${r}C${c}`);
+            }
           }
           if (r >= 4 && tcs[1]) {
             const casTxt = (tcs[1].textContent || '').trim();
@@ -390,6 +433,13 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
         sectionRef: `${sp.key} S3`,
         title: `${sp.key}: Section 3 成分网格居中对齐`,
         measuredDetail: `nonCenterCells=${nonCenterS3}`
+      });
+      check(s3CenteredIndentHits.length === 0, {
+        severity: 'FAIL',
+        ruleId: 'P5_S3_ZERO_INDENT',
+        sectionRef: `${sp.key} S3`,
+        title: `${sp.key}: Section 3 居中单元格零缩进干扰校验`,
+        measuredDetail: s3CenteredIndentHits.length === 0 ? '0 残留缩进' : `残留 w:ind: ${s3CenteredIndentHits.join(', ')}`
       });
       check(casErrors === 0, {
         severity: 'CRITICAL',
@@ -416,8 +466,28 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
       });
     }
 
-    // 6. 字体字阶均一性 (EN 全篇 sz=19，豁免 Section 9 黄金标尺序号 sz=21)
+    // 6. 字体字阶均一性 (自适应模板字阶众数，豁免 Section 9 黄金标尺序号)
     if (sp.lang === 'en') {
+      const enSzCounts = new Map();
+      for (let tIdx = 0; tIdx < tbls.length; tIdx++) {
+        const trs = Array.from(tbls[tIdx].getElementsByTagName('w:tr'));
+        for (let r = 1; r < trs.length; r++) {
+          const tcs = Array.from(trs[r].childNodes).filter(n => n.nodeType === 1 && n.localName === 'tc');
+          const valTc = tcs.length === 2 ? tcs[1] : null;
+          if (!valTc) continue;
+          for (const sNode of Array.from(valTc.getElementsByTagName('w:sz'))) {
+            const v = sNode.getAttribute('w:val');
+            if (v && Number(v) >= 10 && Number(v) <= 40) enSzCounts.set(v, (enSzCounts.get(v) || 0) + 1);
+          }
+        }
+      }
+      let expectedEnSz = templateProfile?.typographyProfile?.valueFontSize || '19';
+      if (!templateProfile?.typographyProfile?.valueFontSize && enSzCounts.size > 0) {
+        let maxC = 0;
+        for (const [k, c] of enSzCounts.entries()) {
+          if (c > maxC) { maxC = c; expectedEnSz = k; }
+        }
+      }
       let non19 = 0;
       for (let tIdx = 0; tIdx < tbls.length; tIdx++) {
         const tbl = tbls[tIdx];
@@ -430,7 +500,7 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
             const szs = Array.from(rNode.getElementsByTagName('w:sz'));
             for (const sNode of szs) {
               const v = sNode.getAttribute('w:val');
-              if (v && v !== '19' && !(isS9Seq && v === '21')) non19++;
+              if (v && v !== expectedEnSz && !(isS9Seq && (v === '21' || v === expectedEnSz))) non19++;
             }
           }
         }
@@ -439,8 +509,8 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
         severity: 'FAIL',
         ruleId: 'P5_EN_FONT_SZ19',
         sectionRef: sp.key,
-        title: `${sp.key}: 英文全篇表格字阶均一性校验 (sz=19)`,
-        measuredDetail: `non19Count=${non19}`
+        title: `${sp.key}: 英文全篇表格字阶均一性校验 (sz=${expectedEnSz})`,
+        measuredDetail: `nonUniformCount=${non19}, expectedSz=${expectedEnSz}`
       });
     }
   }
@@ -607,6 +677,135 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
       title: `${spKey}: 左侧标签单元格防重拼接校验`,
       measuredDetail: dupSeqHits.length === 0 ? '0 处重复序号拼接' : dupSeqHits.slice(0, 5).join(', ')
     });
+
+    // 12. Section 8 规范子节顺序校验 (8.1 暴露控制/Exposure controls 必须先于 8.2 控制参数/Control parameters)
+    const rec8 = (eng.records || []).find(r => r.sectionNumber === 8);
+    if (rec8) {
+      let idx81 = -1;
+      let idx82 = -1;
+      let txt81 = '';
+      let txt82 = '';
+      for (let rIdx = 1; rIdx < (rec8.rows || []).length; rIdx++) {
+        const c0Txt = (rec8.rows[rIdx]?.cells?.[0]?.text || '').trim();
+        if (/^8\.1\b/.test(c0Txt) && idx81 < 0) {
+          idx81 = rIdx;
+          txt81 = c0Txt;
+        } else if (/^8\.2\b/.test(c0Txt) && idx82 < 0) {
+          idx82 = rIdx;
+          txt82 = c0Txt;
+        }
+      }
+      const s8OrderOk =
+        idx81 >= 0 &&
+        idx82 >= 0 &&
+        idx81 < idx82 &&
+        /暴露控制|Exposure\s*controls?/i.test(txt81) &&
+        !/控制参数|Control\s*parameters?/i.test(txt81) &&
+        /控制参数|Control\s*parameters?/i.test(txt82) &&
+        !/暴露控制|Exposure\s*controls?/i.test(txt82);
+      check(s8OrderOk, {
+        severity: 'CRITICAL',
+        ruleId: 'P5_S8_CANONICAL_ORDER',
+        sectionRef: `${spKey} S8`,
+        title: `${spKey}: Section 8 规范顺序校验 (8.1 暴露控制 -> 8.2 控制参数)`,
+        measuredDetail: s8OrderOk
+          ? `8.1(${txt81})@R${idx81} -> 8.2(${txt82})@R${idx82}`
+          : `顺序/语义错误: 8.1="${txt81}"@R${idx81}, 8.2="${txt82}"@R${idx82}`
+      });
+    }
+
+    // 13. 单元格内连续重复非空行校验 (防止 S2 等出现两行完全相同文本堆叠)
+    const adjDupHits = [];
+    for (const rec of (eng.records || [])) {
+      const s = rec.sectionNumber;
+      if (!s) continue;
+      for (let rIdx = 1; rIdx < (rec.rows || []).length; rIdx++) {
+        const cells = rec.rows[rIdx]?.cells || [];
+        cells.forEach((cell, ci) => {
+          const lines = (cell?.text || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+          for (let li = 1; li < lines.length; li++) {
+            if (lines[li] === lines[li - 1]) {
+              adjDupHits.push(`S${s}:R${rIdx}:C${ci}(${lines[li].slice(0, 24)})`);
+            }
+          }
+        });
+      }
+    }
+    check(adjDupHits.length === 0, {
+      severity: 'FAIL',
+      ruleId: 'P5_NO_ADJACENT_DUPLICATE_LINES',
+      sectionRef: spKey,
+      title: `${spKey}: 单元格连续重复行校验`,
+      measuredDetail: adjDupHits.length === 0 ? '0 处连续重复行' : adjDupHits.slice(0, 5).join(', ')
+    });
+
+    // 14. 源文 S2 含带值 GHS象形图 时，产出物必须保留对应标签
+    if (sourceHasS2PictogramValue) {
+      const rec2 = (eng.records || []).find(r => r.sectionNumber === 2);
+      const s2AllText = (rec2?.rows || []).flatMap(r => (r.cells || []).map(c => c.text || '')).join('\n');
+      const hasPictogramLbl = entry.sp.lang === 'zh'
+        ? /GHS[-\s]*象形图[：:]/i.test(s2AllText)
+        : /GHS\s*Pictograms?:/i.test(s2AllText);
+      check(hasPictogramLbl, {
+        severity: 'CRITICAL',
+        ruleId: 'P5_S2_PICTOGRAM_LABEL_RETENTION',
+        sectionRef: `${spKey} S2`,
+        title: `${spKey}: Section 2 源文 GHS象形图 标签保留校验`,
+        measuredDetail: hasPictogramLbl ? '已保留 GHS象形图/Pictograms 标签' : '缺失 GHS象形图/Pictograms 标签'
+      });
+    }
+
+    // 15. 英文版 SI 单位间距与 (e.g.,) 缩写空格校验
+    if (entry.sp.lang === 'en') {
+      const enSpacingHits = [];
+      const badUnitRe = /\d+(?:\.\d+)?(?:g\/cm3|g\/cm³|mm|min|cm|mg|kg|hPa|mPa·s)\b/i;
+      const badEgRe = /\(\s*e\.\s+g\.,/i;
+      for (const rec of (eng.records || [])) {
+        const s = rec.sectionNumber;
+        if (!s) continue;
+        for (let rIdx = 1; rIdx < (rec.rows || []).length; rIdx++) {
+          for (const cell of (rec.rows[rIdx]?.cells || [])) {
+            const t = (cell?.text || '').trim();
+            if (!t) continue;
+            const um = t.match(badUnitRe);
+            if (um) enSpacingHits.push(`S${s}:R${rIdx}(${um[0]})`);
+            const em = t.match(badEgRe);
+            if (em) enSpacingHits.push(`S${s}:R${rIdx}(${em[0]})`);
+          }
+        }
+      }
+      check(enSpacingHits.length === 0, {
+        severity: 'FAIL',
+        ruleId: 'P5_EN_SPACING_TYPOS',
+        sectionRef: spKey,
+        title: `${spKey}: 英文版 SI 单位间距与缩写空格校验`,
+        measuredDetail: enSpacingHits.length === 0 ? '0 处间距异常' : enSpacingHits.slice(0, 5).join(', ')
+      });
+    }
+  }
+
+  // 16. 中英文标签温度单位 (/℃ -> /°C) 守恒校验
+  for (const [cnKey, enKey] of [['CN_Guanzhi', 'EN_Guanzhi'], ['CN_Guocai', 'EN_Guocai']]) {
+    if (!loaded[cnKey] || !loaded[enKey]) continue;
+    const cnS9 = (loaded[cnKey].engine.records || []).find(r => r.sectionNumber === 9);
+    const enS9 = (loaded[enKey].engine.records || []).find(r => r.sectionNumber === 9);
+    if (!cnS9 || !enS9) continue;
+    const unitLossHits = [];
+    const maxRows = Math.min(cnS9.rows.length, enS9.rows.length);
+    for (let rIdx = 1; rIdx < maxRows; rIdx++) {
+      const cnLbl = (cnS9.rows[rIdx]?.cells?.[0]?.text || '').trim();
+      const enLbl = (enS9.rows[rIdx]?.cells?.[0]?.text || '').trim();
+      if (/\/[℃°]C?/i.test(cnLbl) && !/[℃°]C/i.test(enLbl)) {
+        unitLossHits.push(`S9:R${rIdx}(CN="${cnLbl.slice(0, 22)}" -> EN="${enLbl.slice(0, 28)}")`);
+      }
+    }
+    check(unitLossHits.length === 0, {
+      severity: 'FAIL',
+      ruleId: 'P5_UNIT_SUFFIX_PRESERVATION',
+      sectionRef: `${enKey} S9`,
+      title: `${enKey}: 中英文标签温度单位 (/℃ -> /°C) 守恒校验`,
+      measuredDetail: unitLossHits.length === 0 ? '温度单位 100% 保留' : unitLossHits.slice(0, 5).join(', ')
+    });
   }
 
   // @FIX_TAG(2026-11-23/staged-mechanical-audit/FIX-BILINGUAL-SEQ-SYMMETRY): 12. 中英文双语子序号 1:1 对称校验 (防止如 S7 7.1/7.2 或 S8 8.1/8.2 在 CN 丢失而 EN 存在)
@@ -660,7 +859,7 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
           continue;
         }
         const cNums = (cCells.map(c => c.text || '').join(' ').replace(/^(\d+\.\d+)/gm, '').match(/\d+(?:\.\d+)?/g) || []);
-        const eStr = eCells.map(c => c.text || '').join(' ').replace(/^(\d+\.\d+)/gm, '');
+        const eStr = eCells.map(c => c.text || '').join(' ').replace(/³/g, '3').replace(/²/g, '2').replace(/^(\d+\.\d+)/gm, '');
         const eNums = eStr.match(/\d+(?:\.\d+)?/g) || [];
         const missing = cNums.filter(n => !eNums.includes(n));
         if (missing.length > 0) {
@@ -726,7 +925,7 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
       if (!pt) continue;
       const pInd = p.getElementsByTagName('w:ind')?.[0];
       const leftVal = Number(pInd?.getAttribute('w:left') || 0);
-      const isParent = /^(?:2\.\d+\s*(?:紧急情况概述|Emergency\s+overview|物质或混合物的?分类|Classification\s+of\s+the\s+substance\s+or\s+mixture|标签要素|Label\s+elements|危险性说明|危害性说明|Hazard\s+statements?|防范说明|Precautionary\s+statements?|其他危险|其他危害|Other\s+hazards)|物质或混合物的?分类|Classification\s+of\s+the\s+substance\s+or\s+mixture)[：:]?$/i.test(pt);
+      const isParent = /^(?:2\.\d+\s*(?:紧急情况概述|Emergency\s+overview|物质或混合物的?分类|Classification\s+of\s+the\s+substance\s+or\s+mixture|标签要素|Label\s+elements|危险性说明|危害性说明|Hazard\s+statements?|防范说明|Precautionary\s+statements?|其他危险|其他危害|Other\s+hazards)(?:[：:].*)?|物质或混合物的?分类|Classification\s+of\s+the\s+substance\s+or\s+mixture)[：:]?$/i.test(pt);
       const isSubSub = /^(?:预防措施|事故响应|安全储存|安全存储|废弃处置|Prevention|Response|Storage|Disposal)(?:[：:]|$)/i.test(pt);
       const isSub = !isSubSub && /^(?:(?:GHS[-\s]*)?(?:危险性?类别|危险性?分类|分类|Hazard\s*categories|Hazard\s*classification|Classification|象形图|pictograms?)|信号词|警告词|Signal\s*word|必须列在标签上的有害成[份分]|Hazardous\s+components\s+(?:which\s+must\s+|to\s+)?be\s+listed\s+on\s+the\s+label|危险性说明|危害性说明|Hazard\s*statements?|防范说明|Precautionary\s*statements?|[^：\n]*聚合物GHS危险性分类|Hydroxy\s+acrylic\s+polymer\s+GHS\s+classification)(?:[：:]|$)/i.test(pt);
       if (isParent) {
@@ -808,6 +1007,285 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
         title: `${spKey}: Section 8 OEL 组分值行非加粗校验`,
         measuredDetail: boldOelRows.length === 0 ? 'S8 OEL 数据行首列为常规非加粗值样式' : `发现 ${boldOelRows.length} 行 OEL 数据行首列仍加粗`
       });
+
+      // 17c. Section 8 控制参数物质表 (OEL 多列表) 居中对齐与零缩进校验
+      if (oelHdrIdx >= 0) {
+        const oelAlignIssues = [];
+        for (let r = oelHdrIdx; r < s8Rows.length; r++) {
+          const row = s8Rows[r];
+          if (!row?.cells || row.cells.length < 3) continue;
+          for (let c = 0; c < row.cells.length; c++) {
+            const tcNode = row.cells[c]?.node;
+            if (!tcNode) continue;
+            const jc = tcNode.getElementsByTagName('w:jc')[0]?.getAttribute('w:val');
+            const va = tcNode.getElementsByTagName('w:vAlign')[0]?.getAttribute('w:val');
+            const indEl = tcNode.getElementsByTagName('w:ind')[0];
+            if (jc !== 'center' || va !== 'center' || (indEl && indEl.attributes && indEl.attributes.length > 0)) {
+              oelAlignIssues.push(`R${r}C${c}(jc=${jc},va=${va},ind=${Boolean(indEl && indEl.attributes.length)})`);
+            }
+          }
+        }
+        check(oelAlignIssues.length === 0, {
+          severity: 'FAIL',
+          ruleId: 'P5_S8_OEL_ALIGNMENT',
+          sectionRef: `${spKey}:S8`,
+          title: `${spKey}: Section 8 控制参数物质表居中与零缩进校验`,
+          measuredDetail: oelAlignIssues.length === 0 ? 'S8 OEL 多列表表头及物质行全部居中且无缩进干扰' : oelAlignIssues.slice(0, 6).join(', ')
+        });
+      }
+    }
+
+    // 18. 防复发门禁：Section 11 单物质端点禁止错用通栏 & 英文版化学式下标存在性
+    const s11Rec = eng.records.find(r => r.sectionNumber === 11);
+    if (s11Rec && (s11Rec.rows || []).length >= 2) {
+      const s11BodyRows = s11Rec.rows.slice(1);
+      const twoColS11Count = s11BodyRows.filter(r => (r.cells || []).length === 2).length;
+      const giantMergedS11 = s11BodyRows.filter(r => (r.cells || []).length === 1 && (r.cells[0]?.text || '').length > 400);
+      if (giantMergedS11.length > 0 && twoColS11Count === 0) {
+        const giantTxt = giantMergedS11.map(r => r.cells[0]?.text || '').join('\n');
+        const hasMultipleEndpoints = (giantTxt.match(/(?:急性毒性|原发性|致敏性|Acute\s+oral|Primary\s+skin)/gi) || []).length >= 2;
+        const hasMultipleSubstances = /(?:组分\s*1|组分\s*2|Component\s*1|Component\s*2)/i.test(giantTxt);
+        check(!(hasMultipleEndpoints && !hasMultipleSubstances), {
+          severity: 'FAIL',
+          ruleId: 'P5_S11_DUAL_PARADIGM',
+          sectionRef: `${spKey}:S11`,
+          title: `${spKey}: Section 11 单物质端点 2 列分列结构校验`,
+          measuredDetail: '单物质多端点 Section 11 被压成单一通栏单元格，未按 2 列分列'
+        });
+      }
+      if (twoColS11Count > 0) {
+        const badS11Rows = s11BodyRows.filter((r, i) => i >= 2 && (r.cells || []).length !== 2);
+        check(badS11Rows.length === 0, {
+          severity: 'FAIL',
+          ruleId: 'P5_S11_2COL_CONSISTENCY',
+          sectionRef: `${spKey}:S11`,
+          title: `${spKey}: Section 11 2列分列模式行结构一致性校验`,
+          measuredDetail: badS11Rows.length === 0 ? `全部 ${twoColS11Count} 行均为标准 2 列 KV` : `存在 ${badS11Rows.length} 行非 2 列异构行`
+        });
+
+        const s11TblNode = s11Rec.tableNode || s11Rec.node || s11Rec.rows?.[0]?.node?.parentNode;
+        const s11GridCols = s11TblNode?.getElementsByTagName('w:gridCol')?.length || 0;
+        check(s11GridCols === 2, {
+          severity: 'FAIL',
+          ruleId: 'P5_S11_2COL_GRID',
+          sectionRef: `${spKey}:S11`,
+          title: `${spKey}: Section 11 tblGrid 必须为标准 2 列网格`,
+          measuredDetail: `s11GridCols=${s11GridCols}`
+        });
+      }
+
+      const hasToxEffectHdr = s11BodyRows.some(r => /^11\.\d+\s*毒理学效应[：:]?$/i.test((r.cells?.[0]?.text || '').trim()));
+      check(!hasToxEffectHdr, {
+        severity: 'FAIL',
+        ruleId: 'P5_S11_NO_TOX_EFFECT_HDR',
+        sectionRef: `${spKey}:S11`,
+        title: `${spKey}: Section 11 禁止残留 11.1 毒理学效应干扰行`,
+        measuredDetail: hasToxEffectHdr ? '仍残留 11.1 毒理学效应干扰行' : '已清理 11.1 毒理学效应，端点直接从 11.1 顺次编号'
+      });
+
+      if (!isEnDoc) {
+        const s11PunctBad = [];
+        for (const r of s11BodyRows) {
+          const c0t = (r.cells?.[0]?.text || '').trim();
+          if (/急性毒性[，,]\s*(?:经口|经皮|吸入)/.test(c0t)) {
+            s11PunctBad.push(`未转括号(${c0t})`);
+          }
+          if (/生殖毒性\s*\/\s*(?:生育力|致畸形)/.test(c0t) || /STOT\s*评估\s*[-–—]\s*(?:一次性接触|重复性接触)/i.test(c0t)) {
+            s11PunctBad.push(`父子标签未转括号(${c0t})`);
+          }
+          if (/亚急性[，,\s]*亚慢性和延迟毒性[：:]/.test(c0t)) {
+            s11PunctBad.push(`整体标签不应加冒号(${c0t})`);
+          }
+        }
+        check(s11PunctBad.length === 0, {
+          severity: 'FAIL',
+          ruleId: 'P5_S11_PUNCTUATION_RULE',
+          sectionRef: `${spKey}:S11`,
+          title: `${spKey}: Section 11 括号与冒号分层规范校验`,
+          measuredDetail: s11PunctBad.length === 0 ? '多途径标签已转括号加冒号，亚急性整体标签无冒号' : s11PunctBad.join(', ')
+        });
+      } else {
+        // 英文版 S11 多研究块（如 11.6 Sensitization）空行分隔一致性校验
+        const sensRow = s11BodyRows.find(r => /Sensitization/i.test((r.cells?.[0]?.text || '').trim()));
+        if (sensRow && /Buehler/i.test(sensRow.cells?.[1]?.text || '') && /LLNA/i.test(sensRow.cells?.[1]?.text || '')) {
+          const sensPs = Array.from(sensRow.cells[1].node?.getElementsByTagName('w:p') || []);
+          const hasBlankSep = sensPs.some((p, idx) => idx > 0 && idx < sensPs.length - 1 && !(p.textContent || '').trim());
+          check(hasBlankSep, {
+            severity: 'FAIL',
+            ruleId: 'P5_S11_EN_STUDY_BLANK_SEP',
+            sectionRef: `${spKey}:S11`,
+            title: `${spKey}: 英文版 Section 11 多研究块空行分隔（与中文一致）`,
+            measuredDetail: hasBlankSep ? `11.6 Sensitization 含空行分隔 (pCount=${sensPs.length})` : `11.6 Sensitization 缺少研究块间空行 (pCount=${sensPs.length})`
+          });
+        }
+      }
+    }
+
+    // 18b. 全局表宽统一校验 (自适应模板众数表宽，排除异类表) + S3 3.2 成分左对齐 + S8 8.2 两列结构
+    const tblWCounts = new Map();
+    for (const rec of eng.records) {
+      if (!rec.sectionNumber || rec.sectionNumber < 1 || rec.sectionNumber > 16) continue;
+      const tblNode = rec.tableNode || rec.node || rec.rows?.[0]?.node?.parentNode;
+      const tblW = Number(tblNode?.getElementsByTagName('w:tblPr')?.[0]?.getElementsByTagName('w:tblW')?.[0]?.getAttribute('w:w') || 0);
+      if (tblW >= 5000 && tblW <= 15000) tblWCounts.set(tblW, (tblWCounts.get(tblW) || 0) + 1);
+    }
+    let expectedTableWidth = templateProfile?.geometryProfile?.standardTableWidthDxa || 0;
+    if (!expectedTableWidth && tblWCounts.size > 0) {
+      let maxWCount = 0;
+      for (const [wVal, cnt] of tblWCounts.entries()) {
+        if (cnt > maxWCount) { maxWCount = cnt; expectedTableWidth = wVal; }
+      }
+    }
+    if (!expectedTableWidth) expectedTableWidth = 9781;
+
+    const widthOutliers = [];
+    for (const rec of eng.records) {
+      if (!rec.sectionNumber || rec.sectionNumber < 1 || rec.sectionNumber > 16) continue;
+      const tblNode = rec.tableNode || rec.node || rec.rows?.[0]?.node?.parentNode;
+      const tblW = tblNode?.getElementsByTagName('w:tblPr')?.[0]?.getElementsByTagName('w:tblW')?.[0]?.getAttribute('w:w');
+      if (tblW && Number(tblW) !== expectedTableWidth) {
+        widthOutliers.push(`S${rec.sectionNumber}(tblW=${tblW})`);
+      }
+      const gcs = Array.from(tblNode?.getElementsByTagName('w:gridCol') || []);
+      if (gcs.length > 0) {
+        const gcSum = gcs.reduce((acc, gc) => acc + Number(gc.getAttribute('w:w') || 0), 0);
+        if (gcSum > 0 && gcSum !== expectedTableWidth) {
+          widthOutliers.push(`S${rec.sectionNumber}(gridSum=${gcSum})`);
+        }
+      }
+    }
+    check(widthOutliers.length === 0, {
+      severity: 'FAIL',
+      ruleId: 'P5_TABLE_WIDTH_UNIFIED',
+      sectionRef: `${spKey}:Tables`,
+      title: `${spKey}: 16 个 Section 表格总宽度统一为 ${expectedTableWidth} dxa`,
+      measuredDetail: widthOutliers.length === 0 ? `全部表格 tblW 与 gridCol 宽度之和均为 ${expectedTableWidth} dxa` : `异类表宽: ${widthOutliers.join(', ')}`
+    });
+
+    const s3RecCheck = eng.records.find(r => r.sectionNumber === 3);
+    const s3ParentRow = s3RecCheck?.rows?.find(r => /^(?:3\.2[\s\t]*)?(?:成分|Ingredients)(?:\b|$)/i.test((r.cells?.[0]?.text || '').trim()));
+    if (s3ParentRow) {
+      const s3pJc = s3ParentRow.cells?.[0]?.node?.getElementsByTagName('w:jc')?.[0]?.getAttribute('w:val') || 'left';
+      check(s3pJc !== 'center', {
+        severity: 'FAIL',
+        ruleId: 'P5_S3_PARENT_LEFT',
+        sectionRef: `${spKey}:S3`,
+        title: `${spKey}: Section 3 3.2 成分父标签禁止居中对齐`,
+        measuredDetail: `jc=${s3pJc}`
+      });
+    }
+
+    if (s8Rec) {
+      const s8CtrlRow = (s8Rec.rows || []).find(r => /^(?:\d+\.\d+[\s\t]*)?(?:控制参数|Control\s*parameters)/i.test((r.cells?.[0]?.text || '').trim()));
+      const hasS8OelTable = (s8Rec.rows || []).some(r => (r.cells || []).length >= 3);
+      if (s8CtrlRow && !hasS8OelTable) {
+        const ctrlOk = (s8CtrlRow.cells || []).length === 2 && Boolean((s8CtrlRow.cells?.[1]?.text || '').trim());
+        check(ctrlOk, {
+          severity: 'FAIL',
+          ruleId: 'P5_S8_2COL_CTRL_PARAM',
+          sectionRef: `${spKey}:S8`,
+          title: `${spKey}: Section 8 8.2 控制参数两列键值结构校验`,
+          measuredDetail: ctrlOk ? '8.2 控制参数已形成标准两列键值结构' : `8.2 控制参数列数=${(s8CtrlRow.cells || []).length}`
+        });
+      }
+    }
+
+    // 18c. 全局角色分类与真实 XML 文本格式深度校验 (自适应模板角色字阶 SEQ_NUM / LABEL / VALUE)
+    const seqSzCounts = new Map();
+    const valSzCounts = new Map();
+    for (const rec of eng.records) {
+      if (!rec.sectionNumber || rec.sectionNumber < 1 || rec.sectionNumber > 16 || [2, 9].includes(rec.sectionNumber)) continue;
+      for (let rIdx = 1; rIdx < (rec.rows || []).length; rIdx++) {
+        const cells = rec.rows[rIdx].cells || [];
+        if ((rec.sectionNumber === 3 || rec.sectionNumber === 8) && cells.length >= 3) continue;
+        if (cells[0]?.node) {
+          for (const r of Array.from(cells[0].node.getElementsByTagName('w:r'))) {
+            const rTxt = (r.textContent || '').trim();
+            if (/^\d+\.\d+$/.test(rTxt) && r.getElementsByTagName('w:tab').length > 0) {
+              const sz = r.getElementsByTagName('w:sz')[0]?.getAttribute('w:val');
+              if (sz) seqSzCounts.set(sz, (seqSzCounts.get(sz) || 0) + 1);
+            }
+          }
+        }
+        if (cells.length === 2 && cells[1]?.node) {
+          for (const r of Array.from(cells[1].node.getElementsByTagName('w:r'))) {
+            if (!(r.textContent || '').trim()) continue;
+            const sz = r.getElementsByTagName('w:sz')[0]?.getAttribute('w:val');
+            if (sz) valSzCounts.set(sz, (valSzCounts.get(sz) || 0) + 1);
+          }
+        }
+      }
+    }
+    const pickAuditMode = (m, fb) => {
+      let best = fb;
+      let mx = 0;
+      for (const [k, c] of m.entries()) { if (c > mx) { mx = c; best = k; } }
+      return best;
+    };
+    const expSeqSz = templateProfile?.typographyProfile?.seqFontSize || pickAuditMode(seqSzCounts, isEnDoc ? '19' : '21');
+    const expTextSz = templateProfile?.typographyProfile?.valueFontSize || pickAuditMode(valSzCounts, isEnDoc ? '19' : '24');
+    const roleFormatBad = [];
+    for (const rec of eng.records) {
+      if (!rec.sectionNumber || rec.sectionNumber < 1 || rec.sectionNumber > 16 || [2, 9].includes(rec.sectionNumber)) continue;
+      for (let rIdx = 1; rIdx < (rec.rows || []).length; rIdx++) {
+        const row = rec.rows[rIdx];
+        const cells = row.cells || [];
+        if (rec.sectionNumber === 3 && cells.length >= 3) continue;
+        if (rec.sectionNumber === 8 && cells.length >= 3) continue;
+        for (let cIdx = 0; cIdx < cells.length; cIdx++) {
+          const cell = cells[cIdx];
+          if (!cell?.node) continue;
+          const ps = Array.from(cell.node.getElementsByTagName('w:p'));
+          for (const p of ps) {
+            const pTxt = (p.textContent || '').trim();
+            if (!pTxt) continue;
+            const runs = Array.from(p.getElementsByTagName('w:r'));
+            for (const r of runs) {
+              const rTxt = (r.textContent || '').trim();
+              if (!rTxt) continue;
+              const rPr = r.getElementsByTagName('w:rPr')[0];
+              const szVal = rPr?.getElementsByTagName('w:sz')[0]?.getAttribute('w:val');
+              const isBold = Boolean(rPr?.getElementsByTagName('w:b')[0]);
+              const isSeqRun = cIdx === 0 && /^\d+\.\d+$/.test(rTxt) && r.getElementsByTagName('w:tab').length > 0;
+              const isAllowedBoldExp = /^(?:其它的规定|其它规定|Other\s*provisions|符合下列法规|Complies\s*with\s*the\s*following)/i.test(pTxt);
+              if (isSeqRun) {
+                if (szVal !== expSeqSz || !isBold) {
+                  roleFormatBad.push(`S${rec.sectionNumber}R${rIdx}(SEQ_NUM:${rTxt},sz=${szVal}!=${expSeqSz},b=${isBold})`);
+                }
+              } else if (cIdx >= 1 && cells.length === 2) {
+                if (szVal !== expTextSz || isBold) {
+                  roleFormatBad.push(`S${rec.sectionNumber}R${rIdx}(VALUE:${rTxt.slice(0, 10)},sz=${szVal}!=${expTextSz},b=${isBold})`);
+                }
+              } else if (cIdx === 0 && cells.length === 2 && !isAllowedBoldExp) {
+                if (szVal !== expTextSz || !isBold) {
+                  roleFormatBad.push(`S${rec.sectionNumber}R${rIdx}(LABEL:${rTxt.slice(0, 10)},sz=${szVal}!=${expTextSz},b=${isBold})`);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    check(roleFormatBad.length === 0, {
+      severity: 'FAIL',
+      ruleId: 'P5_GLOBAL_ROLE_TYPOGRAPHY',
+      sectionRef: `${spKey}:Roles`,
+      title: `${spKey}: 全局角色分类与真实 XML 文本格式深度校验`,
+      measuredDetail: roleFormatBad.length === 0 ? '全篇序号/标签/值角色 XML 字号与字重 100% 合规' : roleFormatBad.slice(0, 6).join(', ')
+    });
+
+    if (isEnDoc) {
+      const docTextAll = eng.records.map(r => (r.rows || []).map(row => (row.cells || []).map(c => c.text || '').join(' ')).join(' ')).join(' ');
+      if (/\b(?:CO2|H2O|NO2|SO2)\b/.test(docTextAll)) {
+        const subRuns = eng.documentXml ? eng.documentXml.getElementsByTagName('w:vertAlign').length : 0;
+        check(subRuns > 0, {
+          severity: 'FAIL',
+          ruleId: 'P5_EN_CHEMICAL_SUBSCRIPT',
+          sectionRef: `${spKey}:Tokens`,
+          title: `${spKey}: 英文版化学分子式上下标富文本校验`,
+          measuredDetail: `vertAlignCount=${subRuns}`
+        });
+      }
     }
 
     if (isEnDoc) {
@@ -820,6 +1298,24 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode }) {
         title: `${spKey}: 英文拓扑取消 Product Chinese name 校验`,
         measuredDetail: hasProdCnName ? 'EN S1 仍残留 Product Chinese name 行' : 'EN S1 已取消 Product Chinese name'
       });
+    } else {
+      // @ANTIGRAVITY_INVARIANT_LOCK_START: 中文 Section 1 中文名称必须硬性拼接产品型号（如 羟基聚氨酯分散体 HPU-7651），严禁缺失或被审计误判
+      const s1Rec = eng.records.find(r => r.sectionNumber === 1);
+      const prodRow = s1Rec?.rows?.find(r => /产品名称/.test((r.cells?.[0]?.text || '').trim()));
+      const cnNameRow = s1Rec?.rows?.find(r => /中文名称/.test((r.cells?.[0]?.text || '').trim()));
+      const prodModel = (prodRow?.cells?.[1]?.text || '').trim();
+      const cnNameVal = (cnNameRow?.cells?.[1]?.text || '').trim();
+      if (prodModel && cnNameVal) {
+        const hasModelInCnName = cnNameVal.toUpperCase().includes(prodModel.toUpperCase());
+        check(hasModelInCnName, {
+          severity: 'FAIL',
+          ruleId: 'P5_CN_NAME_MODEL_LOCK',
+          sectionRef: `${spKey}:S1`,
+          title: `${spKey}: 中文 Section 1 中文名称硬性拼接型号校验`,
+          measuredDetail: hasModelInCnName ? `中文名称已含型号 (${cnNameVal})` : `中文名称 "${cnNameVal}" 缺失型号 "${prodModel}"`
+        });
+      }
+      // @ANTIGRAVITY_INVARIANT_LOCK_END
     }
 
     // 19. 页眉页脚型号匹配校验 (严禁残留模板默认 PEA-4139)
@@ -926,6 +1422,28 @@ export function auditPhase6PdfFiles({ targetDir, modelCode }) {
     }
   }
 
+  // 防复发门禁：严禁使用裸 LibreOffice 转换 PDF（必须通过官方 pdf-converter.js Windows COM / WPS/Word）
+  if (pdfPaths.length > 0) {
+    const pyCheck = spawnSync('python', [
+      '-c',
+      `import pymupdf, json, sys; res=[{'f':p.split('\\\\')[-1], 'prod':pymupdf.open(p).metadata.get('producer','')} for p in sys.argv[1:]]; print(json.dumps(res))`,
+      ...pdfPaths
+    ], { encoding: 'utf8', timeout: 15000 });
+    if (pyCheck.status === 0 && pyCheck.stdout) {
+      try {
+        const producers = JSON.parse(pyCheck.stdout.trim());
+        const badPdfs = producers.filter(x => /LibreOffice/i.test(x.prod || ''));
+        check(badPdfs.length === 0, {
+          severity: 'CRITICAL',
+          ruleId: 'P6_PDF_NO_LIBREOFFICE',
+          sectionRef: 'PDF_Converter',
+          title: 'PDF 官方转换通道校验 (禁止 LibreOffice 裸转)',
+          measuredDetail: badPdfs.length === 0 ? '全部 PDF 均为官方 COM (WPS/Word) 转换' : `违规 LibreOffice PDF: ${badPdfs.map(x => `${x.f}(${x.prod})`).join(', ')}`
+        });
+      } catch {}
+    }
+  }
+
   if (mtimes.length === 8) {
     const spreadSec = (Math.max(...mtimes) - Math.min(...mtimes)) / 1000;
     check(spreadSec <= 300, {
@@ -1002,7 +1520,7 @@ export async function runStagedMechanicalAudit({
     results.push(auditPhase4TopologyOps({ operations, presetKey }));
   }
   if ((stage === 'all' || stage === 'docx') && targetDir && modelCode) {
-    results.push(await auditPhase5DocxFiles({ targetDir, modelCode }));
+    results.push(await auditPhase5DocxFiles({ targetDir, modelCode, sourcePath }));
   }
   if ((stage === 'all' || stage === 'pdf') && targetDir && modelCode) {
     results.push(auditPhase6PdfFiles({ targetDir, modelCode }));

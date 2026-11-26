@@ -70,5 +70,10 @@ web/output_exact/
 
 # User database & execution log data (local user data only, strictly excluded from repo)
 web/data/user_exec_logs.db*
+web/data/msds_repo.db*
 user_data/
+
+# Test kit outputs & process artifacts (strictly excluded from repo)
+体系交接文档/MSDS_Studio_Agent_Test_Kit/output/
+process_artifacts/
 

@@ -471,8 +471,8 @@ export const BUILTIN_COMPANY_PRESETS = [
       shortName_zh: '冠志',
       shortName_en: 'Guanzhi',
       creditCode: '91440101MA59XXXXXX',
-      address_zh: '广州市萝岗区科学城掬泉路3号广州国际企业孵化器A区1106室',
-      address_en: 'Room 1106, Area A, Guangzhou International Enterprise Incubator, No. 3 Juquan Road, Science City, Luogang District, Guangzhou',
+      address_zh: '广州市黄埔区科学城掬泉路3号广州国际企业孵化器A区1106室',
+      address_en: 'Room 1106, Area A, Guangzhou International Enterprise Incubator, No. 3 Juquan Road, Science City, Huangpu District, Guangzhou',
       tel: '86-20-82567990',
       fax: '86-20-32214789',
       emergencyTel_zh: '86-20-82567990 (24小时应急咨询)',
@@ -486,7 +486,7 @@ export const BUILTIN_COMPANY_PRESETS = [
     },
     fieldOverrides: {
       supplier_name: '广州冠志新材料科技有限公司',
-      supplier_address: '广州市萝岗区科学城掬泉路3号广州国际企业孵化器A区1106室',
+      supplier_address: '广州市黄埔区科学城掬泉路3号广州国际企业孵化器A区1106室',
       emergency_phone: '86-20-82567990',
       phone: '86-20-82567990',
       fax: '86-20-32214789'
@@ -507,8 +507,8 @@ export const BUILTIN_COMPANY_PRESETS = [
       name_en: 'Guangzhou Guanzhi New Material Technology Co., Ltd.',
       shortName_zh: '冠志',
       shortName_en: 'Guanzhi',
-      address_zh: '广州市萝岗区科学城掬泉路3号广州国际企业孵化器A区1106室',
-      address_en: 'Room 1106, Area A, Guangzhou International Enterprise Incubator, No. 3 Juquan Road, Science City, Luogang District, Guangzhou',
+      address_zh: '广州市黄埔区科学城掬泉路3号广州国际企业孵化器A区1106室',
+      address_en: 'Room 1106, Area A, Guangzhou International Enterprise Incubator, No. 3 Juquan Road, Science City, Huangpu District, Guangzhou',
       tel: '86-20-82567990',
       fax: '86-20-32214789',
       emergencyTel_zh: '86-20-82567990',
@@ -522,7 +522,7 @@ export const BUILTIN_COMPANY_PRESETS = [
     },
     fieldOverrides: {
       supplier_name: 'Guangzhou Guanzhi New Material Technology Co., Ltd.',
-      supplier_address: 'Room 1106, Area A, Guangzhou International Enterprise Incubator, No. 3 Juquan Road, Science City, Luogang District, Guangzhou',
+      supplier_address: 'Room 1106, Area A, Guangzhou International Enterprise Incubator, No. 3 Juquan Road, Science City, Huangpu District, Guangzhou',
       emergency_phone: '86-20-82567990',
       phone: '86-20-82567990',
       fax: '86-20-32214789'
@@ -830,7 +830,7 @@ export const DEFAULT_BENCHMARK_CATEGORY_SPECS = [
       general_law_en: 'Dispose of in accordance with applicable national standards and national or local regulations.',
       ewc_en: 'Within the European Union, dispose of in accordance with the applicable provisions of the European Waste Catalogue (EWC).',
       methods_supplement_cn: '尽可能将容器倒空（例如经倾倒，刮擦或排干直至“滴干”）。可根据化学工业现存的回收方案送往适当的收集点处理。容器应按照国家法令和环境相关法规进行回收。严禁直接排放至废水中。',
-      methods_supplement_en: 'Empty containers as completely as possible (e. g., by pouring, scraping, or draining until "drip-dry"). They may be sent to an appropriate collection point under existing chemical industry recycling schemes. Recycle containers in accordance with national regulations and applicable environmental requirements. Do not discharge waste via wastewater.'
+      methods_supplement_en: 'Empty containers as completely as possible (e.g., by pouring, scraping, or draining until "drip-dry"). They may be sent to an appropriate collection point under existing chemical industry recycling schemes. Recycle containers in accordance with national regulations and applicable environmental requirements. Do not discharge waste via wastewater.'
     }),
     regulatory_specs_json: JSON.stringify({
       regulations_cn: [
@@ -868,7 +868,7 @@ export const DEFAULT_BENCHMARK_CATEGORY_SPECS = [
       general_law_en: 'Dispose of in accordance with applicable national standards and national or local regulations.',
       ewc_en: 'Within the European Union, dispose of in accordance with the applicable provisions of the European Waste Catalogue (EWC).',
       methods_supplement_cn: '尽可能将容器倒空（例如经倾倒，刮擦或排干直至“滴干”）。可根据化学工业现存的回收方案送往适当的收集点处理。容器应按照国家法令和环境相关法规进行回收。严禁直接排放至废水中。',
-      methods_supplement_en: 'Empty containers as completely as possible (e. g., by pouring, scraping, or draining until "drip-dry"). They may be sent to an appropriate collection point under existing chemical industry recycling schemes. Recycle containers in accordance with national regulations and applicable environmental requirements. Do not discharge waste via wastewater.'
+      methods_supplement_en: 'Empty containers as completely as possible (e.g., by pouring, scraping, or draining until "drip-dry"). They may be sent to an appropriate collection point under existing chemical industry recycling schemes. Recycle containers in accordance with national regulations and applicable environmental requirements. Do not discharge waste via wastewater.'
     }),
     regulatory_specs_json: JSON.stringify({
       regulations_cn: [

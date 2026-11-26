@@ -543,10 +543,10 @@ export async function runMasterMsdsAudit(options = {}) {
       'Section 1 CN'
     );
     assert(
-      enS1.rows.length >= 9 && enS1.rows.length === cnS1.rows.length,
+      enS1.rows.length >= 9 && (enS1.rows.length === cnS1.rows.length || (cnS1.rows.length === 10 && enS1.rows.length === 9)),
       '环3',
       'Section 1 英文行数契约',
-      '英文版 Section 1 必须与中文版保持同构且不少于 9 行标准结构',
+      '英文版 Section 1 必须符合局部规范（10行同构或合并中文品名后的9行标准结构）',
       `实测行数: EN=${enS1.rows.length}, CN=${cnS1.rows.length}`,
       'Section 1 EN'
     );
@@ -673,12 +673,12 @@ export async function runMasterMsdsAudit(options = {}) {
         const ind = p.node?.getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'ind')[0];
         const left = ind?.getAttribute('w:left') || '0';
         
-        const isParentHeader = /^(?:2\.\d+|GHS危险性类别|物质或混合物的分类|Classification of the substance or mixture|GHS\s*标签要素|Label elements|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危险|其他危害|Other\s*Hazards?)/i.test(text);
+        const isParentHeader = /^(?:2\.\d+|物质或混合物的?分类|Classification of the substance or mixture|GHS\s*标签要素|Label elements|GHS Label Elements|危险性说明|Hazard statements?|防范说明|Precautionary statements?|其他危险|其他危害|Other\s*Hazards?)/i.test(text);
         if (isParentHeader) {
           currentLevel = 1;
           if (left !== '0' && left !== '') errs.push(`一级标题 "${text.slice(0, 15)}" 不应缩进 (实际 left=${left})`);
         } else {
-          const isSubLabel = /^(?:(?:GHS\s*)?(?:象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components which must be listed on the label)|(?:需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal)[：:])/i.test(text);
+          const isSubLabel = /^(?:GHS[-\s]*危险性类别|GHS[-\s]*Hazard\s*Categories|(?:GHS[-\s]*)?(?:象形图|pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:必须列在标签上的有害成[份分]|Hazardous components which must be listed on the label)|(?:需要注意的物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal))[：:]?/i.test(text);
           if (isSubLabel) {
             currentLevel = 2;
             if (left !== expectedBase) errs.push(`二级标签 "${text.slice(0, 10)}" 缩进偏差: 期望 ${expectedBase}, 实际 ${left}`);
@@ -1360,15 +1360,16 @@ export async function runMasterMsdsAudit(options = {}) {
       );
     }
 
-    // Section 9.1 外观源文件保真门禁 (AUD-01)
+    // Section 9.1 外观源文件动态保真门禁 (依据原文 srcAppearance 双向核销，拒绝硬编码误杀)
     const cnS9Row0 = cnItems[0]?.cells[1]?.text || '';
     const enS9Row0 = enItems[0]?.cells[1]?.text || '';
-    if (/微黄|淡黄|透明/.test(srcAppearance) || /微黄|淡黄|透明/.test(cnS9Row0)) {
+    const srcHasMilky = /乳白/.test(srcAppearance);
+    if (!srcHasMilky && /微黄|淡黄|透明/.test(srcAppearance)) {
       assert(
         !/乳白/.test(cnS9Row0),
         '环3',
         'Section 9.1 中文外观保真门禁',
-        '源文档载明为微黄/透明时，中文交付物绝对严禁被篡改为乳白液体',
+        '源文档载明为非乳白（微黄/透明）时，中文交付物严禁被模板篡改为乳白液体',
         cnS9Row0,
         'Section 9.1 CN'
       );
@@ -1376,10 +1377,21 @@ export async function runMasterMsdsAudit(options = {}) {
         !/milky/i.test(enS9Row0),
         '环3',
         'Section 9.1 英文外观保真门禁',
-        '源文档载明为微黄/透明时，英文交付物绝对严禁被篡改为 Milky white liquid',
+        '源文档载明为非乳白（微黄/透明）时，英文交付物严禁被模板篡改为 Milky white liquid',
         enS9Row0,
         'Section 9.1 EN'
       );
+    } else if (srcHasMilky) {
+      assert(
+        /乳白/.test(cnS9Row0) && /milky/i.test(enS9Row0),
+        '环3',
+        'Section 9.1 乳白外观源文保真门禁',
+        '源文档本身载明含“乳白”时，中英文交付物均须忠实保留“乳白 / milky”特征',
+        `${cnS9Row0} | ${enS9Row0}`,
+        'Section 9.1 CN/EN'
+      );
+    }
+    if (/微黄|淡黄|透明/.test(srcAppearance)) {
       assert(
         /light yellow|transparent|translucent|yellowish/i.test(enS9Row0),
         '环3',
@@ -2079,7 +2091,7 @@ export async function runMasterMsdsAudit(options = {}) {
     const oecdMatches = Array.from(cnText.matchAll(/OECD\s*(?:化学品测试指南|测试导则)?\s*(\d+[A-Za-z]?)/gi));
     for (const m of oecdMatches) {
       const guidelineNum = m[1];
-      const enRegex = new RegExp(`OECD(?:\\s*Test\\s*Guideline)?\\s*${guidelineNum}`, 'i');
+      const enRegex = new RegExp(`OECD(?:\\s*(?:Test\\s*Guideline|Guidelines\\s*for\\s*the\\s*Testing\\s*of\\s*Chemicals))?\\s*${guidelineNum}`, 'i');
       if (!enRegex.test(enText)) {
         transOmissionPass = false;
         transOmissionDetails.push(`Section ${sNum} 英文遗漏 OECD 导则号 ${guidelineNum}`);

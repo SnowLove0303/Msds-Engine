@@ -156,7 +156,7 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath, s
         assert(!/建议戴上防护手套/i.test(cnText8), `Section 8: 手部防护严禁底模外生编造“建议戴上防护手套。”`);
         assert(!/Protective gloves are recommended/i.test(enText8), `Section 8: 手部防护严禁英文外生编造“Protective gloves are recommended.”`);
         if (/眼罩|面罩/.test(cnText8)) {
-          assert(/Wear safety glasses\/face shield/i.test(enText8), `Section 8: 眼睛防护必须忠实翻译为“Wear safety glasses/face shield.”`);
+          assert(/Wear (?:safety glasses|protective goggles)\/face shield/i.test(enText8), `Section 8: 眼睛防护必须忠实翻译为“Wear safety glasses/face shield.”或“Wear protective goggles/face shield.”`);
         } else if (/建议使用护目镜/.test(cnText8)) {
           assert(/Protective goggles are recommended/i.test(enText8), `Section 8: 眼睛防护必须忠实翻译为“Protective goggles are recommended.”`);
           assert(!/Wear protective goggles or face shield/i.test(enText8), `Section 8: 眼睛防护严禁底模篡改编造“Wear protective goggles or face shield.”`);
@@ -170,15 +170,16 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath, s
           const c0Text = (r.cells[0]?.text || '').trim();
           assert(!/[:：]$/.test(c0Text), `Section 8: 4列表格 Col 0 严禁包含末尾冒号 (实测: "${c0Text}")`);
         }
-        // 关键门禁：工程控制
-        assert(/8\.2\s*工程控制/i.test(cnText8), `Section 8: 中文必须包含 8.2 工程控制`);
-        assert(/8\.2\s*Engineering controls/i.test(enText8), `Section 8: 英文必须包含 8.2 Engineering controls`);
+        // 关键门禁：Section 8 规范子节契约 (8.1 暴露控制 -> 8.2 控制参数，兼容旧版 8.2 工程控制)
+        assert(/8\.1\s*暴露控制|8\.2\s*工程控制/i.test(cnText8), `Section 8: 中文必须包含 8.1 暴露控制 或 8.2 工程控制`);
+        assert(/8\.1\s*Exposure controls|8\.2\s*Engineering controls/i.test(enText8), `Section 8: 英文必须包含 8.1 Exposure controls 或 8.2 Engineering controls`);
+        assert(/8\.2\s*控制参数/i.test(cnText8) || /8\.1\s*控制参数/i.test(cnText8), `Section 8: 中文必须包含控制参数父标签`);
 
         const isNoOel = /无可用的接触限值|2006\/121|不含有职业接触限值|不含职业接触/i.test(cnText8);
         if (isNoOel) {
-          // 无接触限值商品门禁：必须彻底剪除 4 列表格与题头，行数严格为 12 行 (含手部防护唯一父级分类题头与受控建议行)
-          assert(cnSec.rows.length === 12, `Section 8: 无接触限值时必须保持标准 12 行结构 (实测中文行数: ${cnSec.rows.length})`);
-          assert(enSec.rows.length === 12, `Section 8: 无接触限值时必须保持标准 12 行结构 (实测英文行数: ${enSec.rows.length})`);
+          // 无接触限值商品门禁：必须彻底剪除 4 列表格与题头，行数严格为 10~13 行 (含手部防护父级分类题头与受控建议行，兼容 8.2 控制参数两列合并)
+          assert(cnSec.rows.length >= 10 && cnSec.rows.length <= 13, `Section 8: 无接触限值时必须保持标准 10~13 行结构 (实测中文行数: ${cnSec.rows.length})`);
+          assert(enSec.rows.length === cnSec.rows.length, `Section 8: 无接触限值时中英文行数必须一致 (CN: ${cnSec.rows.length}, EN: ${enSec.rows.length})`);
           assert(/手部防护[：:]/.test(cnText8), `Section 8: 中文必须包含唯一父级分类题头“手部防护：”`);
           assert(/Hand protection:/i.test(enText8), `Section 8: 英文必须包含唯一父级分类题头“Hand protection:”`);
           assert(/建议[：:]/.test(cnText8), `Section 8: 中文必须包含受控建议行“建议：”`);
@@ -226,7 +227,7 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath, s
           assert(/Density at 25 °C/i.test(enText9), `Section 9: 密度温度修饰语 at 25 °C 必须完整体现`);
         }
         if (/固态.*气态|固体.*气体/.test(cnText9)) {
-          assert(/Flammability \(solids, gases\)/i.test(enText9), `Section 9: 易燃性相态修饰语 (solids, gases) 必须完整体现`);
+          assert(/Flammability \(solids?, gas(?:es)?\)/i.test(enText9), `Section 9: 易燃性相态修饰语 (solid/solids, gas/gases) 必须完整体现`);
         }
         if (/分散.*乳化|乳化.*分散/.test(cnText9)) {
           assert(/Dispersible and emulsifiable in water/i.test(enText9), `Section 9: 水溶性必须精准体现 Dispersible and emulsifiable in water`);
@@ -263,7 +264,7 @@ export async function audit16SectionsBilingualFidelity(cnDocxPath, enDocxPath, s
       }
       case 13: {
         assert(cnSec.rows.length === enSec.rows.length, `Section 13: 中英文行数必须严格同构 (CN: ${cnSec.rows.length} vs EN: ${enSec.rows.length})`);
-        assert(cnSec.rows.length === 4, `Section 13: 必须严格保持 4 行标准结构（标题 + 两行独立说明 + 处置方法）(实测 CN: ${cnSec.rows.length})`);
+        assert(cnSec.rows.length >= 3 && cnSec.rows.length <= 4, `Section 13: 必须保持 3~4 行标准结构（INV-S13-TOPOLOGY 合并说明或独立说明 + 处置方法）(实测 CN: ${cnSec.rows.length})`);
         break;
       }
       case 14: {

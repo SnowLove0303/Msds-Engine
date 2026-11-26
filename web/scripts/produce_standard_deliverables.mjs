@@ -60,6 +60,8 @@ async function main() {
   let modelCode = null;
   let sourceDocx = null;
   let targetDir = null;
+  let wordDir = null;
+  let pdfDir = null;
   let userSyncDir = null;
   let skipAudit = false;
   let skipUserSync = false;
@@ -78,6 +80,14 @@ async function main() {
       targetDir = arg.slice(12);
     } else if (arg === '--targetDir' && args[i + 1]) {
       targetDir = args[++i];
+    } else if (arg.startsWith('--wordDir=')) {
+      wordDir = arg.slice(10);
+    } else if (arg === '--wordDir' && args[i + 1]) {
+      wordDir = args[++i];
+    } else if (arg.startsWith('--pdfDir=')) {
+      pdfDir = arg.slice(9);
+    } else if (arg === '--pdfDir' && args[i + 1]) {
+      pdfDir = args[++i];
     } else if (arg.startsWith('--userSyncDir=')) {
       userSyncDir = arg.slice(14);
     } else if (arg === '--userSyncDir' && args[i + 1]) {
@@ -104,6 +114,8 @@ async function main() {
       sourceFilePath: sourceDocx,
       modelCode,
       targetDir,
+      wordDir,
+      pdfDir,
       userSyncDir,
       skipAudit,
       skipUserSync

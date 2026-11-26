@@ -12,6 +12,7 @@ import {
   mergeCellsInSession,
   formatSection9LaserTabs,
   applyCompanyPreset,
+  applyTopologyTypographyLock,
   TEMPLATE_LIBRARY
 } from './template-editor.js';
 import {
@@ -401,9 +402,10 @@ export async function writeDeliverableViaEditor({
   }
   enableCrossPageBreaksForAllSections(engine);
 
-  // 10. 全局排版拓扑自动投影 (Design Tokens、字阶与 420/560 dxa 悬挂缩进)
+  // 10. 全局排版拓扑自动投影 (Design Tokens、字阶、420/560 dxa 悬挂缩进、S3/S8居中零缩进与化学式上下标)
   applyGlobalTypographyProjection(engine, isEnglish);
   enforceStructuralTypographyInvariants(engine, isEnglish);
+  applyTopologyTypographyLock(session);
 
   // 11. 导出保存 DOCX
   if (outputPath) {

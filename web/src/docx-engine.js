@@ -1874,8 +1874,8 @@ export function writeStructuredToxicologyCellValue(cell, value, options = {}) {
   // 1. 规整换行符：统一 \r\n 为 \n
   text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-  // 2. 智能探测试验/研究分界（如：在"对类似产品研究"与紧随的下一个试验标题/测试种类之间，确保存在空行分隔）
-  text = text.replace(/((?:对类似产品(?:的)?(?:毒理学)?研究|Studies on a similar product)[.。]?)\s*\n(?!\n)/gi, '$1\n\n');
+  // 2. 智能探测试验/研究分界（如：在"对类似产品研究"与紧随的下一个试验标题/测试种类之间，确保存在空行分隔；中英文共用统一规则）
+  text = text.replace(/((?:对类似产品(?:的)?(?:毒理学)?研究|Stud(?:y|ies)\s+on\s+(?:a\s+)?similar\s+products?)[.。]?)\s*\n(?!\n)/gi, '$1\n\n');
 
   // 规整连续空行：最多保留 1 个语义空行
   text = text.replace(/\n\s*\n\s*\n+/g, '\n\n');
@@ -3309,9 +3309,13 @@ export function formatSection9LabelCell(cell, numberStr, labelText, isEnglish = 
     } else if (/Saturated vapour/i.test(cleanLabel)) {
       cleanLabel = 'Saturated vapour pressure:';
     } else if (/Minimum film-forming|film forming|MFFT/i.test(cleanLabel)) {
-      cleanLabel = 'Minimum film-forming temperature (MFFT):';
+      cleanLabel = /\/[℃°]C?/i.test(cleanLabel)
+        ? 'Minimum film-forming temperature (MFFT)/°C:'
+        : 'Minimum film-forming temperature (MFFT):';
     } else if (/Glass transition|玻璃化|转变温度|\bTg\b/i.test(cleanLabel)) {
-      cleanLabel = 'Glass transition temperature (Tg):';
+      cleanLabel = /\/[℃°]C?/i.test(cleanLabel)
+        ? 'Glass transition temperature (Tg)/°C:'
+        : 'Glass transition temperature (Tg):';
     } else {
       if (!cleanLabel.endsWith(':')) cleanLabel += ':';
     }
@@ -3560,7 +3564,7 @@ export function renumberRecord(record) {
   const changes = [];
   for (const row of record.rows.slice(1)) {
     const cell = row.cells[0];
-    if (!cell) continue;
+    if (!cell || row.cells.length === 1) continue;
     if (cell.node && seenNodes.has(cell.node)) continue;
     if (cell.node) seenNodes.add(cell.node);
     const match = sequenceMatch(cell.text);
@@ -4257,7 +4261,7 @@ export function auditRecord(record) {
   let lastItem = null;
   for (const row of record.rows.slice(1)) {
     const cell = row.cells[0];
-    if (!cell) continue;
+    if (!cell || row.cells.length === 1) continue;
     const match = sequenceMatch(cell.text);
     if (!match || Number(match[2]) !== section) continue;
     const item = Number(match[3]);

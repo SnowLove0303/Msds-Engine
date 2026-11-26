@@ -831,12 +831,12 @@ function parseSection2(record, facts, engine) {
     disposal: []
   };
 
-  const isNegationCategory = (cat) => /^(?:无|无危害|不适用|不属于危险(?:化学)?品|未分类|非危险(?:品|化学品)?|not\s*classified|none|n\/?a)$/i.test((cat || '').trim());
+  const isNegationCategory = (cat) => /^(?:无|无危害|不适用|(?:根据\s*GHS\s*)?不属于(?:危害化学品|危险(?:化学)?品|危险物|危险货物)|未分类|非危险(?:品|化学品)?|not\s*classified(?:\s*as\s*hazardous)?|not\s*a\s*hazardous\s*substance(?:\s*or\s*mixture)?(?:\s*according\s*to\s*GHS)?|none|n\/?a)$/i.test((cat || '').trim());
 
   for (const line of rawLines) {
-    if (/(?:2\.1\s*)?(?:GHS危险性类别|GHS分类|物质或混合物的?分类|危险性类别|Classification of the substance)/i.test(line)) {
+    if (/(?:2\.1\s*)?(?:GHS危险性类别|GHS\s*Hazard\s*Categories|GHS分类|物质或混合物的?分类|危险性类别|Classification of the substance)/i.test(line)) {
       inGhsCategories = true;
-      const afterColon = line.replace(/.*(?:GHS危险性类别|GHS分类|物质或混合物的?分类|危险性类别|Classification of the substance)[：:\s]*/i, '').trim();
+      const afterColon = line.replace(/.*(?:GHS危险性类别|GHS\s*Hazard\s*Categories|GHS分类|物质或混合物的?分类|危险性类别|Classification of the substance)[：:\s]*/i, '').trim();
       if (afterColon && !/^(?:分类|详见下文|如下)/i.test(afterColon)) {
         const cats = afterColon.split(/[；;、\n]+/).map(s => s.trim()).filter(Boolean);
         for (const c of cats) {

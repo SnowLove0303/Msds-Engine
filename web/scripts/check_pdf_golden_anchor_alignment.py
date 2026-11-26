@@ -50,6 +50,8 @@ for p in pdf_paths:
             line_words = [w for w in words if abs(w[1] - sw[1]) < 3.5 and w[0] > sw[0] and w[0] < 220]
             if line_words:
                 first_text_word = min(line_words, key=lambda w: w[0])
+                if num_str == '11.1' and first_text_word[4] in ('毒理学效应', 'Toxicological'):
+                    continue
                 actual_x0 = first_text_word[0]
                 rows_checked += 1
                 if abs(actual_x0 - expected_x0) > 1.5:

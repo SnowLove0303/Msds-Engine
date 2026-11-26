@@ -449,7 +449,7 @@ const TOOLS = [
   }
 ];
 
-async function handleToolCall(name, args) {
+export async function handleToolCall(name, args) {
   if (name === 'msds_compile_topology_ops') {
     if (!args.sourceFilePath || !fs.existsSync(args.sourceFilePath)) {
       throw new Error(`必须提供有效的 sourceFilePath: ${args.sourceFilePath || '未指定'}`);
@@ -1011,4 +1011,6 @@ async function startServer() {
   });
 }
 
-startServer();
+if (process.argv[1] && process.argv[1].endsWith('mcp-server.js')) {
+  startServer();
+}
