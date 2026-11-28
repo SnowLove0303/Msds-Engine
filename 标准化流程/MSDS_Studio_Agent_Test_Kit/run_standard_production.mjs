@@ -66,12 +66,19 @@ const {
   closeUserExecDb
 } = await import('../../web/src/user-exec-db.js');
 const {
+  auditPhase0Provenance,
   auditPhase1Context1,
   auditPhase2Context2,
   auditPhase4TopologyOps,
   auditPhase5DocxFiles,
   auditPhase6PdfFiles
 } = await import('../../web/src/staged-mechanical-audit.js');
+const {
+  initProvenanceManifest,
+  recordProvenancePhase,
+  recordProvenanceDeliverable,
+  getManifestPath
+} = await import('../../web/src/provenance-ledger.js');
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -275,6 +282,14 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
 
   // Phase 1~6 仅在非 --phase=audit 模式下执行
   if (options.phase !== 'audit') {
+    const manifestPath = initProvenanceManifest({
+      targetDir,
+      runId: execTracker.runId,
+      modelCode,
+      sourcePath,
+      entrypoint: 'run_standard_production.mjs'
+    });
+
     // Phase 1: 源文件事实感知 (Context 1 抽取)
     execTracker.phase = 'PHASE_1_RECOGNITION';
     updateRunPhase(execTracker.runId, execTracker.phase);
@@ -284,6 +299,7 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
   context1.modelCode = modelCode;
   const ctx1MdPath = path.join(targetDir, `${modelCode}_context1.md`);
   fs.writeFileSync(ctx1MdPath, serializeFactsToMarkdown(context1), 'utf8');
+  recordProvenancePhase(manifestPath, 'PHASE_1_CONTEXT1', { artifactPath: ctx1MdPath, meta: { modelCode } });
   updateRunPhase(execTracker.runId, execTracker.phase, { context1Path: ctx1MdPath });
   console.log(`    ✓ 成功解析 16 章节原始事实 (${Date.now() - t1} ms) -> ${ctx1MdPath}`);
   enforceMechanicalGate('PHASE_1', await auditPhase1Context1({ sourcePath, context1 }), options.skipAudit);
@@ -307,6 +323,10 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
   const structuredCtx2 = buildStructuredContext2(context1, { translations: agentTranslations });
   const ctx2MdPath = path.join(targetDir, `${modelCode}_context2.md`);
   fs.writeFileSync(ctx2MdPath, serializeContext2ToMarkdown(structuredCtx2), 'utf8');
+  recordProvenancePhase(getManifestPath(targetDir), 'PHASE_2_CONTEXT2', {
+    artifactPath: ctx2MdPath,
+    meta: { untranslatedCount: structuredCtx2.validation?.untranslatedCount ?? 0 }
+  });
   const v = structuredCtx2.validation || {};
   console.log(`    ✓ Context 2 结构化治理完成: 章节 ${v.coveredSections}/16 | 标注项 ${v.totalItems} | TM库 ${v.tmSize ?? 0} 条 | 待补译 ${v.untranslatedCount} | 数字异常 ${v.numericMismatchCount ?? 0} | isValid=${v.isValid} -> ${ctx2MdPath}`);
   if (v.untranslatedCount > 0) {
@@ -441,6 +461,7 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
     }
     const outDocxPath = path.join(targetDir, tgt.fileName);
     await saveSession(session, outDocxPath);
+    recordProvenanceDeliverable(getManifestPath(targetDir), outDocxPath);
     docxItemsForPdf.push({ docxBuffer: fs.readFileSync(outDocxPath), fileName: tgt.fileName });
     console.log(`    ✓ 生成 DOCX: ${tgt.fileName} (${compiled.mode}, ${compiled.stats.totalOps} ops)`);
   }
@@ -449,8 +470,12 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
   for (const pRes of pdfResults) {
     const outPdfPath = path.join(targetDir, pRes.pdfName || pRes.fileName.replace(/\.docx$/i, '.pdf'));
     fs.writeFileSync(outPdfPath, pRes.pdfBuffer);
+    recordProvenanceDeliverable(getManifestPath(targetDir), outPdfPath);
     console.log(`    ✓ 生成 PDF:  ${path.basename(outPdfPath)} (${pRes.size} bytes, ${pRes.backend})`);
   }
+  recordProvenancePhase(getManifestPath(targetDir), 'PHASE_5_EXPORT', {
+    data: { docxCount: docxItemsForPdf.length, pdfCount: pdfResults.length }
+  });
   console.log(`    ✓ 8 格式全矩阵交付物生成完毕 (4 DOCX + 4 PDF) (${Date.now() - t3} ms)`);
   if (options.stopAfter === 'produce') {
     finishExecutionRun(execTracker.runId, { status: 'SUCCESS', durationMs: Date.now() - execTracker.startedAt, summary: { stoppedAfter: 'produce' } });
@@ -467,6 +492,9 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
     updateRunPhase(execTracker.runId, execTracker.phase);
     console.log(`\n>>> [Phase 7/7] 执行两阶双轨审计（纯确定性机械审计 + 增强版 Agent 内容审计速查包）...`);
     const t4 = Date.now();
+
+    // 7.0 执行血缘凭证与防偷跑前置硬门禁
+    enforceMechanicalGate('PHASE_0_PROVENANCE', auditPhase0Provenance({ targetDir, modelCode }));
 
     // 7.1 统一分阶段机械审计: Phase 5 (4 DOCX 排版/拓扑/数学) + Phase 6 (4 PDF 物理渲染)
     enforceMechanicalGate('PHASE_5_DOCX', await auditPhase5DocxFiles({ targetDir, modelCode }));

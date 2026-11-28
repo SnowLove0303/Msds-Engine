@@ -37,9 +37,10 @@ flowchart TD
 - **生产 Agent 权限边界**：执行生产与覆写任务时，生产 Agent 对受控系统目录具有**绝对物理只读约束**；仅对分配的工作区（如 `算法训练材料/TDS MSDS 重写版/...`）拥有写权限；
 - **权限红线**：未经用户显式、指名道姓的书面授权，严禁任何 Agent 擅自修改、创建或删除系统目录下的任何文件。任何对系统文件的写操作将被立即拦截。
 
-### 1.3 官方 MCP 工具链唯一执行通道公理 (`INV-MCP-EXCLUSIVE-GATEWAY`)
-- **唯一合法通道**：官方 10 大原子 MCP 工具（注册于 `web/src/mcp-server.js`，通过 `web/scripts/msds_mcp_gateway.mjs` 调度）是执行源文档识别、模式探查、几何编辑、批量导出与审计核销的**唯一法定通道**；
-- **废止 ad-hoc 临时脚本**：严禁私自编写针对单一型号的一次性 Node/Python 脚本直接篡改 Word OOXML、拼接底层 XML 或修改模板。一切编辑操作必须封装为标准 MCP 原语经由网关执行。
+### 1.3 唯一法定生产入口与执行血缘门禁 (`INV-MCP-EXCLUSIVE-GATEWAY`)
+- **唯一法定生产 Runner**：全系统端到端 MSDS 生产任务**唯一法定入口**为 `标准化流程/MSDS_Studio_Agent_Test_Kit/run_standard_production.mjs`（内部自动串联 Phase 1~7 并签发 `.run_manifest.json` 阶段与交付物 SHA-256 血缘凭证）；
+- **底层原子工具网关**：`web/scripts/msds_mcp_gateway.mjs`（注册于 `web/src/mcp-server.js`）为底层细粒度探查/单步几何操作工具网关，仅作为 Runner 与交互式辅助通道，不得绕开血缘账本单独产出最终交付物；
+- **废止 ad-hoc 临时脚本**：严禁私自编写针对单一型号的一次性 Node/Python 脚本直接篡改 Word OOXML、拼接底层 XML 或单独调用旧入口（`run_source_recognition.mjs` 等已降级为内部组件）；终审 `auditPhase0Provenance` 会强制校验 `.run_manifest.json`（`P0_PROVENANCE_CHAIN`）与工作区零临时脚本（`P0_NO_ADHOC_SCRIPTS`）。
 
 ### 1.4 底座通用缺陷安全停机与申报升级规程 (`INV-SAFE-HALT-AND-ESCALATION`)
 - **严禁就地特判**：生产 Agent 遇到未知化工分类（如无水环氧、固化剂复合体）、英译缺失、正则表达式失配或版式不兼容时，**绝对严禁**为了应付单个型号而就地打硬编码补丁（如 `if (model === 'xxx')`）；

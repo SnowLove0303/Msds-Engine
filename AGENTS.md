@@ -41,7 +41,7 @@
      - **严禁以通用常识挑战法定规范**：严禁任何审计脚本或 Agent 凭通用大模型常识、通用国标层级或字面差异，将白名单内的法定正确行为判定为“缺陷/错误”；
      - **审计报告出具前强制机检过滤**：出具任何形式的审计报告（TXT/MD/JSON）前，必须无条件执行 `npm run lint:audit`。任何命中白名单的虚假指控将直接触发 Exit Code 1 阻断报告流出，强制审计方撤回错误！
 - 源文件绝对无损保护: 任何导出或生成任务严禁直接原地覆盖同名物理源文件。执行前强制调用 `preserveOriginalFileBackup` 将输入源文件克隆为 `<原文件名>_源文件留存.docx/pdf` 并单向只读封存，永久保护源数据母本。
-- MSDS Studio 唯一法定通道与直改 DOCX 禁令: 所有 MSDS 生产、装配、英译、预设派生与 8 格式导出任务，必须且仅能通过 MSDS Studio（REST API `/api/msds/*` 或工作台底座流水线 `web/run_pipeline.mjs` / `pipeline-engine.js`）执行；严格禁止任何 Agent 绕开 Studio 直接编写 ad-hoc 脚本（如使用 python-docx、原生 XML 修改或文件写入）直接操作 DOCX 文件。任何脱离 Studio 管道的直改行为一律视为非法并直接阻断。
+- MSDS Studio 唯一法定通道与执行血缘门禁: 所有 MSDS 生产、装配、英译、预设派生与导出任务，必须且仅能通过唯一法定受控 Runner `标准化流程/MSDS_Studio_Agent_Test_Kit/run_standard_production.mjs` 执行（`web/scripts/msds_mcp_gateway.mjs` 与 REST API `/api/msds/*` 为其底层受控原子工具通道）；严格禁止任何 Agent 绕开标准通道直接编写 ad-hoc 脚本（如使用 python-docx、原生 XML 修改或自建 `.mjs/.py`）操作 DOCX 文件。标准流水线会在产出目录签发 `.run_manifest.json` 血缘凭证，终审 `auditPhase0Provenance`（`P0_PROVENANCE_CHAIN` / `P0_NO_ADHOC_SCRIPTS`）将直接阻断任何未携带有效血缘链或存在临时脚本的交付物。
 - 规格落点先行: 任何写入型任务（新增或修改代码、文档、配置、脚本、数据产出）先确认规格落点；`openspec/specs/` 已有对应条目则以其为准，没有则先建 change 提案，规格未落地前不开始实现。
 - 规格高于代码: 代码与 `openspec/specs/` 冲突时修代码而不改规格；确需改变行为时先在规格层发起变更，再调整实现。
 - VS Code 协同检阅: 无论何时修改或创建代码文件，必须优先调用 `vscode-review` MCP 工具中的 `review_diff_in_vscode`，拉起原生 Diff 视图等待人工审核确认。

@@ -19,9 +19,13 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const SRC_DIR = 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/web/src';
-const SCRIPTS_DIR = 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/web/scripts';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const REPO_ROOT = path.resolve(__dirname, '../..');
+const SRC_DIR = path.join(REPO_ROOT, 'web/src');
+const SCRIPTS_DIR = path.join(REPO_ROOT, 'web/scripts');
 
 const violations = [];
 
@@ -40,7 +44,7 @@ function checkFile(filePath, rules) {
         violations.push({
           ruleId: rule.id,
           severity: rule.severity,
-          file: path.relative('F:/App Location/Guanzhi Tong/Skill/MSDS-Engine', filePath),
+          file: path.relative(REPO_ROOT, filePath),
           lineNum: i + 1,
           code: line.trim(),
           message: rule.message,
