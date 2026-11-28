@@ -95,10 +95,19 @@ function makeCollector(stage) {
   return { check, summarize };
 }
 
+function resolveExpectedSectionNumbers(templateProfile) {
+  if (templateProfile && Array.isArray(templateProfile.sections) && templateProfile.sections.length > 0) {
+    return templateProfile.sections
+      .map(s => Number(s.sectionNumber))
+      .filter(n => Number.isFinite(n) && n > 0);
+  }
+  return Array.from({ length: 16 }, (_, idx) => idx + 1);
+}
+
 /**
- * Phase 1 机械审计: 源文件包完好性与 16 章节抽取覆盖率
+ * Phase 1 机械审计: 源文件包完好性与章节抽取覆盖率（支持基于 templateProfile 参数化）
  */
-export async function auditPhase1Context1({ sourcePath, context1 }) {
+export async function auditPhase1Context1({ sourcePath, context1, templateProfile = null }) {
   const { check, summarize } = makeCollector('PHASE_1');
 
   const exists = Boolean(sourcePath && fs.existsSync(sourcePath));
@@ -127,26 +136,27 @@ export async function auditPhase1Context1({ sourcePath, context1 }) {
     });
   }
 
+  const expectedSections = resolveExpectedSectionNumbers(templateProfile);
   const secObj = context1?.sections || {};
   let missingSecs = [];
-  for (let s = 1; s <= 16; s++) {
+  for (const s of expectedSections) {
     if (!secObj[s] && !secObj[String(s)]) missingSecs.push(s);
   }
   check(missingSecs.length === 0, {
     severity: 'CRITICAL',
     ruleId: 'P1_16_SECTIONS',
-    sectionRef: 'S1~S16',
-    title: 'Context 1 十六章节抽取完备性校验',
-    measuredDetail: missingSecs.length === 0 ? '16/16 章节完整' : `缺失章节: ${missingSecs.join(',')}`
+    sectionRef: expectedSections.length === 16 ? 'S1~S16' : `S${expectedSections[0]}~S${expectedSections[expectedSections.length - 1]}`,
+    title: `Context 1 章节抽取完备性校验 (${expectedSections.length} 节)`,
+    measuredDetail: missingSecs.length === 0 ? `${expectedSections.length}/${expectedSections.length} 章节完整` : `缺失章节: ${missingSecs.join(',')}`
   });
 
   return summarize();
 }
 
 /**
- * Phase 2 & 3 机械审计: Context 2 结构化治理、数字守恒、零中文与输入文本归一化
+ * Phase 2 & 3 机械审计: Context 2 结构化治理、数字守恒、零中文与输入文本归一化（支持基于 templateProfile 参数化）
  */
-export function auditPhase2Context2({ context2 }) {
+export function auditPhase2Context2({ context2, templateProfile = null }) {
   const { check, summarize } = makeCollector('PHASE_2_3');
 
   const valid = Boolean(context2?.validation?.isValid);
@@ -172,7 +182,8 @@ export function auditPhase2Context2({ context2 }) {
   let badEgSpaces = [];
   let badTrailingDots = [];
 
-  for (let s = 1; s <= 16; s++) {
+  const expectedSections = resolveExpectedSectionNumbers(templateProfile);
+  for (const s of expectedSections) {
     const items = context2?.sections?.[s]?.items || [];
     for (const item of items) {
       if (item.role === 'MIGRATED_TO_S2') continue;
@@ -592,7 +603,8 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode, sourcePath = 
   // 7. 中英文 16 章节表格行数 1:1 严格对称
   if (loaded.CN_Guanzhi && loaded.EN_Guanzhi) {
     const diffs = [];
-    for (let s = 1; s <= 16; s++) {
+    const expectedSections = resolveExpectedSectionNumbers(templateProfile);
+  for (const s of expectedSections) {
       const cnRec = loaded.CN_Guanzhi.engine.records.find(r => r.sectionNumber === s);
       const enRec = loaded.EN_Guanzhi.engine.records.find(r => r.sectionNumber === s);
       const cnLen = cnRec?.rows?.length || 0;
@@ -1489,7 +1501,8 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode, sourcePath = 
 
     // 20. 16 章节标题序号完整性校验 (防止类似 S1 "Identification" 漏号复发)
     const missingSecNums = [];
-    for (let s = 1; s <= 16; s++) {
+    const expectedSections = resolveExpectedSectionNumbers(templateProfile);
+  for (const s of expectedSections) {
       const hTxt = (eng.records.find(r => r.sectionNumber === s)?.rows?.[0]?.cells?.[0]?.text || '').trim();
       if (hTxt && !new RegExp(`^${s}\\s*[.．、]`).test(hTxt)) {
         missingSecNums.push(`S${s}(${hTxt.slice(0, 20)})`);
