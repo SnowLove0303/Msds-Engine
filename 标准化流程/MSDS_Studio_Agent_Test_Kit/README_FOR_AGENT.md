@@ -64,7 +64,10 @@ node run_standard_production.mjs --source="<源文件路径>" --targetDir="<目�
 
 ---
 
-### 模式 B：Node.js 编程式 API 调用（流水线集成）
+### 模式 B：底层编程式调用（DEPRECATED / 仅限内部集成，禁止 Agent 生产使用）
+
+> [!WARNING]
+> **防漂移门禁提示**：Agent 执行常规生产任务**必须使用模式 A（`run_standard_production.mjs`）**。直接自建脚本调用 `executeEightDeliverablesPipeline` 不会签发 `.run_manifest.json` 血缘凭证，且工作区残留的临时 `.mjs/.js/.py` 脚本将触发终审 `P0_PROVENANCE_CHAIN` / `P0_NO_ADHOC_SCRIPTS` 硬阻断。
 
 如果您需要将生产流程集成至自己的自动化脚本中，请按以下官方规范通过 ES Module 导入执行：
 

@@ -18,6 +18,7 @@ import { JSDOM } from 'jsdom';
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 import { loadDocx } from './docx-engine.js';
 import { validateCasChecksum } from './cas-validator.js';
+import { verifyProvenanceChain } from './provenance-ledger.js';
 
 if (!globalThis.DOMParser || !globalThis.XMLSerializer) {
   const dom = new JSDOM('<!doctype html><html><body></body></html>');
@@ -1652,6 +1653,26 @@ export function auditPhase6PdfFiles({ targetDir, modelCode }) {
 }
 
 /**
+ * Phase 0 执行血缘与防偷跑机械门禁 (Provenance & Anti-Adhoc-Script Gate)
+ */
+export function auditPhase0Provenance({ targetDir, modelCode, requiredPhases } = {}) {
+  const { check, summarize } = makeCollector('PHASE_0_PROVENANCE');
+  const res = verifyProvenanceChain(targetDir, modelCode, { requiredPhases });
+
+  check(res.ok && res.issues.length === 0, {
+    severity: 'CRITICAL',
+    ruleId: res.issues[0]?.ruleId || 'P0_PROVENANCE_CHAIN',
+    sectionRef: 'Provenance',
+    title: '标准流水线执行血缘凭证与防偷跑校验',
+    measuredDetail: res.ok
+      ? `血缘链完整 (entrypoint=${res.manifest?.entrypoint}, deliverables=${Object.keys(res.manifest?.deliverables || {}).length})`
+      : res.issues.map(i => `[${i.ruleId}] ${i.title}: ${i.measuredDetail}`).join(' | ')
+  });
+
+  return summarize();
+}
+
+/**
  * 统一分阶段机械审计入口
  */
 export async function runStagedMechanicalAudit({
@@ -1662,9 +1683,13 @@ export async function runStagedMechanicalAudit({
   operations = null,
   presetKey = null,
   targetDir = null,
-  modelCode = null
+  modelCode = null,
+  requireProvenance = true
 }) {
   const results = [];
+  if ((stage === 'all' || stage === 'provenance') && requireProvenance && targetDir && modelCode) {
+    results.push(auditPhase0Provenance({ targetDir, modelCode }));
+  }
   if ((stage === 'all' || stage === 'phase1') && (sourcePath || context1)) {
     results.push(await auditPhase1Context1({ sourcePath, context1 }));
   }
