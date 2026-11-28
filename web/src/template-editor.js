@@ -287,8 +287,8 @@ export function detectTemplateProfile(engine, isEnTpl = false) {
     }
   }
   const uniqueIndents = Array.from(new Set(detectedIndents)).sort((a, b) => a - b);
-  const tierA = uniqueIndents[0] || 420;
-  const tierB = uniqueIndents.find(v => v > tierA) || (tierA === 420 ? 560 : tierA);
+  const tierA = uniqueIndents[0] || 0;
+  const tierB = uniqueIndents.find(v => v > tierA) || tierA;
 
   const typographyProfile = {
     isEnglish: isEnTpl,
@@ -1181,15 +1181,42 @@ export function mergeCells(session, secNum, rowIdx, fromCol, toCol) {
 
 /**
  * 将拓扑识别层提取的语义角色样式原型 (stylePrototype) 精准复用至目标单元格
+ * 优先读取该节自身 stylePrototypes，其次读取文档级众数 stylePrototypes
  */
 export function applyRoleStylePrototype(session, { sectionNumber, rowIndex, cellIndex, role }) {
-  const proto = session?.templateProfile?.stylePrototypes?.[role];
+  const secProfile = (session?.templateProfile?.sections || []).find(s => s.sectionNumber === sectionNumber);
+  const proto = secProfile?.stylePrototypes?.[role] || session?.templateProfile?.stylePrototypes?.[role];
   if (!proto) return { applied: false, reason: `No stylePrototype for role ${role}` };
   const record = (session.engine?.records || []).find(r => r.sectionNumber === sectionNumber);
   const cell = record?.rows?.[rowIndex]?.cells?.[cellIndex];
   if (!cell?.node) return { applied: false, reason: 'Target cell not found' };
 
   const doc = session.engine.documentXml;
+  if (proto.shadingFill || proto.vAlign) {
+    let tcPr = cell.node.getElementsByTagNameNS(W_NS, 'tcPr')?.[0];
+    if (!tcPr) {
+      tcPr = doc.createElementNS(W_NS, 'w:tcPr');
+      cell.node.insertBefore(tcPr, cell.node.firstChild);
+    }
+    if (proto.shadingFill) {
+      let shd = tcPr.getElementsByTagNameNS(W_NS, 'shd')?.[0];
+      if (!shd) {
+        shd = doc.createElementNS(W_NS, 'w:shd');
+        tcPr.appendChild(shd);
+      }
+      shd.setAttributeNS(W_NS, 'w:val', 'clear');
+      shd.setAttributeNS(W_NS, 'w:fill', proto.shadingFill);
+    }
+    if (proto.vAlign) {
+      let va = tcPr.getElementsByTagNameNS(W_NS, 'vAlign')?.[0];
+      if (!va) {
+        va = doc.createElementNS(W_NS, 'w:vAlign');
+        tcPr.appendChild(va);
+      }
+      va.setAttributeNS(W_NS, 'w:val', proto.vAlign);
+    }
+  }
+
   const p = cell.node.getElementsByTagNameNS(W_NS, 'p')?.[0];
   if (p) {
     let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
@@ -1205,7 +1232,15 @@ export function applyRoleStylePrototype(session, { sectionNumber, rowIndex, cell
       }
       jc.setAttributeNS(W_NS, 'w:val', proto.align);
     }
-    if (proto.indentLeft > 0 || proto.indentHanging > 0) {
+    if (proto.lineSpacing) {
+      let sp = pPr.getElementsByTagNameNS(W_NS, 'spacing')?.[0];
+      if (!sp) {
+        sp = doc.createElementNS(W_NS, 'w:spacing');
+        pPr.appendChild(sp);
+      }
+      sp.setAttributeNS(W_NS, 'w:line', String(proto.lineSpacing));
+    }
+    if (proto.indentLeft > 0 || proto.indentHanging > 0 || proto.indentFirstLine > 0) {
       let ind = pPr.getElementsByTagNameNS(W_NS, 'ind')?.[0];
       if (!ind) {
         ind = doc.createElementNS(W_NS, 'w:ind');
@@ -1213,6 +1248,7 @@ export function applyRoleStylePrototype(session, { sectionNumber, rowIndex, cell
       }
       ind.setAttributeNS(W_NS, 'w:left', String(proto.indentLeft || 0));
       if (proto.indentHanging > 0) ind.setAttributeNS(W_NS, 'w:hanging', String(proto.indentHanging));
+      if (proto.indentFirstLine > 0) ind.setAttributeNS(W_NS, 'w:firstLine', String(proto.indentFirstLine));
     }
     const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
     for (const r of runs) {
@@ -1238,11 +1274,25 @@ export function applyRoleStylePrototype(session, { sectionNumber, rowIndex, cell
         }
         sz.setAttributeNS(W_NS, 'w:val', String(proto.sz));
       }
+      if (proto.color) {
+        let clr = rPr.getElementsByTagNameNS(W_NS, 'color')?.[0];
+        if (!clr) {
+          clr = doc.createElementNS(W_NS, 'w:color');
+          rPr.appendChild(clr);
+        }
+        clr.setAttributeNS(W_NS, 'w:val', proto.color);
+      }
       const existingB = rPr.getElementsByTagNameNS(W_NS, 'b')?.[0];
       if (proto.bold && !existingB) {
         rPr.appendChild(doc.createElementNS(W_NS, 'w:b'));
       } else if (!proto.bold && existingB) {
         rPr.removeChild(existingB);
+      }
+      const existingI = rPr.getElementsByTagNameNS(W_NS, 'i')?.[0];
+      if (proto.italic && !existingI) {
+        rPr.appendChild(doc.createElementNS(W_NS, 'w:i'));
+      } else if (!proto.italic && existingI) {
+        rPr.removeChild(existingI);
       }
     }
   }
@@ -1251,7 +1301,7 @@ export function applyRoleStylePrototype(session, { sectionNumber, rowIndex, cell
 
 /**
  * 自适应排版标尺自检与注入 (Adaptive Ruler)
- * 探测章节最大序号位数，按模板拓扑提取的 tierA / tierB 动态注入
+ * 探测章节最大序号位数，按模板拓扑提取的 tiers 动态注入（未提取到缩进档位时保持 0）
  */
 export function applyAdaptiveRuler(session, secNum) {
   const record = (session.engine.records || []).find(r => r.sectionNumber === secNum);
@@ -1267,7 +1317,7 @@ export function applyAdaptiveRuler(session, secNum) {
     }
   }
 
-  const ruler = session.templateProfile?.typographyProfile?.tabStops || { tierA: 420, tierB: 560 };
+  const ruler = session.templateProfile?.typographyProfile?.tabStops || { tierA: 0, tierB: 0 };
   const targetIndent = String(maxDigits >= 4 ? ruler.tierB : ruler.tierA);
 
   for (let rIdx = 1; rIdx < (record.rows || []).length; rIdx++) {
