@@ -19,12 +19,15 @@ const status = await slot.mountTemplate(CN_TPL_PATH);
 assert.equal(status.mounted, true);
 assert.ok(status.sourceSha256);
 
-// 3. 多次复用同一构建结果（无需重复解析 DOCX）
+// 3. 多次复用同一构建结果（无需重复解析 DOCX）与 9 大层面完整性核查
 const profile1 = slot.getMountedProfile();
 const profile2 = slot.getMountedProfile();
 const topo1 = slot.getMountedTopology();
 assert.strictEqual(profile1, profile2, '多次复用应返回同一冻结构建结果');
 assert.equal(slot.getStatus().reuseCount, 3);
+assert.equal(profile1.completenessCheck?.ok, true, `9大层面完整性核查应全绿: ${JSON.stringify(profile1.completenessCheck?.missingItems)}`);
+assert.equal(profile1.completenessCheck?.passedCount, 9);
+console.log('✅ PASS: 仓库 CN 模板 9/9 层级完整性核查全部通过');
 
 console.log('\n=== 仓库 CN 模板动态识别与构建结果实测摘要 ===');
 console.log(JSON.stringify({

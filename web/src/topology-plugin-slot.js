@@ -95,8 +95,10 @@ export function createTopologyPluginSlot() {
         typographyProfile: state.profile.typographyProfile,
         stylePrototypes: state.profile.stylePrototypes,
         headerFooterTopology: state.profile.headerFooterTopology,
+        bodyFlow: state.profile.bodyFlow || null,
         sectionsCount: state.profile.sectionsCount,
         sections: state.profile.sections,
+        completenessCheck: state.profile.completenessCheck || null,
         diagnostics: state.profile.diagnostics || []
       };
       if (outPath) {
