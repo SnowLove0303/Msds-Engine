@@ -47,14 +47,32 @@ function getItemTexts(item, lang) {
 }
 
 /**
+ * 归一化模板 Schema 的 sections 为有序数组（兼容对象映射与数组两种形态，不写死 1..16）
+ */
+export function normalizeTemplateSections(templateSchema) {
+  const raw = templateSchema?.sections;
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw.filter(sec => sec && sec.found !== false && Array.isArray(sec.rows) && sec.rows.length > 0);
+  }
+  if (typeof raw === 'object') {
+    return Object.keys(raw)
+      .map(k => ({ sectionNumber: Number(k), ...(raw[k] || {}) }))
+      .filter(sec => Number.isFinite(sec.sectionNumber) && Array.isArray(sec.rows) && sec.rows.length > 0)
+      .sort((a, b) => a.sectionNumber - b.sectionNumber);
+  }
+  return [];
+}
+
+/**
  * 可选内容映射与基准数据库补齐统一入口 (默认关闭，仅在用户显式开启 enableContentMapping 时调用)
  */
 export function applyOptionalContentMappingAndDbFill(context2, options = {}) {
   const cloned = JSON.parse(JSON.stringify(context2));
   const mapRules = options.contentMappingRules || {};
   const dbFill = options.dbBenchmarkFill || {};
-  for (let s = 1; s <= 16; s++) {
-    const sec = cloned.sections?.[s] || cloned.sections?.[String(s)];
+  for (const secKey of Object.keys(cloned.sections || {})) {
+    const sec = cloned.sections[secKey];
     if (!sec?.items) continue;
     for (const item of sec.items) {
       if (item.valueCn && mapRules[item.valueCn]) item.valueCn = mapRules[item.valueCn];
@@ -62,8 +80,10 @@ export function applyOptionalContentMappingAndDbFill(context2, options = {}) {
       if (item.textCn && mapRules[item.textCn]) item.textCn = mapRules[item.textCn];
       if (item.textEn && mapRules[item.textEn]) item.textEn = mapRules[item.textEn];
     }
-    if (dbFill[s] && Array.isArray(dbFill[s])) {
-      sec.items.push(...dbFill[s]);
+    const sNum = Number(secKey);
+    const fillEntries = dbFill[secKey] || dbFill[sNum];
+    if (Array.isArray(fillEntries)) {
+      sec.items.push(...fillEntries);
     }
   }
   return cloned;
@@ -87,17 +107,15 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
   const enableContentMapping = Boolean(options.enableContentMapping);
   const workingCtx2 = enableContentMapping ? applyOptionalContentMappingAndDbFill(context2, options) : context2;
 
-  for (let s = 1; s <= 16; s++) {
-    const secTpl = templateSchema.sections[s] || templateSchema.sections[String(s)];
-    if (!secTpl || !Array.isArray(secTpl.rows) || secTpl.rows.length === 0) {
-      throw new Error(`[TOPOLOGY_MISMATCH] 目标模板缺失第 ${s} 节物理表格骨架，无法安全匹配！`);
-    }
+  const tplSections = normalizeTemplateSections(templateSchema);
+  if (tplSections.length === 0) {
+    throw new Error('[TOPOLOGY_MISMATCH] 目标模板未包含任何有效的物理表格骨架，无法安全匹配！');
   }
 
   const lang = options.language || (templateSchema.language === 'en' ? 'en' : 'zh');
   const operations = [];
   const sectionPlans = [];
-  const stats = { totalOps: 0, sectionsMatched: 16, inserts: 0, deletes: 0, merges: 0, writes: 0 };
+  const stats = { totalOps: 0, sectionsMatched: tplSections.length, inserts: 0, deletes: 0, merges: 0, writes: 0 };
 
   // 强制全模板前置值格清零，彻底消除底模历史脏数据残留 (INV-PRE-WRITE-CLEAR)
   operations.push({ op: 'clearTemplate' });
@@ -120,9 +138,9 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
     else if (opObj.op === 'writeCell' || opObj.op === 'writeFullWidth') stats.writes++;
   };
 
-  for (let s = 1; s <= 16; s++) {
+  for (const tplSec of tplSections) {
+    const s = tplSec.sectionNumber;
     const c2Sec = workingCtx2.sections?.[s] || workingCtx2.sections?.[String(s)] || { items: [] };
-    const tplSec = templateSchema.sections[s] || templateSchema.sections[String(s)];
     const tplRows = tplSec.rows || [];
     const c2Items = (c2Sec.items || []).filter(i => i.role !== 'SECTION_HEADER' && i.role !== 'MIGRATED_TO_S2');
 
@@ -133,8 +151,14 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
 
     pushOp({ op: 'clearSectionValues', sectionNumber: s });
 
-    // 1. Section 2: 唯一通栏大纲结构
-    if (s === 2) {
+    // 1. 能力驱动通栏大纲结构 (FULL_WIDTH_OUTLINE / Section 2 等)
+    const isFullWidthOutline = Boolean(
+      tplSec.capabilities?.isFullWidthOutline ||
+      tplSec.layoutType === 'FULL_WIDTH_OUTLINE' ||
+      (tplSec.layoutType === 'FULL_WIDTH' && c2Items.some(i => i.role === 'FULL_WIDTH_STRUCTURED')) ||
+      s === 2
+    );
+    if (isFullWidthOutline) {
       const fwItem = c2Items.find(i => i.role === 'FULL_WIDTH_STRUCTURED');
       let content = fwItem ? getItemTexts(fwItem, lang).text : c2Items.map(i => getItemTexts(i, lang).text).filter(Boolean).join('\n');
       if (lang === 'zh') {
@@ -144,7 +168,7 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
       }
       if (tplRows.length >= 2) {
         // @FIX_TAG(2026-11-24/topology-matcher/FIX-S2-ROLE-TYPO): 透传 Context 2 的 lineMetas (subRole/boldLabel/indentDxa)，由拓扑渲染层按角色自动赋予标签格式
-        pushOp({ op: 'writeFullWidth', sectionNumber: s, content, options: { isSection2: true, lineMetas: fwItem?.lines || [], sourceDocxPath: context2?.sourceFile || null } });
+        pushOp({ op: 'writeFullWidth', sectionNumber: s, content, options: { isSection2: s === 2, lineMetas: fwItem?.lines || [], sourceDocxPath: context2?.sourceFile || null } });
         secMerges++;
         secWrites++;
         for (let r = tplRows.length - 1; r >= 2; r--) {
@@ -152,9 +176,9 @@ export function compileTopologyOps(context2, templateSchema, options = {}) {
           secDeletes++;
         }
       } else {
-        throw new Error('[TOPOLOGY_MISMATCH] 模板 Section 2 行数不足 2 行，无法挂载通栏内容！');
+        throw new Error(`[TOPOLOGY_MISMATCH] 模板 Section ${s} 行数不足 2 行，无法挂载通栏内容！`);
       }
-      sectionPlans.push({ sectionNumber: s, tplRows: tplRows.length, c2Items: c2Items.length, inserts: secInserts, deletes: secDeletes, merges: secMerges, writes: secWrites, strategy: 'FULL_WIDTH_S2' });
+      sectionPlans.push({ sectionNumber: s, tplRows: tplRows.length, c2Items: c2Items.length, inserts: secInserts, deletes: secDeletes, merges: secMerges, writes: secWrites, strategy: 'FULL_WIDTH_OUTLINE' });
       continue;
     }
 
