@@ -87,8 +87,8 @@ export function inferCellSemanticRole(cellNode, rowIndex, cellIndex, totalRows, 
   // 首行且跨通栏或包含章节名 -> SECTION_HEADER
   if (rowIndex === 0) return 'SECTION_HEADER';
 
-  // Section 3 成分表表头 -> TABLE_HEADER
-  if (sectionNumber === 3 && (text.includes('CAS') || text.includes('化学品名称') || text.includes('Chemical name'))) {
+  // 多列表头识别（通用化学/暴露限值表头，不锁死特定章节号）
+  if (totalCols >= 3 && /(?:CAS|化学品名称|Chemical\s*name|物质|Substance|Basis|TWA|STEL|OEL|限值)/i.test(text)) {
     return 'TABLE_HEADER';
   }
 
@@ -480,40 +480,22 @@ export async function recognizeTemplateTopology(templateSource, options = {}) {
   // 3. 识别通用页脚拓扑几何与插槽 (Footer Topology)
   const footerTopology = await recognizeFooterTopology(zip, doc, parser);
 
-  // 4. 提取表格并建立拓扑
+  // 4. 动态发现所有章节表格并建立拓扑（不再写死 1..16）
   const tblNodes = Array.from(doc.getElementsByTagNameNS(W_NS, 'tbl'));
   const sectionsTopology = [];
 
-  // 标准 16 章节序数与通用正则
-  for (let sNum = 1; sNum <= 16; sNum++) {
-    let matchedTbl = null;
-    let tableIndex = -1;
+  const extractSectionNumber = (titleText, fallbackNum) => {
+    const m = String(titleText || '').trim().match(/^\s*(?:第\s*(\d+)\s*部分|Section\s*(\d+)\b|(\d+)\s*[.、:：\s])/i);
+    const num = m ? Number(m[1] || m[2] || m[3]) : NaN;
+    return Number.isFinite(num) && num > 0 ? num : fallbackNum;
+  };
 
-    // 若正好 16 个表格，直接一一映射；否则按标题模式探测
-    if (tblNodes.length === 16) {
-      tableIndex = sNum - 1;
-      matchedTbl = tblNodes[tableIndex];
-    } else {
-      const secRegex = new RegExp(`^\\s*(?:第\\s*${sNum}\\s*部分|Section\\s*${sNum}\\b|${sNum}\\s*\\.|Identification|Hazards)`, 'i');
-      tableIndex = tblNodes.findIndex(tbl => {
-        const firstRow = tbl.getElementsByTagNameNS(W_NS, 'tr')?.[0];
-        const firstCellText = (firstRow?.getElementsByTagNameNS(W_NS, 'tc')?.[0]?.textContent || '').trim();
-        return secRegex.test(firstCellText);
-      });
-      if (tableIndex !== -1) matchedTbl = tblNodes[tableIndex];
-    }
-
-    if (!matchedTbl) {
-      sectionsTopology.push({
-        sectionNumber: sNum,
-        found: false,
-        layoutType: 'UNKNOWN',
-        slots: []
-      });
-      continue;
-    }
-
+  tblNodes.forEach((matchedTbl, tableIndex) => {
     const trNodes = Array.from(matchedTbl.getElementsByTagNameNS(W_NS, 'tr'));
+    if (trNodes.length === 0) return;
+
+    const titleText = (trNodes[0]?.textContent || '').replace(/\s+/g, ' ').trim();
+    const sNum = extractSectionNumber(titleText, tableIndex + 1);
     const rowsTopology = [];
     const slots = [];
     const columnWidthsSet = [];
@@ -584,30 +566,41 @@ export async function recognizeTemplateTopology(templateSource, options = {}) {
       });
     });
 
-    // 判定主布局形态
-    let layoutType = 'TWO_COLUMN';
-    const dataRow = rowsTopology[1] || rowsTopology[0];
-    if (dataRow) {
-      if (dataRow.cellsCount === 1) layoutType = 'FULL_WIDTH';
-      else if (dataRow.cellsCount === 2) layoutType = 'TWO_COLUMN';
-      else layoutType = 'MULTI_COLUMN';
-    }
+    // 基于全节数据行形态推断主布局类型与能力标记
+    const bodyRows = rowsTopology.slice(1);
+    const hasMultiCol = bodyRows.some(r => r.cellsCount >= 3);
+    const hasTwoCol = bodyRows.some(r => r.cellsCount === 2);
+    const hasFullWidth = bodyRows.some(r => r.cellsCount === 1);
 
-    const titleText = (trNodes[0]?.textContent || '').trim();
+    let layoutType = 'KV_TWO_COL';
+    if (bodyRows.length > 0 && bodyRows.every(r => r.cellsCount === 1)) {
+      layoutType = 'FULL_WIDTH_OUTLINE';
+    } else if (hasMultiCol) {
+      layoutType = 'MULTI_COL_GRID';
+    } else if (hasTwoCol && hasFullWidth) {
+      layoutType = 'HYBRID';
+    }
 
     sectionsTopology.push({
       sectionNumber: sNum,
+      sectionKey: `section_${sNum}`,
       sectionTitle: titleText,
       found: true,
       tableIndex,
       layoutType,
+      capabilities: {
+        isFullWidthOutline: layoutType === 'FULL_WIDTH_OUTLINE',
+        hasMultiColGrid: hasMultiCol,
+        hasTwoColKv: hasTwoCol,
+        hasFullWidthRows: hasFullWidth
+      },
       rowsCount: trNodes.length,
       columnWidths: columnWidthsSet,
       borders: borderConfig,
       slots,
       rows: rowsTopology
     });
-  }
+  });
 
   return {
     templateKey,
@@ -617,5 +610,29 @@ export async function recognizeTemplateTopology(templateSource, options = {}) {
     footerTopology,
     sectionsCount: sectionsTopology.filter(s => s.found).length,
     sections: sectionsTopology
+  };
+}
+
+/**
+ * 导出可移植的模板拓扑 Profile (Template Manifest)
+ */
+export function buildTemplateProfile(blueprint) {
+  if (!blueprint) return null;
+  return {
+    schemaVersion: '1.0.0',
+    templateKey: blueprint.templateKey,
+    recognizedAt: blueprint.recognizedAt,
+    sectionsCount: blueprint.sectionsCount,
+    pageFormat: blueprint.pageFormat,
+    footerTopology: blueprint.footerTopology,
+    sections: (blueprint.sections || []).map(sec => ({
+      sectionNumber: sec.sectionNumber,
+      sectionKey: sec.sectionKey || `section_${sec.sectionNumber}`,
+      sectionTitle: sec.sectionTitle,
+      layoutType: sec.layoutType,
+      capabilities: sec.capabilities || {},
+      rowsCount: sec.rowsCount,
+      columnWidths: sec.columnWidths || []
+    }))
   };
 }
