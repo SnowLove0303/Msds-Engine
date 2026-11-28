@@ -78,38 +78,54 @@ export function electModeStylePrototype(samples, docDefaults = null) {
 }
 
 /**
- * 从 word/styles.xml 提取文档自身 docDefaults（作为未显式声明 rPr/pPr 时的真实基准）
+ * 从 word/styles.xml 提取文档自身 docDefaults 与命名样式映射 (stylesMap)
  */
 export async function extractDocumentStyleDefaults(zip, parser = new DOMParser()) {
-  const defaults = { font: null, asciiFont: null, sz: null, lineSpacing: null, spaceBefore: null, spaceAfter: null };
+  const defaults = { font: null, asciiFont: null, sz: null, lineSpacing: null, spaceBefore: null, spaceAfter: null, stylesMap: {} };
   const stylesFile = zip?.file('word/styles.xml');
   if (!stylesFile) return defaults;
   try {
     const xml = await stylesFile.async('text');
     const sDoc = parser.parseFromString(xml, 'application/xml');
     const docDefaults = sDoc.getElementsByTagNameNS(W_NS, 'docDefaults')?.[0];
-    if (!docDefaults) return defaults;
+    if (docDefaults) {
+      const rPr = docDefaults.getElementsByTagNameNS(W_NS, 'rPr')?.[0];
+      if (rPr) {
+        const rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')?.[0];
+        defaults.font = rFonts?.getAttributeNS(W_NS, 'eastAsia') || rFonts?.getAttribute('w:eastAsia') || rFonts?.getAttributeNS(W_NS, 'ascii') || rFonts?.getAttribute('w:ascii') || null;
+        defaults.asciiFont = rFonts?.getAttributeNS(W_NS, 'ascii') || rFonts?.getAttribute('w:ascii') || defaults.font;
+        const szNode = rPr.getElementsByTagNameNS(W_NS, 'sz')?.[0];
+        defaults.sz = szNode?.getAttributeNS(W_NS, 'val') || szNode?.getAttribute('w:val') || null;
+      }
 
-    const rPr = docDefaults.getElementsByTagNameNS(W_NS, 'rPr')?.[0];
-    if (rPr) {
-      const rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')?.[0];
-      defaults.font = rFonts?.getAttributeNS(W_NS, 'eastAsia') || rFonts?.getAttribute('w:eastAsia') || rFonts?.getAttributeNS(W_NS, 'ascii') || rFonts?.getAttribute('w:ascii') || null;
-      defaults.asciiFont = rFonts?.getAttributeNS(W_NS, 'ascii') || rFonts?.getAttribute('w:ascii') || defaults.font;
-      const szNode = rPr.getElementsByTagNameNS(W_NS, 'sz')?.[0];
-      defaults.sz = szNode?.getAttributeNS(W_NS, 'val') || szNode?.getAttribute('w:val') || null;
+      const pPr = docDefaults.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
+      if (pPr) {
+        const spacing = pPr.getElementsByTagNameNS(W_NS, 'spacing')?.[0];
+        if (spacing) {
+          const line = Number(spacing.getAttributeNS(W_NS, 'line') || spacing.getAttribute('w:line'));
+          const before = Number(spacing.getAttributeNS(W_NS, 'before') || spacing.getAttribute('w:before'));
+          const after = Number(spacing.getAttributeNS(W_NS, 'after') || spacing.getAttribute('w:after'));
+          if (Number.isFinite(line) && line > 0) defaults.lineSpacing = line;
+          if (Number.isFinite(before) && before >= 0) defaults.spaceBefore = before;
+          if (Number.isFinite(after) && after >= 0) defaults.spaceAfter = after;
+        }
+      }
     }
 
-    const pPr = docDefaults.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
-    if (pPr) {
-      const spacing = pPr.getElementsByTagNameNS(W_NS, 'spacing')?.[0];
-      if (spacing) {
-        const line = Number(spacing.getAttributeNS(W_NS, 'line') || spacing.getAttribute('w:line'));
-        const before = Number(spacing.getAttributeNS(W_NS, 'before') || spacing.getAttribute('w:before'));
-        const after = Number(spacing.getAttributeNS(W_NS, 'after') || spacing.getAttribute('w:after'));
-        if (Number.isFinite(line) && line > 0) defaults.lineSpacing = line;
-        if (Number.isFinite(before) && before >= 0) defaults.spaceBefore = before;
-        if (Number.isFinite(after) && after >= 0) defaults.spaceAfter = after;
-      }
+    for (const stNode of Array.from(sDoc.getElementsByTagNameNS(W_NS, 'style'))) {
+      const styleId = stNode.getAttributeNS(W_NS, 'styleId') || stNode.getAttribute('w:styleId');
+      if (!styleId) continue;
+      const rPr = stNode.getElementsByTagNameNS(W_NS, 'rPr')?.[0];
+      const pPr = stNode.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
+      const rFonts = rPr?.getElementsByTagNameNS(W_NS, 'rFonts')?.[0];
+      const szNode = rPr?.getElementsByTagNameNS(W_NS, 'sz')?.[0];
+      const jcNode = pPr?.getElementsByTagNameNS(W_NS, 'jc')?.[0];
+      defaults.stylesMap[styleId] = {
+        font: rFonts?.getAttributeNS(W_NS, 'eastAsia') || rFonts?.getAttribute('w:eastAsia') || rFonts?.getAttributeNS(W_NS, 'ascii') || rFonts?.getAttribute('w:ascii') || null,
+        asciiFont: rFonts?.getAttributeNS(W_NS, 'ascii') || rFonts?.getAttribute('w:ascii') || null,
+        sz: szNode?.getAttributeNS(W_NS, 'val') || szNode?.getAttribute('w:val') || null,
+        align: jcNode?.getAttributeNS(W_NS, 'val') || jcNode?.getAttribute('w:val') || null
+      };
     }
   } catch {
     // 忽略损坏的 styles.xml
@@ -175,8 +191,10 @@ export function extractCellStylePrototype(tcNode, trNode = null, docDefaults = n
 
   const pNode = tcNode.getElementsByTagNameNS(W_NS, 'p')?.[0];
   const pPr = pNode?.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
+  const pStyleId = pPr?.getElementsByTagNameNS(W_NS, 'pStyle')?.[0]?.getAttributeNS(W_NS, 'val') || pPr?.getElementsByTagNameNS(W_NS, 'pStyle')?.[0]?.getAttribute('w:val') || null;
+  const namedStyle = pStyleId ? docDefaults?.stylesMap?.[pStyleId] : null;
   const jcNode = pPr?.getElementsByTagNameNS(W_NS, 'jc')?.[0];
-  const align = jcNode?.getAttributeNS(W_NS, 'val') || jcNode?.getAttribute('w:val') || null;
+  const align = jcNode?.getAttributeNS(W_NS, 'val') || jcNode?.getAttribute('w:val') || namedStyle?.align || null;
   const indNode = pPr?.getElementsByTagNameNS(W_NS, 'ind')?.[0];
   const indentLeft = indNode ? Number(indNode.getAttributeNS(W_NS, 'left') || indNode.getAttribute('w:left')) || 0 : 0;
   const indentFirstLine = indNode ? Number(indNode.getAttributeNS(W_NS, 'firstLine') || indNode.getAttribute('w:firstLine')) || 0 : 0;
@@ -193,10 +211,10 @@ export function extractCellStylePrototype(tcNode, trNode = null, docDefaults = n
   const rNode = pNode?.getElementsByTagNameNS(W_NS, 'r')?.[0];
   const rPr = rNode?.getElementsByTagNameNS(W_NS, 'rPr')?.[0] || pPr?.getElementsByTagNameNS(W_NS, 'rPr')?.[0];
   const rFonts = rPr?.getElementsByTagNameNS(W_NS, 'rFonts')?.[0];
-  const font = rFonts?.getAttributeNS(W_NS, 'eastAsia') || rFonts?.getAttribute('w:eastAsia') || rFonts?.getAttributeNS(W_NS, 'ascii') || rFonts?.getAttribute('w:ascii') || docDefaults?.font || null;
-  const asciiFont = rFonts?.getAttributeNS(W_NS, 'ascii') || rFonts?.getAttribute('w:ascii') || font || docDefaults?.asciiFont || null;
+  const font = rFonts?.getAttributeNS(W_NS, 'eastAsia') || rFonts?.getAttribute('w:eastAsia') || rFonts?.getAttributeNS(W_NS, 'ascii') || rFonts?.getAttribute('w:ascii') || namedStyle?.font || docDefaults?.font || null;
+  const asciiFont = rFonts?.getAttributeNS(W_NS, 'ascii') || rFonts?.getAttribute('w:ascii') || font || namedStyle?.asciiFont || docDefaults?.asciiFont || null;
   const szNode = rPr?.getElementsByTagNameNS(W_NS, 'sz')?.[0];
-  const sz = szNode?.getAttributeNS(W_NS, 'val') || szNode?.getAttribute('w:val') || docDefaults?.sz || null;
+  const sz = szNode?.getAttributeNS(W_NS, 'val') || szNode?.getAttribute('w:val') || namedStyle?.sz || docDefaults?.sz || null;
   const bNodes = rPr?.getElementsByTagNameNS(W_NS, 'b');
   const bold = Boolean(bNodes && bNodes.length > 0 && bNodes[0].getAttributeNS(W_NS, 'val') !== '0' && bNodes[0].getAttribute('w:val') !== '0');
   const iNodes = rPr?.getElementsByTagNameNS(W_NS, 'i');
@@ -576,11 +594,12 @@ function discoverBodySections(doc) {
     const text = (pNode.textContent || '').replace(/\s+/g, ' ').trim();
     if (!text) return false;
     const pPr = pNode.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
+    const hasOutlineLvl = Boolean(pPr?.getElementsByTagNameNS(W_NS, 'outlineLvl')?.[0]);
     const pStyle = pPr?.getElementsByTagNameNS(W_NS, 'pStyle')?.[0]?.getAttributeNS(W_NS, 'val') || '';
     const hasHeadingStyle = /heading|标题/i.test(pStyle);
     const hasSeqHeading = /^\s*(?:第\s*\d+\s*部分|Section\s*\d+\b|\d+\s*[.、:：\s]|[IVX]+\s*\.)/i.test(text);
     const firstRunBold = Boolean(pNode.getElementsByTagNameNS(W_NS, 'r')?.[0]?.getElementsByTagNameNS(W_NS, 'rPr')?.[0]?.getElementsByTagNameNS(W_NS, 'b')?.length);
-    return hasHeadingStyle || (hasSeqHeading && (firstRunBold || text.length <= 80));
+    return hasOutlineLvl || hasHeadingStyle || (hasSeqHeading && (firstRunBold || text.length <= 80));
   };
 
   const groups = [];
@@ -690,6 +709,8 @@ export async function recognizeTemplateTopology(templateSource, options = {}) {
     const tblPr = primaryTbl.getElementsByTagNameNS(W_NS, 'tblPr')?.[0];
     const borderConfig = readBordersBlock(tblPr?.getElementsByTagNameNS(W_NS, 'tblBorders')?.[0]);
     const cellMargins = readMarginsBlock(tblPr?.getElementsByTagNameNS(W_NS, 'tblCellMar')?.[0]);
+    const tblLayoutNode = tblPr?.getElementsByTagNameNS(W_NS, 'tblLayout')?.[0];
+    const tableLayout = tblLayoutNode?.getAttributeNS(W_NS, 'type') || tblLayoutNode?.getAttribute('w:type') || null;
     const tblGridNode = primaryTbl.getElementsByTagNameNS(W_NS, 'tblGrid')?.[0];
     const tableGridWidths = tblGridNode
       ? Array.from(tblGridNode.getElementsByTagNameNS(W_NS, 'gridCol')).map(gc => Number(gc.getAttributeNS(W_NS, 'w') || gc.getAttribute('w:w')) || null)
@@ -775,6 +796,7 @@ export async function recognizeTemplateTopology(templateSource, options = {}) {
         hasFullWidthRows: hasFullWidth
       },
       rowsCount: trNodes.length,
+      tableLayout,
       columnWidths: tableGridWidths.length > 0 ? tableGridWidths : (bodyRows[0]?.cells.map(c => c.widthTwips).filter(Boolean) || []),
       borders: borderConfig,
       cellMargins,
@@ -841,6 +863,7 @@ export function buildTemplateProfile(blueprint) {
       layoutType: sec.layoutType,
       capabilities: sec.capabilities || {},
       rowsCount: sec.rowsCount,
+      tableLayout: sec.tableLayout || null,
       columnWidths: sec.columnWidths || [],
       borders: sec.borders || null,
       cellMargins: sec.cellMargins || null,

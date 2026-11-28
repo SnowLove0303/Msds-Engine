@@ -178,7 +178,7 @@ if (fs.existsSync(SRC_DIR)) {
   }
 }
 
-// 5. LINT-UNIVERSAL-01 & 02: 严禁在核心引擎/编辑器中写死本机绝对路径或特定企业预设
+// 5. LINT-UNIVERSAL-01 & 02 & LINT-TOPO-PURE-01: 严禁写死本机路径，且拓扑识别层严禁混入任何用户数据或内容词典
 checkFile(path.join(SRC_DIR, 'template-editor.js'), [
   {
     id: 'LINT-UNIVERSAL-02',
@@ -186,6 +186,15 @@ checkFile(path.join(SRC_DIR, 'template-editor.js'), [
     pattern: /F:\/App Location\//i,
     message: '严禁在核心模块中硬编码本机绝对路径！必须基于 REPO_ROOT 相对解析。',
     remediation: '使用 path.resolve(REPO_ROOT, ...) 动态解析路径。'
+  }
+]);
+checkFile(path.join(SRC_DIR, 'template-topology-recognizer.js'), [
+  {
+    id: 'LINT-TOPO-PURE-01',
+    severity: 'ERROR',
+    pattern: /冠志|国彩|Guanzhi|Guocai|SEMANTIC_KEY_MAP|STANDARD_TEMPLATES|闪点|溶解性|有限公司/,
+    message: '拓扑识别与构建层严禁包含任何用户数据、企业名称或模板内容词典！',
+    remediation: '移除用户数据与内容映射，仅保留纯结构与样式提取。'
   }
 ]);
 
