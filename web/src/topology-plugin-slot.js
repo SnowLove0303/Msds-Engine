@@ -1,0 +1,100 @@
+/**
+ * MSDS-Engine 插拔式模板拓扑槽位管理器 (topology-plugin-slot.js)
+ *
+ * 严格隔离通用层与用户数据层：
+ * 1. 未载入模板时处于纯净默认状态 (mounted=false, topology=null, profile=null)；
+ * 2. mountTemplate(): 一次插拔式载入用户模板，执行识别与 StandardTopology 构建并缓存；
+ * 3. getMountedTopology() / getMountedProfile(): 支持构建结果的多次无损复用；
+ * 4. unmountTemplate() / resetToDefault(): 拔出模板，彻底清空用户模板数据并恢复至未载入默认状态。
+ */
+
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import { recognizeTemplateTopology, buildTemplateProfile } from './template-topology-recognizer.js';
+
+export function createTopologyPluginSlot() {
+  let state = {
+    mounted: false,
+    templateKey: null,
+    sourceSha256: null,
+    mountedAt: null,
+    reuseCount: 0,
+    topology: null,
+    profile: null
+  };
+
+  return {
+    isMounted() {
+      return state.mounted;
+    },
+
+    getStatus() {
+      return {
+        mounted: state.mounted,
+        templateKey: state.templateKey,
+        sourceSha256: state.sourceSha256,
+        mountedAt: state.mountedAt,
+        reuseCount: state.reuseCount,
+        sectionsCount: state.profile?.sectionsCount ?? 0
+      };
+    },
+
+    async mountTemplate(templateSource, options = {}) {
+      const buf = Buffer.isBuffer(templateSource)
+        ? templateSource
+        : (typeof templateSource === 'string' && fs.existsSync(templateSource) ? fs.readFileSync(templateSource) : null);
+      const sourceSha256 = buf ? crypto.createHash('sha256').update(buf).digest('hex') : null;
+
+      const topology = await recognizeTemplateTopology(templateSource, options);
+      const profile = buildTemplateProfile(topology);
+
+      state = {
+        mounted: true,
+        templateKey: topology.templateKey,
+        sourceSha256,
+        mountedAt: new Date().toISOString(),
+        reuseCount: 0,
+        topology: Object.freeze(topology),
+        profile: Object.freeze(profile)
+      };
+
+      return this.getStatus();
+    },
+
+    getMountedTopology() {
+      if (!state.mounted || !state.topology) {
+        throw new Error('[TOPOLOGY_SLOT_UNMOUNTED] 当前未载入任何用户模板，请先调用 mountTemplate()！');
+      }
+      state.reuseCount += 1;
+      return state.topology;
+    },
+
+    getMountedProfile() {
+      if (!state.mounted || !state.profile) {
+        throw new Error('[TOPOLOGY_SLOT_UNMOUNTED] 当前未载入任何用户模板，请先调用 mountTemplate()！');
+      }
+      state.reuseCount += 1;
+      return state.profile;
+    },
+
+    unmountTemplate() {
+      state = {
+        mounted: false,
+        templateKey: null,
+        sourceSha256: null,
+        mountedAt: null,
+        reuseCount: 0,
+        topology: null,
+        profile: null
+      };
+      return this.getStatus();
+    },
+
+    resetToDefault() {
+      return this.unmountTemplate();
+    }
+  };
+}
+
+// 默认全局单槽位实例（初始绝对未载入任何用户数据）
+export const defaultTopologySlot = createTopologyPluginSlot();
