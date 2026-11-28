@@ -11,6 +11,7 @@ console.log = (...args) => process.stderr.write(args.map(a => typeof a === 'obje
 console.error = (...args) => process.stderr.write(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ') + '\n');
 
 import { recognizeSourceDocx, serializeFactsToMarkdown } from './recognition-engine.js';
+import { getMcpVisionInstructions, SYSTEM_VISION_CORE } from './system-vision.js';
 import { buildStructuredContext2, serializeContext2ToMarkdown, saveTranslationsToMemory } from './context-governor.js';
 import { compileTopologyOps, formatTopologyPlanMarkdown } from './topology-matcher.js';
 import { loadDocx } from './docx-engine.js';
@@ -509,6 +510,7 @@ export async function handleToolCall(name, args) {
     const buf = fs.readFileSync(filePath);
     const facts = await recognizeSourceDocx(buf, path.basename(filePath));
     return {
+      _systemVision: SYSTEM_VISION_CORE,
       ...facts,
       context1Markdown: serializeFactsToMarkdown(facts)
     };
@@ -942,7 +944,8 @@ async function startServer() {
             serverInfo: {
               name: 'msds-engine-mcp',
               version: '2.1.0'
-            }
+            },
+            instructions: getMcpVisionInstructions()
           }
         };
         originalStdoutWrite(JSON.stringify(resp) + '\n');
