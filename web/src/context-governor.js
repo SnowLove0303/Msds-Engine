@@ -14,6 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveRulePack, classifyLineByGenericFeatures } from './rule-pack-registry.js';
 
 const __cgFilename = fileURLToPath(import.meta.url);
 const __cgDirname = path.dirname(__cgFilename);
@@ -883,6 +884,8 @@ export function buildStructuredContext2(context1, options = {}) {
 
   const modelCode = context1.modelCode || 'UNKNOWN';
   const governed = governContext(context1);
+  const rulePack = resolveRulePack(options?.rulePack);
+  const roleOverrides = options?.roleOverrides && typeof options.roleOverrides === 'object' ? options.roleOverrides : {};
   const annotatedSections = {};
   const editorOps = [];
 
@@ -940,6 +943,13 @@ export function buildStructuredContext2(context1, options = {}) {
 
   const getRawRows = (s) => context1.sections?.[s]?.rows || context1.sections?.[String(s)]?.rows || [];
 
+  const sectionNumbersToProcess = rulePack.require16Sections
+    ? Array.from({ length: 16 }, (_, idx) => idx + 1)
+    : Object.keys(context1.sections || {})
+        .map(k => Number(k))
+        .filter(n => Number.isFinite(n) && n > 0)
+        .sort((a, b) => a - b);
+
   // 辅助：提取并清洗序号 (如 "9.1. 外 观：" -> { seq: "9.1", cleanLabel: "外观：", indentDxa: 420 })
   const parseSeqLabel = (rawText) => {
     const t = String(rawText || '').trim();
@@ -954,7 +964,7 @@ export function buildStructuredContext2(context1, options = {}) {
     return { isSeq: false, seq: null, label: t, cleanKey: t.replace(/[：:\s]/g, ''), indentDxa: 420 };
   };
 
-  for (let s = 1; s <= 16; s++) {
+  for (const s of sectionNumbersToProcess) {
     const rawSec = context1.sections?.[s] || context1.sections?.[String(s)] || { sectionNumber: s, title: `${s}.`, rows: [] };
     const rows = getRawRows(s);
     const items = [];
@@ -1025,34 +1035,36 @@ export function buildStructuredContext2(context1, options = {}) {
         });
       }
 
-      // @FIX_TAG(2026-11-24/context-governor/FIX-S2-COMPLETE-PARENTS): 若原文缺失 2.1/2.2 父级标签（如仅写"物质或混合物分类"或直接写"GHS象形图："），自动补全父级序号与"2.2 标签要素"，并将子标签归纳于其下；同时去除连续/重复的父级标题
-      const hasClassSeq = s2Lines.some(l => /^2\.\d+\s*物质或混合物的?分类/i.test(l));
-      for (let i = 0; i < s2Lines.length; i++) {
-        if (!hasClassSeq && /^物质或混合物的?分类[：:]?$/i.test(s2Lines[i])) {
-          s2Lines[i] = '2.1 物质或混合物的分类';
-          break;
+      if (rulePack.s2InjectParents) {
+        // @FIX_TAG(2026-11-24/context-governor/FIX-S2-COMPLETE-PARENTS): 若原文缺失 2.1/2.2 父级标签（如仅写"物质或混合物分类"或直接写"GHS象形图："），自动补全父级序号与"2.2 标签要素"，并将子标签归纳于其下；同时去除连续/重复的父级标题
+        const hasClassSeq = s2Lines.some(l => /^2\.\d+\s*物质或混合物的?分类/i.test(l));
+        for (let i = 0; i < s2Lines.length; i++) {
+          if (!hasClassSeq && /^物质或混合物的?分类[：:]?$/i.test(s2Lines[i])) {
+            s2Lines[i] = '2.1 物质或混合物的分类';
+            break;
+          }
         }
-      }
-      const seenS2Headers = new Set();
-      for (let i = s2Lines.length - 1; i >= 0; i--) {
-        if (hasClassSeq && /^物质或混合物的?分类[：:]?$/i.test(s2Lines[i])) {
-          s2Lines.splice(i, 1);
+        const seenS2Headers = new Set();
+        for (let i = s2Lines.length - 1; i >= 0; i--) {
+          if (hasClassSeq && /^物质或混合物的?分类[：:]?$/i.test(s2Lines[i])) {
+            s2Lines.splice(i, 1);
+          }
         }
-      }
-      const dedupedS2Lines = [];
-      for (const l of s2Lines) {
-        const hdrKey = l.replace(/[：:\s]/g, '');
-        const isRepeatableHdr = /^(?:2\.\d+)?(?:物质或混合物的?分类|紧急情况概述|GHS?标签要素|标签要素|危害性说明|危险性说明|防范说明)$/i.test(hdrKey);
-        if (isRepeatableHdr) {
-          if (seenS2Headers.has(hdrKey)) continue;
-          seenS2Headers.add(hdrKey);
+        const dedupedS2Lines = [];
+        for (const l of s2Lines) {
+          const hdrKey = l.replace(/[：:\s]/g, '');
+          const isRepeatableHdr = /^(?:2\.\d+)?(?:物质或混合物的?分类|紧急情况概述|GHS?标签要素|标签要素|危害性说明|危险性说明|防范说明)$/i.test(hdrKey);
+          if (isRepeatableHdr) {
+            if (seenS2Headers.has(hdrKey)) continue;
+            seenS2Headers.add(hdrKey);
+          }
+          dedupedS2Lines.push(l);
         }
-        dedupedS2Lines.push(l);
+        s2Lines.length = 0;
+        s2Lines.push(...dedupedS2Lines);
       }
-      s2Lines.length = 0;
-      s2Lines.push(...dedupedS2Lines);
       // @ANTIGRAVITY_INVARIANT_LOCK_START: Section 2 非危险品必须忠实保留源文 2.2 标签要素 下的 GHS-象形图 及其值（如 根据GHS不属于危害化学品），严禁擅自删除
-      if (!governed.cn.isHazardous) {
+      if (rulePack.s2PruneEmptyNonHaz && !governed.cn.isHazardous) {
         const s2ChildLblRe = /^(?:GHS[-\s]*象形图|危险象形标记|信号词|警告词|必须列在标签上的有害成[份分])(?:[：:]\s*(?:无|None)?)?$/i;
         const s2AnyHeaderRe = /^(?:2\.\d+\s*|(?:GHS\s*)?标签要素|物质或混合物的?分类|GHS[-\s]*分类|GHS[-\s]*象形图|危险象形标记|信号词|警告词|必须列在标签上的有害成[份分]|危险性说明|危害性说明|防范说明|预防措施|事故响应|安全储存|安全存储|废弃处置|其他危害|其他危险)/i;
         for (let i = s2Lines.length - 1; i >= 0; i--) {
@@ -1067,17 +1079,19 @@ export function buildStructuredContext2(context1, options = {}) {
         }
       }
       // @ANTIGRAVITY_INVARIANT_LOCK_END
-      const hasLabelParent = !governed.cn.isHazardous || s2Lines.some(l => /^(?:2\.\d+\s*)?(?:GHS\s*)?标签要素[：:]?$/i.test(l));
-      if (!hasLabelParent) {
-        const firstLabelChildIdx = s2Lines.findIndex(l => /^(?:GHS[-\s]*象形图|危险象形标记|警告词|信号词|必须列在标签上的有害成[份分])[：:]/i.test(l));
-        if (firstLabelChildIdx >= 0) {
-          s2Lines.splice(firstLabelChildIdx, 0, '2.2 标签要素');
+      if (rulePack.s2InjectParents) {
+        const hasLabelParent = !governed.cn.isHazardous || s2Lines.some(l => /^(?:2\.\d+\s*)?(?:GHS\s*)?标签要素[：:]?$/i.test(l));
+        if (!hasLabelParent) {
+          const firstLabelChildIdx = s2Lines.findIndex(l => /^(?:GHS[-\s]*象形图|危险象形标记|警告词|信号词|必须列在标签上的有害成[份分])[：:]/i.test(l));
+          if (firstLabelChildIdx >= 0) {
+            s2Lines.splice(firstLabelChildIdx, 0, '2.2 标签要素');
+          }
         }
       }
 
       // @FIX_TAG(2026-11-24/context-governor/FIX-S2-P-SUBLABELS): 继承 pipeline-engine 规范，若 S2 存在 P2xx/P3xx/P4xx/P5xx 但缺失对应中文子标签，自动注入 预防措施：/事故响应：/安全储存：/废弃处置：
       const hasAnyPSubLabel = s2Lines.some(l => /^(?:预防措施|事故响应|安全储存|安全存储|废弃处置)[：:]?$/i.test(l));
-      if (!hasAnyPSubLabel) {
+      if (rulePack.s2InjectPSubLabels && !hasAnyPSubLabel) {
         const pGroups = [
           { re: /^P2\d+/i, label: '预防措施：' },
           { re: /^P3\d+/i, label: '事故响应：' },
@@ -1104,6 +1118,12 @@ export function buildStructuredContext2(context1, options = {}) {
 
       const classifyS2Line = (line) => {
         const l = line.trim();
+        if (roleOverrides[l]) {
+          return classifyLineByGenericFeatures(l, { override: roleOverrides[l] });
+        }
+        if (!rulePack.s2UseLegacyRegex) {
+          return classifyLineByGenericFeatures(l);
+        }
         // @FIX_TAG(2026-11-24/context-governor/FIX-S2-ROLE-CLASSIFY): 统一将 2.X 节标题及"物质或混合物分类/紧急情况概述"归为 PARENT_HEADER，将无序号的"危害性说明/防范说明/GHS分类/GHS-象形图"归为 SUB_LABEL_KV
         if (/^(?:2\.\d+\s*(?:紧急情况概述|物质或混合物的?分类|GHS\s*危险性类别|GHS\s*标签要素|标签要素|危险性说明|危害性说明|防范说明|其他危害|其他危险)(?:[：:].*)?|物质或混合物的?分类|GHS\s*标签要素|其他危害|其他危险)[：:]?$/i.test(l)) {
           return { subRole: 'PARENT_HEADER', boldLabel: true, indentDxa: 0 };
@@ -1748,7 +1768,7 @@ export function buildStructuredContext2(context1, options = {}) {
           }
         }
       }
-      if (s === 8) {
+      if (s === 8 && rulePack.s8CanonicalOrder) {
         // @ANTIGRAVITY_INVARIANT_LOCK_START: Section 8 唯一规范顺序契约（8.1 暴露控制 严格先于 8.2 控制参数），严禁擅自更改或回退为源文反向顺序
         const hdrItems = items.filter(it => it.role === 'SECTION_HEADER');
         const bodyItems = items.filter(it => it.role !== 'SECTION_HEADER');
@@ -1837,7 +1857,7 @@ export function buildStructuredContext2(context1, options = {}) {
       .trim());
   };
 
-  for (let s = 1; s <= 16; s++) {
+  for (const s of sectionNumbersToProcess) {
     for (const item of annotatedSections[s]?.items || []) {
       if (item.labelCn) item.labelCn = normalizeCnText(item.labelCn);
       if (item.valueCn) item.valueCn = normalizeCnText(item.valueCn);
@@ -1858,7 +1878,7 @@ export function buildStructuredContext2(context1, options = {}) {
       }
     }
     // @FIX_TAG(2026-11-24/context-governor/FIX-S2-START-AT-21): Section 2 序号统一从 .1 开始（若含 2.0 紧急情况概述，则顺延重排为 2.1, 2.2, 2.3, 2.4...）
-    if (s === 2) {
+    if (s === 2 && rulePack.s2RenumberFrom21) {
       for (const item of annotatedSections[2]?.items || []) {
         if (item.role !== 'FULL_WIDTH_STRUCTURED' || !Array.isArray(item.lines)) continue;
         const has20 = item.lines.some(sub => /^2\.0\b/.test(String(sub.textCn || '').trim()));
@@ -1887,7 +1907,7 @@ export function buildStructuredContext2(context1, options = {}) {
   let totalItems = 0;
   let emptySectionsCount = 0;
 
-  for (let s = 1; s <= 16; s++) {
+  for (const s of sectionNumbersToProcess) {
     const sec = annotatedSections[s];
     const secItems = sec?.items || [];
     totalItems += secItems.length;
@@ -1978,7 +1998,7 @@ export function buildStructuredContext2(context1, options = {}) {
       }
     }
   };
-  for (let s = 1; s <= 16; s++) {
+  for (const s of sectionNumbersToProcess) {
     for (const item of (annotatedSections[s]?.items || [])) {
       if (item.role === 'MIGRATED_TO_S2' || item.role === 'SECTION_HEADER') continue;
       if (item.role === 'FULL_WIDTH_STRUCTURED') {
@@ -2065,7 +2085,7 @@ export function serializeContext2ToMarkdown(ctx2) {
   lines.push('');
   lines.push('## 二、 16 章节标准化表格结构与逐格定位清单');
 
-  for (let s = 1; s <= 16; s++) {
+  for (const s of sectionNumbersToProcess) {
     const sec = ctx2.sections[s];
     if (!sec) continue;
     lines.push('');
