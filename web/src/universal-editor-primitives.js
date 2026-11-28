@@ -311,13 +311,25 @@ export function parseChemicalFormulaRuns(text, baseStyle = {}) {
  * 彻底废除任何针对字符长度局部缩小英文序号至 18 或 15 的非标准逻辑！
  * 包含：页眉页脚 XML 投影、16 章节大标题 Row 0 投影、第 0 列序号/标签投影、填写值顶格左对齐常规体投影、复合通栏行原生解耦。
  */
-export function applyGlobalTypographyProjection(engine, isEnglish = false) {
+export function applyGlobalTypographyProjection(engine, isEnglish = false, typographyProfile = null) {
   if (!engine?.documentXml) return;
   const doc = engine.documentXml;
-  const tokens = isEnglish ? MSDS_DESIGN_TOKENS.EN : MSDS_DESIGN_TOKENS.CN;
-  const targetFont = tokens.TABLE_VALUE.font;
-  const targetSz = tokens.TABLE_VALUE.sz;
-  const targetAscii = tokens.TABLE_VALUE.asciiFont || targetFont;
+  const fallbackTokens = isEnglish ? MSDS_DESIGN_TOKENS.EN : MSDS_DESIGN_TOKENS.CN;
+  const profileRoles = typographyProfile?.roles || {};
+  const tokens = {
+    SECTION_HEADER: profileRoles.SECTION_HEADER || fallbackTokens.SECTION_HEADER,
+    SUBHEADER: profileRoles.PARENT_LABEL || fallbackTokens.SUBHEADER,
+    LABEL_BOLD: profileRoles.CHILD_LABEL || fallbackTokens.LABEL_BOLD,
+    LABEL_SEQ: profileRoles.CHILD_LABEL || fallbackTokens.LABEL_SEQ,
+    LABEL_SEQ_TIER_B: profileRoles.CHILD_LABEL || fallbackTokens.LABEL_SEQ_TIER_B,
+    TABLE_VALUE: profileRoles.VALUE || fallbackTokens.TABLE_VALUE,
+    TABLE_HEADER: profileRoles.SECTION_HEADER || fallbackTokens.TABLE_HEADER,
+    PREAMBLE: profileRoles.EXPLANATION || fallbackTokens.PREAMBLE
+  };
+  const ruler = typographyProfile?.tabStops || { tierA: 420, tierB: 560 };
+  const targetFont = typographyProfile?.fontFamily || tokens.TABLE_VALUE.font;
+  const targetSz = typographyProfile?.valueFontSize || tokens.TABLE_VALUE.sz;
+  const targetAscii = typographyProfile?.asciiFontFamily || tokens.TABLE_VALUE.asciiFont || targetFont;
 
   // 1. 页眉页脚样式基座只读公理 (REQ-TOPO-HF-INHERIT-01)
   // 无论母版如何变化，默认完整继承母版原生的页眉页脚样式、字号、字体与底纹，
@@ -353,7 +365,7 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false) {
       }
     }
     const isTierB = (maxSeqDigitCount >= 4);
-    const targetIndent = isTierB ? '560' : '420';
+    const targetIndent = String(isTierB ? ruler.tierB : ruler.tierA);
 
     for (let rIdx = 0; rIdx < rows.length; rIdx++) {
       const row = rows[rIdx];

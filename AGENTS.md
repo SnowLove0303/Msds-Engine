@@ -1,8 +1,15 @@
 # AGENTS.md
 
+## System Vision & Universality Principles (核心构建愿景与通用性准则 — 每次必读)
+
+- **核心构建愿景**: 不论源 MSDS 原来长什么样，通过手脚层（无损感知 + 拓扑参数提取 + 万能编辑器原语 + 参数化门禁）的搭建给 Agent，让 Agent 大脑将其内容结构化、标准化；手脚层永远不替 Agent 预设“MSDS 应该长什么样”。
+- **通用性准则（拓扑即参数 / 反硬编码 / 反情景化）**:
+  - 严禁在引擎或标准工作流中写死特定企业预设（如 `冠志`/`国彩`）、固定交付矩阵（如 `8 格式`）、固定页数（如 `5 页`）、固定章节数（如 `16 节` 或 `Section 2 通栏`）或固定几何常数（如 `420/560 dxa`、`80.28pt`）；
+  - 模板的所有结构与排版参数必须由 `template-topology-recognizer.js` 从目标母版中动态提取（`Template Profile`），编辑器与审计器只消费该参数；既有的“冠志/国彩 8 格式”仅作为外部示例配置包 `profiles/guanzhi-guocai-8x/` 存在。
+
 ## Project (项目概述与技术基线)
 
-- 项目定位: MSDS-Engine (化学品安全技术说明书智能处理引擎)，专为化学品安全技术说明书（MSDS / SDS）打造的高保真纯本地结构化识别、智能语义匹配规约、模板安全覆写工作台与 AI Agent REST API 驱动中枢；统一管理 8 格式交付物矩阵（4 DOCX + 4 PDF：冠志/国彩 × 中/英）。
+- 项目定位: MSDS-Engine (化学品安全技术说明书智能处理引擎)，专为化学品安全技术说明书（MSDS / SDS）打造的高保真纯本地结构化识别、通用拓扑参数化模板装配、AI Agent 工作流与参数化审计中枢；支持任意模板、任意企业预设与任意交付格式组合（按需派生，不锁死固定格式矩阵）。
 - 开发语言与运行时: Node.js (>=18/20 LTS, 原生 ES Modules, `"type": "module"`), Python 3 辅助测试与比对。
 - 前端技术栈: 原生 ES Modules, HTML5, CSS3, Vite 7, `docx-preview`。
 - 后端与引擎技术栈: Node.js 原生 HTTP / Vite 中间件，`jszip` (3.10.1), `@xmldom/xmldom` (0.8.10), `jsdom` (26.0.0)。

@@ -1,0 +1,49 @@
+{
+  "profileId": "guanzhi-guocai-8x",
+  "description": "特定企业场景示例配置包（冠志/国彩 × 中/英 × DOCX/PDF 8 份交付矩阵），仅供按需加载，非系统硬规定。",
+  "expectedDeliverablePattern": [
+    "{modelCode} msds_CN 冠志.docx",
+    "{modelCode} msds_CN 冠志.pdf",
+    "{modelCode} msds_CN 国彩.docx",
+    "{modelCode} msds_CN 国彩.pdf",
+    "{modelCode} msds_EN Guanzhi.docx",
+    "{modelCode} msds_EN Guanzhi.pdf",
+    "{modelCode} msds_EN Guocai.docx",
+    "{modelCode} msds_EN Guocai.pdf"
+  ],
+  "presets": {
+    "Guanzhi_zh": {
+      "name": "广州冠志新材料科技有限公司",
+      "shortName": "冠志",
+      "address": "广州市黄埔区科学城掬泉路3号广州国际企业孵化器A区1106室",
+      "tel": "86-20-82567990",
+      "fax": "86-20-32214789"
+    },
+    "Guocai_zh": {
+      "name": "英德市国彩精细化工有限公司",
+      "shortName": "国彩",
+      "address": "广东省英德市白沙镇太平村更古坑凯迪工业园区",
+      "tel": "86-763-2811205",
+      "fax": "86-763-2811024"
+    },
+    "Guanzhi_en": {
+      "name": "Guangzhou Guanzhi New Material Technology Co., Ltd.",
+      "shortName": "Guanzhi",
+      "address": "Room 1106, Area A, Guangzhou International Enterprise Incubator, No. 3 Juquan Road, Science City, Huangpu District, Guangzhou",
+      "tel": "86-20-82567990",
+      "fax": "86-20-32214789"
+    },
+    "Guocai_en": {
+      "name": "Yingde Guocai New Material Co., Ltd.",
+      "shortName": "Guocai",
+      "address": "Kaidi Industrial Park, Genggukeng, Taiping Village, Baisha Town, Yingde City, Guangdong Province",
+      "tel": "86-763-2811205",
+      "fax": "86-763-2811024"
+    }
+  },
+  "defaultTypography": {
+    "ruler": { "tierA": 420, "tierB": 560 },
+    "pdfAnchorPt": { "tierA": 80.28, "tierB": 87.28 },
+    "expectedPdfPages": 5
+  }
+}
