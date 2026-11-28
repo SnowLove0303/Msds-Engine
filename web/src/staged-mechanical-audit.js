@@ -95,10 +95,19 @@ function makeCollector(stage) {
   return { check, summarize };
 }
 
+function resolveExpectedSectionNumbers(templateProfile) {
+  if (templateProfile && Array.isArray(templateProfile.sections) && templateProfile.sections.length > 0) {
+    return templateProfile.sections
+      .map(s => Number(s.sectionNumber))
+      .filter(n => Number.isFinite(n) && n > 0);
+  }
+  return Array.from({ length: 16 }, (_, idx) => idx + 1);
+}
+
 /**
- * Phase 1 机械审计: 源文件包完好性与 16 章节抽取覆盖率
+ * Phase 1 机械审计: 源文件包完好性与章节抽取覆盖率（支持基于 templateProfile 参数化）
  */
-export async function auditPhase1Context1({ sourcePath, context1 }) {
+export async function auditPhase1Context1({ sourcePath, context1, templateProfile = null }) {
   const { check, summarize } = makeCollector('PHASE_1');
 
   const exists = Boolean(sourcePath && fs.existsSync(sourcePath));
@@ -127,26 +136,27 @@ export async function auditPhase1Context1({ sourcePath, context1 }) {
     });
   }
 
+  const expectedSections = resolveExpectedSectionNumbers(templateProfile);
   const secObj = context1?.sections || {};
   let missingSecs = [];
-  for (let s = 1; s <= 16; s++) {
+  for (const s of expectedSections) {
     if (!secObj[s] && !secObj[String(s)]) missingSecs.push(s);
   }
   check(missingSecs.length === 0, {
     severity: 'CRITICAL',
     ruleId: 'P1_16_SECTIONS',
-    sectionRef: 'S1~S16',
-    title: 'Context 1 十六章节抽取完备性校验',
-    measuredDetail: missingSecs.length === 0 ? '16/16 章节完整' : `缺失章节: ${missingSecs.join(',')}`
+    sectionRef: expectedSections.length === 16 ? 'S1~S16' : `S${expectedSections[0]}~S${expectedSections[expectedSections.length - 1]}`,
+    title: `Context 1 章节抽取完备性校验 (${expectedSections.length} 节)`,
+    measuredDetail: missingSecs.length === 0 ? `${expectedSections.length}/${expectedSections.length} 章节完整` : `缺失章节: ${missingSecs.join(',')}`
   });
 
   return summarize();
 }
 
 /**
- * Phase 2 & 3 机械审计: Context 2 结构化治理、数字守恒、零中文与输入文本归一化
+ * Phase 2 & 3 机械审计: Context 2 结构化治理、数字守恒、零中文与输入文本归一化（支持基于 templateProfile 参数化）
  */
-export function auditPhase2Context2({ context2 }) {
+export function auditPhase2Context2({ context2, templateProfile = null }) {
   const { check, summarize } = makeCollector('PHASE_2_3');
 
   const valid = Boolean(context2?.validation?.isValid);
@@ -172,7 +182,8 @@ export function auditPhase2Context2({ context2 }) {
   let badEgSpaces = [];
   let badTrailingDots = [];
 
-  for (let s = 1; s <= 16; s++) {
+  const expectedSections = resolveExpectedSectionNumbers(templateProfile);
+  for (const s of expectedSections) {
     const items = context2?.sections?.[s]?.items || [];
     for (const item of items) {
       if (item.role === 'MIGRATED_TO_S2') continue;
@@ -281,7 +292,7 @@ export function auditPhase4TopologyOps({ operations = [], presetKey = null }) {
 /**
  * Phase 5 机械审计: 4 份 DOCX 底层 XML 排版几何、边框、CAS、双语对称与双主体隔离
  */
-export async function auditPhase5DocxFiles({ targetDir, modelCode, sourcePath = null, templateProfile = null, companyPresets = null }) {
+export async function auditPhase5DocxFiles({ targetDir, modelCode, sourcePath = null, templateProfile = null, companyPresets = null, expectedDeliverables = null }) {
   const { check, summarize } = makeCollector('PHASE_5_DOCX');
   const presetsRegistry = loadCompanyPresetsRegistry(companyPresets);
 
@@ -317,12 +328,14 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode, sourcePath = 
     }
   }
 
-  const specs = [
-    { key: 'CN_Guanzhi', lang: 'zh', company: 'guanzhi', file: `${modelCode} msds_CN 冠志.docx` },
-    { key: 'CN_Guocai', lang: 'zh', company: 'guocai', file: `${modelCode} msds_CN 国彩.docx` },
-    { key: 'EN_Guanzhi', lang: 'en', company: 'guanzhi', file: `${modelCode} msds_EN Guanzhi.docx` },
-    { key: 'EN_Guocai', lang: 'en', company: 'guocai', file: `${modelCode} msds_EN Guocai.docx` }
-  ];
+  const specs = Array.isArray(expectedDeliverables) && expectedDeliverables.length > 0
+    ? expectedDeliverables.filter(d => String(d.file || '').toLowerCase().endsWith('.docx'))
+    : [
+        { key: 'CN_Guanzhi', lang: 'zh', company: 'guanzhi', file: `${modelCode} msds_CN 冠志.docx` },
+        { key: 'CN_Guocai', lang: 'zh', company: 'guocai', file: `${modelCode} msds_CN 国彩.docx` },
+        { key: 'EN_Guanzhi', lang: 'en', company: 'guanzhi', file: `${modelCode} msds_EN Guanzhi.docx` },
+        { key: 'EN_Guocai', lang: 'en', company: 'guocai', file: `${modelCode} msds_EN Guocai.docx` }
+      ];
 
   const loaded = {};
   for (const sp of specs) {
@@ -592,7 +605,8 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode, sourcePath = 
   // 7. 中英文 16 章节表格行数 1:1 严格对称
   if (loaded.CN_Guanzhi && loaded.EN_Guanzhi) {
     const diffs = [];
-    for (let s = 1; s <= 16; s++) {
+    const expectedSections = resolveExpectedSectionNumbers(templateProfile);
+  for (const s of expectedSections) {
       const cnRec = loaded.CN_Guanzhi.engine.records.find(r => r.sectionNumber === s);
       const enRec = loaded.EN_Guanzhi.engine.records.find(r => r.sectionNumber === s);
       const cnLen = cnRec?.rows?.length || 0;
@@ -1489,7 +1503,8 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode, sourcePath = 
 
     // 20. 16 章节标题序号完整性校验 (防止类似 S1 "Identification" 漏号复发)
     const missingSecNums = [];
-    for (let s = 1; s <= 16; s++) {
+    const expectedSections = resolveExpectedSectionNumbers(templateProfile);
+  for (const s of expectedSections) {
       const hTxt = (eng.records.find(r => r.sectionNumber === s)?.rows?.[0]?.cells?.[0]?.text || '').trim();
       if (hTxt && !new RegExp(`^${s}\\s*[.．、]`).test(hTxt)) {
         missingSecNums.push(`S${s}(${hTxt.slice(0, 20)})`);
@@ -1543,21 +1558,23 @@ export async function auditPhase5DocxFiles({ targetDir, modelCode, sourcePath = 
 }
 
 /**
- * Phase 6 机械审计: 8 格式全矩阵完整性、时间戳同步与 PyMuPDF 物理坐标/字号/末页防空
+ * Phase 6 机械审计: 参数化交付矩阵完整性、时间戳同步与 PDF 物理核销
  */
-export function auditPhase6PdfFiles({ targetDir, modelCode }) {
+export function auditPhase6PdfFiles({ targetDir, modelCode, expectedDeliverables = null, templateProfile = null }) {
   const { check, summarize } = makeCollector('PHASE_6_PDF');
 
-  const expected = [
-    `${modelCode} msds_CN 冠志.docx`,
-    `${modelCode} msds_CN 冠志.pdf`,
-    `${modelCode} msds_CN 国彩.docx`,
-    `${modelCode} msds_CN 国彩.pdf`,
-    `${modelCode} msds_EN Guanzhi.docx`,
-    `${modelCode} msds_EN Guanzhi.pdf`,
-    `${modelCode} msds_EN Guocai.docx`,
-    `${modelCode} msds_EN Guocai.pdf`
-  ];
+  const expected = Array.isArray(expectedDeliverables) && expectedDeliverables.length > 0
+    ? expectedDeliverables.map(d => (typeof d === 'string' ? d : d.file)).filter(Boolean)
+    : [
+        `${modelCode} msds_CN 冠志.docx`,
+        `${modelCode} msds_CN 冠志.pdf`,
+        `${modelCode} msds_CN 国彩.docx`,
+        `${modelCode} msds_CN 国彩.pdf`,
+        `${modelCode} msds_EN Guanzhi.docx`,
+        `${modelCode} msds_EN Guanzhi.pdf`,
+        `${modelCode} msds_EN Guocai.docx`,
+        `${modelCode} msds_EN Guocai.pdf`
+      ];
 
   const mtimes = [];
   const pdfPaths = [];
@@ -1599,18 +1616,19 @@ export function auditPhase6PdfFiles({ targetDir, modelCode }) {
     }
   }
 
-  if (mtimes.length === 8) {
+  if (mtimes.length === expected.length && mtimes.length >= 2) {
     const spreadSec = (Math.max(...mtimes) - Math.min(...mtimes)) / 1000;
     check(spreadSec <= 300, {
       severity: 'CRITICAL',
       ruleId: 'P6_TIMESTAMP_SYNC',
       sectionRef: 'Deliverables',
-      title: '8 份交付物物理时间戳同步性校验 (<= 300s)',
+      title: `${expected.length} 份交付物物理时间戳同步性校验 (<= 300s)`,
       measuredDetail: `差值: ${spreadSec.toFixed(1)} 秒`
     });
   }
 
-  if (pdfPaths.length === 4) {
+  const runLegacyGoldenCoords = !Array.isArray(expectedDeliverables) || Boolean(templateProfile?.pdfAnchorPt);
+  if (runLegacyGoldenCoords && pdfPaths.length === 4) {
     const quotedPdfs = pdfPaths.map(p => `"${p}"`).join(' ');
     const anchorPy = path.resolve(__dirname, '../scripts/check_pdf_golden_anchor_alignment.py');
     if (fs.existsSync(anchorPy)) {

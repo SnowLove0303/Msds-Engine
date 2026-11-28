@@ -1,6 +1,13 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { JSDOM } from 'jsdom';
+
+const __teFilename = fileURLToPath(import.meta.url);
+const __teDirname = path.dirname(__teFilename);
+const REPO_ROOT = path.resolve(__teDirname, '../..');
+const TEMPLATES_DIR = path.join(REPO_ROOT, 'web/public/templates');
+const DEFAULT_PRESETS_PATH = path.join(REPO_ROOT, '标准化流程/MSDS_Studio_Agent_Test_Kit/presets/company_presets.json');
 
 if (!globalThis.DOMParser || !globalThis.XMLSerializer) {
   const dom = new JSDOM('<!doctype html><html><body></body></html>');
@@ -35,81 +42,67 @@ import { applyGlobalTypographyProjection, bindEntityPresetToDocument } from './u
 import { getPresetById, listPresets } from './msds-db.js';
 import { enforceStructuralTypographyInvariants } from './pipeline-engine.js';
 
+function resolveTemplateFile(fileName) {
+  return path.join(TEMPLATES_DIR, fileName);
+}
+
 export const TEMPLATE_LIBRARY = {
   CN_Guanzhi: {
     key: 'CN_Guanzhi',
     name: '正式模板_MSDS_CN_冠志',
     language: 'zh',
     company: 'Guanzhi',
-    templatePath: 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/web/public/templates/正式模板_MSDS_CN_冠志(1).docx'
+    templatePath: resolveTemplateFile('正式模板_MSDS_CN_冠志(1).docx')
   },
   EN_Guanzhi: {
     key: 'EN_Guanzhi',
     name: '正式模板_MSDS_EN_冠志',
     language: 'en',
     company: 'Guanzhi',
-    templatePath: 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/web/public/templates/正式模板_MSDS_EN_冠志(1).docx'
+    templatePath: resolveTemplateFile('正式模板_MSDS_EN_冠志(1).docx')
   },
   CN_Guocai: {
     key: 'CN_Guocai',
     name: '正式模板_MSDS_CN_国彩',
     language: 'zh',
     company: 'Guocai',
-    templatePath: 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/web/public/templates/正式模板_MSDS_CN_冠志(1).docx'
+    templatePath: resolveTemplateFile('正式模板_MSDS_CN_冠志(1).docx')
   },
   EN_Guocai: {
     key: 'EN_Guocai',
     name: '正式模板_MSDS_EN_国彩',
     language: 'en',
     company: 'Guocai',
-    templatePath: 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/web/public/templates/正式模板_MSDS_EN_冠志(1).docx'
+    templatePath: resolveTemplateFile('正式模板_MSDS_EN_冠志(1).docx')
   },
   PA_Benchmark_CN: {
     key: 'PA_Benchmark_CN',
     name: '正式模板_MSDS_CN_PA基准',
     language: 'zh',
     company: 'Guanzhi',
-    templatePath: 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/web/public/templates/正式模板_MSDS_CN_冠志(1).docx'
+    templatePath: resolveTemplateFile('正式模板_MSDS_CN_冠志(1).docx')
   },
   PA_Benchmark_EN: {
     key: 'PA_Benchmark_EN',
     name: '正式模板_MSDS_EN_PA基准',
     language: 'en',
     company: 'Guanzhi',
-    templatePath: 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/web/public/templates/正式模板_MSDS_EN_冠志(1).docx'
+    templatePath: resolveTemplateFile('正式模板_MSDS_EN_冠志(1).docx')
   }
 };
 
-const COMPANY_PRESETS = {
-  Guanzhi_zh: {
-    name: '广州冠志新材料科技有限公司',
-    shortName: '冠志',
-    address: '广州市黄埔区科学城掬泉路3号广州国际企业孵化器A区1106室',
-    tel: '86-20-82567990',
-    fax: '86-20-32214789'
-  },
-  Guocai_zh: {
-    name: '英德市国彩精细化工有限公司',
-    shortName: '国彩',
-    address: '广东省英德市白沙镇太平村更古坑凯迪工业园区',
-    tel: '86-763-2811205',
-    fax: '86-763-2811024'
-  },
-  Guanzhi_en: {
-    name: 'Guangzhou Guanzhi New Material Technology Co., Ltd.',
-    shortName: 'Guanzhi',
-    address: 'Room 1106, Area A, Guangzhou International Enterprise Incubator, No. 3 Juquan Road, Science City, Huangpu District, Guangzhou',
-    tel: '86-20-82567990',
-    fax: '86-20-32214789'
-  },
-  Guocai_en: {
-    name: 'Yingde Guocai Fine Chemical Co., Ltd.',
-    shortName: 'Guocai',
-    address: 'Kaidi Industrial Park, Genggukeng, Taiping Village, Baisha Town, Yingde City, Guangdong Province',
-    tel: '86-763-2811205',
-    fax: '86-763-2811024'
+function loadDynamicCompanyPresets() {
+  if (fs.existsSync(DEFAULT_PRESETS_PATH)) {
+    try {
+      return JSON.parse(fs.readFileSync(DEFAULT_PRESETS_PATH, 'utf8'));
+    } catch {
+      return {};
+    }
   }
-};
+  return {};
+}
+
+const COMPANY_PRESETS = loadDynamicCompanyPresets();
 
 /**
  * 动态注册用户上传的新模板 (Register Custom Template)
@@ -284,8 +277,18 @@ export function detectTemplateProfile(engine, isEnTpl = false) {
     ? (valueFontCounts.size > 0 && !valueFontCounts.has('Times New Roman') ? pickMode(valueFontCounts, 'Arial') : 'Arial')
     : pickMode(valueFontCounts, pickMode(labelFontCounts, '宋体'));
   const detectedSeqFont = isEnTpl ? detectedFont : pickMode(seqFontCounts, 'Times New Roman');
-  const tierA = 420;
-  const tierB = 560;
+  const detectedIndents = [];
+  for (const rec of engine.records || []) {
+    for (const row of rec.rows || []) {
+      const p = row.cells?.[0]?.node?.getElementsByTagNameNS(W_NS, 'p')?.[0];
+      const ind = p?.getElementsByTagNameNS(W_NS, 'ind')?.[0];
+      const leftVal = Number(ind?.getAttributeNS(W_NS, 'left') || ind?.getAttribute('w:left'));
+      if (Number.isFinite(leftVal) && leftVal > 0) detectedIndents.push(leftVal);
+    }
+  }
+  const uniqueIndents = Array.from(new Set(detectedIndents)).sort((a, b) => a - b);
+  const tierA = uniqueIndents[0] || 420;
+  const tierB = uniqueIndents.find(v => v > tierA) || (tierA === 420 ? 560 : tierA);
 
   const typographyProfile = {
     isEnglish: isEnTpl,
@@ -426,12 +429,11 @@ export async function createWorkSession(templateKeyOrOptions = 'CN_Guanzhi', wor
   let tplInfo;
   if (typeof templateKey === 'string' && fs.existsSync(templateKey)) {
     const isEn = /_EN|English/i.test(templateKey);
-    const isGc = /国彩|Guocai/i.test(templateKey);
     tplInfo = {
       key: 'custom_path',
       name: path.basename(templateKey, '.docx'),
       language: isEn ? 'en' : 'zh',
-      company: isGc ? 'Guocai' : 'Guanzhi',
+      company: templateKeyOrOptions?.company || null,
       templatePath: path.resolve(templateKey)
     };
   } else {
@@ -1195,7 +1197,8 @@ export function applyAdaptiveRuler(session, secNum) {
     }
   }
 
-  const targetIndent = maxDigits >= 4 ? '560' : '420';
+  const ruler = session.templateProfile?.typographyProfile?.tabStops || { tierA: 420, tierB: 560 };
+  const targetIndent = String(maxDigits >= 4 ? ruler.tierB : ruler.tierA);
 
   for (let rIdx = 1; rIdx < (record.rows || []).length; rIdx++) {
     const row = record.rows[rIdx];

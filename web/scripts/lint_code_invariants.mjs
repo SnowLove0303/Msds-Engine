@@ -19,9 +19,13 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const SRC_DIR = 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/web/src';
-const SCRIPTS_DIR = 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/web/scripts';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const REPO_ROOT = path.resolve(__dirname, '../..');
+const SRC_DIR = path.join(REPO_ROOT, 'web/src');
+const SCRIPTS_DIR = path.join(REPO_ROOT, 'web/scripts');
 
 const violations = [];
 
@@ -40,7 +44,7 @@ function checkFile(filePath, rules) {
         violations.push({
           ruleId: rule.id,
           severity: rule.severity,
-          file: path.relative('F:/App Location/Guanzhi Tong/Skill/MSDS-Engine', filePath),
+          file: path.relative(REPO_ROOT, filePath),
           lineNum: i + 1,
           code: line.trim(),
           message: rule.message,
@@ -164,7 +168,7 @@ if (fs.existsSync(SRC_DIR)) {
       violations.push({
         ruleId: 'LINT-LOCK-01',
         severity: 'ERROR',
-        file: path.relative('F:/App Location/Guanzhi Tong/Skill/MSDS-Engine', fp),
+        file: path.relative(REPO_ROOT, fp),
         lineNum: 1,
         code: `START=${starts}, END=${ends}`,
         message: '源码防篡改封印标记 @ANTIGRAVITY_INVARIANT_LOCK_START 与 END 数量不成对，存在截断或破坏风险！',
@@ -173,6 +177,17 @@ if (fs.existsSync(SRC_DIR)) {
     }
   }
 }
+
+// 5. LINT-UNIVERSAL-01 & 02: 严禁在核心引擎/编辑器中写死本机绝对路径或特定企业预设
+checkFile(path.join(SRC_DIR, 'template-editor.js'), [
+  {
+    id: 'LINT-UNIVERSAL-02',
+    severity: 'ERROR',
+    pattern: /F:\/App Location\//i,
+    message: '严禁在核心模块中硬编码本机绝对路径！必须基于 REPO_ROOT 相对解析。',
+    remediation: '使用 path.resolve(REPO_ROOT, ...) 动态解析路径。'
+  }
+]);
 
 // 输出 Lint 结果
 console.log(`扫描完成。发现违规项: ${violations.length} 项\n`);
