@@ -54,7 +54,17 @@ console.log(JSON.stringify({
   totalSlots: topo1.sections.reduce((acc, s) => acc + (s.slots?.length || 0), 0)
 }, null, 2));
 
-// 4. 拔出模板 / 恢复默认：彻底回到未载入状态
+// 4. 导出标准可复用拓扑 JSON 并通过新槽位直接挂载复用（无需重新解析 DOCX）
+const bundle = slot.exportTopologyBundle();
+assert.equal(bundle.kind, 'MsdsEngineStandardTopology');
+const slot2 = createTopologyPluginSlot();
+const bundleStatus = slot2.mountTopologyBundle(bundle);
+assert.equal(bundleStatus.mounted, true);
+assert.equal(bundleStatus.sectionsCount, 16);
+assert.equal(slot2.getMountedProfile().templateKey, profile1.templateKey);
+console.log('✅ PASS: 标准拓扑 JSON 对象导出与免解析二次复用通过');
+
+// 5. 拔出模板 / 恢复默认：彻底回到未载入状态
 const resetStatus = slot.unmountTemplate();
 assert.equal(resetStatus.mounted, false);
 assert.equal(resetStatus.templateKey, null);

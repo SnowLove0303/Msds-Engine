@@ -686,7 +686,7 @@ export async function recognizeTemplateTopology(templateSource, options = {}) {
   const sectionGroups = discoverBodySections(doc);
   const sectionsTopology = [];
   const globalRoleSamples = {};
-  const indentValues = new Set();
+  const indentCounts = new Map();
   const diagnostics = [];
 
   const extractSectionNumber = (titleText, fallbackNum) => {
@@ -725,9 +725,10 @@ export async function recognizeTemplateTopology(templateSource, options = {}) {
 
       tcNodes.forEach((tc, cIdx) => {
         const styleProto = rowProtos[cIdx];
-        if (styleProto?.indentLeft > 0) indentValues.add(styleProto.indentLeft);
-
         const role = inferCellSemanticRole(tc, rIdx, cIdx, trNodes.length, tcNodes.length, sNum, styleProto, group.hasExternalTitle, isInterleavedKv);
+        if ((role === 'CHILD_LABEL' || role === 'PARENT_LABEL' || role === 'EXPLANATION') && styleProto?.indentLeft >= 100 && styleProto?.indentLeft <= 2000) {
+          indentCounts.set(styleProto.indentLeft, (indentCounts.get(styleProto.indentLeft) || 0) + 1);
+        }
         if (role && styleProto) {
           if (!globalRoleSamples[role]) globalRoleSamples[role] = [];
           globalRoleSamples[role].push(styleProto);
@@ -820,7 +821,11 @@ export async function recognizeTemplateTopology(templateSource, options = {}) {
   for (const [role, samples] of Object.entries(globalRoleSamples)) {
     stylePrototypes[role] = electModeStylePrototype(samples, docDefaults);
   }
-  const typographyProfile = extractTypographyProfileFromPrototypes(stylePrototypes, indentValues, docDefaults);
+  // 仅保留有效频次与合理范围的缩进档位（去除 1~34dxa 微扰与 >2000dxa 特殊右对齐值）
+  const filteredIndents = Array.from(indentCounts.entries())
+    .filter(([, cnt]) => cnt >= 2 || indentCounts.size <= 3)
+    .map(([val]) => val);
+  const typographyProfile = extractTypographyProfileFromPrototypes(stylePrototypes, filteredIndents, docDefaults);
 
   return {
     templateKey,

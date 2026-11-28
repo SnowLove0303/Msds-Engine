@@ -77,6 +77,56 @@ export function createTopologyPluginSlot() {
       return state.profile;
     },
 
+    /**
+     * 导出标准的、可重复使用的拓扑构建结果对象 (StandardTopology JSON)
+     */
+    exportTopologyBundle(outPath = null) {
+      if (!state.mounted || !state.profile) {
+        throw new Error('[TOPOLOGY_SLOT_UNMOUNTED] 当前未载入任何用户模板，无法导出标准拓扑结果！');
+      }
+      const bundle = {
+        schemaVersion: state.profile.schemaVersion || '2.0.0',
+        kind: 'MsdsEngineStandardTopology',
+        templateKey: state.templateKey,
+        sourceSha256: state.sourceSha256,
+        builtAt: state.mountedAt,
+        docDefaults: state.profile.docDefaults,
+        pageFormat: state.profile.pageFormat,
+        typographyProfile: state.profile.typographyProfile,
+        stylePrototypes: state.profile.stylePrototypes,
+        headerFooterTopology: state.profile.headerFooterTopology,
+        sectionsCount: state.profile.sectionsCount,
+        sections: state.profile.sections,
+        diagnostics: state.profile.diagnostics || []
+      };
+      if (outPath) {
+        fs.writeFileSync(outPath, JSON.stringify(bundle, null, 2) + '\n', 'utf8');
+      }
+      return bundle;
+    },
+
+    /**
+     * 直接挂载已导出的标准拓扑 JSON（无需重复解析 DOCX，支持一次构建多次复用）
+     */
+    mountTopologyBundle(bundleOrPath) {
+      const bundle = typeof bundleOrPath === 'string'
+        ? JSON.parse(fs.readFileSync(bundleOrPath, 'utf8'))
+        : bundleOrPath;
+      if (!bundle || bundle.kind !== 'MsdsEngineStandardTopology' || !Array.isArray(bundle.sections)) {
+        throw new Error('[TOPOLOGY_BUNDLE_INVALID] 非法的 StandardTopology JSON 对象！');
+      }
+      state = {
+        mounted: true,
+        templateKey: bundle.templateKey || 'CACHED_TOPOLOGY',
+        sourceSha256: bundle.sourceSha256 || null,
+        mountedAt: bundle.builtAt || new Date().toISOString(),
+        reuseCount: 0,
+        topology: Object.freeze(bundle),
+        profile: Object.freeze(bundle)
+      };
+      return this.getStatus();
+    },
+
     unmountTemplate() {
       state = {
         mounted: false,
