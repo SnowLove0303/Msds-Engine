@@ -5,7 +5,7 @@ import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 globalThis.DOMParser = DOMParser;
 globalThis.XMLSerializer = XMLSerializer;
 
-import { recognizeSourceDocx } from '../src/recognition-engine.js';
+import { recognizeSourceDocx } from '../src/msds-source-semantic-adapter.js';
 import { governContext } from '../src/context-governor.js';
 import { writeDeliverableViaEditor } from '../src/editor-writer.js';
 import { applyCompanyPreset, TEMPLATE_LIBRARY } from '../src/template-editor.js';

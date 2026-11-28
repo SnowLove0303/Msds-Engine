@@ -2,7 +2,7 @@ import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 globalThis.DOMParser = DOMParser;
 globalThis.XMLSerializer = XMLSerializer;
 
-import { recognizeSourceDocx } from '../src/recognition-engine.js';
+import { recognizeSourceDocx } from '../src/msds-source-semantic-adapter.js';
 import path from 'path';
 
 const srcPath = path.resolve('web/scratch/pa_doc_converted/PA-3612 msds_CN 冠志.docx');

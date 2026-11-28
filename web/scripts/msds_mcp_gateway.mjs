@@ -13,7 +13,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
-import { serializeFactsToMarkdown } from '../src/recognition-engine.js';
+import { serializeFactsToMarkdown } from '../src/msds-source-semantic-adapter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

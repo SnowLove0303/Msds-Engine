@@ -1,4 +1,4 @@
-import { recognizeSourceDocx } from '../src/recognition-engine.js';
+import { recognizeSourceDocx } from '../src/msds-source-semantic-adapter.js';
 
 async function test() {
   const file = 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练材料/源文件材料/2-4 水溶性丙烯酸树脂 PA/PA-4914/PA-4914 msds_CN 冠志_源文件留存.docx';

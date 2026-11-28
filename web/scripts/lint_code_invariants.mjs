@@ -197,6 +197,75 @@ checkFile(path.join(SRC_DIR, 'template-topology-recognizer.js'), [
     remediation: '移除用户数据与内容映射，仅保留纯结构与样式提取。'
   }
 ]);
+checkFile(path.join(SRC_DIR, 'recognition-engine.js'), [
+  {
+    id: 'LINT-RECOG-PURE-01',
+    severity: 'ERROR',
+    pattern: /SECTION_KEYWORDS|parseSection\d+|smart-matching|冠志|国彩|Guanzhi|Guocai|\bGHS\b|\bCAS\b|secNum\s*>\s*16|s\s*<=\s*16/,
+    message: '通用识别层 (L2 recognition-engine.js) 严禁包含 1..16 章节上限、行业词典、GHS/CAS 硬编码或业务解析器！',
+    remediation: '将 MSDS 行业语义解析逻辑放在 L3 msds-source-semantic-adapter.js，保持 recognition-engine.js 100% 通用纯净。'
+  }
+]);
+checkFile(path.join(SRC_DIR, 'production-orchestrator.js'), [
+  {
+    id: 'LINT-ORCH-PURE-01',
+    severity: 'ERROR',
+    pattern: /冠志|国彩|Guanzhi|Guocai|8\s*格式|4\s*份/,
+    message: '标准工作流编排器 (production-orchestrator.js) 严禁写死企业名称或“8 格式/4 份”固定矩阵！',
+    remediation: '所有预设与交付矩阵必须由 API/DB 与用户确认参数动态驱动。'
+  }
+]);
+checkFile(path.join(SRC_DIR, 'universal-editor-primitives.js'), [
+  {
+    id: 'LINT-PRIM-PURE-01',
+    severity: 'ERROR',
+    pattern: /冠志|国彩|Guanzhi|Guocai/,
+    message: '通用编辑器原语 (universal-editor-primitives.js) 严禁包含特定企业名称硬编码！',
+    remediation: '通过注入 preset 参数动态替换，禁止写死企业正则。'
+  }
+]);
+checkFile(path.join(SRC_DIR, 'user-config-db.js'), [
+  {
+    id: 'LINT-UCFG-PURE-01',
+    severity: 'ERROR',
+    pattern: /冠志|国彩|Guanzhi|Guocai/,
+    message: '用户配置数据库 (user-config-db.js) 严禁硬编码特定企业种子数据！',
+    remediation: '保持纯净空表与通用占位符，企业预设由用户通过 UI/API 动态录入。'
+  }
+]);
+
+// 6. LINT-ROOT-HYGIENE-01: 严禁在仓库根目录或 web/ 根目录私自堆放临时/一次性脚本，强制走统一入口
+const ROOT_SCRIPT_ALLOWLIST = new Set([]);
+const WEB_ROOT_SCRIPT_ALLOWLIST = new Set(['server.mjs', 'vite.config.js']);
+for (const entry of fs.readdirSync(REPO_ROOT, { withFileTypes: true })) {
+  if (entry.isFile() && /\.(?:js|mjs|py)$/i.test(entry.name) && !ROOT_SCRIPT_ALLOWLIST.has(entry.name)) {
+    violations.push({
+      ruleId: 'LINT-ROOT-HYGIENE-01',
+      severity: 'ERROR',
+      file: entry.name,
+      lineNum: 1,
+      code: entry.name,
+      message: '严禁在仓库根目录放置临时或绕过统一入口的脚本！',
+      remediation: '请复用 web/server.mjs、标准化流程/run_standard_production.mjs 或将测试放入 web/tests/，历史脚本归档至 archive/legacy-scripts/。'
+    });
+  }
+}
+const WEB_ROOT_DIR = path.join(REPO_ROOT, 'web');
+if (fs.existsSync(WEB_ROOT_DIR)) {
+  for (const entry of fs.readdirSync(WEB_ROOT_DIR, { withFileTypes: true })) {
+    if (entry.isFile() && /\.(?:js|mjs|py)$/i.test(entry.name) && !WEB_ROOT_SCRIPT_ALLOWLIST.has(entry.name)) {
+      violations.push({
+        ruleId: 'LINT-ROOT-HYGIENE-01',
+        severity: 'ERROR',
+        file: `web/${entry.name}`,
+        lineNum: 1,
+        code: `web/${entry.name}`,
+        message: '严禁在 web/ 根目录放置临时或绕过统一入口的脚本！',
+        remediation: '请复用 web/server.mjs、web/src/* 或将测试放入 web/tests/，历史脚本归档至 archive/legacy-scripts/web/。'
+      });
+    }
+  }
+}
 
 // 输出 Lint 结果
 console.log(`扫描完成。发现违规项: ${violations.length} 项\n`);

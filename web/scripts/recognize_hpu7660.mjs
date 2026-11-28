@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { recognizeSourceDocx } from '../src/recognition-engine.js';
+import { recognizeSourceDocx } from '../src/msds-source-semantic-adapter.js';
 import { governContext } from '../src/context-governor.js';
 
 const __filename = fileURLToPath(import.meta.url);

@@ -1,0 +1,7 @@
+# Tasks: Topology-Driven Dynamic Editor
+
+- [ ] 1. Bridge `topology-plugin-slot.js` into `template-editor.js` (`createWorkSession`, `reshapeTableRows`, `applyTopologyTypographyLock`, `saveSession`) so sessions accept `MsdsEngineStandardTopology` / `docxBuffer` and disable legacy section special cases in pure dynamic mode.
+- [ ] 2. Parameterize `universal-editor-primitives.js` (`applyGlobalTypographyProjection`, `MSDS_DESIGN_TOKENS` fallback) to consume `topology.typographyProfile` and `topology.docDefaults` dynamically without hardcoded `420/560` or `9781` overrides.
+- [ ] 3. Upgrade `web/src/render-utils.js` (`renderEditorTable`, `renderEditorCell`, `renderParagraph`) to dynamically render `columnWidths`, `vMergeGroups` (`rowspan`), `rowTemplates.lockedRowIndices`, and `typographyProfile.roles` / `docDefaults` WYSIWYG styles.
+- [ ] 4. Upgrade `web/src/main.js` (`renderEditor`, `renderHeaderFooterEditor`, `sectionNav`, template mount/unmount actions) to eliminate hardcoded `/16` section assumptions, support uploading `.docx` or importing `MsdsEngineStandardTopology` JSON directly in the Web editor, dynamically render `bodyFlow` & `headerFooterTopology` slots, and support one-click unmount/reset.
+- [ ] 5. Add automated end-to-end tests in `web/tests/` verifying dynamic N-section / M-column topology -> `createWorkSession` / `renderEditorTable` rendering, row cloning via `rowTemplates`, unmount reset, and run `npm run lint --prefix web` + `openspec validate topology-driven-dynamic-editor --strict`.

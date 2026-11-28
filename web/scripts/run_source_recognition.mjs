@@ -13,7 +13,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { recognizeSourceDocx, serializeFactsToMarkdown } from '../src/recognition-engine.js';
+import { recognizeSourceDocx, serializeFactsToMarkdown } from '../src/msds-source-semantic-adapter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

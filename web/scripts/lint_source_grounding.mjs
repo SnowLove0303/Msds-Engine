@@ -21,7 +21,7 @@ if (!globalThis.DOMParser || !globalThis.XMLSerializer) {
 import fs from 'fs';
 import path from 'path';
 import { loadDocx } from '../src/docx-engine.js';
-import { recognizeSourceDocx } from '../src/recognition-engine.js';
+import { recognizeSourceDocx } from '../src/msds-source-semantic-adapter.js';
 
 export async function lintSourceGrounding(sourceDocxPath, cnDocxPath, enDocxPath) {
   console.log('========================================================================');

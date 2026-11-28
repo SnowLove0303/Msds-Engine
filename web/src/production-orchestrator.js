@@ -2,9 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { recognizeSourceDocx } from './recognition-engine.js';
+import { recognizeSourceDocx } from './msds-source-semantic-adapter.js';
+import { recognizeDocumentUniversal, serializeUniversalToMarkdown } from './recognition-engine.js';
+import { recognizeTemplateTopology } from './template-topology-recognizer.js';
+import { listPresets as listDbPresets, listNamingPatterns as listDbNamingPatterns, getNamingPatternById as getDbNamingPatternById } from './msds-db.js';
+import { listUserPresets as listCfgUserPresets, listUserNamingPatterns as listCfgNamingPatterns, getUserNamingPatternById as getCfgNamingPatternById } from './user-config-db.js';
 import { governContext, buildStructuredContext2, serializeContext2ToMarkdown } from './context-governor.js';
 import { inspectTemplateSchema } from './template-editor.js';
+import { resolveDefaultTemplate } from './editor-writer.js';
 import { compileTopologyOps } from './topology-matcher.js';
 import { handleToolCall } from './mcp-server.js';
 import { convertBatchDocxToPdf } from './pdf-converter.js';
@@ -85,7 +90,7 @@ export function normalizeContext(context1, overrides = {}) {
 /**
  * 阶段 7: 交付物镜像同步至用户工作目录
  */
-export async function syncDeliverablesToUserDir(targetDir, userSyncDir, modelCode) {
+export async function syncDeliverablesToUserDir(targetDir, userSyncDir, modelCode, actualDeliverables = []) {
   const syncResults = [];
   if (!userSyncDir) return syncResults;
 
@@ -98,18 +103,11 @@ export async function syncDeliverablesToUserDir(targetDir, userSyncDir, modelCod
     }
   }
 
-  const expectedDeliverableNames = [
-    `${modelCode} msds_CN 冠志.docx`,
-    `${modelCode} msds_CN 国彩.docx`,
-    `${modelCode} msds_EN Guanzhi.docx`,
-    `${modelCode} msds_EN Guocai.docx`,
-    `${modelCode} msds_CN 冠志.pdf`,
-    `${modelCode} msds_CN 国彩.pdf`,
-    `${modelCode} msds_EN Guanzhi.pdf`,
-    `${modelCode} msds_EN Guocai.pdf`
-  ];
+  const targetFileNames = (Array.isArray(actualDeliverables) && actualDeliverables.length > 0)
+    ? actualDeliverables.map((p) => path.basename(p))
+    : (fs.existsSync(targetDir) ? fs.readdirSync(targetDir).filter((n) => /\.(?:docx|pdf)$/i.test(n)) : []);
 
-  for (const fileName of expectedDeliverableNames) {
+  for (const fileName of targetFileNames) {
     const srcFile = path.join(targetDir, fileName);
     const destFile = path.join(userSyncDir, fileName);
 
@@ -162,34 +160,243 @@ export function generateVerificationLedger(syncResults, modelCode, auditSummary)
  * 
  * @param {Object} params
  * @param {string} params.sourceFilePath - 物理源文件绝对路径 (必须存在)
- * @param {string} [params.modelCode] - 产品型号 (若未提供则从源文件名推导)
- * @param {string} [params.targetDir] - 8 格式正式交付物生成专有目录
+ * @param {string} [params.documentId] - 通用文档标识 (若未提供则从源文件名推导)
+ * @param {string} [params.targetDir] - 交付物生成目录
  * @param {string} [params.userSyncDir] - 用户工作目录镜像同步路径
  * @param {Object} [params.facts] - 附加治理事实或覆盖项
  * @param {boolean} [params.skipAudit=false] - 是否跳过终审 (默认执行双阶审计)
  * @param {boolean} [params.skipUserSync=false] - 是否跳过用户目录同步
  * @returns {Promise<Object>} 生产全链路指标与执行凭据报告
  */
+/**
+ * 从 Web API (/api/msds/presets) 或本地数据库拉取可用用户预设清单（支持多预设选择，严禁写死预设列表）
+ */
+export async function fetchAvailableUserPresets({ apiBase = null } = {}) {
+  const baseUrl = apiBase || process.env.MSDS_API_BASE || null;
+  if (baseUrl) {
+    try {
+      const resp = await fetch(`${String(baseUrl).replace(/\/$/, '')}/api/msds/presets`);
+      if (resp.ok) {
+        const json = await resp.json();
+        const rows = Array.isArray(json?.presets) ? json.presets : (Array.isArray(json?.data) ? json.data : []);
+        if (rows.length > 0) {
+          return rows.map((p) => ({
+            id: p.id,
+            name: p.name || p.id,
+            entity: p.entity || p.company || '',
+            language: (p.language || 'zh').toLowerCase(),
+            targetTemplate: p.targetTemplate || null,
+            isDefault: Boolean(p.isDefault),
+            enabled: p.enabled !== false,
+            source: 'api'
+          }));
+        }
+      }
+    } catch {
+      // API 未启动时回退读取本地 SQLite 预设库
+    }
+  }
+  const userCfgRows = listCfgUserPresets({ enabledOnly: true }) || [];
+  const dbRows = listDbPresets({ enabledOnly: true }) || [];
+  const seenIds = new Set();
+  const merged = [];
+  for (const p of [...userCfgRows, ...dbRows]) {
+    if (seenIds.has(p.id)) continue;
+    seenIds.add(p.id);
+    merged.push({
+      id: p.id,
+      name: p.name || p.id,
+      entity: p.entity || p.company || '',
+      language: (p.language || 'zh').toLowerCase(),
+      targetTemplate: p.targetTemplate || p.targetTemplateId || null,
+      isDefault: Boolean(p.isDefault),
+      enabled: p.enabled !== false,
+      source: userCfgRows.some((u) => u.id === p.id) ? 'user_config_db' : 'db'
+    });
+  }
+  return merged;
+}
+
+function normalizeListArg(val, allowed = null) {
+  const arr = Array.isArray(val)
+    ? val
+    : (typeof val === 'string' ? val.split(',').map((s) => s.trim()).filter(Boolean) : []);
+  const norm = arr.map((x) => String(x).trim()).filter(Boolean);
+  if (!allowed) return norm;
+  return [...new Set(norm.map((x) => x.toLowerCase()).filter((x) => allowed.includes(x)))];
+}
+
+/**
+ * Stage 0 机械需求确认门禁：未显式确认 presets / formats / languages 前严禁直接进入识别与生产
+ */
+export function validateWorkflowRequirements({
+  confirmRequirements = false,
+  presets = [],
+  formats = [],
+  languages = [],
+  availablePresets = []
+} = {}) {
+  const normPresets = normalizeListArg(presets);
+  const normFormats = normalizeListArg(formats, ['docx', 'pdf']);
+  const normLanguages = normalizeListArg(languages).map((l) => l.toLowerCase());
+
+  if (!confirmRequirements || normPresets.length === 0 || normFormats.length === 0 || normLanguages.length === 0) {
+    const presetSummary = availablePresets.map((p) => `${p.id} (${p.name})`).join(', ') || '暂无预设，请在 Web 预设管理录入';
+    throw new Error(
+      `[WORKFLOW_REQUIREMENTS_CONFIRMATION_REQUIRED] 启动标准工作流前，必须先向用户确认产出需求并传入 confirmRequirements=true：\n` +
+      `1. 选用预设 (presets，支持多选，或传 none 仅用模板): 可选 [${presetSummary}]\n` +
+      `2. 产出格式 (formats): 支持 docx、pdf 或两者都要 (docx,pdf；选择 pdf 时强制先生成 docx 再调用 pdf-converter.js)\n` +
+      `3. 目标语言 (languages): 支持任意语言组合（如 zh、en、zh,en 等；含非源语言时在 Context 2 由 Agent 结合映射库翻译）`
+    );
+  }
+  return { presets: normPresets, formats: normFormats, languages: normLanguages };
+}
+
+export async function fetchAvailableNamingPatterns({ apiBase = null } = {}) {
+  const baseUrl = apiBase || process.env.MSDS_API_BASE || null;
+  if (baseUrl) {
+    try {
+      const resp = await fetch(`${String(baseUrl).replace(/\/$/, '')}/api/msds/naming-patterns`);
+      if (resp.ok) {
+        const json = await resp.json();
+        const rows = Array.isArray(json?.namingPatterns) ? json.namingPatterns : [];
+        if (rows.length > 0) return rows;
+      }
+    } catch {
+      // API 未启动时回退读取本地 SQLite 命名预设表
+    }
+  }
+  return listDbNamingPatterns();
+}
+
+export function formatDeliverableBaseName({
+  docId,
+  lang,
+  presetLabel,
+  outputNamePattern = null,
+  dateStr = null
+}) {
+  const safeDoc = String(docId || 'document').replace(/[\\/:*?"<>|]/g, '_');
+  const safeLang = String(lang || 'default').toUpperCase();
+  const safePreset = String(presetLabel || '').replace(/[\\/:*?"<>|]/g, '_');
+  const effectiveDate = dateStr || new Date().toISOString().slice(0, 10);
+  if (outputNamePattern) {
+    return outputNamePattern
+      .replace(/\{docId\}|\{model\}/gi, safeDoc)
+      .replace(/\{lang\}/gi, safeLang)
+      .replace(/\{preset\}/gi, safePreset)
+      .replace(/\{date\}/gi, effectiveDate)
+      .replace(/[\\/:*?"<>|]/g, '_');
+  }
+  return safePreset && safePreset.toLowerCase() !== 'none'
+    ? `${safeDoc}_${safeLang}_${safePreset}`
+    : `${safeDoc}_${safeLang}`;
+}
+
+export async function runUniversalDeliverableAudit({
+  generatedDocxPaths = [],
+  deliverables = [],
+  pdfConverterUsed = false
+} = {}) {
+  const docxAudit = [];
+  const pdfAudit = [];
+  const failures = [];
+
+  for (const docxPath of generatedDocxPaths) {
+    if (!fs.existsSync(docxPath)) {
+      failures.push(`MISSING_DOCX:${path.basename(docxPath)}`);
+      continue;
+    }
+    const buf = fs.readFileSync(docxPath);
+    const uni = await recognizeDocumentUniversal(buf, { sourceName: path.basename(docxPath) });
+    const topo = await recognizeTemplateTopology(buf, { templateName: path.basename(docxPath) });
+    const uniOk = Boolean(uni.coverage?.tableCountMatches && uni.coverage?.normalizedCellCount > 0);
+    const topoOk = Boolean(topo.completenessCheck?.ok);
+    if (!uniOk) failures.push(`UNIVERSAL_CONTENT_MISMATCH:${path.basename(docxPath)}`);
+    if (!topoOk) failures.push(`TOPOLOGY_INCOMPLETE:${path.basename(docxPath)}:${(topo.completenessCheck?.missingItems || []).map(m => m.id).join(',')}`);
+    docxAudit.push({
+      file: path.basename(docxPath),
+      tables: uni.tables.length,
+      cells: uni.coverage.normalizedCellCount,
+      topologySections: topo.sectionsCount,
+      completeness: `${topo.completenessCheck?.passedCount}/${topo.completenessCheck?.totalChecks}`,
+      ok: uniOk && topoOk
+    });
+  }
+
+  for (const pdfPath of deliverables.filter((p) => /\.pdf$/i.test(p))) {
+    if (!fs.existsSync(pdfPath)) {
+      failures.push(`MISSING_PDF:${path.basename(pdfPath)}`);
+      continue;
+    }
+    const buf = fs.readFileSync(pdfPath);
+    const isPdfHeader = buf.subarray(0, 5).toString('ascii') === '%PDF-';
+    if (!isPdfHeader || !pdfConverterUsed) {
+      failures.push(`INVALID_PDF_OR_CONVERTER:${path.basename(pdfPath)}`);
+    }
+    pdfAudit.push({
+      file: path.basename(pdfPath),
+      sizeBytes: buf.length,
+      validPdfHeader: isPdfHeader,
+      viaStandardConverter: pdfConverterUsed
+    });
+  }
+
+  return { ok: failures.length === 0, failures, docxAudit, pdfAudit };
+}
+
 export async function produceStandardDeliverables({
   sourceFilePath,
+  documentId = null,
   modelCode = null,
+  outputNamePattern = null,
+  namingPatternId = null,
   targetDir = null,
   wordDir = null,
   pdfDir = null,
   userSyncDir = null,
   facts = {},
+  presets = [],
+  formats = [],
+  languages = [],
+  confirmRequirements = false,
+  apiBase = null,
+  templatePath = null,
+  topologyPath = null,
+  legacy8FormatAudit = false,
   prepareOnly = false,
   approveContext2 = false,
   skipAudit = false,
   skipUserSync = false
 }) {
+  // =========================================================================
+  // 阶段 0: 机械层需求确认门禁 + API 预设拉取 (Stage 0 Gate)
+  // =========================================================================
+  const availablePresets = await fetchAvailableUserPresets({ apiBase });
+  const confirmedReq = validateWorkflowRequirements({
+    confirmRequirements,
+    presets,
+    formats,
+    languages,
+    availablePresets
+  });
+
   if (!prepareOnly && !approveContext2) {
     throw new Error(
-      '[CONTEXT2_AGENT_APPROVAL_REQUIRED] 禁止机械程序直接完成 Context1->Context2->产出！请先运行 --prepareOnly 生成 Context 2 中英文对照校对包，由 Agent 逐行校对翻译后，再传入 --approveContext2（及可选 --translations=<json>）放行编辑器写入与产出。'
+      '[CONTEXT2_AGENT_APPROVAL_REQUIRED] 禁止机械程序直接完成 Context1->Context2->产出！请先运行 --prepareOnly 生成 Context 1 (JSON+MD) 与 Context 2 校对包，由 Agent 结合映射库完成逐句校对翻译后，再传入 --approveContext2（及可选 --translations=<json>）放行编辑器写入与产出。'
     );
   }
   const globalStartTime = Date.now();
-  const stages = {};
+  const stages = {
+    stage0: {
+      name: 'Requirements Confirmation & Preset Fetch',
+      status: 'COMPLETED',
+      presets: confirmedReq.presets,
+      formats: confirmedReq.formats,
+      languages: confirmedReq.languages,
+      availablePresetsCount: availablePresets.length
+    }
+  };
 
   // =========================================================================
   // 阶段 1: 物理源文件定位与存在性校验 (Source Discovery)
@@ -209,13 +416,12 @@ export async function produceStandardDeliverables({
     throw new Error(`[STAGE-01 FATAL] 源文件字节数为 0，为空文件: ${resolvedSourcePath}`);
   }
 
-  const effectiveModel = (modelCode || extractModelCodeFromPath(resolvedSourcePath)).toUpperCase();
+  const sourceStem = path.basename(resolvedSourcePath, path.extname(resolvedSourcePath));
+  const effectiveModel = String(documentId || modelCode || sourceStem).trim();
   const effectiveTargetDir = targetDir
     ? path.resolve(targetDir)
     : path.resolve(__dirname, '../../output', effectiveModel);
-  const effectiveUserSyncDir = userSyncDir
-    ? path.resolve(userSyncDir)
-    : `E:\\冠志\\TDS MSDS (2)\\待处理文件\\${effectiveModel}`;
+  const effectiveUserSyncDir = userSyncDir ? path.resolve(userSyncDir) : null;
 
   if (!fs.existsSync(effectiveTargetDir)) {
     fs.mkdirSync(effectiveTargetDir, { recursive: true });
@@ -233,16 +439,29 @@ export async function produceStandardDeliverables({
   };
 
   // =========================================================================
-  // 阶段 2: 源事实零损耗识别与 Context1 生成 (Source Recognition to Context1)
+  // 阶段 2: 源事实零损耗识别与 Context1 双产物生成 (JSON + 1:1 MD)
   // =========================================================================
   const s2Start = Date.now();
-  const context1 = await recognizeSourceDocx(fs.readFileSync(resolvedSourcePath), path.basename(resolvedSourcePath));
+  const srcBuffer = fs.readFileSync(resolvedSourcePath);
+  const srcBaseName = path.basename(resolvedSourcePath);
+  const universalContext1 = await recognizeDocumentUniversal(srcBuffer, { sourceName: srcBaseName });
+  const context1JsonPath = path.join(effectiveTargetDir, `${effectiveModel}_context1_universal.json`);
+  const context1MdPath = path.join(effectiveTargetDir, `${effectiveModel}_context1_recognition.md`);
+  fs.writeFileSync(context1JsonPath, JSON.stringify(universalContext1, null, 2), 'utf8');
+  fs.writeFileSync(context1MdPath, serializeUniversalToMarkdown(universalContext1), 'utf8');
+
+  const context1 = await recognizeSourceDocx(srcBuffer, srcBaseName);
   context1.modelCode = effectiveModel;
+  context1.context1JsonPath = context1JsonPath;
+  context1.context1MdPath = context1MdPath;
 
   stages.stage2 = {
-    name: 'Recognition Engine to Context1',
+    name: 'Recognition Engine to Context1 (JSON + MD)',
     status: 'COMPLETED',
     modelCode: effectiveModel,
+    context1JsonPath,
+    context1MdPath,
+    recognizedTablesCount: universalContext1.tables.length,
     recognizedSectionsCount: Object.keys(context1.sections || {}).length,
     componentsCount: Array.isArray(context1.components) ? context1.components.length : 0,
     isHazardous: Boolean(context1.ghs?.isHazardous),
@@ -293,7 +512,7 @@ export async function produceStandardDeliverables({
     const reviewMdPath = path.join(effectiveTargetDir, `${effectiveModel}_context2_review.md`);
     const translationsJsonPath = path.join(effectiveTargetDir, `${effectiveModel}_context2_translations.json`);
     const translationsMap = {};
-    for (let s = 1; s <= 16; s++) {
+    for (const s of Object.keys(ctx2Structured.sections || {})) {
       for (const item of (ctx2Structured.sections?.[s]?.items || [])) {
         if (item.labelCn && item.labelEn && item.labelCn !== '—') translationsMap[item.labelCn] = item.labelEn;
         if (item.valueCn && item.valueEn) translationsMap[item.valueCn] = item.valueEn;
@@ -316,8 +535,11 @@ export async function produceStandardDeliverables({
       status: 'AWAITING_AGENT_PROOFREAD',
       modelCode: effectiveModel,
       targetDir: effectiveTargetDir,
+      context1JsonPath,
+      context1MdPath,
       reviewMdPath,
       translationsJsonPath,
+      requiresAgentTranslation: confirmedReq.languages.includes('en'),
       untranslatedCount: ctx2Structured.validation?.untranslatedCount || 0,
       factFingerprintOk: Boolean(ctx2Structured.validation?.factFingerprintOk),
       totalDurationSec: Number(((Date.now() - globalStartTime) / 1000).toFixed(2)),
@@ -326,68 +548,79 @@ export async function produceStandardDeliverables({
   }
 
   // =========================================================================
-  // 阶段 4 & 5: 强制调用拓扑编译与编辑器万能原语受控写入 (Stages 4 & 5)
+  // 阶段 4 & 5: 按确认的 presets × languages 生成 DOCX，含 PDF 时强制走 pdf-converter.js
   // =========================================================================
   const s45Start = Date.now();
   const deliverables = [];
+  const generatedDocxPaths = [];
+  const generatedByPreset = new Map();
 
-  const variantSpecs = [
-    { templateKey: 'CN_Guanzhi', presetKey: 'Guanzhi_zh', outputPath: path.join(effectiveTargetDir, `${effectiveModel} msds_CN 冠志.docx`) },
-    { templateKey: 'CN_Guocai', presetKey: 'Guocai_zh', outputPath: path.join(effectiveTargetDir, `${effectiveModel} msds_CN 国彩.docx`) },
-    { templateKey: 'EN_Guanzhi', presetKey: 'Guanzhi_en', outputPath: path.join(effectiveTargetDir, `${effectiveModel} msds_EN Guanzhi.docx`) },
-    { templateKey: 'EN_Guocai', presetKey: 'Guocai_en', outputPath: path.join(effectiveTargetDir, `${effectiveModel} msds_EN Guocai.docx`) }
-  ];
-
-  for (const v of variantSpecs) {
-    const schema = await inspectTemplateSchema(v.templateKey);
-    const compiled = compileTopologyOps(ctx2Structured, schema, { presetKey: v.presetKey });
-    await handleToolCall('msds_execute_editor_ops', {
-      templateKey: v.templateKey,
-      outputPath: v.outputPath,
-      sourceDocxPath: resolvedSourcePath,
-      operations: compiled.operations
-    });
-    deliverables.push(v.outputPath);
+  let resolvedNamePattern = outputNamePattern;
+  if (!resolvedNamePattern && namingPatternId) {
+    const allPatterns = await fetchAvailableNamingPatterns({ apiBase });
+    const hit = allPatterns.find((p) => p.id === namingPatternId || p.name === namingPatternId)
+      || getCfgNamingPatternById(namingPatternId)
+      || getDbNamingPatternById(namingPatternId);
+    if (hit?.pattern) resolvedNamePattern = hit.pattern;
   }
 
-  const cnGzDocxPath = variantSpecs[0].outputPath;
-  const cnGcDocxPath = variantSpecs[1].outputPath;
-  const enGzDocxPath = variantSpecs[2].outputPath;
-  const enGcDocxPath = variantSpecs[3].outputPath;
-
-  // 5. 原生转换 4 份高清 PDF (线性法定工序)
-  const pdfItems = [
-    { sourcePath: cnGzDocxPath, outputPath: path.join(effectiveTargetDir, `${effectiveModel} msds_CN 冠志.pdf`) },
-    { sourcePath: cnGcDocxPath, outputPath: path.join(effectiveTargetDir, `${effectiveModel} msds_CN 国彩.pdf`) },
-    { sourcePath: enGzDocxPath, outputPath: path.join(effectiveTargetDir, `${effectiveModel} msds_EN Guanzhi.pdf`) },
-    { sourcePath: enGcDocxPath, outputPath: path.join(effectiveTargetDir, `${effectiveModel} msds_EN Guocai.pdf`) }
-  ];
-
-  const batchInputs = [];
-  for (const item of pdfItems) {
-    if (fs.existsSync(item.sourcePath)) {
-      batchInputs.push({
-        docxBuffer: fs.readFileSync(item.sourcePath),
-        fileName: path.basename(item.sourcePath)
+  for (const presetId of confirmedReq.presets) {
+    const isNonePreset = String(presetId).toLowerCase() === 'none';
+    const matchedPreset = isNonePreset
+      ? { id: 'none', name: 'none', entity: 'none' }
+      : (availablePresets.find((p) => p.id === presetId || p.name === presetId) || { id: presetId, name: presetId, entity: presetId });
+    const langPair = {};
+    for (const lang of confirmedReq.languages) {
+      const tplKey = templatePath || matchedPreset.targetTemplate || resolveDefaultTemplate(lang);
+      const baseName = formatDeliverableBaseName({
+        docId: effectiveModel,
+        lang,
+        presetLabel: matchedPreset.entity || matchedPreset.name || matchedPreset.id,
+        outputNamePattern: resolvedNamePattern
       });
+      const docxOut = path.join(effectiveTargetDir, `${baseName}.docx`);
+
+      const schema = await inspectTemplateSchema(tplKey);
+      const compiled = compileTopologyOps(ctx2Structured, schema, isNonePreset ? {} : { presetKey: matchedPreset.id });
+      await handleToolCall('msds_execute_editor_ops', {
+        templateKey: tplKey,
+        outputPath: docxOut,
+        sourceDocxPath: resolvedSourcePath,
+        operations: compiled.operations
+      });
+      generatedDocxPaths.push(docxOut);
+      langPair[lang] = docxOut;
+      if (confirmedReq.formats.includes('docx')) {
+        deliverables.push(docxOut);
+      }
     }
+    generatedByPreset.set(matchedPreset.id, langPair);
   }
 
-  const convertedPdfs = await convertBatchDocxToPdf(batchInputs);
-  for (let i = 0; i < convertedPdfs.length; i++) {
-    const res = convertedPdfs[i];
-    const item = pdfItems[i];
-    if (res && res.pdfBuffer && item) {
-      fs.writeFileSync(item.outputPath, res.pdfBuffer);
-      deliverables.push(item.outputPath);
+  let pdfConverterUsed = false;
+  if (confirmedReq.formats.includes('pdf')) {
+    const batchInputs = generatedDocxPaths
+      .filter((p) => fs.existsSync(p))
+      .map((p) => ({ docxBuffer: fs.readFileSync(p), fileName: path.basename(p) }));
+    const convertedPdfs = await convertBatchDocxToPdf(batchInputs);
+    pdfConverterUsed = true;
+    for (let i = 0; i < convertedPdfs.length; i++) {
+      const res = convertedPdfs[i];
+      const srcDocx = generatedDocxPaths[i];
+      if (res && res.pdfBuffer && srcDocx) {
+        const pdfOut = srcDocx.replace(/\.docx$/i, '.pdf');
+        fs.writeFileSync(pdfOut, res.pdfBuffer);
+        deliverables.push(pdfOut);
+      }
     }
   }
 
   stages.stage4_5 = {
-    name: 'Universal Editor & Strict Production Order',
+    name: 'Universal Editor & Enforced DOCX->PDF Order',
     status: 'COMPLETED',
     deliverables,
     deliverablesCount: deliverables.length,
+    pdfConverterModule: pdfConverterUsed ? 'web/src/pdf-converter.js' : null,
     durationMs: Date.now() - s45Start
   };
 
@@ -398,65 +631,69 @@ export async function produceStandardDeliverables({
   let auditSummary = { skipped: true };
 
   if (!skipAudit) {
-    // 6.1 第一步: 159 项机械确定性中央主审计 (退出码 0 门禁)
-    const masterAuditRes = await runMasterMsdsAudit({
-      model: effectiveModel,
-      targetDir: effectiveTargetDir,
-      sourceDocx: resolvedSourcePath
+    // 6.1 默认通用审计：对实际产出的每份 DOCX/PDF 执行 L2 内容覆盖率 + 9 层拓扑完整度 + PDF 规范核验（不锁死 8 格式或 16 节）
+    const univAuditRes = await runUniversalDeliverableAudit({
+      generatedDocxPaths,
+      deliverables,
+      pdfConverterUsed
     });
-
-    if (!masterAuditRes.success) {
-      throw new Error(`[STAGE-06 FATAL] 159 项集中式主审计未通过，存在 ${masterAuditRes.failCount} 项违章，发布已阻断！`);
+    if (!univAuditRes.ok) {
+      throw new Error(`[STAGE-06 FATAL] 通用交付物内容/拓扑审计未通过: ${univAuditRes.failures.join(' | ')}`);
     }
 
-    // 6.1b 第一步a2: 分阶防复发机械硬门禁 (P5_S3_ZERO_INDENT, P5_S8_OEL_ALIGNMENT, P5_S11_DUAL_PARADIGM, P5_EN_CHEMICAL_SUBSCRIPT, P6_PDF_NO_LIBREOFFICE)
-    const p5MechRes = await auditPhase5DocxFiles({
-      targetDir: effectiveTargetDir,
-      modelCode: effectiveModel,
-      sourcePath: resolvedSourcePath
-    });
-    const p6PdfMechRes = auditPhase6PdfFiles({
-      targetDir: effectiveTargetDir,
-      modelCode: effectiveModel
-    });
-    if (!p5MechRes.ok || !p6PdfMechRes.ok) {
-      const fails = [...(p5MechRes.findings || []), ...(p6PdfMechRes.findings || [])].map(x => `${x.ruleId}:${x.measuredDetail}`);
-      throw new Error(`[STAGE-06 FATAL] 防复发机械硬门禁未通过: ${fails.join(' | ')}`);
-    }
-
-    // 6.2 第一步b: 双极双层全景法医级深度审计 (Failures: 0 门禁)
-    const bilayerAuditRes = await runBipolarBilayerAudit(effectiveTargetDir, effectiveModel);
-    if (!bilayerAuditRes.success) {
-      throw new Error(`[STAGE-06 FATAL] 双极双层全景深度审计未通过，存在 ${bilayerAuditRes.failCount} 项违章，发布已阻断！`);
-    }
-
-    // 6.3 第二步: 16-Section 中英文逐句逐槽位 1:1 双向物理对账认知审计
-    const cnGuanzhiDocx = path.join(effectiveTargetDir, `${effectiveModel} msds_CN 冠志.docx`);
-    const enGuanzhiDocx = path.join(effectiveTargetDir, `${effectiveModel} msds_EN Guanzhi.docx`);
-    let fidelityRes = { success: true, totalAssertions: 0, passes: 0, failures: [] };
-    if (fs.existsSync(cnGuanzhiDocx) && fs.existsSync(enGuanzhiDocx)) {
-      fidelityRes = await audit16SectionsBilingualFidelity(cnGuanzhiDocx, enGuanzhiDocx, resolvedSourcePath);
-      if (!fidelityRes.success) {
-        throw new Error(`[STAGE-06 FATAL] 16 章节双语保真度审计未通过，存在 ${fidelityRes.failures.length} 项违章，发布已阻断！`);
+    let legacyAudit = null;
+    if (legacy8FormatAudit) {
+      const masterAuditRes = await runMasterMsdsAudit({
+        model: effectiveModel,
+        targetDir: effectiveTargetDir,
+        sourceDocx: resolvedSourcePath
+      });
+      if (!masterAuditRes.success) {
+        throw new Error(`[STAGE-06 FATAL] 159 项集中式主审计未通过，存在 ${masterAuditRes.failCount} 项违章，发布已阻断！`);
       }
+      const p5MechRes = await auditPhase5DocxFiles({
+        targetDir: effectiveTargetDir,
+        modelCode: effectiveModel,
+        sourcePath: resolvedSourcePath
+      });
+      const p6PdfMechRes = auditPhase6PdfFiles({
+        targetDir: effectiveTargetDir,
+        modelCode: effectiveModel
+      });
+      if (!p5MechRes.ok || !p6PdfMechRes.ok) {
+        const fails = [...(p5MechRes.findings || []), ...(p6PdfMechRes.findings || [])].map(x => `${x.ruleId}:${x.measuredDetail}`);
+        throw new Error(`[STAGE-06 FATAL] 防复发机械硬门禁未通过: ${fails.join(' | ')}`);
+      }
+      const bilayerAuditRes = await runBipolarBilayerAudit(effectiveTargetDir, effectiveModel);
+      if (!bilayerAuditRes.success) {
+        throw new Error(`[STAGE-06 FATAL] 双极双层全景深度审计未通过，存在 ${bilayerAuditRes.failCount} 项违章，发布已阻断！`);
+      }
+      let fidelityRes = { success: true, totalAssertions: 0, passes: 0, failures: [] };
+      for (const pair of generatedByPreset.values()) {
+        if (pair.zh && pair.en && fs.existsSync(pair.zh) && fs.existsSync(pair.en)) {
+          const pairRes = await audit16SectionsBilingualFidelity(pair.zh, pair.en, resolvedSourcePath);
+          fidelityRes.totalAssertions += pairRes.totalAssertions || 0;
+          fidelityRes.passes += pairRes.passes || 0;
+          if (!pairRes.success) {
+            fidelityRes.success = false;
+            fidelityRes.failures.push(...(pairRes.failures || []));
+          }
+        }
+      }
+      if (!fidelityRes.success) {
+        throw new Error(`[STAGE-06 FATAL] 双语保真度审计未通过，存在 ${fidelityRes.failures.length} 项违章，发布已阻断！`);
+      }
+      legacyAudit = {
+        masterFailCount: masterAuditRes.failCount,
+        bilayerFailCount: bilayerAuditRes.failCount,
+        bilingualFailures: fidelityRes.failures.length
+      };
     }
 
     auditSummary = {
       skipped: false,
-      masterAudit: {
-        totalAssertions: masterAuditRes.totalAssertions,
-        passCount: masterAuditRes.passCount,
-        whitelistPassCount: masterAuditRes.whitelistPassCount,
-        failCount: masterAuditRes.failCount
-      },
-      bilayerAudit: {
-        failCount: bilayerAuditRes.failCount
-      },
-      bilingualFidelity: {
-        totalAssertions: fidelityRes.totalAssertions || 0,
-        passes: fidelityRes.passes || 0,
-        failures: (fidelityRes.failures || []).length
-      }
+      universalAudit: univAuditRes,
+      legacyAudit
     };
   }
 
@@ -473,8 +710,8 @@ export async function produceStandardDeliverables({
   const s7Start = Date.now();
   let syncResults = [];
 
-  if (!skipUserSync) {
-    syncResults = await syncDeliverablesToUserDir(effectiveTargetDir, effectiveUserSyncDir, effectiveModel);
+  if (!skipUserSync && effectiveUserSyncDir) {
+    syncResults = await syncDeliverablesToUserDir(effectiveTargetDir, effectiveUserSyncDir, effectiveModel, deliverables);
   }
   if (wordDir) {
     fs.mkdirSync(path.resolve(wordDir), { recursive: true });

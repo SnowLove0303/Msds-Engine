@@ -1,551 +1,269 @@
 #!/usr/bin/env node
 
 /**
- * MSDS-Studio 标准七步覆写流水线统一执行脚手架 (Test Kit Standard Runner)
- * 
- * 严格按照 MSDS-Studio 7 阶标准作业规程 (7-Phase Pipeline) 执行：
- * Phase 1: 物理源文件事实感知 (Context 1 抽取与指纹锁定)
- * Phase 2: 双实体预设加载与意图对齐 (冠志 / 国彩)
- * Phase 3: 事实标准化治理与基准补全 (Context 2)
- * Phase 4: 模板加载与前置值格清零
- * Phase 5: 编辑器受控写入与排版几何硬锁 (420/560 dxa, 单 Tab, Section 2 通栏)
- * Phase 6: 原生高保真矢量 PDF 转换 (Windows WPS COM 原生 5 页复刻)
- * Phase 7: 两阶双轨全景深度审计 (双极双层 165 项 + 中央主审计 170 项，退出码 0 门禁)
- * 
- * 使用方式:
- *   node run_standard_production.mjs [--source="<源文件路径>"] [--model="<产品型号>"] [--targetDir="<输出目录>"]
+ * MSDS-Studio 唯一标准七步覆写流水线统一执行入口 (Test Kit Standard Runner)
+ *
+ * 统一调度 ../../web/src/production-orchestrator.js (produceStandardDeliverables)，
+ * 与 PA / HPU 全系统一，严禁绕过或使用旧版分步脚本。
+ *
+ * 用法:
+ *   node run_standard_production.mjs [--source="<源文件路径>"] [--model="<产品型号>"] [--targetDir="<输出目录>"] [--wordDir="<Word目录>"] [--pdfDir="<PDF目录>"] [--skipUserSync]
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { execSync, spawnSync } from 'node:child_process';
-import { JSDOM } from 'jsdom';
-const { default: JSZip } = await import('../../node_modules/jszip/lib/index.js');
-
-const dom = new JSDOM('<!doctype html><html><body></body></html>');
-globalThis.DOMParser = dom.window.DOMParser;
-globalThis.XMLSerializer = dom.window.XMLSerializer;
+import { fileURLToPath } from 'node:url';
+import { produceStandardDeliverables, extractModelCodeFromPath, fetchAvailableUserPresets, fetchAvailableNamingPatterns } from '../../web/src/production-orchestrator.js';
+import { recognizeDocumentUniversal, serializeUniversalToMarkdown } from '../../web/src/recognition-engine.js';
+import { createTopologyPluginSlot } from '../../web/src/topology-plugin-slot.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const REPO_ROOT = path.resolve(__dirname, '../..');
-
-// 动态载入官方正规流水线构件
-const { recognizeSourceDocx, serializeFactsToMarkdown } = await import('../../web/src/recognition-engine.js');
-const { governContext, buildStructuredContext2, serializeContext2ToMarkdown, saveTranslationsToMemory } = await import('../../web/src/context-governor.js');
-const { compileTopologyOps } = await import('../../web/src/topology-matcher.js');
-const { convertBatchDocxToPdf } = await import('../../web/src/pdf-converter.js');
-const {
-  inspectTemplateSchema,
-  createWorkSession,
-  saveSession,
-  clearTemplateValues,
-  clearSectionValuesInSession,
-  applyCompanyPreset,
-  writeCellValueToSession,
-  writeFullWidthSection,
-  formatSection9LaserTabs,
-  deleteRowFromSession,
-  insertRowIntoSession,
-  insertRowAfter,
-  morphToFullWidth,
-  applyAdaptiveRuler,
-  enforceFlushLeftValues,
-  formatSection3GridCenter,
-  pruneRowsSafely,
-  applyTopologyTypographyLock
-} = await import('../../web/src/template-editor.js');
-const {
-  createExecutionRun,
-  updateRunPhase,
-  recordWorkflowError,
-  recordAuditFindings,
-  finishExecutionRun,
-  parseAuditOutput,
-  closeUserExecDb
-} = await import('../../web/src/user-exec-db.js');
-const {
-  auditPhase1Context1,
-  auditPhase2Context2,
-  auditPhase4TopologyOps,
-  auditPhase5DocxFiles,
-  auditPhase6PdfFiles
-} = await import('../../web/src/staged-mechanical-audit.js');
 
 function parseArgs() {
   const args = process.argv.slice(2);
   const options = {
     source: null,
     model: null,
+    documentId: null,
+    outputNamePattern: null,
+    namingPatternId: null,
+    legacy8FormatAudit: false,
     targetDir: null,
+    wordDir: null,
+    pdfDir: null,
+    userSyncDir: null,
     facts: null,
     translations: null,
-    stopAfter: null,
-    phase: null,
-    user: null,
-    actorType: 'human',
-    enableContentMapping: false,
-    allowDirty: false,
+    template: null,
+    topology: null,
+    presets: [],
+    formats: [],
+    languages: [],
+    confirmRequirements: false,
+    listPresets: false,
+    listNamingPatterns: false,
+    apiBase: null,
+    recognizeOnly: false,
+    buildTopology: false,
+    prepareOnly: false,
+    approveContext2: false,
     skipAudit: false,
-    legacyAudit: false,
+    skipUserSync: false,
     help: false
   };
 
-  for (const arg of args) {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
     if (arg === '--help' || arg === '-h') options.help = true;
-    else if (arg.startsWith('--source=')) options.source = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
-    else if (arg.startsWith('--model=')) options.model = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
-    else if (arg.startsWith('--targetDir=')) options.targetDir = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
-    else if (arg.startsWith('--facts=')) options.facts = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
-    else if (arg.startsWith('--translations=')) options.translations = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
-    else if (arg.startsWith('--stopAfter=')) options.stopAfter = arg.split('=', 2)[1].replace(/^["']|["']$/g, '').toLowerCase();
-    else if (arg.startsWith('--phase=')) options.phase = arg.split('=', 2)[1].replace(/^["']|["']$/g, '').toLowerCase();
-    else if (arg.startsWith('--user=')) options.user = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
-    else if (arg.startsWith('--actorType=')) options.actorType = arg.split('=', 2)[1].replace(/^["']|["']$/g, '').toLowerCase();
-    else if (arg === '--enableContentMapping') options.enableContentMapping = true;
-    else if (arg === '--allowDirty') options.allowDirty = true;
+    else if (arg.startsWith('--source=')) options.source = arg.slice(9).replace(/^["']|["']$/g, '');
+    else if (arg === '--source' && args[i + 1]) options.source = args[++i].replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--sourceDocx=')) options.source = arg.slice(13).replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--model=')) options.model = arg.slice(8).replace(/^["']|["']$/g, '');
+    else if (arg === '--model' && args[i + 1]) options.model = args[++i].replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--documentId=')) options.documentId = arg.slice(13).replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--outputNamePattern=')) options.outputNamePattern = arg.slice(20).replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--namingPatternId=')) options.namingPatternId = arg.slice(18).replace(/^["']|["']$/g, '');
+    else if (arg === '--legacy8FormatAudit') options.legacy8FormatAudit = true;
+    else if (arg === '--listNamingPatterns') options.listNamingPatterns = true;
+    else if (arg.startsWith('--targetDir=')) options.targetDir = arg.slice(12).replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--wordDir=')) options.wordDir = arg.slice(10).replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--pdfDir=')) options.pdfDir = arg.slice(9).replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--userSyncDir=')) options.userSyncDir = arg.slice(14).replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--facts=')) options.facts = arg.slice(8).replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--translations=')) options.translations = arg.slice(15).replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--template=')) options.template = arg.slice(11).replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--topology=')) options.topology = arg.slice(11).replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--presets=')) options.presets = arg.slice(10).replace(/^["']|["']$/g, '').split(',').map(s => s.trim()).filter(Boolean);
+    else if (arg.startsWith('--formats=')) options.formats = arg.slice(10).replace(/^["']|["']$/g, '').split(',').map(s => s.trim()).filter(Boolean);
+    else if (arg.startsWith('--languages=')) options.languages = arg.slice(12).replace(/^["']|["']$/g, '').split(',').map(s => s.trim()).filter(Boolean);
+    else if (arg.startsWith('--apiBase=')) options.apiBase = arg.slice(10).replace(/^["']|["']$/g, '');
+    else if (arg === '--confirmRequirements') options.confirmRequirements = true;
+    else if (arg === '--listPresets') options.listPresets = true;
+    else if (arg === '--recognizeOnly') options.recognizeOnly = true;
+    else if (arg === '--buildTopology') options.buildTopology = true;
+    else if (arg === '--prepareOnly') options.prepareOnly = true;
+    else if (arg === '--approveContext2') options.approveContext2 = true;
     else if (arg === '--skipAudit') options.skipAudit = true;
-    else if (arg === '--legacyAudit') options.legacyAudit = true;
+    else if (arg === '--skipUserSync') options.skipUserSync = true;
     else if (!options.source && !arg.startsWith('--')) options.source = arg.replace(/^["']|["']$/g, '');
   }
-
   return options;
-}
-
-const execTracker = {
-  runId: null,
-  phase: 'INIT',
-  startedAt: Date.now()
-};
-
-function runAuditAndRecord(auditorName, scriptPath, args, runId) {
-  const res = spawnSync('node', [scriptPath, ...args], {
-    encoding: 'utf-8',
-    maxBuffer: 50 * 1024 * 1024
-  });
-  if (res.stdout) process.stdout.write(res.stdout);
-  if (res.stderr) process.stderr.write(res.stderr);
-
-  const combined = `${res.stdout || ''}\n${res.stderr || ''}`;
-  const findings = parseAuditOutput(auditorName, combined);
-  if (runId && findings.length > 0) {
-    recordAuditFindings(runId, findings);
-  }
-  const ok = res.status === 0;
-  if (!ok && runId) {
-    recordWorkflowError({
-      runId,
-      phase: 'PHASE_7_AUDIT',
-      errorCode: `${auditorName}_BLOCKED`,
-      message: `${auditorName} exited with code ${res.status} (captured ${findings.length} findings)`
-    });
-  }
-  return { ok, status: res.status, findingsCount: findings.length };
-}
-
-function enforceMechanicalGate(stageName, auditResult, skipBlock = false) {
-  if (!auditResult) return;
-  const s = auditResult.summary || {};
-  console.log(`    🛡️ [前置机械审计 ${stageName}] 通过: ${s.passed} | CRITICAL: ${s.critical} | FAIL: ${s.fail} | WARNING: ${s.warning}`);
-  if (execTracker.runId && Array.isArray(auditResult.findings) && auditResult.findings.length > 0) {
-    recordAuditFindings(execTracker.runId, auditResult.findings);
-  }
-  for (const f of auditResult.findings || []) {
-    console.error(`       [${f.severity}] (${f.ruleId}) ${f.title} -> ${f.measuredDetail}`);
-  }
-  if (!auditResult.ok && !skipBlock) {
-    if (execTracker.runId) {
-      recordWorkflowError({
-        runId: execTracker.runId,
-        phase: stageName,
-        errorCode: `MECH_${stageName}_BLOCKED`,
-        message: `${stageName} mechanical gate blocked (critical=${s.critical}, fail=${s.fail})`
-      });
-      finishExecutionRun(execTracker.runId, {
-        status: 'AUDIT_BLOCKED',
-        durationMs: Date.now() - execTracker.startedAt,
-        summary: { blockedBy: stageName, ...s }
-      });
-      closeUserExecDb();
-    }
-    process.exit(1);
-  }
 }
 
 async function main() {
   const options = parseArgs();
   if (options.help) {
     console.log(`
-MSDS-Studio 官方标准七步流水线 Runner
+MSDS-Studio 唯一标准七步覆写流水线 Runner (Test Kit)
 用法:
   node run_standard_production.mjs [选项]
 
 选项:
-  --source=<路径>      源文件路径 (默认: ./source/ 下第一个 docx)
-  --model=<型号>       产品型号代码 (如 PA-3655，默认自动从源文件解析)
-  --targetDir=<路径>   交付物输出目录 (默认: ./output/<型号>/)
-  --skipAudit         跳过终审 (不推荐，默认执行法医级审计)
+  --source=<路径>         源文件路径 (默认: ./source/ 下第一个 docx)
+  --documentId=<标识>     通用文档标识 (默认取源文件名主干)
+  --model=<型号>          可选：兼容别名，等同 --documentId
+  --targetDir=<路径>      交付物生成目录 (默认: ./output/<documentId>/)
+  --wordDir=<路径>        可选：同步实际产出的 DOCX 文件至指定目录
+  --pdfDir=<路径>         可选：同步实际产出的 PDF 文件至指定目录
+  --facts=<路径|JSON>     可选：非标源文件事实覆盖
+  --template=<路径>       可选：指定自定义母版 .docx 路径
+  --topology=<路径>       可选：指定 MsdsEngineStandardTopology JSON 路径
+  --listPresets           通过 API/数据库列出全部可用用户预设
+  --listNamingPatterns    通过 API/数据库列出全部可复用产出物命名格式预设
+  --namingPatternId=<ID>  选用已保存的命名格式预设 ID
+  --outputNamePattern=<P> 直接指定命名模板 (如 "{date}_{docId}_{lang}_{preset}")
+  --presets=<id1,id2>     已确认的用户预设列表（支持多选，或传 none）
+  --formats=<docx,pdf>    已确认的产出格式（含 pdf 时强制先生成 docx 再经 pdf-converter.js 转换）
+  --languages=<zh,en>     已确认的目标语言（支持任意语言代码）
+  --confirmRequirements   显式声明已完成 Stage 0 需求确认门禁
+  --apiBase=<URL>         可选：Web API 服务基地址
+  --recognizeOnly         仅执行 L2 通用全量识别，输出 JSON 与 1:1 原样 MD
+  --buildTopology         仅执行 L2 9 层拓扑识别与标准可复用包构建
+  --legacy8FormatAudit    可选：显式启用旧版 8 格式/16 节专项审计
+  --skipUserSync          可选：跳过同步至外部目录
+  --skipAudit             仅调试用，正式生产严禁跳过审计
 `);
     process.exit(0);
   }
 
-  // 1. 解析源文件路径
+  if (options.listPresets) {
+    const presets = await fetchAvailableUserPresets({ apiBase: options.apiBase });
+    process.stdout.write(JSON.stringify({ count: presets.length, presets }, null, 2) + '\n');
+    return;
+  }
+  if (options.listNamingPatterns) {
+    const namingPatterns = await fetchAvailableNamingPatterns({ apiBase: options.apiBase });
+    process.stdout.write(JSON.stringify({ count: namingPatterns.length, namingPatterns }, null, 2) + '\n');
+    return;
+  }
+
+  if (options.recognizeOnly) {
+    if (!options.source || !fs.existsSync(options.source)) {
+      console.error(`❌ --recognizeOnly 需要有效的 --source 文件路径: ${options.source || '未指定'}`);
+      process.exit(1);
+    }
+    const baseName = path.basename(options.source, path.extname(options.source));
+    const outDir = options.targetDir ? path.resolve(options.targetDir) : path.resolve(__dirname, 'output', baseName);
+    fs.mkdirSync(outDir, { recursive: true });
+    const universal = await recognizeDocumentUniversal(options.source, { sourceName: path.basename(options.source) });
+    const md = serializeUniversalToMarkdown(universal);
+    const jsonOut = path.join(outDir, `${baseName}_universal_recognition.json`);
+    const mdOut = path.join(outDir, `${baseName}_recognition_result.md`);
+    fs.writeFileSync(jsonOut, JSON.stringify(universal, null, 2));
+    fs.writeFileSync(mdOut, md);
+    console.log(`✅ [RECOGNIZE_ONLY] 通用全量识别完成: ${universal.tables.length} 表 / ${universal.coverage.normalizedCellCount} 格`);
+    console.log(`   • JSON: ${jsonOut}`);
+    console.log(`   • MD (1:1): ${mdOut}`);
+    return;
+  }
+
+  if (options.buildTopology) {
+    const tplPath = options.template || options.source;
+    if (!tplPath || !fs.existsSync(tplPath)) {
+      console.error(`❌ --buildTopology 需要有效的 --template 或 --source 文件路径: ${tplPath || '未指定'}`);
+      process.exit(1);
+    }
+    const baseName = path.basename(tplPath, path.extname(tplPath));
+    const outDir = options.targetDir ? path.resolve(options.targetDir) : path.resolve(__dirname, 'output', baseName);
+    fs.mkdirSync(outDir, { recursive: true });
+    const slot = createTopologyPluginSlot();
+    await slot.mountTemplate(tplPath, { templateName: path.basename(tplPath) });
+    const bundle = slot.exportTopologyBundle();
+    const topoOut = path.join(outDir, `${baseName}_built_topology.json`);
+    fs.writeFileSync(topoOut, JSON.stringify(bundle, null, 2));
+    slot.unmountTemplate();
+    console.log(`✅ [BUILD_TOPOLOGY] 9层拓扑构建完成: ${bundle.sectionsCount} 节 | 完整度=${bundle.completenessCheck?.passedCount}/${bundle.completenessCheck?.totalChecks}`);
+    console.log(`   • Bundle: ${topoOut}`);
+    return;
+  }
+
   let sourcePath = options.source;
   if (!sourcePath) {
     const defaultSourceDir = path.resolve(__dirname, 'source');
     if (fs.existsSync(defaultSourceDir)) {
       const candidates = fs.readdirSync(defaultSourceDir).filter(f => f.endsWith('.docx') && !f.startsWith('~$'));
-      if (candidates.length > 0) {
-        sourcePath = path.join(defaultSourceDir, candidates[0]);
-      }
+      if (candidates.length > 0) sourcePath = path.join(defaultSourceDir, candidates[0]);
     }
   }
-
   if (!sourcePath || !fs.existsSync(sourcePath)) {
     console.error(`❌ 未找到有效的源文件: ${sourcePath || '未指定'}`);
     process.exit(1);
   }
 
-  // 2. 解析产品型号
-  let modelCode = options.model;
-  if (!modelCode) {
-    const baseName = path.basename(sourcePath);
-    const m = baseName.match(/([A-Z]{2,4}-\d{3,5}[A-Z0-9-]*)/i) || baseName.match(/([A-Z]{1,4}\d{3,5}[A-Z0-9]*)/i);
-    modelCode = m ? m[1].toUpperCase() : baseName.replace(/\.[^/.]+$/, '').trim();
-  }
-
-function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
-  // 1. 严禁在输出目录或工作区生成调用 MSDS-Engine 的临时脚本
-  if (fs.existsSync(targetDir)) {
-    const adHocScripts = fs.readdirSync(targetDir).filter(f => /\.(?:mjs|js|cjs|py|ps1|sh)$/i.test(f));
-    if (adHocScripts.length > 0) {
-      console.error(`❌ [AD_HOC_SCRIPT_BLOCKED] 检测到临时脚本产出 (${adHocScripts.join(', ')})！工作流调用期间严禁生成任何临时脚本！`);
-      process.exit(1);
-    }
-  }
-
-  // 2. 严禁在工作流调用期间修改受控源码 (豁免合法沉淀的 translation-memory.json)
-  if (!allowDirty && fs.existsSync(path.join(REPO_ROOT, '.git'))) {
-    try {
-      const statusOut = execSync('git status --porcelain web/src web/scripts web/templates "标准化流程"', {
-        cwd: REPO_ROOT,
-        encoding: 'utf8'
-      }).trim();
-      const violations = statusOut
-        .split(/\r?\n/)
-        .map(l => l.trim())
-        .filter(Boolean)
-        .filter(l => !l.endsWith('web/src/translation-memory.json') && !l.includes('/output/'));
-      if (violations.length > 0) {
-        console.error(`❌ [SOURCE_TAMPER_BLOCKED] 检测到系统受控源码/脚本被修改或新增临时文件，工作流调用期间严禁修改源码：\n  ${violations.join('\n  ')}`);
-        process.exit(1);
-      }
-    } catch {
-      // 非 Git 环境跳过 git status 检查
-    }
-  }
-}
-
-  // 3. 解析目标输出目录
+  const modelCode = (options.model || extractModelCodeFromPath(sourcePath)).toUpperCase();
   const targetDir = options.targetDir
     ? path.resolve(options.targetDir)
     : path.resolve(__dirname, 'output', modelCode);
 
-  fs.mkdirSync(targetDir, { recursive: true });
-  verifyReadonlyEngineGuard(targetDir, process.argv.includes('--devAllowDirty'));
+  let customFacts = {};
+  if (options.facts) {
+    customFacts = fs.existsSync(options.facts)
+      ? JSON.parse(fs.readFileSync(options.facts, 'utf8'))
+      : JSON.parse(options.facts);
+  }
 
-  execTracker.startedAt = Date.now();
-  execTracker.runId = createExecutionRun({
-    userId: options.user,
-    actorType: options.actorType,
-    modelCode,
-    sourcePath,
-    targetDir,
-    mode: options.enableContentMapping ? 'TOPOLOGY_PLUS_MAPPING' : 'PURE_TOPOLOGY_SOURCE_INHERITED'
-  });
+  if (options.translations) {
+    const tObj = fs.existsSync(options.translations)
+      ? JSON.parse(fs.readFileSync(options.translations, 'utf8'))
+      : JSON.parse(options.translations);
+    customFacts.translations = { ...(customFacts.translations || {}), ...tObj };
+  }
 
   console.log(`============================================================`);
-  console.log(`🚀 [MSDS-Studio Test Kit] 启动标准七步法覆写生产流水线`);
-  console.log(`   • 执行批次: ${execTracker.runId}`);
+  console.log(`🚀 [MSDS-Studio Test Kit] 启动标准生产流水线 (${options.prepareOnly ? '阶段A: Context 2 预处理导出' : '阶段B: Agent 已校对批准，执行写入与产出'})`);
   console.log(`   • 产品型号: ${modelCode}`);
   console.log(`   • 源文件路径: ${sourcePath}`);
   console.log(`   • 输出目录: ${targetDir}`);
   console.log(`============================================================\n`);
 
-  // Phase 1~6 仅在非 --phase=audit 模式下执行
-  if (options.phase !== 'audit') {
-    // Phase 1: 源文件事实感知 (Context 1 抽取)
-    execTracker.phase = 'PHASE_1_RECOGNITION';
-    updateRunPhase(execTracker.runId, execTracker.phase);
-    console.log(`>>> [Phase 1/7] 识别模块事实感知与 Context 1 抽取...`);
-  const t1 = Date.now();
-  const context1 = await recognizeSourceDocx(sourcePath, path.basename(sourcePath));
-  context1.modelCode = modelCode;
-  const ctx1MdPath = path.join(targetDir, `${modelCode}_context1.md`);
-  fs.writeFileSync(ctx1MdPath, serializeFactsToMarkdown(context1), 'utf8');
-  updateRunPhase(execTracker.runId, execTracker.phase, { context1Path: ctx1MdPath });
-  console.log(`    ✓ 成功解析 16 章节原始事实 (${Date.now() - t1} ms) -> ${ctx1MdPath}`);
-  enforceMechanicalGate('PHASE_1', await auditPhase1Context1({ sourcePath, context1 }), options.skipAudit);
-  if (options.stopAfter === 'context1') {
-    finishExecutionRun(execTracker.runId, { status: 'SUCCESS', durationMs: Date.now() - execTracker.startedAt, summary: { stoppedAfter: 'context1' } });
-    closeUserExecDb();
-    console.log(`\n✅ [STOPPED AFTER PHASE 1] Context 1 已落盘校验: ${ctx1MdPath}`);
-    return;
-  }
-
-  // Phase 2 & 3: 事实标准化治理与基准补全 (Context 2)
-  execTracker.phase = 'PHASE_2_3_GOVERNANCE';
-  updateRunPhase(execTracker.runId, execTracker.phase);
-  console.log(`>>> [Phase 2 & 3/7] 规范治理与全量英译/标准化表格校验 (Context 2)...`);
-  const t2 = Date.now();
-  let agentTranslations = null;
-  if (options.translations && fs.existsSync(options.translations)) {
-    agentTranslations = JSON.parse(fs.readFileSync(options.translations, 'utf8'));
-    console.log(`    ℹ️ 已加载 Agent 全量逐句英译回填字典: ${options.translations}`);
-  }
-  const structuredCtx2 = buildStructuredContext2(context1, { translations: agentTranslations });
-  const ctx2MdPath = path.join(targetDir, `${modelCode}_context2.md`);
-  fs.writeFileSync(ctx2MdPath, serializeContext2ToMarkdown(structuredCtx2), 'utf8');
-  const v = structuredCtx2.validation || {};
-  console.log(`    ✓ Context 2 结构化治理完成: 章节 ${v.coveredSections}/16 | 标注项 ${v.totalItems} | TM库 ${v.tmSize ?? 0} 条 | 待补译 ${v.untranslatedCount} | 数字异常 ${v.numericMismatchCount ?? 0} | isValid=${v.isValid} -> ${ctx2MdPath}`);
-  if (v.untranslatedCount > 0) {
-    const untranslatedPath = path.join(targetDir, `${modelCode}_untranslated.json`);
-    fs.writeFileSync(untranslatedPath, JSON.stringify(v.untranslatedTemplate || {}, null, 2) + '\n', 'utf8');
-    console.warn(`    ⚠️ [GATE 3A->3B] 已自动导出待译模板: ${untranslatedPath}`);
-    console.warn(`       请 Agent 逐句翻译填满上述 JSON 的空值后，传 --translations="${untranslatedPath}" 复跑！`);
-  } else if (agentTranslations && (v.numericMismatchCount ?? 0) === 0) {
-    const saved = saveTranslationsToMemory(agentTranslations);
-    console.log(`    💾 [TM 沉淀] 新增 ${saved.added} 条专业英译已写入映射数据库 (累计 ${saved.total} 条): ${saved.path}`);
-  }
-  if ((v.numericMismatchCount ?? 0) > 0) {
-    console.error(`    ❌ [NUMERIC GATE] 发现 ${v.numericMismatchCount} 条译文丢失原文数字/CAS，已阻断沉淀，请修正：`);
-    for (const nm of (v.numericMismatches || []).slice(0, 10)) {
-      console.error(`       - S${nm.sectionNumber} R${nm.rowIndex} [${nm.field}] 缺失 "${nm.missingNumber}" | CN="${nm.cnSource}" | EN="${nm.currentEn}"`);
-    }
-  }
-  const governed = governContext(context1, { modelCode });
-  const cn = governed.cn;
-  const en = governed.en;
-
-  const pipelineFacts = {
-    modelCode,
-    productName: cn.productName || modelCode,
-    productNameEn: en.productNameEn || en.productName || modelCode,
-    isHazardous: Boolean(cn.isHazardous),
-    isDangerousGoods: false,
-    signalWord: cn.ghs?.signalWord || '',
-    components: (cn.components || []).map(c => ({
-      name: c.name,
-      cas: c.cas,
-      conc: c.conc
-    })),
-    enComponents: (en.components || []).map(c => ({
-      name: c.name,
-      cas: c.cas,
-      conc: c.conc
-    })),
-    appearanceOverride: cn.physicalProperties?.find(p => /外观|外\s*观/i.test(p.label))?.value,
-    appearanceEn: en.physicalProperties?.find(p => /Appearance|外观/i.test(p.label))?.value,
-    section9Overrides: {}
-  };
-
-  for (const prop of cn.physicalProperties || []) {
-    if (prop.label && prop.value) {
-      pipelineFacts.section9Overrides[prop.label] = prop.value;
-    }
-  }
-
-  // 融合调用端显式传入的自定义事实覆盖 (严禁因为源文档非标而随意去修改底层源码)
-  if (options.facts) {
-    let customFacts = {};
-    if (fs.existsSync(options.facts)) {
-      try {
-        if (options.facts.endsWith('.js') || options.facts.endsWith('.mjs')) {
-          const mod = await import(pathToFileURL(path.resolve(options.facts)).href);
-          customFacts = mod.default || mod.facts || mod;
-          console.log(`    ℹ️ 已成功从外部 JS 模块注入 Facts 事实覆盖: ${options.facts}`);
-        } else {
-          customFacts = JSON.parse(fs.readFileSync(options.facts, 'utf8'));
-          console.log(`    ℹ️ 已成功从外部文件注入 Facts 事实覆盖: ${options.facts}`);
-        }
-      } catch (e) {
-        console.warn(`    ⚠️ 读取 --facts 文件失败: ${e.message}`);
-      }
-    } else {
-      try {
-        customFacts = JSON.parse(options.facts);
-        console.log(`    ℹ️ 已成功注入内联 Facts 事实覆盖`);
-      } catch (e) {
-        console.warn(`    ⚠️ 解析内联 --facts JSON 失败: ${e.message}`);
-      }
-    }
-    Object.assign(pipelineFacts, customFacts);
-    if (customFacts.section9Overrides) {
-      Object.assign(pipelineFacts.section9Overrides, customFacts.section9Overrides);
-    }
-  }
-
-  updateRunPhase(execTracker.runId, execTracker.phase, { context2Path: ctx2MdPath });
-  console.log(`    ✓ 事实标准化完成，危化定性: ${pipelineFacts.isHazardous ? '危险品' : '非危险化学品'} (${Date.now() - t2} ms)`);
-  enforceMechanicalGate('PHASE_2_3', auditPhase2Context2({ context2: structuredCtx2 }), options.skipAudit);
-  if (options.stopAfter === 'context2') {
-    finishExecutionRun(execTracker.runId, { status: 'SUCCESS', durationMs: Date.now() - execTracker.startedAt, summary: { stoppedAfter: 'context2' } });
-    closeUserExecDb();
-    console.log(`\n✅ [STOPPED AFTER PHASE 3] Context 1 & Context 2 已落盘校验，未触发写盘覆写。`);
-    return;
-  }
-
-  // Phase 4, 5, 6: Context 2 -> 拓扑匹配编译器 -> 编辑器原语写入 -> Windows WPS 原生 COM PDF 转译
-  execTracker.phase = 'PHASE_4_6_PRODUCTION';
-  updateRunPhase(execTracker.runId, execTracker.phase);
-  if (!v.isValid) {
-    console.error(`❌ [CONTEXT2 GATE BLOCKED] Context 2 尚未通过零中文/数字守恒校验，禁止进入 Phase 4~6 写盘！`);
-    process.exit(1);
-  }
-  console.log(`>>> [Phase 4, 5, 6/7] 基于 Context 2 执行拓扑匹配 (${options.enableContentMapping ? 'TOPOLOGY+MAPPING' : 'PURE_TOPOLOGY_SOURCE_INHERITED'}) 与 WPS PDF 转译...`);
-  const t3 = Date.now();
-  const targets = [
-    { templateKey: 'CN_Guanzhi', presetKey: 'CN_Guanzhi', fileName: `${modelCode} msds_CN 冠志.docx` },
-    { templateKey: 'CN_Guocai', presetKey: 'CN_Guocai', fileName: `${modelCode} msds_CN 国彩.docx` },
-    { templateKey: 'EN_Guanzhi', presetKey: 'EN_Guanzhi', fileName: `${modelCode} msds_EN Guanzhi.docx` },
-    { templateKey: 'EN_Guocai', presetKey: 'EN_Guocai', fileName: `${modelCode} msds_EN Guocai.docx` }
-  ];
-
-  const docxItemsForPdf = [];
-  for (const tgt of targets) {
-    const schema = await inspectTemplateSchema(tgt.templateKey);
-    const compiled = compileTopologyOps(structuredCtx2, schema, {
-      presetKey: tgt.presetKey,
-      enableContentMapping: options.enableContentMapping
-    });
-    enforceMechanicalGate(`PHASE_4_${tgt.templateKey}`, auditPhase4TopologyOps({ operations: compiled.operations, presetKey: tgt.presetKey }), options.skipAudit);
-    const session = await createWorkSession(tgt.templateKey);
-    session.modelCode = modelCode;
-    for (const op of compiled.operations) {
-      if (op.op === 'clearTemplate') clearTemplateValues(session);
-      else if (op.op === 'clearSectionValues') clearSectionValuesInSession(session, { sectionNumber: op.sectionNumber });
-      else if (op.op === 'applyPreset') applyCompanyPreset(session, op.presetKey);
-      else if (op.op === 'writeCell') writeCellValueToSession(session, { sectionNumber: op.sectionNumber, rowIndex: op.rowIndex, cellIndex: op.cellIndex, text: op.text || '', bold: Boolean(op.bold) });
-      else if (op.op === 'writeFullWidth') writeFullWidthSection(session, { sectionNumber: op.sectionNumber, content: op.content || op.text || '', options: op.options || {} });
-      else if (op.op === 'formatLaserTabs') formatSection9LaserTabs(session);
-      else if (op.op === 'deleteRow') deleteRowFromSession(session, { sectionNumber: op.sectionNumber, rowIndex: op.rowIndex });
-      else if (op.op === 'insertRow') insertRowIntoSession(session, { sectionNumber: op.sectionNumber, targetRowIndex: op.targetRowIndex || op.rowIndex, cloneFromRowIndex: op.cloneFromRowIndex });
-      else if (op.op === 'insertRowAfter') insertRowAfter(session, op.sectionNumber, op.rowIndex ?? 0, op.cloneFromRowIndex);
-      else if (op.op === 'morphToFullWidth') morphToFullWidth(session, op.sectionNumber, op.rowIndex ?? 0, op.content || op.text || '', op.options || {});
-      else if (op.op === 'applyAdaptiveRuler') applyAdaptiveRuler(session, op.sectionNumber);
-      else if (op.op === 'enforceFlushLeftValues') enforceFlushLeftValues(session, op.sectionNumber);
-      else if (op.op === 'formatSection3Grid') formatSection3GridCenter(session);
-      else if (op.op === 'pruneSafely') pruneRowsSafely(session, op.sectionNumber, op.rowIndices || []);
-      else if (op.op === 'applyTopologyLock') applyTopologyTypographyLock(session, op.typographyProfile || null);
-    }
-    const outDocxPath = path.join(targetDir, tgt.fileName);
-    await saveSession(session, outDocxPath);
-    docxItemsForPdf.push({ docxBuffer: fs.readFileSync(outDocxPath), fileName: tgt.fileName });
-    console.log(`    ✓ 生成 DOCX: ${tgt.fileName} (${compiled.mode}, ${compiled.stats.totalOps} ops)`);
-  }
-
-  const pdfResults = await convertBatchDocxToPdf(docxItemsForPdf);
-  for (const pRes of pdfResults) {
-    const outPdfPath = path.join(targetDir, pRes.pdfName || pRes.fileName.replace(/\.docx$/i, '.pdf'));
-    fs.writeFileSync(outPdfPath, pRes.pdfBuffer);
-    console.log(`    ✓ 生成 PDF:  ${path.basename(outPdfPath)} (${pRes.size} bytes, ${pRes.backend})`);
-  }
-  console.log(`    ✓ 8 格式全矩阵交付物生成完毕 (4 DOCX + 4 PDF) (${Date.now() - t3} ms)`);
-  if (options.stopAfter === 'produce') {
-    finishExecutionRun(execTracker.runId, { status: 'SUCCESS', durationMs: Date.now() - execTracker.startedAt, summary: { stoppedAfter: 'produce' } });
-    closeUserExecDb();
-    console.log(`\n✅ [STOPPED AFTER PHASE 6] 8 份交付物已生成至: ${targetDir}`);
-    console.log(`   👉 请 Agent 确认产出已生成后，运行 --phase=audit 触发机械审计并同步开展介入审计！`);
-    return;
-  }
-  } // end if (options.phase !== 'audit')
-
-  // Phase 7: 两阶双轨审计（统一分阶段纯确定性机械审计 + 增强版 Agent 内容审计速查包）
-  if (!options.skipAudit) {
-    execTracker.phase = 'PHASE_7_AUDIT';
-    updateRunPhase(execTracker.runId, execTracker.phase);
-    console.log(`\n>>> [Phase 7/7] 执行两阶双轨审计（纯确定性机械审计 + 增强版 Agent 内容审计速查包）...`);
-    const t4 = Date.now();
-
-    // 7.1 统一分阶段机械审计: Phase 5 (4 DOCX 排版/拓扑/数学) + Phase 6 (4 PDF 物理渲染)
-    enforceMechanicalGate('PHASE_5_DOCX', await auditPhase5DocxFiles({ targetDir, modelCode }));
-    enforceMechanicalGate('PHASE_6_PDF', auditPhase6PdfFiles({ targetDir, modelCode }));
-
-    // 7.2 同步生成增强版 Agent 内容审计速查包 (含 Preset 声明 + S2/S3/S14 逻辑摘要 + 16 节对照)
-    console.log(`    • 同步生成增强版 Agent 内容审计速查包 (generate_agent_audit_brief.mjs)...`);
-    const briefCmd = `node "${path.resolve(REPO_ROOT, 'web/scripts/generate_agent_audit_brief.mjs')}" --targetDir="${targetDir}" --model=${modelCode} --source="${sourcePath}"`;
-    execSync(briefCmd, { stdio: 'inherit' });
-    const briefPath = path.join(targetDir, `${modelCode}_agent_audit_brief.md`);
-    if (fs.existsSync(briefPath)) {
-      updateRunPhase(execTracker.runId, execTracker.phase, { auditBriefPath: briefPath });
-    }
-
-    // 7.3 可选历史兼容审计 (--legacyAudit)
-    if (options.legacyAudit) {
-      console.log(`    • [LEGACY] 执行兼容旧版 165/170 项审计套件...`);
-      const bilayerRes = runAuditAndRecord(
-        'BIPOLAR_BILAYER',
-        path.resolve(REPO_ROOT, 'web/scripts/audit_bipolar_bilayer.mjs'),
-        [targetDir, modelCode],
-        execTracker.runId
-      );
-      if (!bilayerRes.ok) {
-        finishExecutionRun(execTracker.runId, { status: 'AUDIT_BLOCKED', durationMs: Date.now() - execTracker.startedAt, summary: { blockedBy: 'BIPOLAR_BILAYER' } });
-        closeUserExecDb();
-        process.exit(1);
-      }
-      const masterRes = runAuditAndRecord(
-        'MASTER_AUDIT',
-        path.resolve(REPO_ROOT, 'web/scripts/run_master_msds_audit.mjs'),
-        [`--model=${modelCode}`, `--targetDir=${targetDir}`, `--source=${sourcePath}`],
-        execTracker.runId
-      );
-      if (!masterRes.ok) {
-        finishExecutionRun(execTracker.runId, { status: 'AUDIT_BLOCKED', durationMs: Date.now() - execTracker.startedAt, summary: { blockedBy: 'MASTER_AUDIT' } });
-        closeUserExecDb();
-        process.exit(1);
-      }
-    }
-
-    console.log(`    ✓ 全部审计套件通过 (${Date.now() - t4} ms)`);
-  }
-
-  finishExecutionRun(execTracker.runId, {
-    status: 'SUCCESS',
-    durationMs: Date.now() - execTracker.startedAt,
-    summary: { skipAudit: options.skipAudit }
+  const result = await produceStandardDeliverables({
+    sourceFilePath: sourcePath,
+    documentId: options.documentId,
+    modelCode: options.model,
+    outputNamePattern: options.outputNamePattern,
+    namingPatternId: options.namingPatternId,
+    targetDir,
+    wordDir: options.wordDir,
+    pdfDir: options.pdfDir,
+    userSyncDir: options.userSyncDir,
+    facts: customFacts,
+    presets: options.presets,
+    formats: options.formats,
+    languages: options.languages,
+    confirmRequirements: options.confirmRequirements,
+    apiBase: options.apiBase,
+    templatePath: options.template,
+    topologyPath: options.topology,
+    legacy8FormatAudit: options.legacy8FormatAudit,
+    prepareOnly: options.prepareOnly,
+    approveContext2: options.approveContext2,
+    skipAudit: options.skipAudit,
+    skipUserSync: options.skipUserSync
   });
-  closeUserExecDb();
+
+  if (result.status === 'AWAITING_AGENT_PROOFREAD') {
+    console.log(`\n============================================================`);
+    console.log(`⏸️  [GATE: AWAITING_AGENT_PROOFREAD] ${result.modelCode} Context 1 & Context 2 已就绪！`);
+    console.log(`   • Context 1 (JSON): ${result.context1JsonPath}`);
+    console.log(`   • Context 1 (1:1 MD): ${result.context1MdPath}`);
+    console.log(`   • Context 2 校对视图 (MD): ${result.reviewMdPath}`);
+    console.log(`   • Context 2 译文补丁 (JSON): ${result.translationsJsonPath}`);
+    console.log(`   • 未译项: ${result.untranslatedCount} | 事实指纹守恒: ${result.factFingerprintOk}`);
+    console.log(`   • 下一步（强制）: Agent 基于 Context 1 MD 与映射库逐行校对翻译后，使用 --approveContext2 --translations="${result.translationsJsonPath}" 放行产出！`);
+    console.log(`============================================================\n`);
+    return;
+  }
 
   console.log(`\n============================================================`);
-  console.log(`🎉 [SUCCESS] 🏆 ${modelCode} 标准七步覆写全流程执行完毕！`);
-  console.log(`   • 执行批次: ${execTracker.runId} (已记录至用户执行数据库)`);
-  console.log(`   • 产出目录: ${targetDir}`);
-  console.log(`   • 交付成果: 4 份 DOCX + 4 份高保真矢量 PDF 全部通过终审 (退出码 0)`);
+  console.log(`🎉 [SUCCESS] 🏆 ${result.modelCode} 标准七步覆写与机械审计全绿完成！`);
+  console.log(`   • 总耗时: ${result.totalDurationSec} 秒`);
+  console.log(`   • 交付目录: ${result.targetDir}`);
+  console.log(`   • 下一步（强制）: 请立即触发 Agent 三任务审计（任务 1 合并 Context 3 内容审计 + 任务 2 7 维度拓扑审计 + 任务 3 无删减并集清单）！`);
   console.log(`============================================================\n`);
 }
 
 main().catch(err => {
-  console.error('\n❌ 流水线执行异常中断:', err);
-  if (execTracker.runId) {
-    try {
-      recordWorkflowError({
-        runId: execTracker.runId,
-        phase: execTracker.phase || 'UNKNOWN',
-        errorCode: err?.code || err?.name || 'UNHANDLED_EXCEPTION',
-        message: err?.message || String(err),
-        stackTrace: err?.stack || ''
-      });
-      finishExecutionRun(execTracker.runId, {
-        status: 'FAILED',
-        durationMs: Date.now() - execTracker.startedAt,
-        summary: { failedPhase: execTracker.phase, error: err?.message || String(err) }
-      });
-      closeUserExecDb();
-    } catch {
-      // 避免数据库记录异常掩盖原始堆栈
-    }
-  }
+  console.error('\n❌ 流水线执行异常中断:', err.message || err);
   process.exit(1);
 });

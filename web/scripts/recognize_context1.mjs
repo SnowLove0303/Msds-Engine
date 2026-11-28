@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { recognizeSourceDocx, serializeFactsToMarkdown } from '../src/recognition-engine.js';
+import { recognizeSourceDocx, serializeFactsToMarkdown } from '../src/msds-source-semantic-adapter.js';
 
 async function main() {
   const args = process.argv.slice(2);

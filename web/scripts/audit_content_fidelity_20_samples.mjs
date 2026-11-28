@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { recognizeSourceDocx } from '../src/recognition-engine.js';
+import { recognizeSourceDocx } from '../src/msds-source-semantic-adapter.js';
 import { loadDocx } from '../src/docx-engine.js';
 
 const SAMPLES = [

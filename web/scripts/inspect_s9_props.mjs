@@ -4,7 +4,7 @@ import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 globalThis.DOMParser = DOMParser;
 globalThis.XMLSerializer = XMLSerializer;
 import { loadDocx } from '../src/docx-engine.js';
-import { recognizeSourceDocx } from '../src/recognition-engine.js';
+import { recognizeSourceDocx } from '../src/msds-source-semantic-adapter.js';
 
 const sampleSource = path.resolve('算法训练材料/源文件材料/水性噁唑啉交联剂/OS-8970/OS-8970 msds_CN 冠志.docx');
 const context1 = await recognizeSourceDocx(sampleSource, path.basename(sampleSource));

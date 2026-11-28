@@ -24,7 +24,29 @@ import {
   setDefaultPreset,
   savePreset,
   deletePreset,
+  listNamingPatterns,
+  getNamingPatternById,
+  saveNamingPattern,
+  setDefaultNamingPattern,
+  deleteNamingPattern,
 } from './msds-db.js';
+import {
+  saveUserTemplate,
+  listUserTemplates,
+  getUserTemplateById,
+  setDefaultUserTemplate,
+  deleteUserTemplate,
+  saveUserPreset,
+  listUserPresets,
+  getUserPresetById,
+  getDefaultUserPreset,
+  setDefaultUserPreset,
+  deleteUserPreset,
+  listUserNamingPatterns,
+  saveUserNamingPattern,
+  setDefaultUserNamingPattern,
+  deleteUserNamingPattern,
+} from './user-config-db.js';
 import {
   applyPresetPriorityOverlay,
   buildExportDocxName,
@@ -585,13 +607,16 @@ export async function handleApiRequest(req, res) {
     // 0.5 预设库管理与优先级应用 (Presets API)
     // ==========================================
 
-    // 0.5.1 GET /api/msds/presets - 获取全部预设（支持 entity/language/enabled 过滤）
+    // 0.5.1 GET /api/msds/presets - 获取全部预设（合并 user_config.db 与 legacy msds-db）
     if (pathname === '/api/msds/presets' && req.method === 'GET') {
       const entity = searchParams.get('entity') || 'all';
       const language = searchParams.get('language') || 'all';
       const enabledOnly = searchParams.get('enabledOnly') === 'true';
 
-      const presets = listPresets({ entity, language, enabledOnly });
+      const userPresets = listUserPresets({ entity, language, enabledOnly });
+      const legacyPresets = listPresets({ entity, language, enabledOnly });
+      const seenIds = new Set(userPresets.map((p) => p.id));
+      const presets = [...userPresets, ...legacyPresets.filter((p) => !seenIds.has(p.id))];
       sendJson(res, 200, {
         success: true,
         total: presets.length,
@@ -603,7 +628,7 @@ export async function handleApiRequest(req, res) {
     // 0.5.1b GET /api/msds/presets/default - 获取当前默认企业预设
     if (pathname === '/api/msds/presets/default' && req.method === 'GET') {
       const lang = searchParams.get('language') || searchParams.get('lang') || 'CN';
-      const def = getDefaultPreset(lang);
+      const def = getDefaultUserPreset(lang) || getDefaultPreset(lang);
       if (!def) {
         sendJson(res, 404, { success: false, error: { message: `未找到语言为 ${lang} 的默认预设` } });
         return true;
@@ -617,7 +642,9 @@ export async function handleApiRequest(req, res) {
     if (presetDefaultMatch && req.method === 'POST') {
       const presetId = decodeURIComponent(presetDefaultMatch[1]);
       try {
-        const updated = setDefaultPreset(presetId);
+        const updated = getUserPresetById(presetId)
+          ? setDefaultUserPreset(presetId)
+          : setDefaultPreset(presetId);
         sendJson(res, 200, { success: true, data: updated, message: `预设【${updated.name}】已成功设为系统默认` });
       } catch (err) {
         sendJson(res, 400, { success: false, error: { message: err.message } });
@@ -629,7 +656,7 @@ export async function handleApiRequest(req, res) {
     const presetDetailMatch = pathname.match(/^\/api\/msds\/presets\/([^\/]+)$/);
     if (presetDetailMatch && req.method === 'GET') {
       const presetId = decodeURIComponent(presetDetailMatch[1]);
-      const p = getPresetById(presetId);
+      const p = getUserPresetById(presetId) || getPresetById(presetId);
       if (!p) {
         sendJson(res, 404, { success: false, error: { message: `未找到 ID 为 ${presetId} 的预设` } });
         return true;
@@ -638,14 +665,14 @@ export async function handleApiRequest(req, res) {
       return true;
     }
 
-    // 0.5.3 POST /api/msds/presets - 新建或保存预设
+    // 0.5.3 POST /api/msds/presets - 新建或保存预设（写入 user_config.db）
     if (pathname === '/api/msds/presets' && req.method === 'POST') {
       const body = await parseJsonBody(req);
       if (!body.name) {
         sendJson(res, 400, { success: false, error: { message: '预设名称（name）为必填字段' } });
         return true;
       }
-      const saved = savePreset(body);
+      const saved = saveUserPreset(body);
       sendJson(res, 200, { success: true, data: saved, message: '预设已成功保存' });
       return true;
     }
@@ -655,7 +682,7 @@ export async function handleApiRequest(req, res) {
       const presetId = decodeURIComponent(presetDetailMatch[1]);
       const body = await parseJsonBody(req);
       body.id = presetId;
-      const updated = savePreset(body);
+      const updated = saveUserPreset(body);
       sendJson(res, 200, { success: true, data: updated, message: '预设已成功更新' });
       return true;
     }
@@ -664,11 +691,106 @@ export async function handleApiRequest(req, res) {
     if (presetDetailMatch && req.method === 'DELETE') {
       const presetId = decodeURIComponent(presetDetailMatch[1]);
       try {
-        const delRes = deletePreset(presetId);
+        const deletedUser = deleteUserPreset(presetId);
+        let deletedLegacy = false;
+        try {
+          if (getPresetById(presetId)) {
+            deletePreset(presetId);
+            deletedLegacy = true;
+          }
+        } catch {
+          // ignore legacy delete errors for built-ins if user preset was deleted
+        }
+        if (!deletedUser && !deletedLegacy) {
+          throw new Error(`未找到 ID 为 ${presetId} 的预设`);
+        }
         sendJson(res, 200, { success: true, id: presetId, message: '预设已成功删除' });
       } catch (err) {
         sendJson(res, 400, { success: false, error: { message: err.message } });
       }
+      return true;
+    }
+
+    // 0.5.5b 可复用产出物命名格式预设 CRUD (/api/msds/naming-patterns -> user-config-db)
+    if (pathname === '/api/msds/naming-patterns' && req.method === 'GET') {
+      sendJson(res, 200, { success: true, namingPatterns: listUserNamingPatterns() });
+      return true;
+    }
+    if (pathname === '/api/msds/naming-patterns' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      if (!body.name || !body.pattern) {
+        sendJson(res, 400, { success: false, error: { message: 'name 和 pattern 为必填字段' } });
+        return true;
+      }
+      const saved = saveUserNamingPattern(body);
+      sendJson(res, 200, { success: true, data: saved });
+      return true;
+    }
+    const npDefaultMatch = pathname.match(/^\/api\/msds\/naming-patterns\/([^/]+)\/default$/);
+    if (npDefaultMatch && req.method === 'POST') {
+      const saved = setDefaultUserNamingPattern(decodeURIComponent(npDefaultMatch[1]));
+      sendJson(res, 200, { success: true, data: saved });
+      return true;
+    }
+    const npDetailMatch = pathname.match(/^\/api\/msds\/naming-patterns\/([^/]+)$/);
+    if (npDetailMatch && req.method === 'DELETE') {
+      deleteUserNamingPattern(decodeURIComponent(npDetailMatch[1]));
+      sendJson(res, 200, { success: true, id: decodeURIComponent(npDetailMatch[1]) });
+      return true;
+    }
+
+    // 0.5.5c 用户模板库与 9 层标准拓扑缓存 CRUD (/api/msds/user-templates)
+    if (pathname === '/api/msds/user-templates' && req.method === 'GET') {
+      const includeTopology = url.searchParams.get('includeTopology') === '1';
+      sendJson(res, 200, { success: true, templates: listUserTemplates({ includeTopology }) });
+      return true;
+    }
+    if (pathname === '/api/msds/user-templates' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      if (!body.name || !body.fileName || !body.contentBase64) {
+        sendJson(res, 400, { success: false, error: { message: 'name, fileName 与 contentBase64 为必填字段' } });
+        return true;
+      }
+      const docxBuffer = Buffer.from(body.contentBase64, 'base64');
+      let topology = body.topology || null;
+      if (!topology) {
+        const { createTopologyPluginSlot } = await import('./topology-plugin-slot.js');
+        const slot = createTopologyPluginSlot();
+        await slot.mountTemplate(docxBuffer, { templateName: body.fileName });
+        topology = slot.exportTopologyBundle();
+        slot.unmountTemplate();
+      }
+      const saved = saveUserTemplate({
+        id: body.id || null,
+        name: body.name,
+        language: body.language || (topology?.typographyProfile?.isEnglish ? 'en' : 'zh'),
+        fileName: body.fileName,
+        docxBuffer,
+        topology,
+        isDefault: Boolean(body.isDefault)
+      });
+      sendJson(res, 200, { success: true, data: saved });
+      return true;
+    }
+    const utDefaultMatch = pathname.match(/^\/api\/msds\/user-templates\/([^/]+)\/default$/);
+    if (utDefaultMatch && req.method === 'POST') {
+      const saved = setDefaultUserTemplate(decodeURIComponent(utDefaultMatch[1]));
+      sendJson(res, 200, { success: true, data: saved });
+      return true;
+    }
+    const utDetailMatch = pathname.match(/^\/api\/msds\/user-templates\/([^/]+)$/);
+    if (utDetailMatch && req.method === 'GET') {
+      const tpl = getUserTemplateById(decodeURIComponent(utDetailMatch[1]), { includeBlob: false });
+      if (!tpl) {
+        sendJson(res, 404, { success: false, error: { message: '未找到用户模板' } });
+        return true;
+      }
+      sendJson(res, 200, { success: true, data: tpl });
+      return true;
+    }
+    if (utDetailMatch && req.method === 'DELETE') {
+      deleteUserTemplate(decodeURIComponent(utDetailMatch[1]));
+      sendJson(res, 200, { success: true, id: decodeURIComponent(utDetailMatch[1]) });
       return true;
     }
 

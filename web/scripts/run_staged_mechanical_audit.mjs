@@ -9,7 +9,7 @@
 
 import path from 'node:path';
 import { runStagedMechanicalAudit } from '../src/staged-mechanical-audit.js';
-import { recognizeSourceDocx } from '../src/recognition-engine.js';
+import { recognizeSourceDocx } from '../src/msds-source-semantic-adapter.js';
 import { buildStructuredContext2 } from '../src/context-governor.js';
 
 function parseArgs() {

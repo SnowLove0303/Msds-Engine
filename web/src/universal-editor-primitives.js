@@ -311,24 +311,42 @@ export function parseChemicalFormulaRuns(text, baseStyle = {}) {
  * 彻底废除任何针对字符长度局部缩小英文序号至 18 或 15 的非标准逻辑！
  * 包含：页眉页脚 XML 投影、16 章节大标题 Row 0 投影、第 0 列序号/标签投影、填写值顶格左对齐常规体投影、复合通栏行原生解耦。
  */
-export function applyGlobalTypographyProjection(engine, isEnglish = false, typographyProfile = null) {
+export function applyGlobalTypographyProjection(engine, isEnglish = false, typographyProfile = null, docDefaults = null, options = {}) {
   if (!engine?.documentXml) return;
   const doc = engine.documentXml;
+  const legacyCompat = options?.legacyCompat !== undefined ? Boolean(options.legacyCompat) : !Boolean(typographyProfile);
   const fallbackTokens = isEnglish ? MSDS_DESIGN_TOKENS.EN : MSDS_DESIGN_TOKENS.CN;
   const profileRoles = typographyProfile?.roles || {};
-  const tokens = {
-    SECTION_HEADER: profileRoles.SECTION_HEADER || fallbackTokens.SECTION_HEADER,
-    SUBHEADER: profileRoles.PARENT_LABEL || fallbackTokens.SUBHEADER,
-    LABEL_BOLD: profileRoles.CHILD_LABEL || fallbackTokens.LABEL_BOLD,
-    LABEL_SEQ: profileRoles.CHILD_LABEL || fallbackTokens.LABEL_SEQ,
-    LABEL_SEQ_TIER_B: profileRoles.CHILD_LABEL || fallbackTokens.LABEL_SEQ_TIER_B,
-    TABLE_VALUE: profileRoles.VALUE || fallbackTokens.TABLE_VALUE,
-    TABLE_HEADER: profileRoles.SECTION_HEADER || fallbackTokens.TABLE_HEADER,
-    PREAMBLE: profileRoles.EXPLANATION || fallbackTokens.PREAMBLE
+  const defaultFont = typographyProfile?.fontFamily || docDefaults?.font || docDefaults?.theme?.minorFont || fallbackTokens.TABLE_VALUE.font;
+  const defaultSz = typographyProfile?.valueFontSize || docDefaults?.sz || fallbackTokens.TABLE_VALUE.sz;
+  const normalizeToken = (roleToken, baseFallback) => {
+    if (!roleToken) return baseFallback;
+    const sz = roleToken.sz || defaultSz || baseFallback.sz;
+    return {
+      font: roleToken.font || defaultFont || baseFallback.font,
+      asciiFont: roleToken.asciiFont || roleToken.font || defaultFont || baseFallback.asciiFont,
+      sz,
+      szCs: roleToken.szCs || sz || baseFallback.szCs,
+      bold: roleToken.bold !== undefined ? roleToken.bold : baseFallback.bold
+    };
   };
-  const ruler = typographyProfile?.tabStops || { tierA: 420, tierB: 560 };
-  const targetFont = typographyProfile?.fontFamily || tokens.TABLE_VALUE.font;
-  const targetSz = typographyProfile?.valueFontSize || tokens.TABLE_VALUE.sz;
+  const tokens = {
+    SECTION_HEADER: normalizeToken(profileRoles.SECTION_HEADER, fallbackTokens.SECTION_HEADER),
+    SUBHEADER: normalizeToken(profileRoles.PARENT_LABEL, fallbackTokens.SUBHEADER),
+    LABEL_BOLD: normalizeToken(profileRoles.CHILD_LABEL, fallbackTokens.LABEL_BOLD),
+    LABEL_SEQ: normalizeToken(profileRoles.CHILD_LABEL, fallbackTokens.LABEL_SEQ),
+    LABEL_SEQ_TIER_B: normalizeToken(profileRoles.CHILD_LABEL, fallbackTokens.LABEL_SEQ_TIER_B),
+    TABLE_VALUE: normalizeToken(profileRoles.VALUE, fallbackTokens.TABLE_VALUE),
+    TABLE_HEADER: normalizeToken(profileRoles.TABLE_HEADER || profileRoles.SECTION_HEADER, fallbackTokens.TABLE_HEADER),
+    PREAMBLE: normalizeToken(profileRoles.EXPLANATION, fallbackTokens.PREAMBLE)
+  };
+  const baseTabDxa = docDefaults?.settings?.defaultTabStopDxa || 420;
+  const ruler = {
+    tierA: typographyProfile?.tabStops?.tierA ?? typographyProfile?.tiers?.[0] ?? baseTabDxa,
+    tierB: typographyProfile?.tabStops?.tierB ?? typographyProfile?.tiers?.[1] ?? typographyProfile?.tabStops?.tierA ?? Math.round(baseTabDxa * 1.33)
+  };
+  const targetFont = tokens.TABLE_VALUE.font;
+  const targetSz = tokens.TABLE_VALUE.sz;
   const targetAscii = typographyProfile?.asciiFontFamily || tokens.TABLE_VALUE.asciiFont || targetFont;
 
   // 1. 页眉页脚样式基座只读公理 (REQ-TOPO-HF-INHERIT-01)
@@ -753,9 +771,9 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false, typog
           }
         }
       } else {
-        // 2.4 单列表格行 (cells.length === 1, 如 Section 2, 11, 15 等通栏行)
-        if (sectionNumber === 11 && rIdx >= 1) {
-          // Section 11 通栏行全量豁免，严禁压平段落或破坏 renderFullWidthRow 的细粒度排版与软回车
+        // 2.4 单列表格行 (cells.length === 1)
+        if (legacyCompat && sectionNumber === 11 && rIdx >= 1) {
+          // 兼容模式下保留 Section 11 通栏行豁免
           continue;
         }
         const cell = cells[0];
@@ -769,8 +787,8 @@ export function applyGlobalTypographyProjection(engine, isEnglish = false, typog
 
           // 匹配复合键值对 (如 "2.1 GHS危险性类别：非危险化学品" 或 "Signal word: None")
           const kvMatch = pText.match(/^(\s*(?:(?:2\.\d+\s*)?(?:GHS\s*危险性类别|GHS\s*分类|Classification of the substance or mixture|GHS\s*Classification|GHS\s*标签要素|Label elements|GHS\s*Label\s*Elements|危险性说明|危害性说明|Hazard\s*statements?(?:\s*\([a-zA-Z0-9]+\))?|防范说明|Precautionary\s*statements?(?:\s*\([a-zA-Z0-9]+\))?|其他危害|其他危险|Other\s*hazards?)|(?:GHS\s*)?(?:象形图|pictograms?)|(?:危险象形标记|Hazard pictograms?)|(?:警告词|信号词|Signal\s*word)|(?:物理化学危险|健康危害|环境危害|Physical and chemical hazards|Health hazards|Environmental hazards)|(?:羟基丙烯酸酯聚合物GHS危险性分类|Hydroxy acrylic polymer GHS classification)|(?:必须列在标签上的有害成[份分]|Hazardous components which must be listed on the label)|(?:需要注意的物质|请注意以下物质|Substances?\s*(?:of\s*concern|to\s*be\s*noted))|(?:预防措施|事故响应|安全存储|安全储存|废弃处置|Prevention|Response|Storage|Disposal)))[:：]\s*(.*)$/i);
-          const s15Match = sectionNumber === 15 && pText.match(/^(\s*(?:其它的规定|其它规定|其他规定|Other provisions|Other regulations|符合下列法规要求|Complies with the following regulations))[:：]\s*(.*)$/i);
-          const s11Match = sectionNumber === 11 && rIdx >= 3 && pText.match(/^(\s*[^：:\n]+[：:])\s*(.*)$/);
+          const s15Match = legacyCompat && sectionNumber === 15 && pText.match(/^(\s*(?:其它的规定|其它规定|其他规定|Other provisions|Other regulations|符合下列法规要求|Complies with the following regulations))[:：]\s*(.*)$/i);
+          const s11Match = legacyCompat && sectionNumber === 11 && rIdx >= 3 && pText.match(/^(\s*[^：:\n]+[：:])\s*(.*)$/);
 
           if (kvMatch || s15Match || s11Match) {
             const match = kvMatch || s15Match || s11Match;
@@ -982,14 +1000,21 @@ export function bindEntityPresetToDocument(engineOrSession, preset, options = {}
     }
   }
 
-  // 2. 注入 Section 16 免责声明落款
+  // 2. 注入末节免责声明落款 (动态替换既有企业名称，零硬编码企业正则)
   const s16 = (engine.records || []).find(r => r.sectionNumber === 16);
-  if (s16 && Array.isArray(s16.rows)) {
+  if (s16 && Array.isArray(s16.rows) && companyName) {
+    const customPattern = preset?.replaceCompanyPattern ? new RegExp(preset.replaceCompanyPattern, 'g') : null;
     for (const row of s16.rows) {
       for (const cell of row.cells || []) {
-        if (cell.text && /广州冠志|英德国彩/i.test(cell.text)) {
-          const updated = cell.text.replace(/广州冠志新材料科技有限公司|英德市国彩精细化工有限公司|英德市国彩新材料有限公司/g, companyName);
-          setVal(cell, updated, 'DISCLAIMER_SIGNATURE');
+        if (!cell.text) continue;
+        if (customPattern && customPattern.test(cell.text)) {
+          setVal(cell, cell.text.replace(customPattern, companyName), 'DISCLAIMER_SIGNATURE');
+        } else if (Array.isArray(preset?.previousCompanyNames) && preset.previousCompanyNames.length > 0) {
+          let updated = cell.text;
+          for (const prev of preset.previousCompanyNames) {
+            if (prev) updated = updated.split(prev).join(companyName);
+          }
+          if (updated !== cell.text) setVal(cell, updated, 'DISCLAIMER_SIGNATURE');
         }
       }
     }

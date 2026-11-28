@@ -1,4 +1,4 @@
-import { recognizeSourceDocx } from '../src/recognition-engine.js';
+import { recognizeSourceDocx } from '../src/msds-source-semantic-adapter.js';
 import { runSmartMatching } from '../src/smart-matching.js';
 import { loadDocx } from '../src/docx-engine.js';
 import fs from 'fs';

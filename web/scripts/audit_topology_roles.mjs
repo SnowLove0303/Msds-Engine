@@ -18,7 +18,7 @@ import { JSDOM } from 'jsdom';
 import JSZip from 'jszip';
 import { DOMParser } from '@xmldom/xmldom';
 import { loadDocx } from '../src/docx-engine.js';
-import { recognizeSourceDocx } from '../src/recognition-engine.js';
+import { recognizeSourceDocx } from '../src/msds-source-semantic-adapter.js';
 
 if (!globalThis.DOMParser || !globalThis.XMLSerializer) {
   const dom = new JSDOM('<!doctype html><html><body></body></html>');

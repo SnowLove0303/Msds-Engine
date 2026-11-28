@@ -10,7 +10,7 @@ const originalConsoleError = console.error;
 console.log = (...args) => process.stderr.write(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ') + '\n');
 console.error = (...args) => process.stderr.write(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ') + '\n');
 
-import { recognizeSourceDocx, serializeFactsToMarkdown } from './recognition-engine.js';
+import { recognizeSourceDocx, serializeFactsToMarkdown } from './msds-source-semantic-adapter.js';
 import { getMcpVisionInstructions, SYSTEM_VISION_CORE } from './system-vision.js';
 import { buildStructuredContext2, serializeContext2ToMarkdown, saveTranslationsToMemory } from './context-governor.js';
 import { compileTopologyOps, formatTopologyPlanMarkdown } from './topology-matcher.js';

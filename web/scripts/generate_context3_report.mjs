@@ -13,7 +13,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { callMcpTool } from './msds_mcp_gateway.mjs';
-import { serializeFactsToMarkdown } from '../src/recognition-engine.js';
+import { serializeFactsToMarkdown } from '../src/msds-source-semantic-adapter.js';
 
 function parseCliArgs(argv) {
   const opts = {};

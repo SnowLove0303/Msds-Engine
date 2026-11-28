@@ -5,7 +5,7 @@ import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 globalThis.DOMParser = DOMParser;
 globalThis.XMLSerializer = XMLSerializer;
 
-const { recognizeSourceDocx, serializeFactsToMarkdown } = await import('../src/recognition-engine.js');
+const { recognizeSourceDocx, serializeFactsToMarkdown } = await import('../src/msds-source-semantic-adapter.js');
 
 async function main() {
   const sourceDocxPath = 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练材料/源文件材料/2-1 单组份水性丙烯酸乳液 PA/PA-4902/PA-4902msds_CN 冠志___源文件留存.docx';

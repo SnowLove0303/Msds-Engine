@@ -144,8 +144,7 @@ export function renderParagraph(paragraph, cell, record, roleStyles = null, isFi
   const isValueOnly = cell?.role === 'value-only' || cell?.role === 'source-note' || cell?.fontRole === 'value' ||
     Boolean(row && row.cells.length === 1 && (
       (record?.sectionNumber === 13 && /必须遵守适用的国标|必需遵守适用的国标|在欧盟领域内废弃|处理方法|废弃/i.test(cell.text || '')) ||
-      (record?.sectionNumber === 15 && !paragraph.text?.trim()?.endsWith('：')) ||
-      (record?.sectionNumber === 16 && /就我们所掌握的知识/i.test(cell.text || ''))
+      (record?.sectionNumber === 15 && !paragraph.text?.trim()?.endsWith('：'))
     ));
 
   // Empty spacer line in content cell: render as non-collapsing visual line spacer
@@ -275,14 +274,26 @@ export function sourceRowStyle(row, divisor = 1) {
   return styles.join(';');
 }
 
-export function sourceColumnMarkup(record) {
-  const widths = record?.structure?.gridWidthsTwips || [];
+export function sourceColumnMarkup(record, topologySection = null) {
+  const widths = (Array.isArray(topologySection?.columnWidths) && topologySection.columnWidths.length > 0)
+    ? topologySection.columnWidths
+    : (record?.structure?.gridWidthsTwips || []);
   const total = widths.reduce((sum, width) => sum + (Number(width) || 0), 0);
   return widths.length ? `<colgroup>${widths.map((width) => `<col style="${total ? `width:${(Number(width) / total * 100).toFixed(3)}%` : ''}" />`).join('')}</colgroup>` : '';
 }
 
-export function sourceTableStyle(record) {
-  return 'width:100%;max-width:none;border:1px solid #6f6f6f';
+export function sourceTableStyle(record, topologySection = null) {
+  const styles = ['width:100%', 'max-width:none'];
+  if (topologySection?.tableLayout === 'fixed') {
+    styles.push('table-layout:fixed');
+  }
+  const outerBorder = topologySection?.borders?.top || topologySection?.borders?.left;
+  if (outerBorder && !['nil', 'none'].includes(String(outerBorder.val || '').toLowerCase())) {
+    styles.push(`border:${wordBorder(outerBorder)}`);
+  } else {
+    styles.push('border:1px solid #6f6f6f');
+  }
+  return styles.join(';');
 }
 
 export function needsFallbackGrid(record) {
@@ -346,7 +357,17 @@ export function renderEditorCell(record, row, cell, tableWidth, fallbackGrid = f
       ? (hasValue ? 'is-preset-override-val' : 'is-preset-inherited-val')
       : '';
 
-    const valueEditor = `<div class="structured-cell-copy excel-cell-editor is-editable-value ${cellClass}" contenteditable="plaintext-only" data-edit-kind="value" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" data-col="${cell.col}" data-placeholder="${placeholder}" spellcheck="false" role="textbox" aria-label="可编辑值">${escapeHtml(cellValue)}</div>`;
+    const valueRole = options.typographyProfile?.roles?.VALUE || null;
+    const editorFontFamily = valueRole?.font || options.typographyProfile?.fontFamily || options.docDefaults?.font || '';
+    const editorFontSz = Number(valueRole?.sz || options.typographyProfile?.valueFontSize || options.docDefaults?.sz || 0);
+    const editorLineSpacing = Number(valueRole?.lineSpacing || 0);
+    const editorInlineStyles = [];
+    if (editorFontFamily) editorInlineStyles.push(`font-family:'${escapeHtml(editorFontFamily)}',sans-serif`);
+    if (editorFontSz > 0) editorInlineStyles.push(`font-size:${(editorFontSz / 2).toFixed(1)}pt`);
+    if (editorLineSpacing > 0) editorInlineStyles.push(`line-height:${(editorLineSpacing / 240).toFixed(2)}`);
+    const editorStyleAttr = editorInlineStyles.length ? ` style="${editorInlineStyles.join(';')}"` : '';
+
+    const valueEditor = `<div class="structured-cell-copy excel-cell-editor is-editable-value ${cellClass}" contenteditable="plaintext-only" data-edit-kind="value" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" data-col="${cell.col}" data-placeholder="${placeholder}"${editorStyleAttr} spellcheck="false" role="textbox" aria-label="可编辑值">${escapeHtml(cellValue)}</div>`;
     
     innerMarkup = `<div class="editor-cell-wrapper">${labelPart}${images}${valueEditor}${clearBtn}${presetIndicator}</div>`;
   } else if (cell.labelText) {
@@ -363,32 +384,46 @@ export function renderEditorCell(record, row, cell, tableWidth, fallbackGrid = f
     ? `<div class="cell-editability-badge-wrap"><button type="button" class="cell-editability-toggle-badge ${cell.editable ? 'is-unlocked' : 'is-locked'}" data-cell-action="toggle-editability" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" data-col="${cell.col}" title="${cell.editable ? '当前状态：可填写。点击切换为锁定' : '当前状态：已锁定。点击切换为可填写'}"><span class="badge-icon">${cell.editable ? '🔓' : '🔒'}</span><span class="badge-text">${cell.editable ? '可填' : '锁定'}</span></button></div>`
     : '';
 
-  const canMoveUp = row.index > 1;
-  const canMoveDown = row.index < (record.rows?.length || 1) - 1;
+  const lockedRows = Array.isArray(options.topologySection?.rowTemplates?.lockedRowIndices)
+    ? options.topologySection.rowTemplates.lockedRowIndices
+    : [];
+  const isTopologyLockedRow = lockedRows.includes(row.index);
+  const canMoveUp = row.index > 1 && !isTopologyLockedRow;
+  const canMoveDown = row.index < (record.rows?.length || 1) - 1 && !isTopologyLockedRow;
+  const canDeleteRow = record.rows.length > 2 && !isTopologyLockedRow;
 
   const floatingActions = (!isRow0 && isLastCellInRow)
-    ? `<div class="row-floating-actions" aria-hidden="false"><button type="button" class="row-mini-btn btn-move" data-row-action="move-up" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" title="上移行" ${canMoveUp ? '' : 'disabled'}>↑</button><button type="button" class="row-mini-btn btn-move" data-row-action="move-down" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" title="下移行" ${canMoveDown ? '' : 'disabled'}>↓</button><button type="button" class="row-mini-btn" data-row-action="add" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" title="在此行后新增同构数据行">＋</button><button type="button" class="row-mini-btn btn-note wide" data-row-action="add-note" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" title="在此行后插入单列说明行">＋注</button><button type="button" class="row-mini-btn danger" data-row-action="delete" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" title="删除行" ${record.rows.length <= 2 ? 'disabled' : ''}>－</button></div>`
+    ? `<div class="row-floating-actions" aria-hidden="false"><button type="button" class="row-mini-btn btn-move" data-row-action="move-up" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" title="上移行" ${canMoveUp ? '' : 'disabled'}>↑</button><button type="button" class="row-mini-btn btn-move" data-row-action="move-down" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" title="下移行" ${canMoveDown ? '' : 'disabled'}>↓</button><button type="button" class="row-mini-btn" data-row-action="add" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" title="在此行后新增同构数据行">＋</button><button type="button" class="row-mini-btn btn-note wide" data-row-action="add-note" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" title="在此行后插入单列说明行">＋注</button><button type="button" class="row-mini-btn danger" data-row-action="delete" data-record-id="${escapeHtml(record.id)}" data-row="${row.index}" title="${isTopologyLockedRow ? '拓扑锁定行不可删除' : '删除行'}" ${canDeleteRow ? '' : 'disabled'}>－</button></div>`
     : '';
 
   const totalRows = record.rows?.length || 1;
   const maxPossibleSpan = Math.max(1, totalRows - (row.index ?? 0));
-  const effectiveRowspan = Math.min(Number(cell.rowspan) || 1, maxPossibleSpan);
+  const vMergeMatch = Array.isArray(options.topologySection?.vMergeGroups)
+    ? options.topologySection.vMergeGroups.find((g) => g.startRow === row.index && g.colIndex === cell.col)
+    : null;
+  const rawRowspan = Math.max(Number(cell.rowspan) || 1, vMergeMatch ? (vMergeMatch.endRow - vMergeMatch.startRow + 1) : 1);
+  const effectiveRowspan = Math.min(rawRowspan, maxPossibleSpan);
 
-  return `<td colspan="${cell.colspan}" rowspan="${effectiveRowspan}" style="${sourceCellStyle(cell, tableWidth, fallbackGrid, record)}" class="editor-cell ${cell.editable ? 'is-editable' : 'is-protected'} ${manageCellEditability ? 'in-permission-config-mode' : ''}" data-anchor-section="${record.sectionNumber || ''}" data-anchor-row="${row.index}" data-anchor-col="${cell.col}" data-anchor-role="${cell.role || (cell.labelText ? 'label' : 'value')}">${editabilityBadge}${innerMarkup}${floatingActions}</td>`;
+  return `<td colspan="${cell.colspan}" rowspan="${effectiveRowspan}" style="${sourceCellStyle(cell, tableWidth, fallbackGrid, record)}" class="editor-cell ${cell.editable ? 'is-editable' : 'is-protected'} ${isTopologyLockedRow ? 'is-topology-locked-cell' : ''} ${manageCellEditability ? 'in-permission-config-mode' : ''}" data-anchor-section="${record.sectionNumber || ''}" data-anchor-row="${row.index}" data-anchor-col="${cell.col}" data-anchor-role="${cell.role || (cell.labelText ? 'label' : 'value')}">${editabilityBadge}${innerMarkup}${floatingActions}</td>`;
 }
 
 export function renderEditorTable(record, options = {}) {
-  const width = (record.structure?.gridWidthsTwips || []).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  const topologySection = options.topologySection || null;
+  const colWidths = (Array.isArray(topologySection?.columnWidths) && topologySection.columnWidths.length > 0)
+    ? topologySection.columnWidths
+    : (record.structure?.gridWidthsTwips || []);
+  const width = colWidths.reduce((sum, value) => sum + (Number(value) || 0), 0);
   const fallbackGrid = needsFallbackGrid(record);
   const roleStyles = options.roleStyles || null;
+  const lockedSet = new Set(Array.isArray(topologySection?.rowTemplates?.lockedRowIndices) ? topologySection.rowTemplates.lockedRowIndices : []);
 
   return `
-    <div class="table-scroll">
-      <table class="structured-table editor-excel-table" style="${sourceTableStyle(record)}">
-        ${sourceColumnMarkup(record)}
+    <div class="table-scroll" data-topology-section="${escapeHtml(topologySection?.sectionNumber ?? record.sectionNumber ?? '')}" data-table-layout="${escapeHtml(topologySection?.tableLayout || '')}">
+      <table class="structured-table editor-excel-table" style="${sourceTableStyle(record, topologySection)}">
+        ${sourceColumnMarkup(record, topologySection)}
         <tbody>
           ${record.rows.map((row) => `
-            <tr class="editor-row ${row.index === 0 ? 'title-row' : ''}" style="${sourceRowStyle(row)}" data-row-index="${row.index}">
+            <tr class="editor-row ${row.index === 0 ? 'title-row' : ''} ${lockedSet.has(row.index) ? 'topology-locked-row' : ''}" style="${sourceRowStyle(row)}" data-row-index="${row.index}">
               ${row.cells.map((cell, cellIdx) => renderEditorCell(record, row, cell, width, fallbackGrid, roleStyles, cellIdx === row.cells.length - 1, options)).join('')}
             </tr>
           `).join('')}

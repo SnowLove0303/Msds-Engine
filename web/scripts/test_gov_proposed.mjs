@@ -1,4 +1,4 @@
-import { recognizeSourceDocx } from '../src/recognition-engine.js';
+import { recognizeSourceDocx } from '../src/msds-source-semantic-adapter.js';
 import * as govProposed from '../src/context-governor-proposed.js';
 
 async function test() {

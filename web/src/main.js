@@ -347,7 +347,8 @@ function scrollToSectionInPreview(container, sectionNumber) {
       state.previewScrollPositions[container.dataset.preview] = Math.max(0, targetScroll);
     }
   } else {
-    const ratio = Math.max(0, Math.min(1, (sectionNumber - 1) / 16));
+    const totalSec = Math.max(1, state.editor.currentTopology?.sectionsCount || state.editor.engine?.records?.length || 1);
+    const ratio = Math.max(0, Math.min(1, (sectionNumber - 1) / totalSec));
     const targetScroll = container.scrollHeight * ratio;
     container.scrollTo({
       top: targetScroll,
@@ -422,7 +423,7 @@ function navMarkup() {
           <span class="nav-icon">✦</span><span>模板编辑器</span><small>03</small>
         </button>
       </nav>
-      <div class="topbar-meta"><button class="nav-version-badge" data-action="open-version-modal" type="button" title="点击查看系统版本与极速更新中心"><span class="version-dot"></span>v${APP_VERSION}</button><span class="topbar-divider"></span><span class="local-dot"></span>浏览器本地处理<span class="topbar-divider"></span><span>16 sections ready</span></div>
+      <div class="topbar-meta"><button class="nav-version-badge" data-action="open-version-modal" type="button" title="点击查看系统版本与极速更新中心"><span class="version-dot"></span>v${APP_VERSION}</button><span class="topbar-divider"></span><span class="local-dot"></span>浏览器本地处理<span class="topbar-divider"></span><span>${state.editor.currentTopology?.sectionsCount ? `${state.editor.currentTopology.sectionsCount} sections ready` : (state.editor.engine ? `${tableRecords(state.editor.engine).length} sections ready` : '动态拓扑就绪')}</span></div>
     </header>
   `;
 }
@@ -1675,12 +1676,22 @@ function renderInspector() {
   `;
 }
 
+function getEditorTopologySection(record) {
+  const sections = state.editor.currentTopology?.sections;
+  if (!Array.isArray(sections) || !record) return null;
+  return sections.find((s) => s.sectionNumber === record.sectionNumber || s.tableIndex === record.tableIndex) || null;
+}
+
 function sectionNav(records, selectedId, query, mode, engine = null) {
   let hfNavItem = '';
+  let bodyFlowNavItem = '';
+  const activeTopology = mode === 'editor' ? state.editor.currentTopology : null;
   if (mode === 'editor') {
     const isHfSelected = selectedId === '__header_footer__';
     const hf = engine?.headerFooterData || (engine ? extractHeaderFooterData(engine) : null);
-    const modelBadge = hf?.model ? escapeHtml(hf.model) : '待配置';
+    const hfTopo = activeTopology?.headerFooterTopology;
+    const slotCount = (Object.keys(hfTopo?.headers || {}).length + Object.keys(hfTopo?.footers || {}).length);
+    const modelBadge = hf?.model ? escapeHtml(hf.model) : (slotCount ? `${slotCount} 插槽` : '待配置');
     hfNavItem = `
       <button class="section-nav-row hf-nav-row ${isHfSelected ? 'active' : ''}" data-record-id="__header_footer__">
         <span class="section-index hf-index">00</span>
@@ -1688,16 +1699,64 @@ function sectionNav(records, selectedId, query, mode, engine = null) {
         <i class="hf-model-badge">${modelBadge}</i>
       </button>
     `;
+    const bf = activeTopology?.bodyFlow;
+    const bfCount = (bf?.preambleBlocks?.length || 0) + (bf?.trailingBlocks?.length || 0);
+    if (bfCount > 0) {
+      bodyFlowNavItem = `
+        <button class="section-nav-row ${selectedId === '__body_flow__' ? 'active' : ''}" data-record-id="__body_flow__">
+          <span class="section-index">BF</span>
+          <span>正文前后置区 (BodyFlow)</span>
+          <i>${bfCount} 块</i>
+        </button>
+      `;
+    }
   }
-  const bodyNavItems = Array.from({ length: 16 }, (_, index) => {
-    const section = index + 1;
-    const record = records.find((item) => item.sectionNumber === section);
-    const visible = !query || record?.searchText?.toLowerCase().includes(query);
-    if (!record) return `<div class="section-nav-row missing"><span class="section-index">${String(section).padStart(2, '0')}</span><span>Section ${section}</span><i>缺失</i></div>`;
-    if (!visible) return `<div class="section-nav-row filtered"><span class="section-index">${String(section).padStart(2, '0')}</span><span>Section ${section}</span><i>过滤</i></div>`;
-    return recordNavItem(record, selectedId, mode);
-  }).join('');
-  return hfNavItem + bodyNavItems;
+
+  const topoSections = Array.isArray(activeTopology?.sections) && activeTopology.sections.length > 0
+    ? activeTopology.sections
+    : null;
+
+  if (mode === 'editor' && (topoSections || records.length > 0)) {
+    const orderedRecords = [];
+    const usedIds = new Set();
+    if (topoSections) {
+      for (const tSec of topoSections) {
+        const matched = records.find((r) => r.sectionNumber === tSec.sectionNumber || r.tableIndex === tSec.tableIndex);
+        if (matched) {
+          orderedRecords.push({ sectionNumber: tSec.sectionNumber, record: matched, topoSec: tSec });
+          usedIds.add(matched.id);
+        } else {
+          orderedRecords.push({ sectionNumber: tSec.sectionNumber, record: null, topoSec: tSec });
+        }
+      }
+    }
+    for (const r of records) {
+      if (!usedIds.has(r.id)) {
+        orderedRecords.push({ sectionNumber: r.sectionNumber, record: r, topoSec: null });
+      }
+    }
+
+    const bodyNavItems = orderedRecords.map(({ sectionNumber, record, topoSec }, idx) => {
+      if (!record) {
+        const label = topoSec?.title || `Section ${sectionNumber || idx + 1}`;
+        return `<div class="section-nav-row missing"><span class="section-index">${String(sectionNumber || idx + 1).padStart(2, '0')}</span><span>${escapeHtml(label)}</span><i>${topoSec?.columnWidths?.length || 0} 列</i></div>`;
+      }
+      const visible = !query || record.searchText?.toLowerCase().includes(query);
+      if (!visible) return `<div class="section-nav-row filtered"><span class="section-index">${String(record.sectionNumber || idx + 1).padStart(2, '0')}</span><span>${escapeHtml(record.title || `Section ${record.sectionNumber}`)}</span><i>过滤</i></div>`;
+      return recordNavItem(record, selectedId, mode);
+    }).join('');
+    return hfNavItem + bodyFlowNavItem + bodyNavItems;
+  }
+
+  if (records.length > 0) {
+    const bodyNavItems = records.map((record, index) => {
+      const visible = !query || record?.searchText?.toLowerCase().includes(query);
+      if (!visible) return `<div class="section-nav-row filtered"><span class="section-index">${String(record.sectionNumber || index + 1).padStart(2, '0')}</span><span>${escapeHtml(record.title || `Section ${record.sectionNumber || index + 1}`)}</span><i>过滤</i></div>`;
+      return recordNavItem(record, selectedId, mode);
+    }).join('');
+    return hfNavItem + bodyNavItems;
+  }
+  return hfNavItem;
 }
 
 function recordNavItem(record, selectedId, extra = '') {
@@ -2292,11 +2351,16 @@ function renderEditorToolbarButtons() {
     `;
   }
   return `
+    <button class="button button-secondary button-sm" data-action="trigger-upload-docx" title="从本地上传任意 .docx 模板并实时解析拓扑">上传模板 (.docx)</button>
+    <button class="button button-secondary button-sm" data-action="trigger-import-topology" title="导入导出的 MsdsEngineStandardTopology (.json) 拓扑包">导入拓扑 (.json)</button>
+    <input id="editor-upload-docx-input" type="file" accept=".docx" hidden />
+    <input id="editor-import-topology-input" type="file" accept=".json,application/json" hidden />
     <button class="button button-secondary button-sm" data-action="run-audit" title="运行模板规则合规审计">审计</button>
     <button class="button button-secondary button-sm" data-action="toggle-review-drawer" title="查看或管理批注清单">批注 (${openAnnotations})</button>
     <button class="button button-primary button-sm" data-action="quick-export-current-docx" title="直接导出当前正在编辑的 DOCX 文件（所见即所得）">导出当前文档</button>
     <button class="button button-secondary button-sm" data-action="open-unified-export-modal" title="交付全基准与预设多格式">批量导出...</button>
     <button class="button button-secondary button-sm" data-action="open-preset-manager-modal" title="打开预设配置管理中心">预设管理</button>
+    ${state.editor.currentTopology ? '<button class="button button-secondary button-sm" data-action="unmount-editor-topology" title="卸载当前动态拓扑并恢复未载入默认状态">卸载拓扑</button>' : ''}
     <button class="button button-secondary button-sm" data-action="reset-all-template" title="清空修改恢复至初始模板">恢复模板</button>
   `;
 }
@@ -2320,17 +2384,22 @@ function renderHeaderFooterEditor(engine, records, query) {
         <span class="file-ribbon-name-wrap">
           <span>导出文件名：</span>
           <input id="quick-export-name-input" class="quick-export-name-input" value="${escapeHtml(currentExportName)}" title="直接修改导出文件名，回车或失焦生效" />
+          <select id="editor-naming-pattern-select" class="button button-secondary button-sm" title="选择已保存的可复用命名格式（SQLite）" style="max-width:140px;">
+            <option value="">命名预设...</option>
+            ${(state.editor.namingPatterns || []).map((np) => `<option value="${escapeHtml(np.id)}" ${state.editor.selectedNamingPatternId === np.id ? 'selected' : ''}>${escapeHtml(np.name)}</option>`).join('')}
+          </select>
+          <button class="button button-secondary button-sm" data-action="save-naming-pattern" title="保存当前命名格式为可复用规则">+</button>
           <button class="button button-secondary button-sm" data-action="reset-filename-to-standard" title="恢复标准命名规则">↺</button>
         </span>
       </div>
       ${renderBaselineSelectorMarkup()}
       <label class="toggle-control"><input id="allow-label-edit" type="checkbox" ${state.editor.allowLabelEdit ? 'checked' : ''}><span class="toggle-track"></span><span>特殊情况：允许修改标签文本</span></label>
       <label class="toggle-control"><input id="manage-cell-editability" type="checkbox" ${state.editor.manageCellEditability ? 'checked' : ''}><span class="toggle-track"></span><span>特殊情况：配置值格编辑权限</span></label>
-      <div class="file-ribbon-coverage"><span class="pulse-dot"></span>${records.filter((record) => record.sectionNumber).length}/16</div>
+      <div class="file-ribbon-coverage"><span class="pulse-dot"></span>${records.filter((record) => record.sectionNumber).length}/${state.editor.currentTopology?.sectionsCount || records.length || 0}</div>
     </div>
     <div class="inspector-layout editor-layout">
       <aside class="side-panel editor-side">
-        <div class="side-heading" data-toolbar-scope="editor-section-heading"><h2>Section</h2><span class="side-count">${records.filter((record) => record.sectionNumber).length}/16</span></div>
+        <div class="side-heading" data-toolbar-scope="editor-section-heading"><h2>Section</h2><span class="side-count">${records.filter((record) => record.sectionNumber).length}/${state.editor.currentTopology?.sectionsCount || records.length || 0}</span></div>
         <label class="search-box"><span>⌕</span><input id="editor-search" type="search" placeholder="搜索标签、序号…" value="${escapeHtml(state.editor.query)}" /><kbd>⌘ K</kbd></label>
         <div class="section-list">${sectionNav(records, state.editor.selectedRecordId, query, 'editor', engine)}</div>
         <div class="side-footer"><span class="file-signal"></span><span>${state.editor.dirty ? '有未导出修改' : '工作副本干净'}</span></div>
@@ -2468,20 +2537,48 @@ function renderHeaderFooterEditor(engine, records, query) {
   `;
 }
 
+function renderBodyFlowEditor(engine, records, query) {
+  const bf = state.editor.currentTopology?.bodyFlow || { preambleBlocks: [], trailingBlocks: [], pageBreakBetweenTablesCount: 0 };
+  const totalSections = state.editor.currentTopology?.sectionsCount || records.length || 0;
+  return `
+    ${headerBand('模板编辑器', '', '', renderEditorToolbarButtons(), 'editor-top-actions')}
+    ${renderEditorBanner()}
+    <div class="inspector-layout editor-layout">
+      <aside class="side-panel editor-side">
+        <div class="side-heading"><h2>Section</h2><span class="side-count">${records.filter((r) => r.sectionNumber).length}/${totalSections}</span></div>
+        <label class="search-box"><span>⌕</span><input id="editor-search" type="search" placeholder="搜索标签、序号…" value="${escapeHtml(state.editor.query)}" /><kbd>⌘ K</kbd></label>
+        <div class="section-list">${sectionNav(records, state.editor.selectedRecordId, query, 'editor', engine)}</div>
+      </aside>
+      <section class="content-panel editor-content structured-panel">
+        <div class="panel-heading"><h2>📄 正文前后置区 (BodyFlow)</h2><div class="heading-pills"><span class="pill pill-blue">前置 ${bf.preambleBlocks?.length || 0} 块</span><span class="pill">后置 ${bf.trailingBlocks?.length || 0} 块</span><span class="pill">表间分页 ${bf.pageBreakBetweenTablesCount || 0}</span></div></div>
+        <div class="hf-form-grid">
+          <div class="hf-card"><div class="hf-card-head"><div><h3>前置区 (Preamble)</h3><small>主表格之前的正文段落</small></div></div><div class="hf-card-body">${(bf.preambleBlocks || []).length ? bf.preambleBlocks.map((b, i) => `<p><strong>#${i + 1}</strong> ${escapeHtml(b.text || '(空段)')}</p>`).join('') : '<p class="muted">当前模板无前置正文段</p>'}</div></div>
+          <div class="hf-card"><div class="hf-card-head"><div><h3>后置区 (Trailing)</h3><small>末表之后的正文段落</small></div></div><div class="hf-card-body">${(bf.trailingBlocks || []).length ? bf.trailingBlocks.map((b, i) => `<p><strong>#${i + 1}</strong> ${escapeHtml(b.text || '(空段)')}</p>`).join('') : '<p class="muted">当前模板无后置正文段</p>'}</div></div>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
 function renderEditor() {
   const engine = state.editor.engine;
-  if (!engine) return `${headerBand('模板编辑器')}${emptyWorkspace('editor')}`;
+  if (!engine) return `${headerBand('模板编辑器', '', '', renderEditorToolbarButtons(), 'editor-top-actions')}${emptyWorkspace('editor')}`;
   const records = tableRecords(engine);
-    const query = state.editor.query.trim().toLowerCase();
+  const query = state.editor.query.trim().toLowerCase();
   if (state.editor.selectedRecordId === '__header_footer__') {
     return renderHeaderFooterEditor(engine, records, query);
+  }
+  if (state.editor.selectedRecordId === '__body_flow__') {
+    return renderBodyFlowEditor(engine, records, query);
   }
   const selected = selectedRecord(engine, state.editor.selectedRecordId);
   if (selected) state.editor.selectedRecordId = selected.id;
   const errors = auditEngine(engine);
-    const visibleRecords = records.filter((record) => !query || record.searchText.toLowerCase().includes(query));
+  const visibleRecords = records.filter((record) => !query || record.searchText.toLowerCase().includes(query));
   const selectedVisible = visibleRecords.find((record) => record.id === selected?.id) || visibleRecords[0] || selected;
   if (selectedVisible) state.editor.selectedRecordId = selectedVisible.id;
+  const totalSections = state.editor.currentTopology?.sectionsCount || records.filter((record) => record.sectionNumber).length || records.length || 0;
+  const activeTopoSec = getEditorTopologySection(selectedVisible);
   return `
     ${headerBand('模板编辑器', '', '', renderEditorToolbarButtons(), 'editor-top-actions')}
     ${renderEditorBanner()}
@@ -2498,11 +2595,11 @@ function renderEditor() {
       ${renderBaselineSelectorMarkup()}
       <label class="toggle-control"><input id="allow-label-edit" type="checkbox" ${state.editor.allowLabelEdit ? 'checked' : ''}><span class="toggle-track"></span><span>特殊情况：允许修改标签文本</span></label>
       <label class="toggle-control"><input id="manage-cell-editability" type="checkbox" ${state.editor.manageCellEditability ? 'checked' : ''}><span class="toggle-track"></span><span>特殊情况：配置值格编辑权限</span></label>
-      <div class="file-ribbon-coverage"><span class="pulse-dot"></span>${records.filter((record) => record.sectionNumber).length}/16</div>
+      <div class="file-ribbon-coverage"><span class="pulse-dot"></span>${records.filter((record) => record.sectionNumber).length}/${totalSections}${state.editor.currentTopology?.completenessCheck?.ok ? ' · 9/9 拓扑已挂载' : ''}</div>
     </div>
     <div class="inspector-layout editor-layout ${state.editor.isWidePreview ? 'preview-expanded' : ''}">
       <aside class="side-panel editor-side">
-        <div class="side-heading"><h2>Section</h2><span class="side-count">${records.filter((record) => record.sectionNumber).length}/16</span></div>
+        <div class="side-heading"><h2>Section</h2><span class="side-count">${records.filter((record) => record.sectionNumber).length}/${totalSections}</span></div>
         <label class="search-box"><span>⌕</span><input id="editor-search" type="search" placeholder="搜索标签、序号…" value="${escapeHtml(state.editor.query)}" /><kbd>⌘ K</kbd></label>
         <div class="section-list">${sectionNav(records, state.editor.selectedRecordId, query, 'editor', engine)}</div>
         <div class="side-footer"><span class="file-signal"></span><span>${state.editor.dirty ? '有未导出修改' : '工作副本干净'}</span></div>
@@ -2552,6 +2649,9 @@ function renderEditorTable(record) {
     cellEditableOverrides: state.editor.cellEditableOverrides || {},
     roleStyles: state.editor.engine?.roleStyles || null,
     isPresetMode: state.editor.isPresetEditing,
+    topologySection: getEditorTopologySection(record),
+    typographyProfile: state.editor.currentTopology?.typographyProfile || null,
+    docDefaults: state.editor.currentTopology?.docDefaults || null,
   });
 }
 
@@ -2727,9 +2827,67 @@ function bindEvents() {
 
   root.querySelectorAll('[data-action="reset-filename-to-standard"]').forEach((btn) => btn.addEventListener('click', () => {
     state.editor.customFileName = '';
+    state.editor.selectedNamingPatternId = '';
     renderApp();
     showToast('已按当前产品型号与规则恢复标准导出文件名。', 'info');
   }));
+
+  if (!state.editor.namingPatternsLoaded) {
+    state.editor.namingPatternsLoaded = true;
+    fetch('/api/msds/naming-patterns')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (json?.success && Array.isArray(json.namingPatterns)) {
+          state.editor.namingPatterns = json.namingPatterns;
+          if (json.namingPatterns.length > 0) renderApp();
+        }
+      })
+      .catch(() => {});
+  }
+
+  root.querySelector('#editor-naming-pattern-select')?.addEventListener('change', (e) => {
+    const id = e.target.value;
+    state.editor.selectedNamingPatternId = id;
+    const found = (state.editor.namingPatterns || []).find((np) => np.id === id);
+    if (found?.pattern) {
+      const hf = state.editor.engine?.headerFooterData || {};
+      const resolved = found.pattern
+        .replace(/\{model\}/gi, hf.model || 'MODEL')
+        .replace(/\{lang\}/gi, state.editor.template?.includes('EN') ? 'EN' : 'CN')
+        .replace(/\{company\}/gi, hf.company || '')
+        .replace(/\{ext\}/gi, 'docx');
+      state.editor.customFileName = resolved;
+      const curDraft = state.editor.drafts?.[state.editor.currentBaselineId];
+      if (curDraft) curDraft.customFileName = resolved;
+      renderApp();
+      showToast(`已应用命名规则【${found.name}】：${resolved}`, 'info');
+    }
+  });
+
+  root.querySelector('[data-action="save-naming-pattern"]')?.addEventListener('click', async () => {
+    const name = window.prompt('请输入命名规则名称（例如：客户A标准命名）：', '自定义命名规则');
+    if (!name || !name.trim()) return;
+    const defaultPat = state.editor.customFileName || '{model} MSDS_{lang}.{ext}';
+    const pattern = window.prompt('请输入可复用命名模板（支持 {model}, {lang}, {company}, {ext} 占位符）：', defaultPat);
+    if (!pattern || !pattern.trim()) return;
+    try {
+      const resp = await fetch('/api/msds/naming-patterns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), pattern: pattern.trim() })
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json?.success) throw new Error(json?.error?.message || '保存失败');
+      const listResp = await fetch('/api/msds/naming-patterns');
+      const listJson = await listResp.json();
+      state.editor.namingPatterns = listJson?.namingPatterns || [...(state.editor.namingPatterns || []), json.data];
+      state.editor.selectedNamingPatternId = json.data?.id || '';
+      renderApp();
+      showToast(`命名规则【${name.trim()}】已持久化至 SQLite！`, 'success');
+    } catch (err) {
+      showToast(`保存命名规则失败：${err.message}`, 'error');
+    }
+  });
 
   root.querySelectorAll('[data-action="reset-hf-to-template"]').forEach((btn) => btn.addEventListener('click', async () => {
     if (!confirm('确定要恢复模板原始的页眉与页脚吗？')) return;
@@ -2860,9 +3018,110 @@ function bindEvents() {
   root.querySelector('[data-action="export-json"]')?.addEventListener('click', exportJson);
   root.querySelector('[data-action="run-audit"]')?.addEventListener('click', () => {
     const errors = auditEngine(state.editor.engine);
-    showToast(errors.length ? `审计完成：发现 ${errors.length} 个问题。` : '审计完成：16 节结构通过。', errors.length ? 'error' : 'success');
+    const secCount = state.editor.currentTopology?.sectionsCount || tableRecords(state.editor.engine).length;
+    showToast(errors.length ? `审计完成：发现 ${errors.length} 个问题。` : `审计完成：${secCount} 节结构通过。`, errors.length ? 'error' : 'success');
   });
   root.querySelector('[data-action="export-docx"]')?.addEventListener('click', exportDocx);
+  root.querySelector('[data-action="trigger-upload-docx"]')?.addEventListener('click', () => {
+    root.querySelector('#editor-upload-docx-input')?.click();
+  });
+  root.querySelector('#editor-upload-docx-input')?.addEventListener('change', async (event) => {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const engine = await loadDocx(buf.slice(0), file.name);
+      tableRecords(engine).forEach((record) => renumberRecord(record));
+      let topology = null;
+      let savedUserTemplateId = null;
+      const docxBase64 = arrayBufferToBase64(buf);
+      try {
+        const resp = await fetch('/api/msds/templates/inspect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contentBase64: docxBase64,
+            templateKey: file.name,
+            templateName: file.name
+          })
+        });
+        if (resp.ok) {
+          const json = await resp.json();
+          if (json?.success) topology = json.topology || json.data || null;
+        }
+        const saveResp = await fetch('/api/msds/user-templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: file.name.replace(/\.docx$/i, ''),
+            fileName: file.name,
+            language: /_EN|English/i.test(file.name) ? 'en' : 'zh',
+            docxBase64,
+            topology
+          })
+        });
+        if (saveResp.ok) {
+          const saveJson = await saveResp.json();
+          if (saveJson?.success) savedUserTemplateId = saveJson.template?.id || null;
+        }
+      } catch {
+        // 离线纯前端预览时允许仅以本地 DOCX 引擎继续
+      }
+      state.editor.template = file.name;
+      state.editor.userTemplateId = savedUserTemplateId;
+      state.editor.engine = engine;
+      state.editor.currentTopology = topology;
+      state.editor.selectedRecordId = firstSectionRecord(engine)?.id || null;
+      state.editor.selectedCellId = null;
+      state.editor.dirty = false;
+      state.editor.cellEditableOverrides = {};
+      state.view = 'editor';
+      renderApp();
+      showToast(`已载入自定义模板 ${file.name}${topology ? `（${topology.sectionsCount} 节拓扑已挂载）` : ''}。`, 'success');
+    } catch (error) {
+      showToast(`上传模板失败：${error.message}`, 'error');
+    } finally {
+      event.target.value = '';
+    }
+  });
+  root.querySelector('[data-action="trigger-import-topology"]')?.addEventListener('click', () => {
+    root.querySelector('#editor-import-topology-input')?.click();
+  });
+  root.querySelector('#editor-import-topology-input')?.addEventListener('change', async (event) => {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if (!parsed || !Array.isArray(parsed.sections)) {
+        throw new Error('无效的拓扑包：缺少 sections 数组');
+      }
+      state.editor.currentTopology = parsed;
+      state.editor.template = parsed.templateKey || file.name.replace(/\.json$/i, '');
+      if (!state.editor.engine) {
+        state.editor.engine = buildSyntheticEngineFromTopology(parsed);
+      }
+      state.editor.selectedRecordId = firstSectionRecord(state.editor.engine)?.id || null;
+      state.editor.selectedCellId = null;
+      state.editor.dirty = false;
+      state.view = 'editor';
+      renderApp();
+      showToast(`已导入标准拓扑包 ${state.editor.template}（${parsed.sectionsCount || parsed.sections.length} 节）。`, 'success');
+    } catch (error) {
+      showToast(`导入拓扑包失败：${error.message}`, 'error');
+    } finally {
+      event.target.value = '';
+    }
+  });
+  root.querySelector('[data-action="unmount-editor-topology"]')?.addEventListener('click', () => {
+    state.editor.currentTopology = null;
+    state.editor.engine = null;
+    state.editor.selectedRecordId = null;
+    state.editor.selectedCellId = null;
+    state.editor.dirty = false;
+    renderApp();
+    showToast('已卸载动态拓扑，编辑器已恢复未载入默认状态。', 'success');
+  });
   root.querySelector('[data-action="reset-all-template"]')?.addEventListener('click', async () => {
     if (!state.editor.engine) return;
     if (!window.confirm(`确认将整份文档恢复至【${state.editor.template}】初始模板状态吗？\n\n当前所有章节未导出的修改都将被清空还原。`)) {
@@ -3186,7 +3445,12 @@ function bindEvents() {
     const record = recordById(state.editor.engine, button.dataset.recordId);
     if (!record) return;
     try {
-      const updated = addRowAfter(state.editor.engine, record, record.rows.length - 1);
+      const topoSec = getEditorTopologySection(record);
+      const preferredClone = topoSec?.rowTemplates?.dataCloneRowIndex ?? topoSec?.rowTemplates?.kvCloneRowIndex;
+      const cloneAnchor = (preferredClone !== null && preferredClone !== undefined && preferredClone < record.rows.length)
+        ? preferredClone
+        : record.rows.length - 1;
+      const updated = addRowAfter(state.editor.engine, record, cloneAnchor);
       state.editor.selectedRecordId = updated?.id || record.id;
       state.editor.dirty = true;
       renderApp();
@@ -4490,6 +4754,7 @@ async function loadEditorTemplate(name) {
     state.editor.dirty = false;
     state.editor.cellEditableOverrides = {};
     state.view = 'editor';
+    inspectCurrentTemplateTopology(name);
     showToast(`已载入 ${name} 内嵌模板。`, 'success');
     renderApp();
   } catch (error) {
@@ -4587,11 +4852,23 @@ function handleRowAction(button) {
   if (!record) return;
   const rowIndex = Number(button.dataset.row);
   const action = button.dataset.rowAction;
+  const topoSec = getEditorTopologySection(record);
+  const lockedRows = Array.isArray(topoSec?.rowTemplates?.lockedRowIndices)
+    ? topoSec.rowTemplates.lockedRowIndices
+    : [];
+  if (action === 'delete' && lockedRows.includes(rowIndex)) {
+    showToast('该行受拓扑锁定保护，不可删除。', 'error');
+    return;
+  }
   try {
     let updated = record;
     let toastMsg = '';
     if (action === 'add') {
-      updated = addRowAfter(state.editor.engine, record, rowIndex);
+      const preferredClone = topoSec?.rowTemplates?.dataCloneRowIndex ?? topoSec?.rowTemplates?.kvCloneRowIndex;
+      const cloneAnchor = (lockedRows.includes(rowIndex) && preferredClone !== null && preferredClone !== undefined && preferredClone < record.rows.length)
+        ? preferredClone
+        : rowIndex;
+      updated = addRowAfter(state.editor.engine, record, cloneAnchor);
       toastMsg = '已复制行结构并完成序号自动重排序。';
     } else if (action === 'add-note') {
       updated = addNoteRowAfter(state.editor.engine, record, rowIndex, '说明：');
@@ -5124,18 +5401,73 @@ async function fetchAndSyncPresets() {
   }
 }
 
-async function inspectCurrentTemplateTopology() {
+function buildSyntheticEngineFromTopology(topology) {
+  const sections = Array.isArray(topology?.sections) ? topology.sections : [];
+  const records = sections.map((sec, sIdx) => {
+    const colWidths = Array.isArray(sec.columnWidths) && sec.columnWidths.length > 0 ? sec.columnWidths : [3500, 5500];
+    const rowMap = new Map();
+    for (const slot of sec.slots || []) {
+      const rIdx = Number(slot.rowIndex ?? 0);
+      if (!rowMap.has(rIdx)) rowMap.set(rIdx, []);
+      rowMap.get(rIdx).push(slot);
+    }
+    if (!rowMap.has(0)) {
+      rowMap.set(0, [{ rowIndex: 0, cellIndex: 0, text: sec.title || `Section ${sec.sectionNumber || sIdx + 1}`, role: 'SECTION_HEADER' }]);
+    }
+    const sortedRowIndices = Array.from(rowMap.keys()).sort((a, b) => a - b);
+    const rows = sortedRowIndices.map((rIdx) => {
+      const slotList = rowMap.get(rIdx).sort((a, b) => Number(a.cellIndex ?? 0) - Number(b.cellIndex ?? 0));
+      const cells = slotList.map((slot, cIdx) => {
+        const isHeader = rIdx === 0;
+        const isLabel = !isHeader && (slot.role === 'CHILD_LABEL' || slot.role === 'PARENT_LABEL' || cIdx === 0 && slotList.length >= 2);
+        const text = String(slot.text || '');
+        return {
+          col: Number(slot.cellIndex ?? cIdx),
+          colspan: Number(slot.gridSpan || 1),
+          rowspan: 1,
+          text,
+          labelText: isLabel ? text : '',
+          valueText: (!isHeader && !isLabel) ? text : '',
+          editable: !isHeader && !isLabel,
+          role: slot.role || (isHeader ? 'section-header' : (isLabel ? 'label' : 'value')),
+          paragraphs: [{ text, rawText: text, runs: [{ text, bold: isHeader || isLabel }] }],
+          format: { width: { value: colWidths[cIdx] || colWidths[0] || 3500 } }
+        };
+      });
+      return { index: rIdx, cells, properties: {} };
+    });
+    const secNum = Number(sec.sectionNumber || sIdx + 1);
+    const title = sec.title || `Section ${secNum}`;
+    return {
+      id: `topo_sec_${secNum}_${sIdx}`,
+      kind: 'table',
+      sectionNumber: secNum,
+      tableIndex: sec.tableIndex ?? sIdx,
+      title,
+      searchText: `${title} ${rows.flatMap((r) => r.cells.map((c) => c.text)).join(' ')}`,
+      structure: { gridWidthsTwips: colWidths, columnCount: colWidths.length },
+      rows
+    };
+  });
+  return {
+    records,
+    headerFooterData: {},
+    roleStyles: topology?.typographyProfile?.roles || null
+  };
+}
+
+async function inspectCurrentTemplateTopology(templateOverride = null) {
   try {
-    const tpl = state.matching.template || 'CN 冠志';
+    const tpl = templateOverride || state.editor.template || state.matching.template || 'CN 冠志';
     const resp = await fetch('/api/msds/templates/inspect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ templateName: tpl }),
+      body: JSON.stringify({ templateName: tpl, templateKey: tpl }),
     });
     if (resp.ok) {
       const json = await resp.json();
       if (json && json.success) {
-        state.editor.currentTopology = json.data;
+        state.editor.currentTopology = json.topology || json.data || null;
       }
     }
   } catch (err) {

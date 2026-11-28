@@ -6,7 +6,7 @@ globalThis.XMLSerializer = dom.window.XMLSerializer;
 import fs from 'fs';
 import path from 'path';
 import JSZip from 'jszip';
-import { recognizeSourceDocx } from '../src/recognition-engine.js';
+import { recognizeSourceDocx } from '../src/msds-source-semantic-adapter.js';
 
 const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 

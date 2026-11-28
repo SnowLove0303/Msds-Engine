@@ -31,7 +31,7 @@ const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, '../..');
 
 // 导入核心引擎
-const { recognizeSourceDocx } = await import('../src/recognition-engine.js');
+const { recognizeSourceDocx } = await import('../src/msds-source-semantic-adapter.js');
 const { governContext } = await import('../src/context-governor.js');
 const { executeEightDeliverablesPipeline } = await import('../src/pipeline-engine.js');
 

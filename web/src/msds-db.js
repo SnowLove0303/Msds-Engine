@@ -40,8 +40,8 @@ function initTables(db) {
       file_name TEXT NOT NULL,
       model TEXT DEFAULT '',
       language TEXT DEFAULT 'CN',
-      entity TEXT DEFAULT '冠志',
-      template_variant TEXT DEFAULT 'CN_GUANZHI',
+      entity TEXT DEFAULT '',
+      template_variant TEXT DEFAULT '',
       status TEXT DEFAULT 'PERFECT',
       matched_fields INTEGER DEFAULT 0,
       pruned_fields INTEGER DEFAULT 0,
@@ -86,6 +86,16 @@ function initTables(db) {
       ppe_hand_specs_json TEXT NOT NULL DEFAULT '{}',
       waste_disposal_specs_json TEXT NOT NULL DEFAULT '{}',
       regulatory_specs_json TEXT NOT NULL DEFAULT '{}',
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS naming_patterns (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      pattern TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      is_default INTEGER DEFAULT 0,
+      created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
 
@@ -954,4 +964,87 @@ export function getBenchmarkSpecsByCategory(categoryCodeOrKeyword = 'default') {
     regulatorySpecs: JSON.parse(row.regulatory_specs_json || '{}'),
     updatedAt: row.updated_at
   };
+}
+
+function ensureDefaultNamingPattern(db) {
+  const countRow = db.prepare('SELECT COUNT(*) AS cnt FROM naming_patterns').get();
+  if (!countRow || countRow.cnt === 0) {
+    const now = Date.now();
+    db.prepare(`
+      INSERT INTO naming_patterns (id, name, pattern, description, is_default, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 1, ?, ?)
+    `).run('default_standard', '通用标准命名', '{docId}_{lang}_{preset}', '通用占位符: {docId}, {lang}, {preset}, {date}', now, now);
+  }
+}
+
+export function listNamingPatterns() {
+  const db = getDb();
+  ensureDefaultNamingPattern(db);
+  return db.prepare('SELECT * FROM naming_patterns ORDER BY is_default DESC, updated_at DESC').all().map((r) => ({
+    id: r.id,
+    name: r.name,
+    pattern: r.pattern,
+    description: r.description || '',
+    isDefault: Boolean(r.is_default),
+    createdAt: r.created_at,
+    updatedAt: r.updated_at
+  }));
+}
+
+export function getNamingPatternById(id) {
+  const db = getDb();
+  ensureDefaultNamingPattern(db);
+  const r = db.prepare('SELECT * FROM naming_patterns WHERE id = ?').get(id);
+  if (!r) return null;
+  return {
+    id: r.id,
+    name: r.name,
+    pattern: r.pattern,
+    description: r.description || '',
+    isDefault: Boolean(r.is_default),
+    createdAt: r.created_at,
+    updatedAt: r.updated_at
+  };
+}
+
+export function saveNamingPattern({ id = null, name, pattern, description = '', isDefault = false } = {}) {
+  if (!name || !pattern) throw new Error('命名格式预设的 name 和 pattern 不能为空');
+  const db = getDb();
+  ensureDefaultNamingPattern(db);
+  const now = Date.now();
+  const targetId = id || `np_${now}_${Math.random().toString(36).slice(2, 6)}`;
+  if (isDefault) {
+    db.prepare('UPDATE naming_patterns SET is_default = 0').run();
+  }
+  const existing = db.prepare('SELECT id FROM naming_patterns WHERE id = ?').get(targetId);
+  if (existing) {
+    db.prepare(`
+      UPDATE naming_patterns SET name = ?, pattern = ?, description = ?, is_default = ?, updated_at = ?
+      WHERE id = ?
+    `).run(String(name), String(pattern), String(description || ''), isDefault ? 1 : 0, now, targetId);
+  } else {
+    db.prepare(`
+      INSERT INTO naming_patterns (id, name, pattern, description, is_default, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(targetId, String(name), String(pattern), String(description || ''), isDefault ? 1 : 0, now, now);
+  }
+  return getNamingPatternById(targetId);
+}
+
+export function setDefaultNamingPattern(id) {
+  const db = getDb();
+  ensureDefaultNamingPattern(db);
+  const existing = db.prepare('SELECT id FROM naming_patterns WHERE id = ?').get(id);
+  if (!existing) throw new Error(`未找到命名格式预设: ${id}`);
+  db.prepare('UPDATE naming_patterns SET is_default = 0').run();
+  db.prepare('UPDATE naming_patterns SET is_default = 1, updated_at = ? WHERE id = ?').run(Date.now(), id);
+  return getNamingPatternById(id);
+}
+
+export function deleteNamingPattern(id) {
+  const db = getDb();
+  ensureDefaultNamingPattern(db);
+  if (id === 'default_standard') throw new Error('系统通用默认命名预设不可删除');
+  db.prepare('DELETE FROM naming_patterns WHERE id = ?').run(id);
+  return { deleted: true, id };
 }

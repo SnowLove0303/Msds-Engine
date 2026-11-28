@@ -6,7 +6,7 @@ const dom = new JSDOM('<!doctype html><html><body></body></html>');
 globalThis.DOMParser = dom.window.DOMParser;
 globalThis.XMLSerializer = dom.window.XMLSerializer;
 
-import { recognizeSourceDocx, serializeFactsToMarkdown } from '../src/recognition-engine.js';
+import { recognizeSourceDocx, serializeFactsToMarkdown } from '../src/msds-source-semantic-adapter.js';
 
 async function main() {
   const sourceDocxPath = 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/算法训练材料/源文件材料/2-4 水溶性丙烯酸树脂 PA/PA-4914/PA-4914 msds_CN 冠志.docx';

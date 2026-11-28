@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { recognizeSourceDocx, STRUCTURE_TYPES } from '../src/recognition-engine.js';
+import { recognizeSourceDocx, STRUCTURE_TYPES } from '../src/msds-source-semantic-adapter.js';
 
 const SAMPLES = [
   // 1. 单组份水性 PU

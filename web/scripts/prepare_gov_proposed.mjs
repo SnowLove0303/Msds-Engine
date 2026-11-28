@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { recognizeSourceDocx } from '../src/recognition-engine.js';
+import { recognizeSourceDocx } from '../src/msds-source-semantic-adapter.js';
 
 // 读取当前 context-governor.js
 let code = fs.readFileSync('F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/web/src/context-governor.js', 'utf8');

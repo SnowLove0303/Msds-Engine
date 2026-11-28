@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { JSDOM } from 'jsdom';
+import { getUserTemplateById } from './user-config-db.js';
 
 const __teFilename = fileURLToPath(import.meta.url);
 const __teDirname = path.dirname(__teFilename);
@@ -41,6 +42,7 @@ import {
 import { applyGlobalTypographyProjection, bindEntityPresetToDocument } from './universal-editor-primitives.js';
 import { getPresetById, listPresets } from './msds-db.js';
 import { enforceStructuralTypographyInvariants } from './pipeline-engine.js';
+import { defaultTopologySlot } from './topology-plugin-slot.js';
 
 function resolveTemplateFile(fileName) {
   return path.join(TEMPLATES_DIR, fileName);
@@ -180,7 +182,7 @@ export function detectTemplateProfile(engine, isEnTpl = false) {
   const CJK_FONT_RE = /宋体|SimSun|微软雅黑|Microsoft YaHei|黑体|SimHei|楷体|仿宋/i;
   for (const record of engine?.records || []) {
     const secNum = record.sectionNumber;
-    if (!secNum || secNum < 1 || secNum > 16) continue;
+    if (!secNum || secNum < 1) continue;
     const tblNode = record.tableNode || record.node || record.rows?.[0]?.node?.parentNode;
     if (tblNode) {
       const tblWEl = tblNode.getElementsByTagNameNS(W_NS, 'tblPr')?.[0]?.getElementsByTagNameNS(W_NS, 'tblW')?.[0];
@@ -306,14 +308,43 @@ export function detectTemplateProfile(engine, isEnTpl = false) {
 /**
  * 检索模板拓扑结构元数据 (Inspect Template Schema)
  */
-export async function inspectTemplateSchema(templateKey = 'CN_Guanzhi') {
-  const tplInfo = TEMPLATE_LIBRARY[templateKey] || TEMPLATE_LIBRARY.CN_Guanzhi;
-  if (!fs.existsSync(tplInfo.templatePath)) {
-    throw new Error(`Template not found at ${tplInfo.templatePath}`);
+function resolveUserTemplateRecord(templateKey) {
+  if (!templateKey || typeof templateKey !== 'string') return null;
+  if (TEMPLATE_LIBRARY[templateKey] || fs.existsSync(templateKey)) return null;
+  try {
+    const rec = getUserTemplateById(templateKey, { includeBlob: true });
+    return rec && rec.docxBuffer ? rec : null;
+  } catch {
+    return null;
   }
+}
 
-  const buf = fs.readFileSync(tplInfo.templatePath);
-  const engine = await loadDocx(buf, path.basename(tplInfo.templatePath));
+export async function inspectTemplateSchema(templateKey = 'CN_Guanzhi') {
+  const userRec = resolveUserTemplateRecord(templateKey);
+  let tplInfo;
+  let buf;
+  let engine;
+
+  if (userRec) {
+    const fileName = userRec.fileName || `${userRec.name || userRec.id}.docx`;
+    const isEn = userRec.language === 'en' || /_EN|English/i.test(fileName);
+    tplInfo = {
+      key: userRec.id,
+      name: userRec.name || path.basename(fileName, '.docx'),
+      language: userRec.language || (isEn ? 'en' : 'zh'),
+      company: userRec.company || null,
+      templatePath: null
+    };
+    buf = userRec.docxBuffer;
+    engine = await loadDocx(buf, fileName);
+  } else {
+    tplInfo = TEMPLATE_LIBRARY[templateKey] || TEMPLATE_LIBRARY.CN_Guanzhi;
+    if (!fs.existsSync(tplInfo.templatePath)) {
+      throw new Error(`Template not found at ${tplInfo.templatePath}`);
+    }
+    buf = fs.readFileSync(tplInfo.templatePath);
+    engine = await loadDocx(buf, path.basename(tplInfo.templatePath));
+  }
 
   const sectionsSchema = {};
   for (const record of engine.records || []) {
@@ -415,19 +446,116 @@ export async function inspectTemplateSchema(templateKey = 'CN_Guanzhi') {
 }
 
 /**
+ * 将 9 层标准拓扑包 (MsdsEngineStandardTopology) 映射为编辑器会话画像
+ * @param {Object} topologyBundle
+ */
+export function buildEditorProfileFromTopology(topologyBundle) {
+  if (!topologyBundle || typeof topologyBundle !== 'object') return null;
+  const sections = Array.isArray(topologyBundle.sections) ? topologyBundle.sections : [];
+  const widthCounts = new Map();
+  const twoColCounts = new Map();
+  const rowTemplatesBySection = {};
+
+  for (const sec of sections) {
+    const widths = Array.isArray(sec.columnWidths) ? sec.columnWidths.filter(w => Number(w) > 0) : [];
+    const totalW = widths.reduce((a, b) => a + b, 0);
+    if (totalW > 0) widthCounts.set(totalW, (widthCounts.get(totalW) || 0) + 1);
+    if (widths.length === 2) {
+      const key = `${widths[0]}:${widths[1]}`;
+      twoColCounts.set(key, (twoColCounts.get(key) || 0) + 1);
+    }
+    if (sec.rowTemplates) {
+      rowTemplatesBySection[sec.sectionNumber] = sec.rowTemplates;
+    }
+  }
+
+  let standardTableWidthDxa = null;
+  let maxW = 0;
+  for (const [w, c] of widthCounts.entries()) {
+    if (c > maxW) {
+      maxW = c;
+      standardTableWidthDxa = w;
+    }
+  }
+
+  let standardTwoColGridDxa = null;
+  let maxTwo = 0;
+  for (const [k, c] of twoColCounts.entries()) {
+    if (c > maxTwo) {
+      maxTwo = c;
+      standardTwoColGridDxa = k.split(':').map(Number);
+    }
+  }
+
+  return {
+    geometryProfile: {
+      standardTableWidthDxa,
+      standardTwoColGridDxa,
+      sectionsCount: sections.length
+    },
+    typographyProfile: topologyBundle.typographyProfile || null,
+    docDefaults: topologyBundle.docDefaults || null,
+    pageFormat: topologyBundle.pageFormat || null,
+    headerFooterTopology: topologyBundle.headerFooterTopology || null,
+    bodyFlow: topologyBundle.bodyFlow || null,
+    rowTemplatesBySection
+  };
+}
+
+/**
  * 创建独立工作会话 (Create Isolated Work Session)
+ * 支持传入 templateKey/路径，或直接传入 topologyBundle / topologySlot / docxBuffer 驱动纯动态拓扑编辑
  */
 export async function createWorkSession(templateKeyOrOptions = 'CN_Guanzhi', workingDir = null) {
   let templateKey = templateKeyOrOptions;
   let modelCode = null;
+  let topologyBundle = null;
+  let docxBuffer = null;
+  let legacyCompat = null;
+
   if (typeof templateKeyOrOptions === 'object' && templateKeyOrOptions !== null) {
     templateKey = templateKeyOrOptions.templateKey || 'CN_Guanzhi';
     workingDir = templateKeyOrOptions.workingDir || workingDir;
     modelCode = templateKeyOrOptions.modelCode || null;
+    docxBuffer = templateKeyOrOptions.docxBuffer || null;
+    legacyCompat = templateKeyOrOptions.legacyCompat ?? null;
+    if (templateKeyOrOptions.topologyBundle) {
+      topologyBundle = templateKeyOrOptions.topologyBundle;
+    } else if (templateKeyOrOptions.topologySlot?.isMounted?.()) {
+      topologyBundle = templateKeyOrOptions.topologySlot.exportTopologyBundle();
+    } else if (templateKeyOrOptions.useMountedSlot && defaultTopologySlot.isMounted()) {
+      topologyBundle = defaultTopologySlot.exportTopologyBundle();
+    }
+  }
+
+  let userRec = null;
+  if (!docxBuffer && typeof templateKey === 'string') {
+    userRec = resolveUserTemplateRecord(templateKey);
+    if (userRec) {
+      docxBuffer = userRec.docxBuffer;
+      if (!topologyBundle && userRec.topology) {
+        topologyBundle = userRec.topology;
+      }
+    }
   }
 
   let tplInfo;
-  if (typeof templateKey === 'string' && fs.existsSync(templateKey)) {
+  if (docxBuffer) {
+    const rawName = (typeof templateKeyOrOptions === 'object' && templateKeyOrOptions?.templateName)
+      || userRec?.fileName
+      || userRec?.name
+      || 'uploaded_template.docx';
+    const isEn = userRec?.language
+      ? userRec.language === 'en'
+      : /_EN|English/i.test(rawName);
+    tplInfo = {
+      key: userRec?.id || topologyBundle?.templateKey || 'CUSTOM_TEMPLATE',
+      name: userRec?.name || path.basename(rawName, '.docx'),
+      language: isEn ? 'en' : 'zh',
+      company: (typeof templateKeyOrOptions === 'object' ? templateKeyOrOptions?.company : null) || userRec?.company || null,
+      templatePath: null
+    };
+  } else if (typeof templateKey === 'string' && fs.existsSync(templateKey)) {
     const isEn = /_EN|English/i.test(templateKey);
     tplInfo = {
       key: 'custom_path',
@@ -439,9 +567,6 @@ export async function createWorkSession(templateKeyOrOptions = 'CN_Guanzhi', wor
   } else {
     tplInfo = TEMPLATE_LIBRARY[templateKey] || TEMPLATE_LIBRARY.CN_Guanzhi;
   }
-  if (!fs.existsSync(tplInfo.templatePath)) {
-    throw new Error(`Template file not found: ${tplInfo.templatePath}`);
-  }
 
   const dir = workingDir || path.join(process.cwd(), 'temp_sessions');
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -449,30 +574,47 @@ export async function createWorkSession(templateKeyOrOptions = 'CN_Guanzhi', wor
   const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const workingFile = path.join(dir, `${sessionId}_${tplInfo.name}.docx`);
 
-  fs.copyFileSync(tplInfo.templatePath, workingFile);
-  const buf = fs.readFileSync(workingFile);
+  let buf;
+  if (docxBuffer) {
+    buf = Buffer.isBuffer(docxBuffer) ? docxBuffer : Buffer.from(docxBuffer);
+    fs.writeFileSync(workingFile, buf);
+  } else {
+    if (!fs.existsSync(tplInfo.templatePath)) {
+      throw new Error(`Template file not found: ${tplInfo.templatePath}`);
+    }
+    fs.copyFileSync(tplInfo.templatePath, workingFile);
+    buf = fs.readFileSync(workingFile);
+  }
+
   const engine = await loadDocx(buf, path.basename(workingFile));
+  const isDynamicTopology = Boolean(topologyBundle);
+  const effectiveLegacyCompat = legacyCompat !== null ? Boolean(legacyCompat) : !isDynamicTopology;
 
   const session = {
     sessionId,
     templateKey: tplInfo.key,
-    isEnglish: tplInfo.language === 'en',
+    isEnglish: topologyBundle?.typographyProfile?.isEnglish ?? (tplInfo.language === 'en'),
     company: tplInfo.company,
     workingPath: workingFile,
     workingDir: dir,
     engine,
-    templateProfile: detectTemplateProfile(engine, tplInfo.language === 'en'),
+    topology: topologyBundle,
+    isDynamicTopology,
+    legacyCompat: effectiveLegacyCompat,
+    templateProfile: isDynamicTopology
+      ? buildEditorProfileFromTopology(topologyBundle)
+      : detectTemplateProfile(engine, tplInfo.language === 'en'),
     modelCode,
     modifiedSections: new Set(),
     checkpoints: new Map()
   };
 
-  if (tplInfo.company === 'Guocai') {
+  if (effectiveLegacyCompat && tplInfo.company === 'Guocai') {
     applyCompanyPreset(session, tplInfo.language === 'en' ? 'Guocai_en' : 'Guocai_zh');
   }
 
-  // 英文底模 Section 6 错位消防标签自愈 (底模错印为 6.1 Firefighting precautions，依法规自愈为 6.1 Personal precautions)
-  if (session.isEnglish) {
+  // 英文底模 Section 6 错位消防标签自愈 (仅兼容模式启用，纯动态拓扑模式不做旧模板特判)
+  if (effectiveLegacyCompat && session.isEnglish) {
     const s6 = engine.records?.find(r => r.sectionNumber === 6);
     if (s6 && Array.isArray(s6.rows)) {
       for (const row of s6.rows) {
@@ -1001,12 +1143,19 @@ export function reshapeTableRows(session, secNum, targetRowCount) {
     return { success: true, sectionNumber: secNum, previousRowCount: currentRowCount, newRowCount: targetRowCount };
   }
 
+  const topoSec = session.topology?.sections?.find(s => s.sectionNumber === secNum);
+  const rowTpl = topoSec?.rowTemplates || session.templateProfile?.rowTemplatesBySection?.[secNum] || null;
+  const lockedSet = new Set(Array.isArray(rowTpl?.lockedRowIndices) ? rowTpl.lockedRowIndices : []);
+
   if (targetRowCount > currentRowCount) {
     const toAdd = targetRowCount - currentRowCount;
     for (let i = 0; i < toAdd; i++) {
       const currentRecord = (session.engine.records || []).find(r => r.sectionNumber === secNum);
       const insertedIdx = currentRecord.rows.length;
-      const cloneFromIdx = Math.max(1, currentRecord.rows.length - 1);
+      const preferredClone = rowTpl?.dataCloneRowIndex ?? rowTpl?.kvCloneRowIndex;
+      const cloneFromIdx = (preferredClone !== null && preferredClone !== undefined && preferredClone < currentRecord.rows.length)
+        ? preferredClone
+        : Math.max(1, currentRecord.rows.length - 1);
       cloneAndInsertRow(session.engine, currentRecord, insertedIdx, cloneFromIdx);
     }
   } else {
@@ -1014,6 +1163,7 @@ export function reshapeTableRows(session, secNum, targetRowCount) {
     for (let i = 0; i < toRemove; i++) {
       const currentRecord = (session.engine.records || []).find(r => r.sectionNumber === secNum);
       const removeIdx = currentRecord.rows.length - 1;
+      if (lockedSet.has(removeIdx)) break;
       deleteDocxRow(session.engine, currentRecord, removeIdx);
     }
   }
@@ -1719,8 +1869,8 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
 
     const tblNode = record.tableNode || record.node || record.rows?.[0]?.node?.parentNode;
 
-    // Section 11 模板残留 3 列行（c0 为空占位格/vMerge）物理清理：直接从 XML <w:tr> 移除空 c0，确保 100% 归位为标准 2 列 KV
-    if (secNum === 11 && tblNode) {
+    // Section 11 模板残留 3 列行（仅兼容模式启用，纯动态拓扑模式按模板原样保留）
+    if (session.legacyCompat !== false && secNum === 11 && tblNode) {
       const trNodes = Array.from(tblNode.getElementsByTagNameNS(W_NS, 'tr'));
       for (let rIdx = 1; rIdx < trNodes.length; rIdx++) {
         const tr = trNodes[rIdx];
@@ -1836,8 +1986,8 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
     }
     // @ANTIGRAVITY_INVARIANT_LOCK_END
 
-    // 0. 排查并补全 16 个 Section 标题序号 + 页眉/短说明防跨页撕裂 (keepNext / cantSplit)
-    if (secNum >= 1 && secNum <= 16 && record.rows[0]?.cells?.length > 0) {
+    // 0. 排查并补全任意 N 个 Section 标题序号 + 页眉/短说明防跨页撕裂 (keepNext / cantSplit)
+    if (secNum >= 1 && record.rows[0]?.cells?.length > 0) {
       for (const hCell of record.rows[0].cells) {
         const hTxt = (hCell.text || '').trim();
         if (hTxt && !new RegExp(`^${secNum}\\s*[.．、]`).test(hTxt)) {
@@ -1879,10 +2029,11 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
       }
     }
 
-    // Section 2 采用专属 5 级大纲树状层级缩进，禁止执行序号重排与 420/560 悬挂缩进覆写
-    if (secNum === 2) continue;
+    const legacyCompat = session.legacyCompat !== false;
+    // 兼容模式下 Section 2 采用专属 5 级大纲树状层级缩进，禁止执行序号重排
+    if (legacyCompat && secNum === 2) continue;
 
-    // 若章节内序号因语义锚点匹配+末尾追加而出现乱序/跳号，则自动重排为连续序号 (如 9.1..9.11)
+    // 若章节内序号因语义锚点匹配+末尾追加而出现乱序/跳号，则自动重排为连续序号
     const seqRows = [];
     for (let rIdx = 1; rIdx < record.rows.length; rIdx++) {
       const c0 = record.rows[rIdx]?.cells?.[0];
@@ -1890,9 +2041,8 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
       const sm = t.match(/^(\d+)\.(\d+)/);
       if (sm && Number(sm[1]) === secNum) seqRows.push({ rIdx, c0, sub: Number(sm[2]), rawSeq: `${sm[1]}.${sm[2]}` });
     }
-    // @FIX_TAG(2026-11-24/template-editor/FIX-S2-NO-RENUMBER): Section 2 为通栏大纲结构，保留 2.0 紧急情况概述，禁止按 KV 行序重排为 2.1 导致双 2.1
     const isSeqOrdered = seqRows.every((sr, idx) => sr.sub === idx + 1);
-    if (secNum !== 2 && seqRows.length > 0 && !isSeqOrdered) {
+    if ((!legacyCompat || secNum !== 2) && seqRows.length > 0 && !isSeqOrdered) {
       seqRows.forEach((sr, idx) => {
         const expectedSeq = `${secNum}.${idx + 1}`;
         if (sr.rawSeq !== expectedSeq && sr.c0?.node) {
@@ -1955,12 +2105,12 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
           vAlignEl.setAttributeNS(W_NS, 'w:val', 'center');
         }
 
-        if (secNum === 9 && cIdx === 0) continue;
+        if (legacyCompat && secNum === 9 && cIdx === 0) continue;
 
         const c0TextTrim = (cells[0]?.text || '').trim();
-        const isS8OelExplanationRow = secNum === 8 && /^(?:工作场所.*控制参数|Workplace\s+component\s+control\s+parameters)/i.test(c0TextTrim);
-        const isS8OelHeaderRow = secNum === 8 && cells.length >= 3 && /^(?:物质|Substance)$/i.test(c0TextTrim);
-        const isS8OelDataRow = secNum === 8 && cells.length >= 3 && !isS8OelExplanationRow && !isS8OelHeaderRow && !/^(?:8\.\d|控制参数|Control\s*parameters|暴露控制|Exposure)/i.test(c0TextTrim);
+        const isS8OelExplanationRow = legacyCompat && secNum === 8 && /^(?:工作场所.*控制参数|Workplace\s+component\s+control\s+parameters)/i.test(c0TextTrim);
+        const isS8OelHeaderRow = legacyCompat && secNum === 8 && cells.length >= 3 && /^(?:物质|Substance)$/i.test(c0TextTrim);
+        const isS8OelDataRow = legacyCompat && secNum === 8 && cells.length >= 3 && !isS8OelExplanationRow && !isS8OelHeaderRow && !/^(?:8\.\d|控制参数|Control\s*parameters|暴露控制|Exposure)/i.test(c0TextTrim);
         const isLabelCol = (cIdx === 0 && cells.length >= 2 && !isS8OelDataRow && !isS8OelExplanationRow);
         if (isS8OelExplanationRow || (isS8OelDataRow && cIdx === 0)) {
           Array.from(cell.node.getElementsByTagNameNS(W_NS, 'b')).forEach(b => b.parentNode?.removeChild(b));
@@ -2009,7 +2159,7 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
 
         // B. 编号标签单 <w:tab/> 间隔与 420/560 dxa 悬挂缩进规范化 (跳过 Section 9 已有激光垂线专职处理；覆盖 1-col 与 2-col 编号标签如 S8 8.1/8.2)
         let formattedFirstP = null;
-        if (cIdx === 0 && secNum !== 9 && !isS8OelDataRow && !isS8OelExplanationRow) {
+        if (cIdx === 0 && (!legacyCompat || secNum !== 9) && !isS8OelDataRow && !isS8OelExplanationRow) {
           const ps = Array.from(cell.node.getElementsByTagNameNS(W_NS, 'p'));
           const firstP = ps[0];
           const pText = (firstP?.textContent || '').replace(/\u00A0/g, ' ').trim();
@@ -2081,8 +2231,8 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
               });
             }
           } else if (firstP && (
-            (isLabelCol && secNum !== 3)
-            || (secNum === 8 && cells.length === 1 && !isS8OelExplanationRow && !/^\d+\.\d+/.test(rawCellText) && (/[：:]$/.test(rawCellText) || /^(?:手部防护|呼吸系统防护|眼睛防护|身体防护|建议|氟化橡胶|丁基橡胶|丁腈橡胶|Hand protection|Respiratory protection|Eye protection|Body protection|Recommendation|Fluoroelastomer|Butyl rubber|Nitrile rubber)/i.test(rawCellText)))
+            (isLabelCol && (!legacyCompat || secNum !== 3))
+            || (legacyCompat && secNum === 8 && cells.length === 1 && !isS8OelExplanationRow && !/^\d+\.\d+/.test(rawCellText) && (/[：:]$/.test(rawCellText) || /^(?:手部防护|呼吸系统防护|眼睛防护|身体防护|建议|氟化橡胶|丁基橡胶|丁腈橡胶|Hand protection|Respiratory protection|Eye protection|Body protection|Recommendation|Fluoroelastomer|Butyl rubber|Nitrile rubber)/i.test(rawCellText)))
           )) {
             // 通用未编号标签（覆盖 S1 中文名称/化学品分类/供应商信息、S8 防护子标签/手套明细、S13 处理方法等）：
             // 统一注入同基线 w:left (420/560 dxa)，物理清除 hanging/firstLine/*Chars 锯齿，实现首字与带序号标签 100% 垂直齐平
@@ -2116,8 +2266,8 @@ export function applyTopologyTypographyLock(session, typographyProfile = null) {
           // @FIX_TAG(2026-11-23/template-editor/FIX-NO-JUSTIFY-BOTH): 全篇表体段落禁用 both/distribute 两端对齐，未显式居中者统一注入 jc=left（保留 S3 3列成分表与 S8 OEL 表居中对齐，并清除居中格残留 w:ind）
           let jcEl = pPr.getElementsByTagNameNS(W_NS, 'jc')?.[0];
           const curJc = jcEl ? (jcEl.getAttributeNS(W_NS, 'val') || jcEl.getAttribute('w:val')) : null;
-          const isS3ParentRow = secNum === 3 && /^(?:3\.2[\s\t]*)?(?:成分|Ingredients)(?:\b|$)/i.test(rawCellText);
-          if (secNum === 3 && cells.length >= 3 && !isS3ParentRow) {
+          const isS3ParentRow = legacyCompat && secNum === 3 && /^(?:3\.2[\s\t]*)?(?:成分|Ingredients)(?:\b|$)/i.test(rawCellText);
+          if (legacyCompat && secNum === 3 && cells.length >= 3 && !isS3ParentRow) {
             setCellVerticalCenter(cell.node, doc);
             if (!jcEl) {
               jcEl = doc.createElementNS(W_NS, 'w:jc');

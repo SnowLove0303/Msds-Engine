@@ -77,3 +77,6 @@ user_data/
 体系交接文档/MSDS_Studio_Agent_Test_Kit/output/
 process_artifacts/
 
+
+# Dedicated User Config SQLite Database
+web/data/user_config.db*

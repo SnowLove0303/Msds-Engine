@@ -17,7 +17,7 @@ import { loadDocx } from '../src/docx-engine.js';
 import { verifySentenceCountFidelity } from '../src/sentence-translator.js';
 import { auditTranslationDualDisplay } from './audit_translation_dual_display.mjs';
 import { lintSourceGrounding } from './lint_source_grounding.mjs';
-import { recognizeSourceDocx } from '../src/recognition-engine.js';
+import { recognizeSourceDocx } from '../src/msds-source-semantic-adapter.js';
 import {
   validateCasChecksum,
   verifyChemicalCasCoherence,

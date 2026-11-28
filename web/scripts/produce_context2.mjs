@@ -12,7 +12,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { recognizeSourceDocx } from '../src/recognition-engine.js';
+import { recognizeSourceDocx } from '../src/msds-source-semantic-adapter.js';
 import { matchContext1ToTemplateTopology } from '../src/smart-matching.js';
 import { refineContext2WithSpecifications } from '../src/context-governor.js';
 
