@@ -19,9 +19,13 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const SRC_DIR = 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/web/src';
-const SCRIPTS_DIR = 'F:/App Location/Guanzhi Tong/Skill/MSDS-Engine/web/scripts';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const REPO_ROOT = path.resolve(__dirname, '../..');
+const SRC_DIR = path.join(REPO_ROOT, 'web/src');
+const SCRIPTS_DIR = path.join(REPO_ROOT, 'web/scripts');
 
 const violations = [];
 
@@ -40,7 +44,7 @@ function checkFile(filePath, rules) {
         violations.push({
           ruleId: rule.id,
           severity: rule.severity,
-          file: path.relative('F:/App Location/Guanzhi Tong/Skill/MSDS-Engine', filePath),
+          file: path.relative(REPO_ROOT, filePath),
           lineNum: i + 1,
           code: line.trim(),
           message: rule.message,
@@ -164,7 +168,7 @@ if (fs.existsSync(SRC_DIR)) {
       violations.push({
         ruleId: 'LINT-LOCK-01',
         severity: 'ERROR',
-        file: path.relative('F:/App Location/Guanzhi Tong/Skill/MSDS-Engine', fp),
+        file: path.relative(REPO_ROOT, fp),
         lineNum: 1,
         code: `START=${starts}, END=${ends}`,
         message: '源码防篡改封印标记 @ANTIGRAVITY_INVARIANT_LOCK_START 与 END 数量不成对，存在截断或破坏风险！',
@@ -173,6 +177,17 @@ if (fs.existsSync(SRC_DIR)) {
     }
   }
 }
+
+// 5. LINT-UNIVERSAL-01: 严禁在标准工作流 Runner 中硬编码特定企业预设 (冠志/国彩)
+checkFile(path.join(REPO_ROOT, '标准化流程/MSDS_Studio_Agent_Test_Kit/run_standard_production.mjs'), [
+  {
+    id: 'LINT-UNIVERSAL-01',
+    severity: 'ERROR',
+    pattern: /presetKey\s*:\s*['"](?:CN|EN)_(?:Guanzhi|Guocai)['"]/,
+    message: '严禁在标准工作流 Runner 中硬编码特定企业预设！必须通过 resolveDynamicTargets 从外部预设注册表动态读取。',
+    remediation: '使用 resolveDynamicTargets 读取 presets/company_presets.json 或 CLI 参数。'
+  }
+]);
 
 // 输出 Lint 结果
 console.log(`扫描完成。发现违规项: ${violations.length} 项\n`);

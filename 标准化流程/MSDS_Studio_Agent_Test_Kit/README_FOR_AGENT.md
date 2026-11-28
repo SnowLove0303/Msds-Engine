@@ -6,6 +6,8 @@
 
 ---
 
+> **核心愿景与通用性准则**：不论源 MSDS 原来长什么样，手脚层（`run_standard_production.mjs` + 编辑器原语 + 机械门禁）赋能 Agent 将其内容结构化、标准化。**严禁硬编码或情景化**：工作流不强制绑定任何特定企业预设（可通过 `--presets` / `--languages` / `--formats` / `--noPreset` 动态指定）。
+
 ## 🚨【最高法定红线与系统只读高压线】(Supreme Redline)
 
 > [!CAUTION]

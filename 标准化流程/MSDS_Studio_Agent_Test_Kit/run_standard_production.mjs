@@ -20,8 +20,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execSync, spawnSync } from 'node:child_process';
-import { JSDOM } from 'jsdom';
-const { default: JSZip } = await import('../../node_modules/jszip/lib/index.js');
+const { JSDOM } = await import('jsdom').catch(() => import('../../web/node_modules/jsdom/lib/api.js'));
+const { default: JSZip } = await import('jszip')
+  .catch(() => import('../../node_modules/jszip/lib/index.js'))
+  .catch(() => import('../../web/node_modules/jszip/lib/index.js'));
 
 const dom = new JSDOM('<!doctype html><html><body></body></html>');
 globalThis.DOMParser = dom.window.DOMParser;
@@ -72,6 +74,8 @@ const {
   auditPhase5DocxFiles,
   auditPhase6PdfFiles
 } = await import('../../web/src/staged-mechanical-audit.js');
+const { formatVisionBanner } = await import('../../web/src/system-vision.js');
+const { resolveDynamicTargets } = await import('../../web/src/target-matrix-resolver.js');
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -89,6 +93,11 @@ function parseArgs() {
     allowDirty: false,
     skipAudit: false,
     legacyAudit: false,
+    presets: null,
+    templates: null,
+    languages: null,
+    formats: 'docx,pdf',
+    noPreset: false,
     help: false
   };
 
@@ -107,6 +116,11 @@ function parseArgs() {
     else if (arg === '--allowDirty') options.allowDirty = true;
     else if (arg === '--skipAudit') options.skipAudit = true;
     else if (arg === '--legacyAudit') options.legacyAudit = true;
+    else if (arg === '--noPreset') options.noPreset = true;
+    else if (arg.startsWith('--presets=')) options.presets = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--templates=')) options.templates = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--languages=')) options.languages = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
+    else if (arg.startsWith('--formats=')) options.formats = arg.split('=', 2)[1].replace(/^["']|["']$/g, '');
     else if (!options.source && !arg.startsWith('--')) options.source = arg.replace(/^["']|["']$/g, '');
   }
 
@@ -176,19 +190,26 @@ function enforceMechanicalGate(stageName, auditResult, skipBlock = false) {
 async function main() {
   const options = parseArgs();
   if (options.help) {
+    console.log(formatVisionBanner());
     console.log(`
 MSDS-Studio 官方标准七步流水线 Runner
 用法:
   node run_standard_production.mjs [选项]
 
 选项:
-  --source=<路径>      源文件路径 (默认: ./source/ 下第一个 docx)
-  --model=<型号>       产品型号代码 (如 PA-3655，默认自动从源文件解析)
-  --targetDir=<路径>   交付物输出目录 (默认: ./output/<型号>/)
-  --skipAudit         跳过终审 (不推荐，默认执行法医级审计)
+  --source=<路径>        源文件路径 (默认: ./source/ 下第一个 docx)
+  --model=<型号>         产品型号代码 (默认自动从源文件解析)
+  --targetDir=<路径>     交付物输出目录 (默认: ./output/<型号>/)
+  --presets=<列表>       指定企业预设键名 (逗号分隔，默认从 presets/company_presets.json 动态读取)
+  --templates=<列表>     指定模板键名 (逗号分隔，可选)
+  --languages=<zh,en>    指定输出语种 (默认: zh,en)
+  --formats=<docx,pdf>   指定导出格式 (默认: docx,pdf)
+  --noPreset             不绑定任何企业预设，仅做纯模板/源文件标准化导出
+  --skipAudit            跳过终审 (不推荐，默认执行法医级审计)
 `);
     process.exit(0);
   }
+  console.log(formatVisionBanner());
 
   // 1. 解析源文件路径
   let sourcePath = options.source;
@@ -405,12 +426,19 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
   }
   console.log(`>>> [Phase 4, 5, 6/7] 基于 Context 2 执行拓扑匹配 (${options.enableContentMapping ? 'TOPOLOGY+MAPPING' : 'PURE_TOPOLOGY_SOURCE_INHERITED'}) 与 WPS PDF 转译...`);
   const t3 = Date.now();
-  const targets = [
-    { templateKey: 'CN_Guanzhi', presetKey: 'CN_Guanzhi', fileName: `${modelCode} msds_CN 冠志.docx` },
-    { templateKey: 'CN_Guocai', presetKey: 'CN_Guocai', fileName: `${modelCode} msds_CN 国彩.docx` },
-    { templateKey: 'EN_Guanzhi', presetKey: 'EN_Guanzhi', fileName: `${modelCode} msds_EN Guanzhi.docx` },
-    { templateKey: 'EN_Guocai', presetKey: 'EN_Guocai', fileName: `${modelCode} msds_EN Guocai.docx` }
-  ];
+  const presetsJsonPath = path.resolve(__dirname, 'presets/company_presets.json');
+  const { targets, formats } = resolveDynamicTargets({
+    modelCode,
+    presetsPath: presetsJsonPath,
+    presetsArg: options.presets,
+    templatesArg: options.templates,
+    languagesArg: options.languages,
+    formatsArg: options.formats,
+    noPreset: options.noPreset
+  });
+  if (targets.length === 0) {
+    throw new Error('[TARGET_MATRIX_EMPTY] 未解析到任何有效交付目标，请检查 --presets / --languages 或 presets/company_presets.json！');
+  }
 
   const docxItemsForPdf = [];
   for (const tgt of targets) {
@@ -445,7 +473,7 @@ function verifyReadonlyEngineGuard(targetDir, allowDirty = false) {
     console.log(`    ✓ 生成 DOCX: ${tgt.fileName} (${compiled.mode}, ${compiled.stats.totalOps} ops)`);
   }
 
-  const pdfResults = await convertBatchDocxToPdf(docxItemsForPdf);
+  const pdfResults = formats.includes('pdf') ? await convertBatchDocxToPdf(docxItemsForPdf) : [];
   for (const pRes of pdfResults) {
     const outPdfPath = path.join(targetDir, pRes.pdfName || pRes.fileName.replace(/\.docx$/i, '.pdf'));
     fs.writeFileSync(outPdfPath, pRes.pdfBuffer);
