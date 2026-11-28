@@ -5,7 +5,7 @@ import path from 'node:path';
 import JSZip from 'jszip';
 import { JSDOM } from 'jsdom';
 import { recognizeTemplateTopology, buildTemplateProfile } from '../src/template-topology-recognizer.js';
-import { createWorkSession, saveSession, applyAdaptiveRuler, writeCellValueToSession } from '../src/template-editor.js';
+import { createWorkSession, saveSession, applyAdaptiveRuler, writeCellValueToSession, applyRoleStylePrototype } from '../src/template-editor.js';
 import { applyGlobalTypographyProjection } from '../src/universal-editor-primitives.js';
 import { auditPhase1Context1, auditPhase5DocxFiles } from '../src/staged-mechanical-audit.js';
 import { SYSTEM_VISION_CORE } from '../src/system-vision.js';
@@ -42,8 +42,12 @@ async function buildCustom6SectionTemplateDocx(filePath) {
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'msds-zero-hc-'));
 try {
-  // 1. 验证愿景核心文案包含“拓扑即参数”
+  // 1. 验证愿景核心文案包含“拓扑即参数”，且 template-topology-recognizer.js 零内容硬编码
   assert.ok(SYSTEM_VISION_CORE.universalityPrinciples.some(p => p.includes('拓扑即参数')));
+  const recognizerSrc = fs.readFileSync(new URL('../src/template-topology-recognizer.js', import.meta.url), 'utf8');
+  assert.ok(!recognizerSrc.includes('SEMANTIC_KEY_MAP'), '拓扑识别层严禁包含模板内容词典 SEMANTIC_KEY_MAP');
+  assert.ok(!recognizerSrc.includes('STANDARD_TEMPLATES'), '拓扑识别层严禁写死 STANDARD_TEMPLATES');
+  assert.ok(!/冠志|国彩/.test(recognizerSrc), '拓扑识别层严禁包含任何特定企业用户数据');
 
   // 2. 构建完全异构的 6 章节模板 (Calibri 10pt, 360/720 dxa, 第 4 节为通栏大纲)
   const tplPath = path.join(tmpDir, 'custom_6sec_EN.docx');
@@ -58,10 +62,16 @@ try {
   assert.deepEqual(profile.typographyProfile.tabStops, { tierA: 360, tierB: 720 });
   console.log('✅ PASS: 拓扑识别成功从异构模板提取 6 章节、Calibri 10pt 与 360/720 dxa 参数');
 
-  // 3. 参数化编辑器按提取出的 profile 渲染（不强加 420/560 dxa 或 宋体/Arial）
+  // 3. 参数化编辑器按提取出的 profile 与 stylePrototypes 复用渲染
   const session = await createWorkSession({ templateKey: tplPath, workingDir: tmpDir, modelCode: 'ACME-6' });
-  session.templateProfile = { ...session.templateProfile, typographyProfile: profile.typographyProfile };
+  session.templateProfile = {
+    ...session.templateProfile,
+    typographyProfile: profile.typographyProfile,
+    stylePrototypes: profile.stylePrototypes
+  };
   writeCellValueToSession(session, { sectionNumber: 1, rowIndex: 1, cellIndex: 1, text: 'ACME-6' });
+  const protoApplied = applyRoleStylePrototype(session, { sectionNumber: 1, rowIndex: 1, cellIndex: 1, role: 'VALUE' });
+  assert.equal(protoApplied.applied, true, '编辑器应成功复用模板提取的 VALUE 样式原型');
   applyAdaptiveRuler(session, 1);
   applyAdaptiveRuler(session, 3);
   applyGlobalTypographyProjection(session.engine, true, profile.typographyProfile);

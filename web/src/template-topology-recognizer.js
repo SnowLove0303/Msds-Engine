@@ -21,94 +21,96 @@ const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const R_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 
 /**
- * 从单元格文本推断标准化 Slot Key
+ * 纯结构化 Slot 标识生成（不依赖任何模板文本内容映射）
  */
-export function inferSlotKeyFromLabel(labelText, sectionNumber, rowIndex, cellIndex) {
-  const clean = (labelText || '').replace(/[\s\t:：\.\(\)（）_]/g, '').toLowerCase();
-
-  // 常见槽位语义映射
-  const SEMANTIC_KEY_MAP = {
-    '产品名称': 'product_name',
-    'productname': 'product_name',
-    '中文名称': 'product_chinese_name',
-    '产品型号': 'model_code',
-    'modelcode': 'model_code',
-    '推荐用途': 'recommended_use',
-    'recommendeduse': 'recommended_use',
-    '制造商供应商名称': 'company_name',
-    'manufacturersupplier': 'company_name',
-    '供应商名称': 'company_name',
-    '应急咨询电话': 'emergency_phone',
-    'emergencytelephone': 'emergency_phone',
-    '应急电话': 'emergency_phone',
-    '产品类型': 'chemical_nature',
-    'producttype': 'chemical_nature',
-    '成分': 'ingredients_header',
-    '化学品名称': 'chemical_name_header',
-    'cas编号': 'cas_no_header',
-    'casno': 'cas_no_header',
-    '含量': 'concentration_header',
-    'concentration': 'concentration_header',
-    '外观': 'appearance',
-    'appearance': 'appearance',
-    'ph值': 'ph_value',
-    'ph': 'ph_value',
-    '熔点凝固点': 'melting_point',
-    '初沸点和沸程': 'boiling_point',
-    '闪点': 'flash_point',
-    '相对密度': 'relative_density',
-    '溶解性': 'solubility',
-    '黏度': 'viscosity',
-    '粘度': 'viscosity',
-    '固含量': 'solid_content',
-    '离子性': 'ionic_charge',
-    '联合国编号': 'un_number',
-    'unnumber': 'un_number',
-    '联合国运输名称': 'shipping_name',
-    '运输危险类别': 'transport_hazard_class',
-    '包装类别': 'packing_group',
-    'packinggroup': 'packing_group',
-    '海洋污染物': 'marine_pollutant'
-  };
-
-  for (const [pattern, key] of Object.entries(SEMANTIC_KEY_MAP)) {
-    if (clean.includes(pattern)) return key;
-  }
-
+export function buildStructuralSlotKey(sectionNumber, rowIndex, cellIndex) {
   return `sec${sectionNumber}_r${rowIndex}_c${cellIndex}`;
 }
 
 /**
- * 推断单元格在母版中的语义角色
+ * 从单元格 OOXML 节点提取完整样式原型 (Style Prototype)，用于下游编辑器 1:1 样式复用
  */
-export function inferCellSemanticRole(cellNode, rowIndex, cellIndex, totalRows, totalCols, sectionNumber) {
-  const text = (cellNode.textContent || '').trim();
+export function extractCellStylePrototype(tcNode, trNode = null) {
+  if (!tcNode) return null;
+  const trPr = trNode?.getElementsByTagNameNS(W_NS, 'trPr')?.[0];
+  const trHeightNode = trPr?.getElementsByTagNameNS(W_NS, 'trHeight')?.[0];
+  const rowHeightDxa = trHeightNode ? Number(trHeightNode.getAttributeNS(W_NS, 'val') || trHeightNode.getAttribute('w:val')) || null : null;
 
-  // 首行且跨通栏或包含章节名 -> SECTION_HEADER
+  const tcPr = tcNode.getElementsByTagNameNS(W_NS, 'tcPr')?.[0];
+  const tcWNode = tcPr?.getElementsByTagNameNS(W_NS, 'tcW')?.[0];
+  const widthTwips = tcWNode ? Number(tcWNode.getAttributeNS(W_NS, 'w') || tcWNode.getAttribute('w:w')) || null : null;
+  const gridSpanNode = tcPr?.getElementsByTagNameNS(W_NS, 'gridSpan')?.[0];
+  const gridSpan = Number(gridSpanNode?.getAttributeNS(W_NS, 'val') || gridSpanNode?.getAttribute('w:val') || 1);
+  const vAlignNode = tcPr?.getElementsByTagNameNS(W_NS, 'vAlign')?.[0];
+  const vAlign = vAlignNode?.getAttributeNS(W_NS, 'val') || vAlignNode?.getAttribute('w:val') || null;
+  const shdNode = tcPr?.getElementsByTagNameNS(W_NS, 'shd')?.[0];
+  const shadingFill = shdNode?.getAttributeNS(W_NS, 'fill') || shdNode?.getAttribute('w:fill') || null;
+
+  const pNode = tcNode.getElementsByTagNameNS(W_NS, 'p')?.[0];
+  const pPr = pNode?.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
+  const jcNode = pPr?.getElementsByTagNameNS(W_NS, 'jc')?.[0];
+  const align = jcNode?.getAttributeNS(W_NS, 'val') || jcNode?.getAttribute('w:val') || null;
+  const indNode = pPr?.getElementsByTagNameNS(W_NS, 'ind')?.[0];
+  const indentLeft = indNode ? Number(indNode.getAttributeNS(W_NS, 'left') || indNode.getAttribute('w:left')) || 0 : 0;
+  const indentHanging = indNode ? Number(indNode.getAttributeNS(W_NS, 'hanging') || indNode.getAttribute('w:hanging')) || 0 : 0;
+  const spacingNode = pPr?.getElementsByTagNameNS(W_NS, 'spacing')?.[0];
+  const lineSpacing = spacingNode ? Number(spacingNode.getAttributeNS(W_NS, 'line') || spacingNode.getAttribute('w:line')) || null : null;
+
+  const rNode = pNode?.getElementsByTagNameNS(W_NS, 'r')?.[0];
+  const rPr = rNode?.getElementsByTagNameNS(W_NS, 'rPr')?.[0] || pPr?.getElementsByTagNameNS(W_NS, 'rPr')?.[0];
+  const rFonts = rPr?.getElementsByTagNameNS(W_NS, 'rFonts')?.[0];
+  const font = rFonts?.getAttributeNS(W_NS, 'eastAsia') || rFonts?.getAttribute('w:eastAsia') || rFonts?.getAttributeNS(W_NS, 'ascii') || rFonts?.getAttribute('w:ascii') || null;
+  const asciiFont = rFonts?.getAttributeNS(W_NS, 'ascii') || rFonts?.getAttribute('w:ascii') || font || null;
+  const szNode = rPr?.getElementsByTagNameNS(W_NS, 'sz')?.[0];
+  const sz = szNode?.getAttributeNS(W_NS, 'val') || szNode?.getAttribute('w:val') || null;
+  const bNodes = rPr?.getElementsByTagNameNS(W_NS, 'b');
+  const bold = Boolean(bNodes && bNodes.length > 0 && bNodes[0].getAttributeNS(W_NS, 'val') !== '0' && bNodes[0].getAttribute('w:val') !== '0');
+  const colorNode = rPr?.getElementsByTagNameNS(W_NS, 'color')?.[0];
+  const color = colorNode?.getAttributeNS(W_NS, 'val') || colorNode?.getAttribute('w:val') || null;
+
+  return {
+    rowHeightDxa,
+    widthTwips,
+    gridSpan,
+    vAlign,
+    shadingFill,
+    align,
+    indentLeft,
+    indentHanging,
+    lineSpacing,
+    font,
+    asciiFont,
+    sz,
+    bold,
+    color
+  };
+}
+
+/**
+ * 纯结构/视觉特征推断单元格语义角色（不依赖任何特定行业词表或固定章节号）
+ */
+export function inferCellSemanticRole(cellNode, rowIndex, cellIndex, totalRows, totalCols, _sectionNumber, styleProto = null) {
   if (rowIndex === 0) return 'SECTION_HEADER';
 
-  // Section 3 成分表表头 -> TABLE_HEADER
-  if (sectionNumber === 3 && (text.includes('CAS') || text.includes('化学品名称') || text.includes('Chemical name'))) {
-    return 'TABLE_HEADER';
-  }
-
-  // 单列通栏行 -> EXPLANATION
   if (totalCols === 1) return 'EXPLANATION';
 
-  // 双列网格
   if (totalCols === 2) {
     if (cellIndex === 0) {
-      if (text.endsWith('：') || text.endsWith(':') || /^\d+\.\d+/.test(text)) {
+      const text = (cellNode.textContent || '').trim();
+      const isBold = Boolean(styleProto?.bold);
+      if (/^\d+\.\d+/.test(text) || /[：:]$/.test(text)) {
         return 'CHILD_LABEL';
       }
-      return 'PARENT_LABEL';
+      return isBold ? 'PARENT_LABEL' : 'CHILD_LABEL';
     }
     return 'VALUE';
   }
 
-  // 多列数据行
   if (totalCols >= 3) {
-    return 'VALUE';
+    if (rowIndex === 1 && styleProto?.bold) {
+      return 'TABLE_HEADER';
+    }
+    return 'DATA_ROW';
   }
 
   return 'VALUE';
@@ -509,20 +511,9 @@ export async function recognizeFooterTopology(zip, doc, parser = new DOMParser()
   };
 }
 
-const STANDARD_TEMPLATES = {
-  'CN_Guanzhi': 'web/public/templates/正式模板_MSDS_CN_冠志(1).docx',
-  'CN_Guocai': 'web/public/templates/正式模板_MSDS_CN_冠志(1).docx',
-  'EN_Guanzhi': 'web/public/templates/正式模板_MSDS_EN_冠志(1).docx',
-  'EN_Guocai': 'web/public/templates/正式模板_MSDS_EN_冠志(1).docx'
-};
-
 /**
- * 动态识别 DOCX 母版几何与语义拓扑蓝图
- * 包含通用页面格式 (pageFormat)、页脚插槽 (footerTopology) 及 16 章节表格几何
- * 
- * @param {Buffer|string} templateSource - 母版 DOCX Buffer 或文件物理路径
- * @param {Object} [options={}] - 配置项
- * @returns {Promise<Object>} 模板动态拓扑蓝图 (Template Topology Blueprint)
+ * 动态识别 DOCX 母版结构与样式拓扑蓝图（零用户数据硬编码）
+ * 仅提取页面几何 (pageFormat)、排版样式原型 (typographyProfile / stylePrototypes)、页脚插槽 (footerTopology) 与各章节表格结构。
  */
 export async function recognizeTemplateTopology(templateSource, options = {}) {
   let docxBuffer = null;
@@ -531,24 +522,18 @@ export async function recognizeTemplateTopology(templateSource, options = {}) {
   if (Buffer.isBuffer(templateSource)) {
     docxBuffer = templateSource;
   } else if (typeof templateSource === 'string') {
-    let resolvedPath = path.resolve(templateSource);
-    if (!fs.existsSync(resolvedPath)) {
-      resolvedPath = path.resolve(REPO_ROOT, templateSource);
-      if (!fs.existsSync(resolvedPath)) {
-        if (STANDARD_TEMPLATES[templateSource]) {
-          resolvedPath = path.resolve(REPO_ROOT, STANDARD_TEMPLATES[templateSource]);
-          templateKey = templateSource;
-        } else {
-          resolvedPath = path.resolve(REPO_ROOT, 'web/public/templates', `${templateSource}.docx`);
-          templateKey = path.basename(resolvedPath, '.docx');
-        }
-      }
-    }
-    if (!fs.existsSync(resolvedPath)) {
+    const candidates = [
+      path.resolve(templateSource),
+      path.resolve(REPO_ROOT, templateSource),
+      path.resolve(REPO_ROOT, 'web/public/templates', templateSource),
+      path.resolve(REPO_ROOT, 'web/public/templates', `${templateSource}.docx`)
+    ];
+    const resolvedPath = candidates.find(p => fs.existsSync(p) && fs.statSync(p).isFile());
+    if (!resolvedPath) {
       throw new Error(`[TEMPLATE-RECOGNIZER FATAL] 找不到指定的母版文件: ${templateSource}`);
     }
     docxBuffer = fs.readFileSync(resolvedPath);
-    if (!options.templateKey && !STANDARD_TEMPLATES[templateSource]) {
+    if (!options.templateKey) {
       templateKey = path.basename(resolvedPath, '.docx');
     }
   } else {
@@ -569,9 +554,10 @@ export async function recognizeTemplateTopology(templateSource, options = {}) {
   // 3. 识别通用页脚拓扑几何与插槽 (Footer Topology)
   const footerTopology = await recognizeFooterTopology(zip, doc, parser);
 
-  // 4. 动态发现所有章节表格并建立拓扑（不再写死 1..16）
+  // 4. 动态发现所有章节表格并建立纯结构拓扑与样式原型库（禁止写入任何模板内容映射）
   const tblNodes = Array.from(doc.getElementsByTagNameNS(W_NS, 'tbl'));
   const sectionsTopology = [];
+  const stylePrototypes = {};
 
   const extractSectionNumber = (titleText, fallbackNum) => {
     const m = String(titleText || '').trim().match(/^\s*(?:第\s*(\d+)\s*部分|Section\s*(\d+)\b|(\d+)\s*[.、:：\s])/i);
@@ -602,46 +588,28 @@ export async function recognizeTemplateTopology(templateSource, options = {}) {
     trNodes.forEach((tr, rIdx) => {
       const tcNodes = Array.from(tr.getElementsByTagNameNS(W_NS, 'tc'));
       const cellsInRow = [];
-      let rowLabelKey = null;
-
-      // 如果是双列行，先看第 0 列推断本行的语义 key
-      if (tcNodes.length === 2) {
-        const c0Text = (tcNodes[0].textContent || '').replace(/\s+/g, ' ').trim();
-        rowLabelKey = inferSlotKeyFromLabel(c0Text, sNum, rIdx, 0);
-      }
 
       tcNodes.forEach((tc, cIdx) => {
-        const tcPr = tc.getElementsByTagNameNS(W_NS, 'tcPr')?.[0];
-        const tcW = tcPr?.getElementsByTagNameNS(W_NS, 'tcW')?.[0]?.getAttributeNS(W_NS, 'w');
-        const gridSpan = parseInt(tcPr?.getElementsByTagNameNS(W_NS, 'gridSpan')?.[0]?.getAttributeNS(W_NS, 'val') || '1', 10);
-        const text = (tc.textContent || '').replace(/\s+/g, ' ').trim();
-
-        if (rIdx === 1 && tcW) {
-          columnWidthsSet.push(parseInt(tcW, 10));
+        const styleProto = extractCellStylePrototype(tc, tr);
+        if (rIdx === 1 && styleProto?.widthTwips) {
+          columnWidthsSet.push(styleProto.widthTwips);
         }
 
-        const role = inferCellSemanticRole(tc, rIdx, cIdx, trNodes.length, tcNodes.length, sNum);
-        let slotKey = inferSlotKeyFromLabel(text, sNum, rIdx, cIdx);
-
-        // 双列网格下，值格继承标签格推导出的语义 slotKey
-        if (tcNodes.length === 2 && rowLabelKey && !rowLabelKey.startsWith('sec')) {
-          if (cIdx === 0) {
-            slotKey = `${rowLabelKey}_label`;
-          } else if (cIdx === 1) {
-            slotKey = rowLabelKey;
-          }
+        const role = inferCellSemanticRole(tc, rIdx, cIdx, trNodes.length, tcNodes.length, sNum, styleProto);
+        if (role && styleProto && !stylePrototypes[role]) {
+          stylePrototypes[role] = styleProto;
         }
 
         const slot = {
-          slotKey,
+          slotKey: buildStructuralSlotKey(sNum, rIdx, cIdx),
           sectionNumber: sNum,
           rowIndex: rIdx,
           cellIndex: cIdx,
-          gridSpan,
-          widthTwips: tcW ? parseInt(tcW, 10) : null,
+          gridSpan: styleProto?.gridSpan || 1,
+          widthTwips: styleProto?.widthTwips || null,
           role,
-          templateText: text,
-          isEditable: role === 'VALUE' || (role === 'EXPLANATION' && rIdx > 0)
+          styleProto,
+          isEditable: role === 'VALUE' || role === 'DATA_ROW' || (role === 'EXPLANATION' && rIdx > 0)
         };
 
         cellsInRow.push(slot);
@@ -697,6 +665,7 @@ export async function recognizeTemplateTopology(templateSource, options = {}) {
     isTopologyDynamic: true,
     pageFormat,
     typographyProfile,
+    stylePrototypes,
     footerTopology,
     sectionsCount: sectionsTopology.filter(s => s.found).length,
     sections: sectionsTopology
@@ -712,6 +681,7 @@ export function buildTemplateProfile(blueprint) {
     sectionsCount: blueprint.sectionsCount,
     pageFormat: blueprint.pageFormat,
     typographyProfile: blueprint.typographyProfile || null,
+    stylePrototypes: blueprint.stylePrototypes || {},
     footerTopology: blueprint.footerTopology,
     sections: (blueprint.sections || []).map(sec => ({
       sectionNumber: sec.sectionNumber,

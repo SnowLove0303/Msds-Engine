@@ -1180,8 +1180,78 @@ export function mergeCells(session, secNum, rowIdx, fromCol, toCol) {
 }
 
 /**
+ * 将拓扑识别层提取的语义角色样式原型 (stylePrototype) 精准复用至目标单元格
+ */
+export function applyRoleStylePrototype(session, { sectionNumber, rowIndex, cellIndex, role }) {
+  const proto = session?.templateProfile?.stylePrototypes?.[role];
+  if (!proto) return { applied: false, reason: `No stylePrototype for role ${role}` };
+  const record = (session.engine?.records || []).find(r => r.sectionNumber === sectionNumber);
+  const cell = record?.rows?.[rowIndex]?.cells?.[cellIndex];
+  if (!cell?.node) return { applied: false, reason: 'Target cell not found' };
+
+  const doc = session.engine.documentXml;
+  const p = cell.node.getElementsByTagNameNS(W_NS, 'p')?.[0];
+  if (p) {
+    let pPr = p.getElementsByTagNameNS(W_NS, 'pPr')?.[0];
+    if (!pPr) {
+      pPr = doc.createElementNS(W_NS, 'w:pPr');
+      p.insertBefore(pPr, p.firstChild);
+    }
+    if (proto.align) {
+      let jc = pPr.getElementsByTagNameNS(W_NS, 'jc')?.[0];
+      if (!jc) {
+        jc = doc.createElementNS(W_NS, 'w:jc');
+        pPr.appendChild(jc);
+      }
+      jc.setAttributeNS(W_NS, 'w:val', proto.align);
+    }
+    if (proto.indentLeft > 0 || proto.indentHanging > 0) {
+      let ind = pPr.getElementsByTagNameNS(W_NS, 'ind')?.[0];
+      if (!ind) {
+        ind = doc.createElementNS(W_NS, 'w:ind');
+        pPr.appendChild(ind);
+      }
+      ind.setAttributeNS(W_NS, 'w:left', String(proto.indentLeft || 0));
+      if (proto.indentHanging > 0) ind.setAttributeNS(W_NS, 'w:hanging', String(proto.indentHanging));
+    }
+    const runs = Array.from(p.getElementsByTagNameNS(W_NS, 'r'));
+    for (const r of runs) {
+      let rPr = r.getElementsByTagNameNS(W_NS, 'rPr')?.[0];
+      if (!rPr) {
+        rPr = doc.createElementNS(W_NS, 'w:rPr');
+        r.insertBefore(rPr, r.firstChild);
+      }
+      if (proto.font || proto.asciiFont) {
+        let rFonts = rPr.getElementsByTagNameNS(W_NS, 'rFonts')?.[0];
+        if (!rFonts) {
+          rFonts = doc.createElementNS(W_NS, 'w:rFonts');
+          rPr.appendChild(rFonts);
+        }
+        if (proto.font) rFonts.setAttributeNS(W_NS, 'w:eastAsia', proto.font);
+        if (proto.asciiFont) rFonts.setAttributeNS(W_NS, 'w:ascii', proto.asciiFont);
+      }
+      if (proto.sz) {
+        let sz = rPr.getElementsByTagNameNS(W_NS, 'sz')?.[0];
+        if (!sz) {
+          sz = doc.createElementNS(W_NS, 'w:sz');
+          rPr.appendChild(sz);
+        }
+        sz.setAttributeNS(W_NS, 'w:val', String(proto.sz));
+      }
+      const existingB = rPr.getElementsByTagNameNS(W_NS, 'b')?.[0];
+      if (proto.bold && !existingB) {
+        rPr.appendChild(doc.createElementNS(W_NS, 'w:b'));
+      } else if (!proto.bold && existingB) {
+        rPr.removeChild(existingB);
+      }
+    }
+  }
+  return { applied: true, role };
+}
+
+/**
  * 自适应排版标尺自检与注入 (Adaptive Ruler)
- * 探测章节最大序号位数：<=3 位为 Tier A (420 dxa)，>=4 位升级为 Tier B (560 dxa)
+ * 探测章节最大序号位数，按模板拓扑提取的 tierA / tierB 动态注入
  */
 export function applyAdaptiveRuler(session, secNum) {
   const record = (session.engine.records || []).find(r => r.sectionNumber === secNum);
